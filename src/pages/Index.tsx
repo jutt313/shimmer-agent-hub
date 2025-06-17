@@ -49,29 +49,29 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6 relative overflow-hidden">
+    <div className="h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6 relative overflow-hidden">
       {/* Background glow effects */}
       <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-blue-300/20 to-purple-300/20 rounded-full blur-3xl animate-pulse"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-r from-purple-300/20 to-blue-300/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
       
-      <div className="max-w-4xl mx-auto h-screen flex flex-col relative z-10">
-        {/* Main Chat Card */}
-        <div className="flex-1 flex items-center justify-center mb-8">
+      <div className="max-w-6xl mx-auto h-full flex flex-col relative z-10">
+        {/* Main Chat Card - Made much larger */}
+        <div className="flex-1 flex items-center justify-center mb-6">
           <ChatCard messages={messages} />
         </div>
         
         {/* Input Section */}
         <div className="space-y-4">
           <div className="flex gap-4 items-end">
-            {/* AI Agent Button */}
+            {/* AI Agent Button - More rounded */}
             <Button
               onClick={() => setShowAgentForm(true)}
-              className="rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
+              className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-4 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
               style={{
                 boxShadow: '0 0 30px rgba(92, 142, 246, 0.3)'
               }}
             >
-              <Bot className="w-5 h-5" />
+              <Bot className="w-6 h-6" />
             </Button>
             
             {/* Message Input */}
@@ -81,22 +81,22 @@ const Index = () => {
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Type your message here..."
-                className="rounded-2xl bg-white/80 backdrop-blur-sm border-0 px-6 py-4 text-lg focus:outline-none focus:ring-0 shadow-lg"
+                className="rounded-3xl bg-white/80 backdrop-blur-sm border-0 px-6 py-4 text-lg focus:outline-none focus:ring-0 shadow-lg"
                 style={{
                   boxShadow: '0 0 25px rgba(154, 94, 255, 0.2)'
                 }}
               />
             </div>
             
-            {/* Send Button */}
+            {/* Send Button - More rounded */}
             <Button
               onClick={handleSendMessage}
-              className="rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
+              className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-4 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
               style={{
                 boxShadow: '0 0 30px rgba(92, 142, 246, 0.3)'
               }}
             >
-              <Send className="w-5 h-5" />
+              <Send className="w-6 h-6" />
             </Button>
           </div>
         </div>

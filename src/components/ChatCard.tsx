@@ -15,7 +15,7 @@ interface ChatCardProps {
 const ChatCard = ({ messages }: ChatCardProps) => {
   return (
     <div 
-      className="w-full max-w-3xl h-96 bg-white/70 backdrop-blur-md rounded-3xl p-6 shadow-2xl border-0 relative"
+      className="w-full max-w-5xl h-[70vh] bg-white/70 backdrop-blur-md rounded-3xl p-8 shadow-2xl border-0 relative"
       style={{
         boxShadow: '0 0 50px rgba(92, 142, 246, 0.2), 0 0 100px rgba(154, 94, 255, 0.1)'
       }}

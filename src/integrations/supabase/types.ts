@@ -9,7 +9,236 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      ai_agents: {
+        Row: {
+          agent_goal: string | null
+          agent_memory: Json | null
+          agent_name: string
+          agent_role: string | null
+          agent_rules: string | null
+          automation_id: string
+          created_at: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          agent_goal?: string | null
+          agent_memory?: Json | null
+          agent_name: string
+          agent_role?: string | null
+          agent_rules?: string | null
+          automation_id: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          agent_goal?: string | null
+          agent_memory?: Json | null
+          agent_name?: string
+          agent_role?: string | null
+          agent_rules?: string | null
+          automation_id?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agents_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_chats: {
+        Row: {
+          automation_id: string
+          id: string
+          message_content: string
+          sender: string
+          timestamp: string
+        }
+        Insert: {
+          automation_id: string
+          id?: string
+          message_content: string
+          sender: string
+          timestamp?: string
+        }
+        Update: {
+          automation_id?: string
+          id?: string
+          message_content?: string
+          sender?: string
+          timestamp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_chats_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_runs: {
+        Row: {
+          automation_id: string
+          details_log: Json | null
+          duration_ms: number | null
+          id: string
+          run_timestamp: string
+          status: string
+          trigger_data: Json | null
+          user_id: string
+        }
+        Insert: {
+          automation_id: string
+          details_log?: Json | null
+          duration_ms?: number | null
+          id?: string
+          run_timestamp?: string
+          status?: string
+          trigger_data?: Json | null
+          user_id: string
+        }
+        Update: {
+          automation_id?: string
+          details_log?: Json | null
+          duration_ms?: number | null
+          id?: string
+          run_timestamp?: string
+          status?: string
+          trigger_data?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_runs_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_runs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automations: {
+        Row: {
+          automation_blueprint: Json | null
+          created_at: string
+          description: string | null
+          id: string
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          automation_blueprint?: Json | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          automation_blueprint?: Json | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_credentials: {
+        Row: {
+          created_at: string
+          credential_type: string
+          credentials: string
+          id: string
+          is_active: boolean
+          platform_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credential_type: string
+          credentials: string
+          id?: string
+          is_active?: boolean
+          platform_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credential_type?: string
+          credentials?: string
+          id?: string
+          is_active?: boolean
+          platform_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_credentials_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          password_hash: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          password_hash: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          password_hash?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -1,12 +1,14 @@
 
 import { useState } from "react";
-import { Send, Bot } from "lucide-react";
+import { Send, Bot, Settings } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import ChatCard from "@/components/ChatCard";
 import AIAgentForm from "@/components/AIAgentForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
   const [message, setMessage] = useState("");
@@ -20,6 +22,8 @@ const Index = () => {
   }]);
   
   const { toast } = useToast();
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   const handleSendMessage = async () => {
     if (message.trim() && !isLoading) {
@@ -88,6 +92,32 @@ const Index = () => {
       <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-blue-300/20 to-purple-300/20 rounded-full blur-3xl animate-pulse"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-r from-purple-300/20 to-blue-300/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
       
+      {/* Header with navigation */}
+      <div className="absolute top-6 right-6 z-20 flex gap-4">
+        {user ? (
+          <Button 
+            onClick={() => navigate("/automations")}
+            className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0" 
+            style={{
+              boxShadow: '0 0 30px rgba(92, 142, 246, 0.3)'
+            }}
+          >
+            <Settings className="w-5 h-5 mr-2" />
+            Automations
+          </Button>
+        ) : (
+          <Button 
+            onClick={() => navigate("/auth")}
+            className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0" 
+            style={{
+              boxShadow: '0 0 30px rgba(92, 142, 246, 0.3)'
+            }}
+          >
+            Sign In
+          </Button>
+        )}
+      </div>
+      
       <div className="max-w-6xl mx-auto h-full flex flex-col relative z-10">
         {/* Main Chat Card - Made much larger */}
         <div className="flex-1 flex items-center justify-center mb-6">
@@ -125,7 +155,7 @@ const Index = () => {
             
             {/* Send Button - More rounded */}
             <Button 
-              onClick={handleSendMessage} 
+              onClick={handleSendMessage}
               disabled={isLoading || !message.trim()}
               className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-4 shadow-lg hover:shadow-xl transition-all duration-300 border-0 disabled:opacity-50" 
               style={{

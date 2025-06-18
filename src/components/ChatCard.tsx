@@ -105,15 +105,14 @@ const ChatCard = ({
   return (
     <div 
       style={{
-        boxShadow: 'inset 0 0 60px rgba(92, 142, 246, 0.15), inset 0 0 120px rgba(154, 94, 255, 0.08), 0 0 50px rgba(92, 142, 246, 0.2), 0 0 100px rgba(154, 94, 255, 0.1)'
+        boxShadow: '0 0 50px rgba(92, 142, 246, 0.2), 0 0 100px rgba(154, 94, 255, 0.1)'
       }} 
-      className="w-full max-w-7xl h-[75vh] bg-white/70 backdrop-blur-md rounded-3xl shadow-2xl border-0 relative"
+      className="w-full max-w-5xl h-[70vh] bg-white/70 backdrop-blur-md rounded-3xl p-8 shadow-2xl border-0 relative"
     >
-      {/* Subtle glow effect inside with soft gradients instead of padding */}
-      <div className="absolute inset-2 rounded-3xl bg-gradient-to-br from-blue-50/40 via-transparent to-purple-50/40 pointer-events-none"></div>
-      <div className="absolute inset-4 rounded-2xl bg-gradient-to-br from-white/20 via-transparent to-white/10 pointer-events-none"></div>
+      {/* Subtle glow effect inside */}
+      <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/30 to-purple-100/30 pointer-events-none"></div>
       
-      <ScrollArea className="h-full relative z-10 p-8">
+      <ScrollArea className="h-full relative z-10">
         <div className="space-y-6 pr-4">
           {messages.map(message => (
             <div key={message.id} className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}>

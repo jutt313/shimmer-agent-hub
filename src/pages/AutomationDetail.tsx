@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -53,7 +53,6 @@ const AutomationDetail = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-  const scrollRef = useRef<HTMLDivElement>(null);
   
   const [automation, setAutomation] = useState<Automation | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -71,13 +70,6 @@ const AutomationDetail = () => {
     }
     fetchAutomationAndChats();
   }, [user, id, navigate]);
-
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages]);
 
   const fetchAutomationAndChats = async () => {
     try {
@@ -252,7 +244,8 @@ const AutomationDetail = () => {
 
       if (error) throw error;
 
-      console.log('AI Response received:', data.response);
+      console.log('=== RAW AI RESPONSE ===');
+      console.log(data.response);
 
       // Try to parse structured response
       const structuredData = parseStructuredResponse(data.response);      
@@ -261,8 +254,8 @@ const AutomationDetail = () => {
       // If we have structured data, format it nicely
       if (structuredData) {
         displayText = formatStructuredMessage(structuredData);
-        console.log('Formatted display text:', displayText);
-        console.log('Structured data found:', structuredData);
+        console.log('=== FORMATTED DISPLAY TEXT ===');
+        console.log(displayText);
       }
       
       const aiMessage = {
@@ -273,12 +266,18 @@ const AutomationDetail = () => {
         structuredData: structuredData
       };
 
+      console.log('=== FINAL AI MESSAGE OBJECT ===');
+      console.log('Has structuredData:', !!aiMessage.structuredData);
+      console.log('StructuredData content:', aiMessage.structuredData);
+
       setMessages(prev => [...prev, aiMessage]);
 
       // Update platforms immediately after parsing
       if (structuredData?.platforms && Array.isArray(structuredData.platforms)) {
-        console.log('Setting platforms in state:', structuredData.platforms);
+        console.log('✅ Setting platforms in state:', structuredData.platforms);
         setCurrentPlatforms(structuredData.platforms);
+      } else {
+        console.log('❌ No platforms found in structured data');
       }
 
       // Save AI response to database
@@ -391,43 +390,27 @@ const AutomationDetail = () => {
         </Button>
       </div>
       
-      <div className="max-w-7xl mx-auto h-full flex flex-col relative z-10 pt-20">        
-        {/* Chat Card - Enhanced with animations, wider, taller, and lifted up */}
-        <div className="flex-1 flex items-start justify-center mb-4 pt-8">
-          <div className="animate-scale-in transition-all duration-500 ease-out">
-            <ChatCard 
-              messages={messages} 
-              onAgentAdd={handleAgentAdd}
-              dismissedAgents={dismissedAgents}
-              onAgentDismiss={handleAgentDismiss}
-            />
-          </div>
+      <div className="max-w-6xl mx-auto h-full flex flex-col relative z-10 pt-20">        
+        {/* Chat Card */}
+        <div className="flex-1 flex items-center justify-center mb-6">
+          <ChatCard 
+            messages={messages} 
+            onAgentAdd={handleAgentAdd}
+            dismissedAgents={dismissedAgents}
+            onAgentDismiss={handleAgentDismiss}
+          />
         </div>
-        
-        {/* Auto-scroll reference */}
-        <div ref={scrollRef} />
         
         {/* Platform Buttons - Positioned between chat and input */}
         {currentPlatforms && currentPlatforms.length > 0 && (
-          <div className="mb-4 animate-fade-in">
+          <div className="mb-4">
             <PlatformButtons platforms={currentPlatforms} />
           </div>
         )}
         
-        {/* Input Section - Enhanced with animations and bigger size */}
-        <div className="space-y-4 animate-scale-in transition-all duration-500 ease-out">
-          <div className="flex gap-6 items-end px-[80px]">
-            {/* AI Agent Button - Moved to left of input */}
-            <Button
-              onClick={() => setShowAIAgentForm(true)}
-              className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-6 py-5 shadow-lg hover:shadow-xl transition-all duration-300 border-0 flex-shrink-0"
-              style={{
-                boxShadow: '0 0 25px rgba(147, 51, 234, 0.3)'
-              }}
-            >
-              <Bot className="w-6 h-6" />
-            </Button>
-            
+        {/* Input Section */}
+        <div className="space-y-4">
+          <div className="flex gap-4 items-end px-[108px]">
             <div className="flex-1 relative">
               <Input 
                 value={newMessage} 
@@ -435,7 +418,7 @@ const AutomationDetail = () => {
                 onKeyPress={handleKeyPress} 
                 placeholder={sendingMessage ? "AI is thinking..." : "Ask about this automation..."} 
                 disabled={sendingMessage}
-                className="rounded-3xl bg-white/80 backdrop-blur-sm border-0 px-8 py-6 text-lg focus:outline-none focus:ring-0 shadow-lg h-16" 
+                className="rounded-3xl bg-white/80 backdrop-blur-sm border-0 px-6 py-4 text-lg focus:outline-none focus:ring-0 shadow-lg" 
                 style={{
                   boxShadow: '0 0 25px rgba(154, 94, 255, 0.2)'
                 }} 
@@ -445,7 +428,7 @@ const AutomationDetail = () => {
             <Button 
               onClick={handleSendMessage}
               disabled={sendingMessage || !newMessage.trim()}
-              className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-5 shadow-lg hover:shadow-xl transition-all duration-300 border-0 disabled:opacity-50 flex-shrink-0" 
+              className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-4 shadow-lg hover:shadow-xl transition-all duration-300 border-0 disabled:opacity-50" 
               style={{
                 boxShadow: '0 0 30px rgba(92, 142, 246, 0.3)'
               }}

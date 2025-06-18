@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Bot, Calendar, Settings, LogOut, MessageCircle } from "lucide-react";
+import { Plus, Bot, Calendar, LogOut, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface Automation {
@@ -138,7 +139,7 @@ const Automations = () => {
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-r from-purple-300/20 to-blue-300/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
       
       <div className="relative z-10 p-6">
-        {/* Header */}
+        {/* Header - removed Chat button, kept only Sign Out */}
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-8">
             <div>
@@ -148,14 +149,6 @@ const Automations = () => {
               <p className="text-gray-600 mt-2">Create and manage your AI automations</p>
             </div>
             <div className="flex gap-4">
-              <Button
-                onClick={() => navigate("/")}
-                variant="outline"
-                className="rounded-xl border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:shadow-xl"
-              >
-                <Bot className="w-4 h-4 mr-2" />
-                Chat
-              </Button>
               <Button
                 onClick={handleSignOut}
                 variant="outline"

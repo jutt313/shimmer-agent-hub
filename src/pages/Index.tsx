@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Send, Bot, Settings } from "lucide-react";
+import { Send, Bot } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ChatCard from "@/components/ChatCard";
 import AIAgentForm from "@/components/AIAgentForm";
@@ -92,7 +92,7 @@ const Index = () => {
       <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-blue-300/20 to-purple-300/20 rounded-full blur-3xl animate-pulse"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-r from-purple-300/20 to-blue-300/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
       
-      {/* Header with navigation */}
+      {/* Header with navigation - removed Chat button */}
       <div className="absolute top-6 right-6 z-20 flex gap-4">
         {user ? (
           <Button 
@@ -102,7 +102,6 @@ const Index = () => {
               boxShadow: '0 0 30px rgba(92, 142, 246, 0.3)'
             }}
           >
-            <Settings className="w-5 h-5 mr-2" />
             Automations
           </Button>
         ) : (

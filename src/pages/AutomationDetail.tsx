@@ -1,4 +1,5 @@
 
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -140,6 +141,46 @@ const AutomationDetail = () => {
     }
   };
 
+  const formatStructuredMessage = (structuredData: StructuredResponse): string => {
+    let formattedMessage = "";
+
+    // Summary
+    if (structuredData.summary) {
+      formattedMessage += `📋 **Automation Summary**\n${structuredData.summary}\n\n`;
+    }
+
+    // Steps
+    if (structuredData.steps && structuredData.steps.length > 0) {
+      formattedMessage += `🔄 **Step-by-Step Workflow**\n`;
+      structuredData.steps.forEach((step, index) => {
+        formattedMessage += `${index + 1}. ${step}\n`;
+      });
+      formattedMessage += `\n`;
+    }
+
+    // Platform information
+    if (structuredData.platforms && structuredData.platforms.length > 0) {
+      formattedMessage += `🔗 **Required Platform Credentials**\n`;
+      structuredData.platforms.forEach(platform => {
+        formattedMessage += `\n**${platform.name}**\n`;
+        platform.credentials.forEach(cred => {
+          formattedMessage += `• ${cred.field.replace(/_/g, ' ').toUpperCase()}: ${cred.why_needed}\n`;
+        });
+      });
+      formattedMessage += `\n`;
+    }
+
+    // Clarification questions
+    if (structuredData.clarification_questions && structuredData.clarification_questions.length > 0) {
+      formattedMessage += `❓ **I need some clarification:**\n`;
+      structuredData.clarification_questions.forEach((question, index) => {
+        formattedMessage += `${index + 1}. ${question}\n`;
+      });
+    }
+
+    return formattedMessage;
+  };
+
   const handleSendMessage = async () => {
     if (!newMessage.trim() || sendingMessage || !automation) return;
 
@@ -177,9 +218,16 @@ const AutomationDetail = () => {
       // Try to parse structured response
       const structuredData = parseStructuredResponse(data.response);
       
+      let displayText = data.response;
+      
+      // If we have structured data, format it nicely
+      if (structuredData) {
+        displayText = formatStructuredMessage(structuredData);
+      }
+      
       const aiMessage = {
         id: Date.now() + 1,
-        text: data.response,
+        text: displayText,
         isBot: true,
         timestamp: new Date(),
         structuredData: structuredData
@@ -198,7 +246,7 @@ const AutomationDetail = () => {
         .insert({
           automation_id: automation.id,
           sender: 'ai',
-          message_content: data.response
+          message_content: displayText
         });
 
     } catch (error) {
@@ -276,10 +324,10 @@ const AutomationDetail = () => {
           </Button>
           <div>
             <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              {automation.title}
+              {automation?.title}
             </h1>
             <p className="text-sm text-gray-600">
-              Status: <span className="capitalize">{automation.status}</span>
+              Status: <span className="capitalize">{automation?.status}</span>
             </p>
           </div>
         </div>
@@ -350,3 +398,4 @@ const AutomationDetail = () => {
 };
 
 export default AutomationDetail;
+

@@ -129,12 +129,17 @@ const AutomationDetail = () => {
       // Try to extract JSON from the response if it's embedded
       const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
       if (jsonMatch) {
-        return JSON.parse(jsonMatch[1]);
+        const parsed = JSON.parse(jsonMatch[1]);
+        console.log('Parsed structured response from JSON block:', parsed);
+        return parsed;
       }
       
       // Try to parse directly if it's pure JSON
-      return JSON.parse(responseText);
-    } catch {
+      const parsed = JSON.parse(responseText);
+      console.log('Parsed structured response directly:', parsed);
+      return parsed;
+    } catch (error) {
+      console.log('Failed to parse structured response:', error);
       return null;
     }
   };
@@ -212,14 +217,18 @@ const AutomationDetail = () => {
 
       if (error) throw error;
 
+      console.log('AI Response received:', data.response);
+
       // Try to parse structured response
       const structuredData = parseStructuredResponse(data.response);
+      console.log('Structured data parsed:', structuredData);
       
       let displayText = data.response;
       
       // If we have structured data, format it nicely
       if (structuredData) {
         displayText = formatStructuredMessage(structuredData);
+        console.log('Formatted display text:', displayText);
       }
       
       const aiMessage = {
@@ -233,8 +242,11 @@ const AutomationDetail = () => {
       setMessages(prev => [...prev, aiMessage]);
 
       // Update platforms if structured data contains them
-      if (structuredData?.platforms) {
+      if (structuredData?.platforms && Array.isArray(structuredData.platforms)) {
+        console.log('Setting current platforms:', structuredData.platforms);
         setCurrentPlatforms(structuredData.platforms);
+      } else {
+        console.log('No valid platforms found in structured data');
       }
 
       // Save AI response to database
@@ -352,8 +364,12 @@ const AutomationDetail = () => {
           />
         </div>
         
-        {/* Platform Buttons */}
-        <PlatformButtons platforms={currentPlatforms} />
+        {/* Platform Buttons - This should show when currentPlatforms has data */}
+        {currentPlatforms && currentPlatforms.length > 0 && (
+          <div className="mb-6">
+            <PlatformButtons platforms={currentPlatforms} />
+          </div>
+        )}
         
         {/* Input Section */}
         <div className="space-y-4">

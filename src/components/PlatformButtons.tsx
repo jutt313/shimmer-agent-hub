@@ -26,17 +26,17 @@ const PlatformButtons = ({ platforms }: PlatformButtonsProps) => {
 
   return (
     <>
-      <div className="flex flex-wrap gap-2 justify-center mb-4">
+      <div className="flex flex-wrap gap-3 justify-center mb-6 px-4">
         {platforms.map((platform, index) => (
           <Button
             key={index}
             onClick={() => setSelectedPlatform(platform)}
-            className="rounded-2xl bg-gradient-to-r from-purple-500/80 to-indigo-500/80 hover:from-purple-600/90 hover:to-indigo-600/90 text-white px-4 py-2 text-sm shadow-lg hover:shadow-xl transition-all duration-300 border-0 backdrop-blur-sm"
+            className="rounded-2xl bg-gradient-to-r from-purple-500/90 to-indigo-500/90 hover:from-purple-600 hover:to-indigo-600 text-white px-5 py-2.5 text-sm font-medium shadow-lg hover:shadow-xl transition-all duration-300 border-0 backdrop-blur-sm transform hover:scale-105"
             style={{
-              boxShadow: '0 0 15px rgba(147, 51, 234, 0.3)'
+              boxShadow: '0 4px 20px rgba(147, 51, 234, 0.4)'
             }}
           >
-            {platform.name}
+            🔗 Configure {platform.name}
           </Button>
         ))}
       </div>

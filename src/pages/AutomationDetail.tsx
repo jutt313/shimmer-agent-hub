@@ -1,5 +1,3 @@
-
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -146,39 +144,38 @@ const AutomationDetail = () => {
 
     // Summary
     if (structuredData.summary) {
-      formattedMessage += `📋 **Automation Summary**\n${structuredData.summary}\n\n`;
+      formattedMessage += `📋 **Automation Summary**\n\n${structuredData.summary}\n\n`;
     }
 
     // Steps
     if (structuredData.steps && structuredData.steps.length > 0) {
-      formattedMessage += `🔄 **Step-by-Step Workflow**\n`;
+      formattedMessage += `🔄 **Step-by-Step Workflow**\n\n`;
       structuredData.steps.forEach((step, index) => {
-        formattedMessage += `${index + 1}. ${step}\n`;
+        formattedMessage += `**${index + 1}.** ${step}\n\n`;
       });
-      formattedMessage += `\n`;
     }
 
     // Platform information
     if (structuredData.platforms && structuredData.platforms.length > 0) {
-      formattedMessage += `🔗 **Required Platform Credentials**\n`;
+      formattedMessage += `🔗 **Required Platform Credentials**\n\n`;
       structuredData.platforms.forEach(platform => {
-        formattedMessage += `\n**${platform.name}**\n`;
+        formattedMessage += `**${platform.name}**\n`;
         platform.credentials.forEach(cred => {
-          formattedMessage += `• ${cred.field.replace(/_/g, ' ').toUpperCase()}: ${cred.why_needed}\n`;
+          formattedMessage += `• **${cred.field.replace(/_/g, ' ').toUpperCase()}**: ${cred.why_needed}\n`;
         });
+        formattedMessage += `\n`;
       });
-      formattedMessage += `\n`;
     }
 
     // Clarification questions
     if (structuredData.clarification_questions && structuredData.clarification_questions.length > 0) {
-      formattedMessage += `❓ **I need some clarification:**\n`;
+      formattedMessage += `❓ **I need some clarification:**\n\n`;
       structuredData.clarification_questions.forEach((question, index) => {
-        formattedMessage += `${index + 1}. ${question}\n`;
+        formattedMessage += `**${index + 1}.** ${question}\n\n`;
       });
     }
 
-    return formattedMessage;
+    return formattedMessage.trim();
   };
 
   const handleSendMessage = async () => {
@@ -398,4 +395,3 @@ const AutomationDetail = () => {
 };
 
 export default AutomationDetail;
-

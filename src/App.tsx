@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Automations from "./pages/Automations";
+import AutomationDetail from "./pages/AutomationDetail";
 import ProtectedRoute from "./components/ProtectedRoute";
 import NotFound from "./pages/NotFound";
 
@@ -28,6 +29,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Automations />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/automation/:id" 
+              element={
+                <ProtectedRoute>
+                  <AutomationDetail />
                 </ProtectedRoute>
               } 
             />

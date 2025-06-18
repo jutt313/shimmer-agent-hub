@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Bot, Calendar, Settings, LogOut } from "lucide-react";
+import { Plus, Bot, Calendar, Settings, LogOut, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface Automation {
@@ -95,6 +94,9 @@ const Automations = () => {
         title: "Success",
         description: "Automation created successfully!",
       });
+
+      // Navigate to the new automation's chat
+      navigate(`/automation/${data.id}`);
     } catch (error) {
       console.error('Error creating automation:', error);
       toast({
@@ -242,6 +244,7 @@ const Automations = () => {
             {automations.map((automation) => (
               <Card 
                 key={automation.id}
+                onClick={() => navigate(`/automation/${automation.id}`)}
                 className="hover:shadow-xl transition-all duration-300 bg-white/70 backdrop-blur-md border-0 rounded-3xl cursor-pointer"
                 style={{
                   boxShadow: '0 0 25px rgba(154, 94, 255, 0.15)'
@@ -266,14 +269,15 @@ const Automations = () => {
                   )}
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center text-sm text-gray-500 space-x-4">
+                  <div className="flex items-center justify-between text-sm text-gray-500">
                     <div className="flex items-center">
                       <Calendar className="w-4 h-4 mr-1" />
                       {new Date(automation.created_at).toLocaleDateString()}
                     </div>
-                    <Button variant="ghost" size="sm" className="ml-auto rounded-xl">
-                      <Settings className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center text-blue-600">
+                      <MessageCircle className="w-4 h-4 mr-1" />
+                      Chat
+                    </div>
                   </div>
                 </CardContent>
               </Card>

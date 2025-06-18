@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -60,7 +61,6 @@ const AutomationDetail = () => {
   const [loading, setLoading] = useState(true);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [showAIAgentForm, setShowAIAgentForm] = useState(false);
-  const [currentStructuredResponse, setCurrentStructuredResponse] = useState<StructuredResponse | null>(null);
   const [dismissedAgents, setDismissedAgents] = useState<Set<string>>(new Set());
   const [currentPlatforms, setCurrentPlatforms] = useState<any[]>([]);
 
@@ -296,20 +296,7 @@ const AutomationDetail = () => {
         </Button>
       </div>
       
-      <div className="max-w-6xl mx-auto h-full flex flex-col relative z-10 pt-20">
-        {/* Structured Response Display */}
-        {currentStructuredResponse && (
-          <div className="mb-6">
-            <AutomationResponseDisplay 
-              data={currentStructuredResponse}
-              onAgentAdd={(agent) => {
-                setShowAIAgentForm(true);
-                // Pre-fill form with agent data
-              }}
-            />
-          </div>
-        )}
-        
+      <div className="max-w-6xl mx-auto h-full flex flex-col relative z-10 pt-20">        
         {/* Chat Card */}
         <div className="flex-1 flex items-center justify-center mb-6">
           <ChatCard 

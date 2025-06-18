@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Send, ArrowLeft, Bot, Settings } from "lucide-react";
+import { Send, ArrowLeft, Bot } from "lucide-react";
 import ChatCard from "@/components/ChatCard";
 import AIAgentForm from "@/components/AIAgentForm";
-import AutomationResponseDisplay from "@/components/AutomationResponseDisplay";
+import PlatformButtons from "@/components/PlatformButtons";
 
 interface Automation {
   id: string;
@@ -61,6 +61,8 @@ const AutomationDetail = () => {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [showAIAgentForm, setShowAIAgentForm] = useState(false);
   const [currentStructuredResponse, setCurrentStructuredResponse] = useState<StructuredResponse | null>(null);
+  const [dismissedAgents, setDismissedAgents] = useState<Set<string>>(new Set());
+  const [currentPlatforms, setCurrentPlatforms] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user || !id) {
@@ -123,7 +125,7 @@ const AutomationDetail = () => {
     }
   };
 
-  const parseStructuredResponse = (responseText: string): StructuredResponse | null => {
+  const parseStructuredResponse = (responseText: string): any => {
     try {
       // Try to extract JSON from the response if it's embedded
       const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
@@ -172,19 +174,22 @@ const AutomationDetail = () => {
 
       if (error) throw error;
 
+      // Try to parse structured response
+      const structuredData = parseStructuredResponse(data.response);
+      
       const aiMessage = {
         id: Date.now() + 1,
         text: data.response,
         isBot: true,
-        timestamp: new Date()
+        timestamp: new Date(),
+        structuredData: structuredData
       };
 
       setMessages(prev => [...prev, aiMessage]);
 
-      // Try to parse structured response
-      const structuredData = parseStructuredResponse(data.response);
-      if (structuredData) {
-        setCurrentStructuredResponse(structuredData);
+      // Update platforms if structured data contains them
+      if (structuredData?.platforms) {
+        setCurrentPlatforms(structuredData.platforms);
       }
 
       // Save AI response to database
@@ -220,6 +225,15 @@ const AutomationDetail = () => {
     if (e.key === 'Enter' && !sendingMessage) {
       handleSendMessage();
     }
+  };
+
+  const handleAgentAdd = (agent: any) => {
+    setShowAIAgentForm(true);
+    // Pre-fill form with agent data if needed
+  };
+
+  const handleAgentDismiss = (agentName: string) => {
+    setDismissedAgents(prev => new Set([...prev, agentName]));
   };
 
   if (loading) {
@@ -298,8 +312,16 @@ const AutomationDetail = () => {
         
         {/* Chat Card */}
         <div className="flex-1 flex items-center justify-center mb-6">
-          <ChatCard messages={messages} />
+          <ChatCard 
+            messages={messages} 
+            onAgentAdd={handleAgentAdd}
+            dismissedAgents={dismissedAgents}
+            onAgentDismiss={handleAgentDismiss}
+          />
         </div>
+        
+        {/* Platform Buttons */}
+        <PlatformButtons platforms={currentPlatforms} />
         
         {/* Input Section */}
         <div className="space-y-4">

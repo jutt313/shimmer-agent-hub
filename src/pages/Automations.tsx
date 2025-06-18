@@ -1,4 +1,5 @@
 
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ const Automations = () => {
       const { data, error } = await supabase
         .from('automations')
         .select('*')
+        .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -70,13 +72,24 @@ const Automations = () => {
       return;
     }
 
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "User not authenticated",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setCreateLoading(true);
     try {
+      console.log('Creating automation with user_id:', user.id);
+      
       const { data, error } = await supabase
         .from('automations')
         .insert([
           {
-            user_id: user?.id,
+            user_id: user.id,
             title: title.trim(),
             description: description.trim() || null,
             status: 'draft'
@@ -85,8 +98,12 @@ const Automations = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
+      console.log('Automation created successfully:', data);
       setAutomations([data, ...automations]);
       setTitle("");
       setDescription("");
@@ -102,7 +119,7 @@ const Automations = () => {
       console.error('Error creating automation:', error);
       toast({
         title: "Error",
-        description: "Failed to create automation",
+        description: "Failed to create automation. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -293,3 +310,4 @@ const Automations = () => {
 };
 
 export default Automations;
+

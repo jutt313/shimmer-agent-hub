@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -6,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Send, ArrowLeft, Bot } from "lucide-react";
+import { Send, ArrowLeft, Bot, Settings } from "lucide-react";
 import ChatCard from "@/components/ChatCard";
+import AIAgentForm from "@/components/AIAgentForm";
+import AutomationResponseDisplay from "@/components/AutomationResponseDisplay";
 
 interface Automation {
   id: string;
@@ -24,6 +25,29 @@ interface ChatMessage {
   timestamp: string;
 }
 
+interface StructuredResponse {
+  summary?: string;
+  steps?: string[];
+  platforms?: Array<{
+    name: string;
+    credentials: Array<{
+      field: string;
+      placeholder: string;
+      link: string;
+      why_needed: string;
+    }>;
+  }>;
+  agents?: Array<{
+    name: string;
+    role: string;
+    goal: string;
+    rules: string;
+    memory: string;
+    why_needed: string;
+  }>;
+  clarification_questions?: string[];
+}
+
 const AutomationDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -35,6 +59,8 @@ const AutomationDetail = () => {
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [showAIAgentForm, setShowAIAgentForm] = useState(false);
+  const [currentStructuredResponse, setCurrentStructuredResponse] = useState<StructuredResponse | null>(null);
 
   useEffect(() => {
     if (!user || !id) {
@@ -97,6 +123,21 @@ const AutomationDetail = () => {
     }
   };
 
+  const parseStructuredResponse = (responseText: string): StructuredResponse | null => {
+    try {
+      // Try to extract JSON from the response if it's embedded
+      const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[1]);
+      }
+      
+      // Try to parse directly if it's pure JSON
+      return JSON.parse(responseText);
+    } catch {
+      return null;
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!newMessage.trim() || sendingMessage || !automation) return;
 
@@ -139,6 +180,12 @@ const AutomationDetail = () => {
       };
 
       setMessages(prev => [...prev, aiMessage]);
+
+      // Try to parse structured response
+      const structuredData = parseStructuredResponse(data.response);
+      if (structuredData) {
+        setCurrentStructuredResponse(structuredData);
+      }
 
       // Save AI response to database
       await supabase
@@ -222,9 +269,33 @@ const AutomationDetail = () => {
             </p>
           </div>
         </div>
+        
+        <Button
+          onClick={() => setShowAIAgentForm(true)}
+          className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
+          style={{
+            boxShadow: '0 0 25px rgba(147, 51, 234, 0.3)'
+          }}
+        >
+          <Bot className="w-5 h-5 mr-2" />
+          AI Agent
+        </Button>
       </div>
       
       <div className="max-w-6xl mx-auto h-full flex flex-col relative z-10 pt-20">
+        {/* Structured Response Display */}
+        {currentStructuredResponse && (
+          <div className="mb-6">
+            <AutomationResponseDisplay 
+              data={currentStructuredResponse}
+              onAgentAdd={(agent) => {
+                setShowAIAgentForm(true);
+                // Pre-fill form with agent data
+              }}
+            />
+          </div>
+        )}
+        
         {/* Chat Card */}
         <div className="flex-1 flex items-center justify-center mb-6">
           <ChatCard messages={messages} />
@@ -260,6 +331,11 @@ const AutomationDetail = () => {
           </div>
         </div>
       </div>
+
+      {/* AI Agent Form Modal */}
+      {showAIAgentForm && (
+        <AIAgentForm onClose={() => setShowAIAgentForm(false)} />
+      )}
     </div>
   );
 };

@@ -109,7 +109,7 @@ const ChatCard = ({
                 {message.isBot && message.structuredData?.agents && (
                   <div className="mt-4 space-y-3">
                     <div className="text-sm font-semibold text-indigo-800 border-t border-indigo-200 pt-3">
-                      🤖 Recommended AI Agents:
+                      Recommended AI Agents:
                     </div>
                     {message.structuredData.agents.map((agent: any) => renderAgentRecommendation(agent))}
                   </div>

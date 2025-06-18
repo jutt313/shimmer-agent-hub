@@ -156,27 +156,6 @@ const AutomationDetail = () => {
     } catch (error) {
       console.log('JSON parsing failed:', error);
       console.log('Raw response text:', responseText);
-      
-      // As a fallback, try to extract platform information from text
-      if (responseText.includes('platforms') || responseText.includes('Stripe') || responseText.includes('Gmail') || responseText.includes('Slack')) {
-        console.log('Response mentions platforms, creating mock platform data for testing');
-        return {
-          platforms: [
-            {
-              name: "Stripe",
-              credentials: [
-                {
-                  field: "api_key",
-                  placeholder: "sk_test_...",
-                  link: "https://dashboard.stripe.com/apikeys",
-                  why_needed: "Required to authenticate with Stripe API"
-                }
-              ]
-            }
-          ]
-        };
-      }
-      
       return null;
     }
   };
@@ -186,12 +165,12 @@ const AutomationDetail = () => {
 
     // Summary
     if (structuredData.summary) {
-      formattedMessage += `📋 **Automation Summary**\n\n${structuredData.summary}\n\n`;
+      formattedMessage += `Automation Summary\n\n${structuredData.summary}\n\n`;
     }
 
     // Steps
     if (structuredData.steps && structuredData.steps.length > 0) {
-      formattedMessage += `🔄 **Step-by-Step Workflow**\n\n`;
+      formattedMessage += `Step-by-Step Workflow\n\n`;
       structuredData.steps.forEach((step, index) => {
         formattedMessage += `**${index + 1}.** ${step}\n\n`;
       });
@@ -199,7 +178,7 @@ const AutomationDetail = () => {
 
     // Platform information
     if (structuredData.platforms && structuredData.platforms.length > 0) {
-      formattedMessage += `🔗 **Required Platform Credentials**\n\n`;
+      formattedMessage += `Required Platform Credentials\n\n`;
       structuredData.platforms.forEach(platform => {
         formattedMessage += `**${platform.name}**\n`;
         platform.credentials.forEach(cred => {
@@ -211,7 +190,7 @@ const AutomationDetail = () => {
 
     // Clarification questions
     if (structuredData.clarification_questions && structuredData.clarification_questions.length > 0) {
-      formattedMessage += `❓ **I need some clarification:**\n\n`;
+      formattedMessage += `I need some clarification:\n\n`;
       structuredData.clarification_questions.forEach((question, index) => {
         formattedMessage += `**${index + 1}.** ${question}\n\n`;
       });
@@ -408,19 +387,10 @@ const AutomationDetail = () => {
           />
         </div>
         
-        {/* Platform Buttons */}
+        {/* Platform Buttons - Positioned between chat and input */}
         {currentPlatforms && currentPlatforms.length > 0 && (
-          <div className="mb-6">
+          <div className="mb-4">
             <PlatformButtons platforms={currentPlatforms} />
-          </div>
-        )}
-        
-        {/* Debug info for testing */}
-        {currentPlatforms.length === 0 && (
-          <div className="mb-6 p-4 bg-yellow-100 rounded-lg">
-            <p className="text-sm text-yellow-800">
-              Debug: No platforms detected. Current platforms: {JSON.stringify(currentPlatforms)}
-            </p>
           </div>
         )}
         

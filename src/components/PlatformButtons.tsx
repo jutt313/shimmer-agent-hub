@@ -33,7 +33,7 @@ const PlatformButtons = ({ platforms }: PlatformButtonsProps) => {
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-4">
             <h3 className="text-lg font-semibold text-gray-800 mb-2">
-              🔗 Required Platform Credentials
+              Required Platform Credentials
             </h3>
             <p className="text-sm text-gray-600">
               Click a platform below to configure your credentials
@@ -53,7 +53,7 @@ const PlatformButtons = ({ platforms }: PlatformButtonsProps) => {
                   boxShadow: '0 4px 20px rgba(147, 51, 234, 0.4)'
                 }}
               >
-                🔗 Configure {platform.name}
+                Configure {platform.name}
               </Button>
             ))}
           </div>

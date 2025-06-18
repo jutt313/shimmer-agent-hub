@@ -125,14 +125,18 @@ const AutomationDetail = () => {
   };
 
   const parseStructuredResponse = (responseText: string): any => {
-    console.log('Attempting to parse response:', responseText);
+    console.log('=== PARSING AI RESPONSE ===');
+    console.log('Raw response:', responseText);
     
     try {
       // First try to find JSON wrapped in ```json code blocks
       const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[1]);
-        console.log('Successfully parsed JSON from code block:', parsed);
+        console.log('✅ Successfully parsed JSON from code block:', parsed);
+        console.log('Agents found:', parsed.agents);
+        console.log('Platforms found:', parsed.platforms);
+        console.log('Clarification questions found:', parsed.clarification_questions);
         return parsed;
       }
       
@@ -144,18 +148,25 @@ const AutomationDetail = () => {
         const jsonString = responseText.substring(jsonStart, jsonEnd + 1);
         console.log('Extracted JSON string:', jsonString);
         const parsed = JSON.parse(jsonString);
-        console.log('Successfully parsed extracted JSON:', parsed);
+        console.log('✅ Successfully parsed extracted JSON:', parsed);
+        console.log('Agents found:', parsed.agents);
+        console.log('Platforms found:', parsed.platforms);
+        console.log('Clarification questions found:', parsed.clarification_questions);
         return parsed;
       }
       
       // Try to parse the entire response as JSON
       const parsed = JSON.parse(responseText);
-      console.log('Successfully parsed entire response as JSON:', parsed);
+      console.log('✅ Successfully parsed entire response as JSON:', parsed);
+      console.log('Agents found:', parsed.agents);
+      console.log('Platforms found:', parsed.platforms);
+      console.log('Clarification questions found:', parsed.clarification_questions);
       return parsed;
       
     } catch (error) {
-      console.log('JSON parsing failed:', error);
-      console.log('Raw response text:', responseText);
+      console.log('❌ JSON parsing failed:', error);
+      console.log('Response text length:', responseText.length);
+      console.log('Response preview:', responseText.substring(0, 200) + '...');
       return null;
     }
   };
@@ -233,18 +244,18 @@ const AutomationDetail = () => {
 
       if (error) throw error;
 
-      console.log('Raw AI Response received:', data.response);
+      console.log('=== RAW AI RESPONSE ===');
+      console.log(data.response);
 
       // Try to parse structured response
-      const structuredData = parseStructuredResponse(data.response);
-      console.log('Parsed structured data:', structuredData);
-      
+      const structuredData = parseStructuredResponse(data.response);      
       let displayText = data.response;
       
       // If we have structured data, format it nicely
       if (structuredData) {
         displayText = formatStructuredMessage(structuredData);
-        console.log('Formatted display text:', displayText);
+        console.log('=== FORMATTED DISPLAY TEXT ===');
+        console.log(displayText);
       }
       
       const aiMessage = {
@@ -255,15 +266,18 @@ const AutomationDetail = () => {
         structuredData: structuredData
       };
 
+      console.log('=== FINAL AI MESSAGE OBJECT ===');
+      console.log('Has structuredData:', !!aiMessage.structuredData);
+      console.log('StructuredData content:', aiMessage.structuredData);
+
       setMessages(prev => [...prev, aiMessage]);
 
-      // CRITICAL: Update platforms immediately after parsing
+      // Update platforms immediately after parsing
       if (structuredData?.platforms && Array.isArray(structuredData.platforms)) {
-        console.log('Setting platforms in state:', structuredData.platforms);
+        console.log('✅ Setting platforms in state:', structuredData.platforms);
         setCurrentPlatforms(structuredData.platforms);
       } else {
-        console.log('No platforms found in structured data');
-        console.log('Structured data:', structuredData);
+        console.log('❌ No platforms found in structured data');
       }
 
       // Save AI response to database

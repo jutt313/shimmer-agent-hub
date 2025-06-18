@@ -59,6 +59,30 @@ const ChatCard = ({
           <p className="text-indigo-700"><span className="font-medium">Role:</span> {agent.role}</p>
           <p className="text-indigo-700"><span className="font-medium">Goal:</span> {agent.goal}</p>
           <p className="text-indigo-600"><span className="font-medium">Why needed:</span> {agent.why_needed}</p>
+          {agent.rules && (
+            <p className="text-indigo-600"><span className="font-medium">Rules:</span> {agent.rules}</p>
+          )}
+          {agent.memory && (
+            <p className="text-indigo-600"><span className="font-medium">Memory:</span> {agent.memory}</p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderClarificationQuestions = (questions: string[]) => {
+    return (
+      <div className="mt-4 p-4 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl border border-orange-200">
+        <div className="text-sm font-semibold text-orange-800 mb-3 flex items-center gap-2">
+          <span className="w-5 h-5 bg-orange-600 rounded-full flex items-center justify-center text-white text-xs">?</span>
+          I need some clarification:
+        </div>
+        <div className="space-y-2">
+          {questions.map((question, index) => (
+            <p key={index} className="text-orange-700 font-medium text-sm">
+              <span className="font-bold">{index + 1}.</span> {question}
+            </p>
+          ))}
         </div>
       </div>
     );
@@ -105,8 +129,13 @@ const ChatCard = ({
                   {formatMessageText(message.text)}
                 </div>
                 
-                {/* Render agent recommendations inline within bot messages */}
-                {message.isBot && message.structuredData?.agents && (
+                {/* Render clarification questions first */}
+                {message.isBot && message.structuredData?.clarification_questions && message.structuredData.clarification_questions.length > 0 && (
+                  renderClarificationQuestions(message.structuredData.clarification_questions)
+                )}
+                
+                {/* Render agent recommendations */}
+                {message.isBot && message.structuredData?.agents && Array.isArray(message.structuredData.agents) && message.structuredData.agents.length > 0 && (
                   <div className="mt-4 space-y-3">
                     <div className="text-sm font-semibold text-indigo-800 border-t border-indigo-200 pt-3">
                       Recommended AI Agents:

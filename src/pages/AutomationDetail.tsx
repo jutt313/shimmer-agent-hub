@@ -353,6 +353,12 @@ const AutomationDetail = () => {
     );
   }
 
+  // Move console.log outside of JSX
+  console.log('Rendering platform buttons check:', {
+    currentPlatforms,
+    hasData: currentPlatforms && currentPlatforms.length > 0
+  });
+
   return (
     <div className="h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6 relative overflow-hidden">
       {/* Background glow effects */}
@@ -402,18 +408,14 @@ const AutomationDetail = () => {
           />
         </div>
         
-        {/* Platform Buttons - Enhanced debugging */}
-        {console.log('Rendering platform buttons check:', {
-          currentPlatforms,
-          hasData: currentPlatforms && currentPlatforms.length > 0
-        })}
+        {/* Platform Buttons */}
         {currentPlatforms && currentPlatforms.length > 0 && (
           <div className="mb-6">
             <PlatformButtons platforms={currentPlatforms} />
           </div>
         )}
         
-        {/* Force show platform buttons for testing */}
+        {/* Debug info for testing */}
         {currentPlatforms.length === 0 && (
           <div className="mb-6 p-4 bg-yellow-100 rounded-lg">
             <p className="text-sm text-yellow-800">

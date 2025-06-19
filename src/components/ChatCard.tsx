@@ -147,65 +147,35 @@ const ChatCard = ({
       // Method 1: Look for JSON in code blocks
       const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/);
       if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[1]);
-        console.log('✅ Found JSON in code block:', parsed);
-        return parsed;
-      }
-
-      // Method 2: Look for JSON object patterns
-      const patterns = [
-        /\{[\s\S]*"summary"[\s\S]*?\}/,
-        /\{[\s\S]*"steps"[\s\S]*?\}/,
-        /\{[\s\S]*"platforms"[\s\S]*?\}/,
-        /\{[\s\S]*"agents"[\s\S]*?\}/,
-        /\{[\s\S]*"clarification_questions"[\s\S]*?\}/
-      ];
-
-      for (const pattern of patterns) {
-        const match = text.match(pattern);
-        if (match) {
-          try {
-            // Find the complete JSON object
-            let jsonStr = match[0];
-            let braceCount = 0;
-            let startFound = false;
-            let endIndex = 0;
-            
-            for (let i = 0; i < jsonStr.length; i++) {
-              if (jsonStr[i] === '{') {
-                if (!startFound) startFound = true;
-                braceCount++;
-              } else if (jsonStr[i] === '}') {
-                braceCount--;
-                if (startFound && braceCount === 0) {
-                  endIndex = i + 1;
-                  break;
-                }
-              }
-            }
-            
-            if (endIndex > 0) {
-              jsonStr = jsonStr.substring(0, endIndex);
-              const parsed = JSON.parse(jsonStr);
-              console.log('✅ Parsed JSON from pattern:', parsed);
-              return parsed;
-            }
-          } catch (e) {
-            console.log('❌ Failed to parse pattern match:', e);
+        try {
+          const parsed = JSON.parse(jsonMatch[1]);
+          console.log('✅ Found JSON in code block:', parsed);
+          return parsed;
+        } catch (e) {
+          console.log('❌ JSON in code block is malformed, trying to fix...');
+          // Try to fix common JSON issues
+          const fixedJson = fixMalformedJson(jsonMatch[1]);
+          if (fixedJson) {
+            const parsed = JSON.parse(fixedJson);
+            console.log('✅ Fixed and parsed JSON from code block:', parsed);
+            return parsed;
           }
         }
       }
 
-      // Method 3: Try to find any valid JSON object in the text
-      const jsonStart = text.indexOf('{');
-      if (jsonStart !== -1) {
+      // Method 2: Extract and fix JSON patterns
+      const jsonObjectMatch = text.match(/\{[\s\S]*?\}/);
+      if (jsonObjectMatch) {
+        let jsonStr = jsonObjectMatch[0];
+        
+        // Find the complete JSON object
         let braceCount = 0;
         let endIndex = -1;
         
-        for (let i = jsonStart; i < text.length; i++) {
-          if (text[i] === '{') {
+        for (let i = 0; i < jsonStr.length; i++) {
+          if (jsonStr[i] === '{') {
             braceCount++;
-          } else if (text[i] === '}') {
+          } else if (jsonStr[i] === '}') {
             braceCount--;
             if (braceCount === 0) {
               endIndex = i + 1;
@@ -214,16 +184,34 @@ const ChatCard = ({
           }
         }
         
-        if (endIndex > jsonStart) {
-          const jsonStr = text.substring(jsonStart, endIndex);
+        if (endIndex > 0) {
+          jsonStr = jsonStr.substring(0, endIndex);
+          
           try {
             const parsed = JSON.parse(jsonStr);
-            console.log('✅ Parsed complete JSON object:', parsed);
+            console.log('✅ Parsed JSON object:', parsed);
             return parsed;
           } catch (e) {
-            console.log('❌ Failed to parse extracted JSON:', e);
+            console.log('❌ JSON object is malformed, trying to fix...');
+            const fixedJson = fixMalformedJson(jsonStr);
+            if (fixedJson) {
+              try {
+                const parsed = JSON.parse(fixedJson);
+                console.log('✅ Fixed and parsed JSON object:', parsed);
+                return parsed;
+              } catch (e2) {
+                console.log('❌ Could not fix JSON:', e2);
+              }
+            }
           }
         }
+      }
+
+      // Method 3: Try to extract specific data patterns even without valid JSON
+      const extractedData = extractDataFromText(text);
+      if (extractedData) {
+        console.log('✅ Extracted data from text patterns:', extractedData);
+        return extractedData;
       }
 
       console.log('❌ No structured data found in text');
@@ -232,6 +220,71 @@ const ChatCard = ({
       console.error('❌ Error parsing structured data:', error);
       return null;
     }
+  };
+
+  const fixMalformedJson = (jsonStr: string): string | null => {
+    try {
+      // Fix common JSON issues
+      let fixed = jsonStr
+        // Fix unquoted property names
+        .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
+        // Fix single quotes to double quotes
+        .replace(/'/g, '"')
+        // Fix trailing commas
+        .replace(/,(\s*[}\]])/g, '$1')
+        // Fix newlines in strings
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t');
+
+      // Try to parse the fixed JSON
+      JSON.parse(fixed);
+      return fixed;
+    } catch (e) {
+      console.log('❌ Could not fix malformed JSON');
+      return null;
+    }
+  };
+
+  const extractDataFromText = (text: string): any => {
+    const data: any = {};
+
+    // Extract summary
+    const summaryMatch = text.match(/Summary[:\s]*([^#\n]*)/i);
+    if (summaryMatch) {
+      data.summary = summaryMatch[1].trim();
+    }
+
+    // Extract steps
+    const stepsSection = text.match(/Steps?[:\s]*\n((?:\d+\..*\n?)*)/i);
+    if (stepsSection) {
+      const steps = stepsSection[1]
+        .split(/\d+\./)
+        .filter(step => step.trim())
+        .map(step => step.trim());
+      if (steps.length > 0) {
+        data.steps = steps;
+      }
+    }
+
+    // Extract platforms
+    const platformMatches = text.match(/(?:Gmail|Asana|Slack|OpenAI)/gi);
+    if (platformMatches) {
+      const uniquePlatforms = [...new Set(platformMatches)];
+      data.platforms = uniquePlatforms.map(platform => ({
+        name: platform,
+        credentials: [
+          {
+            field: platform === 'Gmail' ? 'email' : platform === 'Asana' ? 'api_token' : platform === 'Slack' ? 'webhook_url' : 'api_key',
+            placeholder: `Enter your ${platform} credentials`,
+            link: `https://${platform.toLowerCase()}.com`,
+            why_needed: `Required to connect to ${platform}`
+          }
+        ]
+      }));
+    }
+
+    return Object.keys(data).length > 0 ? data : null;
   };
 
   const formatMessageText = (text: string) => {

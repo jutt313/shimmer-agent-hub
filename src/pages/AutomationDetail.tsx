@@ -380,7 +380,7 @@ const AutomationDetail = () => {
         
         <Button
           onClick={() => setShowAIAgentForm(true)}
-          className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
+          className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-6 py-4 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
           style={{
             boxShadow: '0 0 25px rgba(147, 51, 234, 0.3)'
           }}
@@ -390,9 +390,9 @@ const AutomationDetail = () => {
         </Button>
       </div>
       
-      <div className="max-w-6xl mx-auto h-full flex flex-col relative z-10 pt-20">        
-        {/* Chat Card */}
-        <div className="flex-1 flex items-center justify-center mb-6">
+      <div className="max-w-7xl mx-auto h-full flex flex-col relative z-10 pt-20">        
+        {/* Chat Card - Made wider and taller */}
+        <div className="flex-1 flex items-start justify-center pt-4 pb-4">
           <ChatCard 
             messages={messages} 
             onAgentAdd={handleAgentAdd}
@@ -409,8 +409,19 @@ const AutomationDetail = () => {
         )}
         
         {/* Input Section */}
-        <div className="space-y-4">
-          <div className="flex gap-4 items-end px-[108px]">
+        <div className="space-y-4 pb-6">
+          <div className="flex gap-4 items-end px-[60px]">
+            <Button
+              onClick={() => setShowAIAgentForm(true)}
+              className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-6 py-4 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
+              style={{
+                boxShadow: '0 0 25px rgba(147, 51, 234, 0.3)'
+              }}
+            >
+              <Bot className="w-5 h-5 mr-2" />
+              AI Agent
+            </Button>
+            
             <div className="flex-1 relative">
               <Input 
                 value={newMessage} 

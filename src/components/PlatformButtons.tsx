@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import PlatformCredentialForm from "./PlatformCredentialForm";
@@ -25,32 +24,20 @@ const PlatformButtons = ({ platforms }: PlatformButtonsProps) => {
     return null;
   }
 
-  console.log('PlatformButtons rendering with platforms:', platforms);
-
   return (
     <>
-      <div className="w-full px-4 mb-6">
+      <div className="w-full px-4 mb-3">
         <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">
-              Required Platform Credentials
-            </h3>
-            <p className="text-sm text-gray-600">
-              Click a platform below to configure your credentials
-            </p>
-          </div>
-          
-          <div className="flex flex-wrap gap-3 justify-center">
+          <div className="flex flex-wrap gap-2 justify-center">
             {platforms.map((platform, index) => (
               <Button
                 key={`${platform.name}-${index}`}
                 onClick={() => {
-                  console.log('Platform button clicked:', platform.name);
                   setSelectedPlatform(platform);
                 }}
-                className="rounded-2xl bg-gradient-to-r from-purple-500/90 to-indigo-500/90 hover:from-purple-600 hover:to-indigo-600 text-white px-6 py-3 text-sm font-medium shadow-lg hover:shadow-xl transition-all duration-300 border-0 backdrop-blur-sm transform hover:scale-105"
+                className="rounded-xl bg-gradient-to-r from-purple-500/90 to-indigo-500/90 hover:from-purple-600 hover:to-indigo-600 text-white px-4 py-2 text-xs font-medium shadow-md hover:shadow-lg transition-all duration-300 border-0 backdrop-blur-sm transform hover:scale-105"
                 style={{
-                  boxShadow: '0 4px 20px rgba(147, 51, 234, 0.4)'
+                  boxShadow: '0 2px 15px rgba(147, 51, 234, 0.3)'
                 }}
               >
                 Configure {platform.name}
@@ -64,7 +51,6 @@ const PlatformButtons = ({ platforms }: PlatformButtonsProps) => {
         <PlatformCredentialForm
           platform={selectedPlatform}
           onClose={() => {
-            console.log('Closing platform form');
             setSelectedPlatform(null);
           }}
         />

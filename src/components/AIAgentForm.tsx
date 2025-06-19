@@ -11,9 +11,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
 
 interface AIAgentFormProps {
-  automationId?: string; // Made optional
+  automationId?: string;
   onClose: () => void;
-  onAgentSaved?: (agentName: string, agentId?: string, llmProvider?: string, model?: string, config?: any, apiKey?: string) => void; // Enhanced callback
+  onAgentSaved?: (agentName: string, agentId?: string, llmProvider?: string, model?: string, config?: any, apiKey?: string) => void;
 }
 
 const llmOptions = {
@@ -61,11 +61,22 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved }: AIAgentFormProps) 
         role: formData.role.trim(),
         goal: formData.goal.trim(),
         rules: formData.rule.trim() || null,
-        memory: formData.memory.trim() || null,
+        memory: formData.memory.trim() || null, // Keep as string, don't parse as JSON
       };
 
       // Only save to ai_agents table if we have an automationId
       if (automationId && user?.id) {
+        // For database storage, try to parse memory as JSON if it's provided
+        let memoryForDB = null;
+        if (formData.memory.trim()) {
+          try {
+            memoryForDB = JSON.parse(formData.memory.trim());
+          } catch (e) {
+            // If it's not valid JSON, store as simple string object
+            memoryForDB = { context: formData.memory.trim() };
+          }
+        }
+
         const { data, error } = await supabase
           .from('ai_agents')
           .insert({
@@ -74,7 +85,7 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved }: AIAgentFormProps) 
             agent_role: formData.role.trim(),
             agent_goal: formData.goal.trim(),
             agent_rules: formData.rule.trim() || null,
-            agent_memory: formData.memory.trim() ? JSON.parse(formData.memory.trim()) : null,
+            agent_memory: memoryForDB,
           })
           .select()
           .single();
@@ -86,7 +97,6 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved }: AIAgentFormProps) 
           description: `AI Agent "${formData.name}" saved!`,
         });
         
-        // Call the onAgentSaved callback with database ID
         onAgentSaved?.(data.agent_name, data.id, selectedLLM, selectedModel, agentConfig, formData.apiKey);
       } else {
         // Handle case where no automationId is provided (e.g., from Index page)
@@ -95,7 +105,6 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved }: AIAgentFormProps) 
           description: `AI Agent "${formData.name}" configured! This will be used for general chat.`,
         });
         
-        // Call the onAgentSaved callback without database ID
         onAgentSaved?.(formData.name.trim(), undefined, selectedLLM, selectedModel, agentConfig, formData.apiKey);
       }
       
@@ -234,7 +243,7 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved }: AIAgentFormProps) 
               id="memory"
               value={formData.memory}
               onChange={(e) => setFormData({...formData, memory: e.target.value})}
-              placeholder="Set memory context for the agent (e.g., JSON string)"
+              placeholder="Set memory context for the agent (simple text or JSON)"
               className="mt-2 rounded-xl border-0 bg-white/60 shadow-md focus:shadow-lg transition-shadow resize-none"
               style={{ boxShadow: '0 0 15px rgba(154, 94, 255, 0.1)' }}
               rows={3}

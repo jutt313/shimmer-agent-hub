@@ -53,12 +53,12 @@ const Index = () => {
           messages: messages.slice(-10) // Send last 10 messages for context
         };
 
-        // Add agent configuration if available
+        // Add agent configuration if available (but don't send API key to the backend)
         if (currentAgentConfig) {
           payload.agentConfig = currentAgentConfig.config;
           payload.llmProvider = currentAgentConfig.llmProvider;
           payload.model = currentAgentConfig.model;
-          payload.apiKey = currentAgentConfig.apiKey;
+          // Don't send the API key to the backend - it should use the one from Supabase secrets
         }
 
         console.log('Sending payload:', { ...payload, apiKey: payload.apiKey ? '[REDACTED]' : undefined });
@@ -107,13 +107,13 @@ const Index = () => {
     }
   };
 
-  const handleAgentConfigSaved = (agentName: string, llmProvider: string, model: string, config: any, apiKey: string) => {
+  const handleAgentConfigSaved = (agentName: string, agentId?: string, llmProvider?: string, model?: string, config?: any, apiKey?: string) => {
     setCurrentAgentConfig({
       name: agentName,
-      llmProvider,
-      model,
-      config,
-      apiKey
+      llmProvider: llmProvider || 'OpenAI',
+      model: model || 'gpt-4o-mini',
+      config: config || {},
+      apiKey: apiKey || '' // Store locally but don't send to backend
     });
     toast({
       title: "AI Agent Configured",

@@ -9,6 +9,7 @@ import { Send, ArrowLeft, Bot } from "lucide-react";
 import ChatCard from "@/components/ChatCard";
 import AIAgentForm from "@/components/AIAgentForm";
 import PlatformButtons from "@/components/PlatformButtons";
+import { AutomationBlueprint } from "@/types/automation"; // ADD THIS IMPORT
 
 interface Automation {
   id: string;
@@ -16,6 +17,7 @@ interface Automation {
   description: string | null;
   status: string;
   created_at: string;
+  automation_blueprint: AutomationBlueprint | null; // ADD THIS FIELD
 }
 
 interface ChatMessage {
@@ -46,6 +48,7 @@ interface StructuredResponse {
     why_needed: string;
   }>;
   clarification_questions?: string[];
+  automation_blueprint?: AutomationBlueprint; // ADD THIS FIELD
 }
 
 const AutomationDetail = () => {
@@ -76,7 +79,7 @@ const AutomationDetail = () => {
       // Fetch automation details
       const { data: automationData, error: automationError } = await supabase
         .from('automations')
-        .select('*')
+        .select('*') // 'automation_blueprint' is included with '*'
         .eq('id', id)
         .single();
 
@@ -134,9 +137,6 @@ const AutomationDetail = () => {
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[1]);
         console.log('✅ Successfully parsed JSON from code block:', parsed);
-        console.log('Agents found:', parsed.agents);
-        console.log('Platforms found:', parsed.platforms);
-        console.log('Clarification questions found:', parsed.clarification_questions);
         return parsed;
       }
       
@@ -149,18 +149,12 @@ const AutomationDetail = () => {
         console.log('Extracted JSON string:', jsonString);
         const parsed = JSON.parse(jsonString);
         console.log('✅ Successfully parsed extracted JSON:', parsed);
-        console.log('Agents found:', parsed.agents);
-        console.log('Platforms found:', parsed.platforms);
-        console.log('Clarification questions found:', parsed.clarification_questions);
         return parsed;
       }
       
       // Try to parse the entire response as JSON
       const parsed = JSON.parse(responseText);
       console.log('✅ Successfully parsed entire response as JSON:', parsed);
-      console.log('Agents found:', parsed.agents);
-      console.log('Platforms found:', parsed.platforms);
-      console.log('Clarification questions found:', parsed.clarification_questions);
       return parsed;
       
     } catch (error) {
@@ -256,6 +250,44 @@ const AutomationDetail = () => {
         displayText = formatStructuredMessage(structuredData);
         console.log('=== FORMATTED DISPLAY TEXT ===');
         console.log(displayText);
+        
+        // Update platforms immediately after parsing
+        if (structuredData.platforms && Array.isArray(structuredData.platforms)) {
+          console.log('✅ Setting platforms in state:', structuredData.platforms);
+          setCurrentPlatforms(structuredData.platforms);
+        } else {
+          console.log('❌ No platforms found in structured data');
+          setCurrentPlatforms([]); // Clear if no platforms are recommended
+        }
+
+        // --- NEW: Update automation_blueprint in the database if provided by AI ---
+        if (structuredData.automation_blueprint) {
+          console.log('✅ Updating automation blueprint in DB:', structuredData.automation_blueprint);
+          const { error: updateBlueprintError } = await supabase
+            .from('automations')
+            .update({ automation_blueprint: structuredData.automation_blueprint })
+            .eq('id', automation.id); // Use the current automation ID
+
+          if (updateBlueprintError) {
+            console.error('Error updating automation blueprint:', updateBlueprintError);
+            toast({
+              title: "Error",
+              description: "Failed to save automation blueprint.",
+              variant: "destructive",
+            });
+          } else {
+            // Update local state to reflect the change
+            setAutomation(prev => ({
+              ...prev!, // prev! because automation is guaranteed not null here
+              automation_blueprint: structuredData.automation_blueprint
+            }));
+            toast({
+              title: "Blueprint Updated",
+              description: "Automation blueprint has been updated.",
+            });
+          }
+        }
+        // --- END NEW ---
       }
       
       const aiMessage = {
@@ -271,14 +303,6 @@ const AutomationDetail = () => {
       console.log('StructuredData content:', aiMessage.structuredData);
 
       setMessages(prev => [...prev, aiMessage]);
-
-      // Update platforms immediately after parsing
-      if (structuredData?.platforms && Array.isArray(structuredData.platforms)) {
-        console.log('✅ Setting platforms in state:', structuredData.platforms);
-        setCurrentPlatforms(structuredData.platforms);
-      } else {
-        console.log('❌ No platforms found in structured data');
-      }
 
       // Save AI response to database
       await supabase
@@ -389,6 +413,18 @@ const AutomationDetail = () => {
           />
         </div>
         
+        {/* NEW: Display Automation Blueprint for debugging/verification */}
+        {automation?.automation_blueprint && (
+          <div className="max-w-7xl mx-auto w-full mb-4 p-6 bg-white/70 backdrop-blur-md rounded-3xl shadow-lg border-0">
+            <h2 className="text-xl font-bold bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent mb-4">
+              Automation Blueprint (for execution)
+            </h2>
+            <pre className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded-xl border border-gray-200 overflow-auto max-h-80">
+              <code>{JSON.stringify(automation.automation_blueprint, null, 2)}</code>
+            </pre>
+          </div>
+        )}
+
         {/* Platform Buttons - Positioned between chat and input */}
         {currentPlatforms && currentPlatforms.length > 0 && (
           <div className="mb-4">

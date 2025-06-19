@@ -143,8 +143,8 @@ const ChatCard = ({
   const formatMessageText = (text: string) => {
     // Convert markdown-style formatting to HTML-like styling for display
     return text
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')  // Bold text
-      .replace(/\n\n/g, '\n')  // Reduce double line breaks
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n\n/g, '\n')
       .split('\n')
       .map((line, index) => (
         <span key={index}>
@@ -161,7 +161,6 @@ const ChatCard = ({
       }} 
       className="w-full max-w-6xl h-[75vh] bg-white/70 backdrop-blur-md rounded-3xl p-8 shadow-2xl border-0 relative"
     >
-      {/* Subtle glow effect inside */}
       <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/30 to-purple-100/30 pointer-events-none"></div>
       
       <ScrollArea className="h-full relative z-10">
@@ -177,8 +176,14 @@ const ChatCard = ({
                   boxShadow: '0 0 20px rgba(92, 142, 246, 0.3)'
                 } : {}}
               >
+                {/* Only show formatted text if there's no structured data, or if there is structured data, show a simplified version */}
                 <div className="text-sm leading-relaxed whitespace-pre-wrap">
-                  {formatMessageText(message.text)}
+                  {message.isBot && message.structuredData ? (
+                    // Show simplified text when we have structured data
+                    <span>Here's what I found for your automation:</span>
+                  ) : (
+                    formatMessageText(message.text)
+                  )}
                 </div>
                 
                 {/* Render structured data components */}

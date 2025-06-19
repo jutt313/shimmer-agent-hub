@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -87,7 +88,6 @@ const AutomationDetail = () => {
 
       if (automationError) throw automationError;
 
-      // Explicitly cast automation_blueprint to AutomationBlueprint type
       const automationData: Automation = {
         ...data,
         automation_blueprint: data.automation_blueprint as AutomationBlueprint | null
@@ -105,12 +105,50 @@ const AutomationDetail = () => {
       if (chatError) throw chatError;
 
       // Convert chat messages to the format expected by ChatCard
-      const formattedMessages = chatData.map((chat: ChatMessage, index: number) => ({
-        id: index + 1,
-        text: chat.message_content,
-        isBot: chat.sender === 'ai',
-        timestamp: new Date(chat.timestamp)
-      }));
+      const formattedMessages = chatData.map((chat: ChatMessage, index: number) => {
+        let structuredData = null;
+        
+        // Try to extract structured data from AI messages
+        if (chat.sender === 'ai') {
+          try {
+            const jsonMatch = chat.message_content.match(/```json\n([\s\S]*?)\n```/);
+            if (jsonMatch) {
+              structuredData = JSON.parse(jsonMatch[1]);
+            } else {
+              // Try to find JSON object in the text
+              const jsonStart = chat.message_content.indexOf('{');
+              const jsonEnd = chat.message_content.lastIndexOf('}');
+              
+              if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+                const jsonString = chat.message_content.substring(jsonStart, jsonEnd + 1);
+                structuredData = JSON.parse(jsonString);
+              }
+            }
+          } catch (error) {
+            console.log('Could not parse structured data from stored message');
+          }
+        }
+
+        return {
+          id: index + 1,
+          text: chat.message_content,
+          isBot: chat.sender === 'ai',
+          timestamp: new Date(chat.timestamp),
+          structuredData
+        };
+      });
+
+      // Extract platforms from the last AI message that has them
+      const lastAIMessageWithPlatforms = formattedMessages
+        .reverse()
+        .find(msg => msg.isBot && msg.structuredData?.platforms);
+      
+      if (lastAIMessageWithPlatforms?.structuredData?.platforms) {
+        setCurrentPlatforms(lastAIMessageWithPlatforms.structuredData.platforms);
+      }
+
+      // Restore the original order
+      formattedMessages.reverse();
 
       // Add welcome message if no chats exist
       if (formattedMessages.length === 0) {
@@ -251,7 +289,7 @@ const AutomationDetail = () => {
       const payload = {
         message: messageText,
         messages: messages.slice(-10),
-        automation: automation // Include automation context
+        automation: automation
       };
 
       const { data, error } = await supabase.functions.invoke('chat-ai', {
@@ -277,9 +315,6 @@ const AutomationDetail = () => {
         if (structuredData.platforms && Array.isArray(structuredData.platforms)) {
           console.log('✅ Setting platforms in state:', structuredData.platforms);
           setCurrentPlatforms(structuredData.platforms);
-        } else {
-          console.log('❌ No platforms found in structured data');
-          setCurrentPlatforms([]);
         }
 
         // Update automation_blueprint in the database if provided by AI
@@ -298,12 +333,11 @@ const AutomationDetail = () => {
               variant: "destructive",
             });
           } else {
-            // Update local state to reflect the change
             setAutomation(prev => ({
               ...prev!,
               automation_blueprint: structuredData.automation_blueprint
             }));
-            setShowBlueprint(true); // Show the blueprint when it's updated
+            setShowBlueprint(true);
             toast({
               title: "Blueprint Updated",
               description: "Automation blueprint has been updated.",
@@ -317,7 +351,7 @@ const AutomationDetail = () => {
         text: displayText,
         isBot: true,
         timestamp: new Date(),
-        structuredData: structuredData // This is the key - attach the structured data
+        structuredData: structuredData
       };
 
       console.log('=== FINAL AI MESSAGE OBJECT ===');
@@ -410,11 +444,6 @@ const AutomationDetail = () => {
     );
   }
 
-  console.log('Rendering platform buttons check:', {
-    currentPlatforms,
-    hasData: currentPlatforms && currentPlatforms.length > 0
-  });
-
   return (
     <div className="h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6 relative overflow-hidden">
       {/* Background glow effects */}
@@ -443,7 +472,7 @@ const AutomationDetail = () => {
       </div>
       
       <div className="max-w-7xl mx-auto h-full flex flex-col relative z-10 pt-16">        
-        {/* Chat Card - Lifted upward by reducing top padding */}
+        {/* Chat Card */}
         <div className="flex-1 flex items-start justify-center pt-2 pb-4">
           <ChatCard 
             messages={messages} 
@@ -453,7 +482,7 @@ const AutomationDetail = () => {
           />
         </div>
         
-        {/* Platform Buttons - Positioned between chat and input */}
+        {/* Platform Buttons */}
         {currentPlatforms && currentPlatforms.length > 0 && (
           <div className="mb-4">
             <PlatformButtons platforms={currentPlatforms} />

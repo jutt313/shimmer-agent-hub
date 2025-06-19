@@ -13,7 +13,7 @@ import { useToast } from "@/components/ui/use-toast";
 interface AIAgentFormProps {
   automationId?: string; // Made optional
   onClose: () => void;
-  onAgentSaved?: (agentName: string, agentId: string) => void; // Made optional
+  onAgentSaved?: (agentName: string, agentId?: string, llmProvider?: string, model?: string, config?: any, apiKey?: string) => void; // Enhanced callback
 }
 
 const llmOptions = {
@@ -49,10 +49,6 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved }: AIAgentFormProps) 
   };
 
   const handleSave = async () => {
-    if (!user?.id) {
-      toast({ title: "Error", description: "User not authenticated.", variant: "destructive" });
-      return;
-    }
     if (!formData.name || !selectedLLM || !selectedModel || !formData.role || !formData.goal || !formData.apiKey) {
       toast({ title: "Error", description: "Please fill all required fields.", variant: "destructive" });
       return;
@@ -60,8 +56,16 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved }: AIAgentFormProps) 
 
     setIsSaving(true);
     try {
+      // Prepare agent configuration
+      const agentConfig = {
+        role: formData.role.trim(),
+        goal: formData.goal.trim(),
+        rules: formData.rule.trim() || null,
+        memory: formData.memory.trim() || null,
+      };
+
       // Only save to ai_agents table if we have an automationId
-      if (automationId) {
+      if (automationId && user?.id) {
         const { data, error } = await supabase
           .from('ai_agents')
           .insert({
@@ -82,14 +86,17 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved }: AIAgentFormProps) 
           description: `AI Agent "${formData.name}" saved!`,
         });
         
-        // Call the onAgentSaved callback if provided
-        onAgentSaved?.(data.agent_name, data.id);
+        // Call the onAgentSaved callback with database ID
+        onAgentSaved?.(data.agent_name, data.id, selectedLLM, selectedModel, agentConfig, formData.apiKey);
       } else {
         // Handle case where no automationId is provided (e.g., from Index page)
         toast({
           title: "Agent Configuration",
           description: `AI Agent "${formData.name}" configured! This will be used for general chat.`,
         });
+        
+        // Call the onAgentSaved callback without database ID
+        onAgentSaved?.(formData.name.trim(), undefined, selectedLLM, selectedModel, agentConfig, formData.apiKey);
       }
       
       onClose();

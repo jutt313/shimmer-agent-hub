@@ -14,6 +14,7 @@ const Index = () => {
   const [message, setMessage] = useState("");
   const [showAgentForm, setShowAgentForm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [currentAgentConfig, setCurrentAgentConfig] = useState(null);
   const [messages, setMessages] = useState([{
     id: 1,
     text: "Hello! I'm your AI assistant powered by OpenAI. How can I help you today?",
@@ -39,11 +40,24 @@ const Index = () => {
       setIsLoading(true);
 
       try {
+        // Prepare payload with agent configuration
+        const payload = { 
+          message: message,
+          messages: messages.slice(-10) // Send last 10 messages for context
+        };
+
+        // Add agent configuration if available
+        if (currentAgentConfig) {
+          payload.agentConfig = currentAgentConfig.config;
+          payload.llmProvider = currentAgentConfig.llmProvider;
+          payload.model = currentAgentConfig.model;
+          payload.apiKey = currentAgentConfig.apiKey;
+        }
+
+        console.log('Sending payload:', { ...payload, apiKey: payload.apiKey ? '[REDACTED]' : undefined });
+
         const { data, error } = await supabase.functions.invoke('chat-ai', {
-          body: { 
-            message: message,
-            messages: messages.slice(-10) // Send last 10 messages for context
-          }
+          body: payload
         });
 
         if (error) {
@@ -86,14 +100,40 @@ const Index = () => {
     }
   };
 
+  const handleAgentConfigSaved = (agentName: string, llmProvider: string, model: string, config: any, apiKey: string) => {
+    setCurrentAgentConfig({
+      name: agentName,
+      llmProvider,
+      model,
+      config,
+      apiKey
+    });
+    toast({
+      title: "AI Agent Configured",
+      description: `AI Agent "${agentName}" is now active for this chat session.`,
+    });
+  };
+
   return (
     <div className="h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6 relative overflow-hidden">
       {/* Background glow effects */}
       <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-blue-300/20 to-purple-300/20 rounded-full blur-3xl animate-pulse"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-r from-purple-300/20 to-blue-300/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
       
-      {/* Header with navigation - removed Chat button */}
+      {/* Header with navigation */}
       <div className="absolute top-6 right-6 z-20 flex gap-4">
+        {/* Agent Status Display */}
+        {currentAgentConfig && (
+          <div className="bg-white/90 backdrop-blur-md rounded-2xl px-4 py-2 shadow-lg border border-blue-200">
+            <div className="text-sm text-blue-600 font-medium">
+              Active Agent: {currentAgentConfig.name}
+            </div>
+            <div className="text-xs text-gray-500">
+              {currentAgentConfig.llmProvider} - {currentAgentConfig.model}
+            </div>
+          </div>
+        )}
+        
         {user ? (
           <Button 
             onClick={() => navigate("/automations")}
@@ -168,7 +208,12 @@ const Index = () => {
       </div>
       
       {/* AI Agent Form Modal */}
-      {showAgentForm && <AIAgentForm onClose={() => setShowAgentForm(false)} />}
+      {showAgentForm && (
+        <AIAgentForm 
+          onClose={() => setShowAgentForm(false)} 
+          onAgentSaved={handleAgentConfigSaved}
+        />
+      )}
     </div>
   );
 };

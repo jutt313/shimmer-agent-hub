@@ -2,14 +2,12 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const SYSTEM_PROMPT = `You are an AI assistant for YusrAI. YusrAI is a very powerful tool that can build real-time automation workflows and AI agents just from a prompt.
+const DEFAULT_SYSTEM_PROMPT = `You are an AI assistant for YusrAI. YusrAI is a very powerful tool that can build real-time automation workflows and AI agents just from a prompt.
 
 Your Task:
 Whenever a user provides a prompt, you will receive:
@@ -82,6 +80,66 @@ When providing structured responses, wrap your response in JSON format with the 
 
 If you need clarification before providing a complete automation design, include the clarification_questions array. Otherwise, omit it.`;
 
+// Function to get API endpoint based on LLM provider
+const getApiEndpoint = (llmProvider: string) => {
+  switch (llmProvider.toLowerCase()) {
+    case 'openai':
+      return 'https://api.openai.com/v1/chat/completions';
+    case 'claude':
+      return 'https://api.anthropic.com/v1/messages';
+    case 'gemini':
+      return 'https://generativelanguage.googleapis.com/v1beta/models';
+    case 'grok':
+      return 'https://api.x.ai/v1/chat/completions';
+    case 'deepseek':
+      return 'https://api.deepseek.com/chat/completions';
+    default:
+      return 'https://api.openai.com/v1/chat/completions';
+  }
+};
+
+// Function to format authorization header based on LLM provider
+const getAuthHeader = (llmProvider: string, apiKey: string) => {
+  switch (llmProvider.toLowerCase()) {
+    case 'claude':
+      return { 'x-api-key': apiKey };
+    case 'gemini':
+      return {}; // Gemini uses API key in URL
+    default:
+      return { 'Authorization': `Bearer ${apiKey}` };
+  }
+};
+
+// Function to build system prompt from agent configuration
+const buildSystemPrompt = (agentConfig: any) => {
+  if (!agentConfig) return DEFAULT_SYSTEM_PROMPT;
+  
+  let systemPrompt = '';
+  
+  if (agentConfig.role) {
+    systemPrompt += `Role: ${agentConfig.role}\n\n`;
+  }
+  
+  if (agentConfig.goal) {
+    systemPrompt += `Goal: ${agentConfig.goal}\n\n`;
+  }
+  
+  if (agentConfig.rules) {
+    systemPrompt += `Rules: ${agentConfig.rules}\n\n`;
+  }
+  
+  if (agentConfig.memory) {
+    try {
+      const memoryObj = typeof agentConfig.memory === 'string' ? JSON.parse(agentConfig.memory) : agentConfig.memory;
+      systemPrompt += `Memory Context: ${JSON.stringify(memoryObj)}\n\n`;
+    } catch (e) {
+      systemPrompt += `Memory Context: ${agentConfig.memory}\n\n`;
+    }
+  }
+  
+  return systemPrompt || DEFAULT_SYSTEM_PROMPT;
+};
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -89,20 +147,57 @@ serve(async (req) => {
   }
 
   try {
-    const { message, messages = [] } = await req.json();
+    const { 
+      message, 
+      messages = [], 
+      agentConfig = null,
+      llmProvider = 'OpenAI',
+      model = 'gpt-4o-mini',
+      apiKey = null
+    } = await req.json();
 
-    console.log('Received message:', message);
+    console.log('Received request with:', { llmProvider, model, hasApiKey: !!apiKey, hasAgentConfig: !!agentConfig });
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
+    // Use provided API key or fallback to environment variable
+    const effectiveApiKey = apiKey || Deno.env.get('OPENAI_API_KEY');
+    
+    if (!effectiveApiKey) {
+      throw new Error('No API key provided');
+    }
+
+    // Build system prompt from agent configuration
+    const systemPrompt = buildSystemPrompt(agentConfig);
+    console.log('Using system prompt:', systemPrompt.substring(0, 200) + '...');
+
+    // Get API endpoint and auth headers based on LLM provider
+    const apiEndpoint = getApiEndpoint(llmProvider);
+    const authHeaders = getAuthHeader(llmProvider, effectiveApiKey);
+
+    console.log('Making request to:', apiEndpoint, 'with model:', model);
+
+    // Prepare request body based on LLM provider
+    let requestBody;
+    
+    if (llmProvider.toLowerCase() === 'claude') {
+      // Anthropic Claude format
+      requestBody = {
+        model: model,
+        max_tokens: 1500,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          ...messages.map((msg: any) => ({
+            role: msg.isBot ? 'assistant' : 'user',
+            content: msg.text
+          })),
+          { role: 'user', content: message }
+        ],
+        system: systemPrompt
+      };
+    } else {
+      // OpenAI format (also works for Grok, DeepSeek)
+      requestBody = {
+        model: model,
+        messages: [
+          { role: 'system', content: systemPrompt },
           ...messages.map((msg: any) => ({
             role: msg.isBot ? 'assistant' : 'user',
             content: msg.text
@@ -111,17 +206,34 @@ serve(async (req) => {
         ],
         max_tokens: 1500,
         temperature: 0.7,
-      }),
+      };
+    }
+
+    const response = await fetch(apiEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders,
+      },
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('API error:', response.status, errorText);
+      throw new Error(`${llmProvider} API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
+    console.log('Received response from API');
 
-    console.log('AI response:', aiResponse);
+    // Extract response content based on provider
+    let aiResponse;
+    if (llmProvider.toLowerCase() === 'claude') {
+      aiResponse = data.content[0].text;
+    } else {
+      aiResponse = data.choices[0].message.content;
+    }
 
     return new Response(JSON.stringify({ response: aiResponse }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

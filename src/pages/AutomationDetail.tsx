@@ -77,13 +77,20 @@ const AutomationDetail = () => {
   const fetchAutomationAndChats = async () => {
     try {
       // Fetch automation details
-      const { data: automationData, error: automationError } = await supabase
+      const { data, error: automationError } = await supabase
         .from('automations')
         .select('*') // 'automation_blueprint' is included with '*'
         .eq('id', id)
         .single();
 
       if (automationError) throw automationError;
+
+      // Explicitly cast automation_blueprint to AutomationBlueprint type
+      const automationData: Automation = {
+        ...data,
+        automation_blueprint: data.automation_blueprint as AutomationBlueprint | null
+      };
+
       setAutomation(automationData);
 
       // Fetch chat messages for this automation

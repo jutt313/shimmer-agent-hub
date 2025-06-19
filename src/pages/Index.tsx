@@ -40,8 +40,15 @@ const Index = () => {
       setIsLoading(true);
 
       try {
-        // Prepare payload with agent configuration
-        const payload = { 
+        // Prepare payload with proper typing
+        const payload: {
+          message: string;
+          messages: any[];
+          agentConfig?: any;
+          llmProvider?: string;
+          model?: string;
+          apiKey?: string;
+        } = { 
           message: message,
           messages: messages.slice(-10) // Send last 10 messages for context
         };

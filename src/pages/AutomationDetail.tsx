@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -178,12 +177,12 @@ const AutomationDetail = () => {
 
     // Summary
     if (structuredData.summary) {
-      formattedMessage += `Automation Summary\n\n${structuredData.summary}\n\n`;
+      formattedMessage += `**Automation Summary**\n\n${structuredData.summary}\n\n`;
     }
 
     // Steps
     if (structuredData.steps && structuredData.steps.length > 0) {
-      formattedMessage += `Step-by-Step Workflow\n\n`;
+      formattedMessage += `**Step-by-Step Workflow**\n\n`;
       structuredData.steps.forEach((step, index) => {
         formattedMessage += `**${index + 1}.** ${step}\n\n`;
       });
@@ -191,7 +190,7 @@ const AutomationDetail = () => {
 
     // Platform information
     if (structuredData.platforms && structuredData.platforms.length > 0) {
-      formattedMessage += `Required Platform Credentials\n\n`;
+      formattedMessage += `**Required Platform Credentials**\n\n`;
       structuredData.platforms.forEach(platform => {
         formattedMessage += `**${platform.name}**\n`;
         platform.credentials.forEach(cred => {
@@ -201,9 +200,19 @@ const AutomationDetail = () => {
       });
     }
 
+    // Agent information
+    if (structuredData.agents && structuredData.agents.length > 0) {
+      formattedMessage += `**Recommended AI Agents**\n\n`;
+      structuredData.agents.forEach(agent => {
+        formattedMessage += `**${agent.name}** - ${agent.role}\n`;
+        formattedMessage += `Goal: ${agent.goal}\n`;
+        formattedMessage += `Why needed: ${agent.why_needed}\n\n`;
+      });
+    }
+
     // Clarification questions
     if (structuredData.clarification_questions && structuredData.clarification_questions.length > 0) {
-      formattedMessage += `I need some clarification:\n\n`;
+      formattedMessage += `**I need some clarification:**\n\n`;
       structuredData.clarification_questions.forEach((question, index) => {
         formattedMessage += `**${index + 1}.** ${question}\n\n`;
       });
@@ -236,12 +245,15 @@ const AutomationDetail = () => {
           message_content: messageText
         });
 
-      // Get AI response
+      // Get AI response with automation context
+      const payload = {
+        message: messageText,
+        messages: messages.slice(-10),
+        automation: automation // Include automation context
+      };
+
       const { data, error } = await supabase.functions.invoke('chat-ai', {
-        body: { 
-          message: `In the context of automation "${automation.title}": ${messageText}`,
-          messages: messages.slice(-10)
-        }
+        body: payload
       });
 
       if (error) throw error;
@@ -253,7 +265,7 @@ const AutomationDetail = () => {
       const structuredData = parseStructuredResponse(data.response);      
       let displayText = data.response;
       
-      // If we have structured data, format it nicely
+      // If we have structured data, format it nicely and store it
       if (structuredData) {
         displayText = formatStructuredMessage(structuredData);
         console.log('=== FORMATTED DISPLAY TEXT ===');
@@ -302,7 +314,7 @@ const AutomationDetail = () => {
         text: displayText,
         isBot: true,
         timestamp: new Date(),
-        structuredData: structuredData
+        structuredData: structuredData // This is the key - attach the structured data
       };
 
       console.log('=== FINAL AI MESSAGE OBJECT ===');

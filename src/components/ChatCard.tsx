@@ -1,7 +1,7 @@
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Bot, Plus, X } from "lucide-react";
+import { Bot, Plus, X, Info } from "lucide-react";
 
 interface Message {
   id: number;
@@ -88,6 +88,31 @@ const ChatCard = ({
     );
   };
 
+  const renderPlatformCredentials = (platforms: any[]) => {
+    return (
+      <div className="mt-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl border border-purple-200">
+        <div className="text-sm font-semibold text-purple-800 mb-3 flex items-center gap-2">
+          <Info className="w-5 h-5 text-purple-600" />
+          Required Platform Credentials:
+        </div>
+        <div className="space-y-3">
+          {platforms.map((platform, index) => (
+            <div key={index} className="border border-purple-200 rounded-lg p-3 bg-white/50">
+              <h4 className="font-semibold text-purple-800 mb-2">{platform.name}</h4>
+              <div className="space-y-1">
+                {platform.credentials?.map((cred: any, credIndex: number) => (
+                  <div key={credIndex} className="text-sm text-purple-700">
+                    <span className="font-medium">{cred.field}:</span> {cred.why_needed}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const formatMessageText = (text: string) => {
     // Convert markdown-style formatting to HTML-like styling for display
     return text
@@ -129,18 +154,28 @@ const ChatCard = ({
                   {formatMessageText(message.text)}
                 </div>
                 
-                {/* Render clarification questions first */}
-                {message.isBot && message.structuredData?.clarification_questions && message.structuredData.clarification_questions.length > 0 && (
-                  renderClarificationQuestions(message.structuredData.clarification_questions)
-                )}
-                
-                {/* Render agent recommendations */}
-                {message.isBot && message.structuredData?.agents && Array.isArray(message.structuredData.agents) && message.structuredData.agents.length > 0 && (
+                {/* Render structured data components */}
+                {message.isBot && message.structuredData && (
                   <div className="mt-4 space-y-3">
-                    <div className="text-sm font-semibold text-indigo-800 border-t border-indigo-200 pt-3">
-                      Recommended AI Agents:
-                    </div>
-                    {message.structuredData.agents.map((agent: any) => renderAgentRecommendation(agent))}
+                    {/* Render clarification questions first */}
+                    {message.structuredData.clarification_questions && message.structuredData.clarification_questions.length > 0 && (
+                      renderClarificationQuestions(message.structuredData.clarification_questions)
+                    )}
+                    
+                    {/* Render platform credentials */}
+                    {message.structuredData.platforms && Array.isArray(message.structuredData.platforms) && message.structuredData.platforms.length > 0 && (
+                      renderPlatformCredentials(message.structuredData.platforms)
+                    )}
+                    
+                    {/* Render agent recommendations */}
+                    {message.structuredData.agents && Array.isArray(message.structuredData.agents) && message.structuredData.agents.length > 0 && (
+                      <div className="border-t border-indigo-200 pt-3">
+                        <div className="text-sm font-semibold text-indigo-800 mb-3">
+                          Recommended AI Agents:
+                        </div>
+                        {message.structuredData.agents.map((agent: any) => renderAgentRecommendation(agent))}
+                      </div>
+                    )}
                   </div>
                 )}
                 

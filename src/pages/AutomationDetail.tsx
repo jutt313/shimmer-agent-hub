@@ -346,7 +346,6 @@ const AutomationDetail = () => {
     );
   }
 
-  // Move console.log outside of JSX
   console.log('Rendering platform buttons check:', {
     currentPlatforms,
     hasData: currentPlatforms && currentPlatforms.length > 0
@@ -358,7 +357,7 @@ const AutomationDetail = () => {
       <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-blue-300/20 to-purple-300/20 rounded-full blur-3xl animate-pulse"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-r from-purple-300/20 to-blue-300/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
       
-      {/* Header */}
+      {/* Header - Removed AI Agent button from top right */}
       <div className="absolute top-6 left-6 right-6 z-20 flex justify-between items-center">
         <div className="flex items-center gap-4">
           <Button 
@@ -377,22 +376,11 @@ const AutomationDetail = () => {
             </p>
           </div>
         </div>
-        
-        <Button
-          onClick={() => setShowAIAgentForm(true)}
-          className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-6 py-4 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
-          style={{
-            boxShadow: '0 0 25px rgba(147, 51, 234, 0.3)'
-          }}
-        >
-          <Bot className="w-5 h-5 mr-2" />
-          AI Agent
-        </Button>
       </div>
       
-      <div className="max-w-7xl mx-auto h-full flex flex-col relative z-10 pt-20">        
-        {/* Chat Card - Made wider and taller */}
-        <div className="flex-1 flex items-start justify-center pt-4 pb-4">
+      <div className="max-w-7xl mx-auto h-full flex flex-col relative z-10 pt-16">        
+        {/* Chat Card - Lifted upward by reducing top padding */}
+        <div className="flex-1 flex items-start justify-center pt-2 pb-4">
           <ChatCard 
             messages={messages} 
             onAgentAdd={handleAgentAdd}

@@ -453,18 +453,6 @@ const AutomationDetail = () => {
           />
         </div>
         
-        {/* Display Automation Blueprint for debugging/verification */}
-        {automation?.automation_blueprint && (
-          <div className="max-w-7xl mx-auto w-full mb-4 p-6 bg-white/70 backdrop-blur-md rounded-3xl shadow-lg border-0">
-            <h2 className="text-xl font-bold bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent mb-4">
-              Automation Blueprint (for execution)
-            </h2>
-            <pre className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded-xl border border-gray-200 overflow-auto max-h-80">
-              <code>{JSON.stringify(automation.automation_blueprint, null, 2)}</code>
-            </pre>
-          </div>
-        )}
-
         {/* Platform Buttons - Positioned between chat and input */}
         {currentPlatforms && currentPlatforms.length > 0 && (
           <div className="mb-4">
@@ -514,7 +502,7 @@ const AutomationDetail = () => {
         </div>
       </div>
 
-      {/* Blueprint Card - Horizontal at bottom */}
+      {/* Blueprint Card - Right side slide-out panel */}
       {showBlueprint && automation?.automation_blueprint && (
         <BlueprintCard
           blueprint={automation.automation_blueprint}

@@ -9,6 +9,7 @@ import { Send, ArrowLeft, Bot } from "lucide-react";
 import ChatCard from "@/components/ChatCard";
 import AIAgentForm from "@/components/AIAgentForm";
 import PlatformButtons from "@/components/PlatformButtons";
+import BlueprintCard from "@/components/BlueprintCard";
 import { AutomationBlueprint } from "@/types/automation";
 
 interface Automation {
@@ -65,6 +66,7 @@ const AutomationDetail = () => {
   const [showAIAgentForm, setShowAIAgentForm] = useState(false);
   const [dismissedAgents, setDismissedAgents] = useState<Set<string>>(new Set());
   const [currentPlatforms, setCurrentPlatforms] = useState<any[]>([]);
+  const [showBlueprint, setShowBlueprint] = useState(false);
 
   useEffect(() => {
     if (!user || !id) {
@@ -301,6 +303,7 @@ const AutomationDetail = () => {
               ...prev!,
               automation_blueprint: structuredData.automation_blueprint
             }));
+            setShowBlueprint(true); // Show the blueprint when it's updated
             toast({
               title: "Blueprint Updated",
               description: "Automation blueprint has been updated.",
@@ -510,6 +513,14 @@ const AutomationDetail = () => {
           </div>
         </div>
       </div>
+
+      {/* Blueprint Card - Horizontal at bottom */}
+      {showBlueprint && automation?.automation_blueprint && (
+        <BlueprintCard
+          blueprint={automation.automation_blueprint}
+          onClose={() => setShowBlueprint(false)}
+        />
+      )}
 
       {/* AI Agent Form Modal */}
       {showAIAgentForm && automation && (

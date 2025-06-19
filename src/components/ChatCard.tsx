@@ -113,6 +113,33 @@ const ChatCard = ({
     );
   };
 
+  const renderSummary = (summary: string) => {
+    return (
+      <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl border border-blue-200">
+        <div className="text-sm font-semibold text-blue-800 mb-2">Summary</div>
+        <p className="text-blue-700 text-sm">{summary}</p>
+      </div>
+    );
+  };
+
+  const renderSteps = (steps: string[]) => {
+    return (
+      <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
+        <div className="text-sm font-semibold text-green-800 mb-3">Step-by-Step Workflow</div>
+        <div className="space-y-2">
+          {steps.map((step, index) => (
+            <div key={index} className="flex gap-3 text-sm">
+              <span className="min-w-[20px] h-5 bg-green-600 text-white rounded-full flex items-center justify-center text-xs font-medium">
+                {index + 1}
+              </span>
+              <p className="text-green-700">{step}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const formatMessageText = (text: string) => {
     // Convert markdown-style formatting to HTML-like styling for display
     return text
@@ -157,7 +184,17 @@ const ChatCard = ({
                 {/* Render structured data components */}
                 {message.isBot && message.structuredData && (
                   <div className="mt-4 space-y-3">
-                    {/* Render clarification questions first */}
+                    {/* Render summary first */}
+                    {message.structuredData.summary && (
+                      renderSummary(message.structuredData.summary)
+                    )}
+                    
+                    {/* Render steps */}
+                    {message.structuredData.steps && Array.isArray(message.structuredData.steps) && message.structuredData.steps.length > 0 && (
+                      renderSteps(message.structuredData.steps)
+                    )}
+                    
+                    {/* Render clarification questions */}
                     {message.structuredData.clarification_questions && message.structuredData.clarification_questions.length > 0 && (
                       renderClarificationQuestions(message.structuredData.clarification_questions)
                     )}
@@ -170,7 +207,8 @@ const ChatCard = ({
                     {/* Render agent recommendations */}
                     {message.structuredData.agents && Array.isArray(message.structuredData.agents) && message.structuredData.agents.length > 0 && (
                       <div className="border-t border-indigo-200 pt-3">
-                        <div className="text-sm font-semibold text-indigo-800 mb-3">
+                        <div className="text-sm font-semibold text-indigo-800 mb-3 flex items-center gap-2">
+                          <Bot className="w-5 h-5" />
                           Recommended AI Agents:
                         </div>
                         {message.structuredData.agents.map((agent: any) => renderAgentRecommendation(agent))}

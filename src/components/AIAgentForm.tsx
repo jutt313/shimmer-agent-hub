@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,20 +5,28 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client"; // ADD THIS IMPORT
+import { useAuth } from "@/contexts/AuthContext"; // ADD THIS IMPORT
+import { useToast } from "@/components/ui/use-toast"; // ADD THIS IMPORT
 
 interface AIAgentFormProps {
+  automationId: string; // ADD THIS PROP: The ID of the current automation
   onClose: () => void;
+  onAgentSaved: (agentName: string, agentId: string) => void; // ADD THIS PROP: Callback when agent is saved
 }
 
 const llmOptions = {
-  "OpenAI": ["gpt-4", "gpt-3.5-turbo", "gpt-4-turbo"],
-  "Claude": ["claude-3-opus", "claude-3-sonnet", "claude-3-haiku"],
-  "Gemini": ["gemini-pro", "gemini-pro-vision", "gemini-ultra"],
-  "Grok": ["grok-1", "grok-1.5", "grok-2"],
-  "DeepSeek": ["deepseek-chat", "deepseek-coder", "deepseek-math"]
+  "OpenAI": ["gpt-4", "gpt-3.5-turbo", "gpt-4-turbo", "gpt-4o", "gpt-4o-mini"], // Added more models
+  "Claude": ["claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"], // Added more specific Claude models
+  "Gemini": ["gemini-pro", "gemini-1.5-pro-latest", "gemini-1.0-pro"], // Added more specific Gemini models
+  "Grok": ["grok-1", "grok-1.5"], // Simplified Grok options
+  "DeepSeek": ["deepseek-chat", "deepseek-coder"] // Simplified DeepSeek options
 };
 
-const AIAgentForm = ({ onClose }: AIAgentFormProps) => {
+const AIAgentForm = ({ automationId, onClose, onAgentSaved }: AIAgentFormProps) => { // Destructure new props
+  const { user } = useAuth(); // Get authenticated user
+  const { toast } = useToast(); // Get toast function
+
   const [selectedLLM, setSelectedLLM] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
   const [formData, setFormData] = useState({
@@ -28,17 +35,70 @@ const AIAgentForm = ({ onClose }: AIAgentFormProps) => {
     rule: "",
     goal: "",
     memory: "",
-    apiKey: ""
+    apiKey: "" // This will ideally be stored in platform_credentials later, but keeping for now
   });
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleTestAPI = () => {
-    console.log("Testing API...");
-    // API test logic would go here
+    toast({
+      title: "Test Connection",
+      description: "API testing functionality is not yet implemented for AI agents.",
+      variant: "default",
+    });
+    // API test logic would go here, likely calling a backend function
   };
 
-  const handleSave = () => {
-    console.log("Saving agent configuration:", { ...formData, llm: selectedLLM, model: selectedModel });
-    onClose();
+  const handleSave = async () => {
+    if (!user?.id) {
+      toast({ title: "Error", description: "User not authenticated.", variant: "destructive" });
+      return;
+    }
+    if (!formData.name || !selectedLLM || !selectedModel || !formData.role || !formData.goal || !formData.apiKey) {
+      toast({ title: "Error", description: "Please fill all required fields.", variant: "destructive" });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Save AI Agent details to public.ai_agents table
+      const { data, error } = await supabase
+        .from('ai_agents')
+        .insert({
+          automation_id: automationId, // Associate with the current automation
+          agent_name: formData.name.trim(),
+          agent_role: formData.role.trim(),
+          agent_goal: formData.goal.trim(),
+          agent_rules: formData.rule.trim() || null, // Allow null for optional fields
+          agent_memory: formData.memory.trim() ? JSON.parse(formData.memory.trim()) : null, // Assuming memory might be JSON
+          // Note: LLM and Model are not directly in ai_agents table.
+          // In a real scenario, you'd save the API key to platform_credentials
+          // and potentially link the agent to a platform/model setup.
+          // For now, we'll focus on the core agent fields.
+          // API Key storage logic would go here, possibly to platform_credentials for security
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `AI Agent "${formData.name}" saved!`,
+      });
+      
+      // Call the onAgentSaved callback passed from parent (AutomationDetail)
+      onAgentSaved(data.agent_name, data.id); // Pass name and new agent ID
+      onClose(); // Close the form
+    } catch (error: any) {
+      console.error("Error saving AI agent:", error);
+      toast({
+        title: "Error",
+        description: `Failed to save AI Agent: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -163,7 +223,7 @@ const AIAgentForm = ({ onClose }: AIAgentFormProps) => {
               id="memory"
               value={formData.memory}
               onChange={(e) => setFormData({...formData, memory: e.target.value})}
-              placeholder="Set memory context for the agent"
+              placeholder="Set memory context for the agent (e.g., JSON string)"
               className="mt-2 rounded-xl border-0 bg-white/60 shadow-md focus:shadow-lg transition-shadow resize-none"
               style={{ boxShadow: '0 0 15px rgba(154, 94, 255, 0.1)' }}
               rows={3}
@@ -197,10 +257,11 @@ const AIAgentForm = ({ onClose }: AIAgentFormProps) => {
           <div className="pt-4">
             <Button
               onClick={handleSave}
-              className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0 text-lg font-medium"
+              disabled={isSaving} // Disable button while saving
+              className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0 text-lg font-medium disabled:opacity-50"
               style={{ boxShadow: '0 0 30px rgba(92, 142, 246, 0.3)' }}
             >
-              Save Agent
+              {isSaving ? "Saving..." : "Save Agent"}
             </Button>
           </div>
         </div>

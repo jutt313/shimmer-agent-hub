@@ -140,16 +140,127 @@ const ChatCard = ({
     );
   };
 
+  const parseStructuredDataFromText = (text: string) => {
+    console.log('🔍 Attempting to parse structured data from:', text.substring(0, 200));
+    
+    try {
+      // Method 1: Look for JSON in code blocks
+      const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[1]);
+        console.log('✅ Found JSON in code block:', parsed);
+        return parsed;
+      }
+
+      // Method 2: Look for JSON object patterns
+      const patterns = [
+        /\{[\s\S]*"summary"[\s\S]*?\}/,
+        /\{[\s\S]*"steps"[\s\S]*?\}/,
+        /\{[\s\S]*"platforms"[\s\S]*?\}/,
+        /\{[\s\S]*"agents"[\s\S]*?\}/,
+        /\{[\s\S]*"clarification_questions"[\s\S]*?\}/
+      ];
+
+      for (const pattern of patterns) {
+        const match = text.match(pattern);
+        if (match) {
+          try {
+            // Find the complete JSON object
+            let jsonStr = match[0];
+            let braceCount = 0;
+            let startFound = false;
+            let endIndex = 0;
+            
+            for (let i = 0; i < jsonStr.length; i++) {
+              if (jsonStr[i] === '{') {
+                if (!startFound) startFound = true;
+                braceCount++;
+              } else if (jsonStr[i] === '}') {
+                braceCount--;
+                if (startFound && braceCount === 0) {
+                  endIndex = i + 1;
+                  break;
+                }
+              }
+            }
+            
+            if (endIndex > 0) {
+              jsonStr = jsonStr.substring(0, endIndex);
+              const parsed = JSON.parse(jsonStr);
+              console.log('✅ Parsed JSON from pattern:', parsed);
+              return parsed;
+            }
+          } catch (e) {
+            console.log('❌ Failed to parse pattern match:', e);
+          }
+        }
+      }
+
+      // Method 3: Try to find any valid JSON object in the text
+      const jsonStart = text.indexOf('{');
+      if (jsonStart !== -1) {
+        let braceCount = 0;
+        let endIndex = -1;
+        
+        for (let i = jsonStart; i < text.length; i++) {
+          if (text[i] === '{') {
+            braceCount++;
+          } else if (text[i] === '}') {
+            braceCount--;
+            if (braceCount === 0) {
+              endIndex = i + 1;
+              break;
+            }
+          }
+        }
+        
+        if (endIndex > jsonStart) {
+          const jsonStr = text.substring(jsonStart, endIndex);
+          try {
+            const parsed = JSON.parse(jsonStr);
+            console.log('✅ Parsed complete JSON object:', parsed);
+            return parsed;
+          } catch (e) {
+            console.log('❌ Failed to parse extracted JSON:', e);
+          }
+        }
+      }
+
+      console.log('❌ No structured data found in text');
+      return null;
+    } catch (error) {
+      console.error('❌ Error parsing structured data:', error);
+      return null;
+    }
+  };
+
   const formatMessageText = (text: string) => {
+    // Clean up JSON artifacts and format the text properly
+    let cleanText = text;
+    
+    // Remove JSON code blocks if they exist
+    cleanText = cleanText.replace(/```json\n[\s\S]*?\n```/g, '');
+    
+    // Remove standalone JSON objects
+    cleanText = cleanText.replace(/\{[\s\S]*?\}/g, '');
+    
+    // Clean up extra whitespace
+    cleanText = cleanText.replace(/\n\s*\n\s*\n/g, '\n\n');
+    cleanText = cleanText.trim();
+    
+    // If text is empty after cleaning, provide a default message
+    if (!cleanText) {
+      cleanText = "Here's what I found for your automation:";
+    }
+    
     // Convert markdown-style formatting to HTML-like styling for display
-    return text
+    return cleanText
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\n\n/g, '\n')
       .split('\n')
       .map((line, index) => (
         <span key={index}>
           <span dangerouslySetInnerHTML={{ __html: line }} />
-          {index < text.split('\n').length - 1 && <br />}
+          {index < cleanText.split('\n').length - 1 && <br />}
         </span>
       ));
   };
@@ -165,72 +276,76 @@ const ChatCard = ({
       
       <ScrollArea className="h-full relative z-10">
         <div className="space-y-6 pr-4">
-          {messages.map(message => (
-            <div key={message.id} className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}>
-              <div className={`max-w-4xl px-6 py-4 rounded-2xl ${
-                message.isBot 
-                  ? 'bg-gradient-to-r from-blue-100/80 to-purple-100/80 text-gray-800 border border-blue-200/50' 
-                  : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
-                } transition-all duration-300`} 
-                style={!message.isBot ? {
-                  boxShadow: '0 0 20px rgba(92, 142, 246, 0.3)'
-                } : {}}
-              >
-                {/* Only show formatted text if there's no structured data, or if there is structured data, show a simplified version */}
-                <div className="text-sm leading-relaxed whitespace-pre-wrap">
-                  {message.isBot && message.structuredData ? (
-                    // Show simplified text when we have structured data
-                    <span>Here's what I found for your automation:</span>
-                  ) : (
-                    formatMessageText(message.text)
-                  )}
-                </div>
-                
-                {/* Render structured data components */}
-                {message.isBot && message.structuredData && (
-                  <div className="mt-4 space-y-3">
-                    {/* Render summary first */}
-                    {message.structuredData.summary && (
-                      renderSummary(message.structuredData.summary)
-                    )}
-                    
-                    {/* Render steps */}
-                    {message.structuredData.steps && Array.isArray(message.structuredData.steps) && message.structuredData.steps.length > 0 && (
-                      renderSteps(message.structuredData.steps)
-                    )}
-                    
-                    {/* Render clarification questions */}
-                    {message.structuredData.clarification_questions && message.structuredData.clarification_questions.length > 0 && (
-                      renderClarificationQuestions(message.structuredData.clarification_questions)
-                    )}
-                    
-                    {/* Render platform credentials */}
-                    {message.structuredData.platforms && Array.isArray(message.structuredData.platforms) && message.structuredData.platforms.length > 0 && (
-                      renderPlatformCredentials(message.structuredData.platforms)
-                    )}
-                    
-                    {/* Render agent recommendations */}
-                    {message.structuredData.agents && Array.isArray(message.structuredData.agents) && message.structuredData.agents.length > 0 && (
-                      <div className="border-t border-indigo-200 pt-3">
-                        <div className="text-sm font-semibold text-indigo-800 mb-3 flex items-center gap-2">
-                          <Bot className="w-5 h-5" />
-                          Recommended AI Agents:
-                        </div>
-                        {message.structuredData.agents.map((agent: any) => renderAgentRecommendation(agent))}
-                      </div>
-                    )}
+          {messages.map(message => {
+            // Parse structured data from message text if not already parsed
+            let structuredData = message.structuredData;
+            if (message.isBot && !structuredData) {
+              structuredData = parseStructuredDataFromText(message.text);
+              console.log('🔄 Parsed structured data for message:', message.id, structuredData);
+            }
+
+            return (
+              <div key={message.id} className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}>
+                <div className={`max-w-4xl px-6 py-4 rounded-2xl ${
+                  message.isBot 
+                    ? 'bg-gradient-to-r from-blue-100/80 to-purple-100/80 text-gray-800 border border-blue-200/50' 
+                    : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
+                  } transition-all duration-300`} 
+                  style={!message.isBot ? {
+                    boxShadow: '0 0 20px rgba(92, 142, 246, 0.3)'
+                  } : {}}
+                >
+                  {/* Show formatted text */}
+                  <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                    {formatMessageText(message.text)}
                   </div>
-                )}
-                
-                <p className={`text-xs mt-3 ${message.isBot ? 'text-gray-500' : 'text-blue-100'}`}>
-                  {message.timestamp.toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </p>
+                  
+                  {/* Render structured data components */}
+                  {message.isBot && structuredData && (
+                    <div className="mt-4 space-y-3">
+                      {/* Render summary first */}
+                      {structuredData.summary && (
+                        renderSummary(structuredData.summary)
+                      )}
+                      
+                      {/* Render steps */}
+                      {structuredData.steps && Array.isArray(structuredData.steps) && structuredData.steps.length > 0 && (
+                        renderSteps(structuredData.steps)
+                      )}
+                      
+                      {/* Render clarification questions */}
+                      {structuredData.clarification_questions && Array.isArray(structuredData.clarification_questions) && structuredData.clarification_questions.length > 0 && (
+                        renderClarificationQuestions(structuredData.clarification_questions)
+                      )}
+                      
+                      {/* Render platform credentials */}
+                      {structuredData.platforms && Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0 && (
+                        renderPlatformCredentials(structuredData.platforms)
+                      )}
+                      
+                      {/* Render agent recommendations */}
+                      {structuredData.agents && Array.isArray(structuredData.agents) && structuredData.agents.length > 0 && (
+                        <div className="border-t border-indigo-200 pt-3">
+                          <div className="text-sm font-semibold text-indigo-800 mb-3 flex items-center gap-2">
+                            <Bot className="w-5 h-5" />
+                            Recommended AI Agents:
+                          </div>
+                          {structuredData.agents.map((agent: any) => renderAgentRecommendation(agent))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  <p className={`text-xs mt-3 ${message.isBot ? 'text-gray-500' : 'text-blue-100'}`}>
+                    {message.timestamp.toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </ScrollArea>
     </div>

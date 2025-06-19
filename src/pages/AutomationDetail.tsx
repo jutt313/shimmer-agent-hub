@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -106,27 +105,14 @@ const AutomationDetail = () => {
 
       // Convert chat messages to the format expected by ChatCard
       const formattedMessages = chatData.map((chat: ChatMessage, index: number) => {
+        console.log('🔄 Processing stored chat message:', chat.message_content.substring(0, 100));
+        
         let structuredData = null;
         
         // Try to extract structured data from AI messages
         if (chat.sender === 'ai') {
-          try {
-            const jsonMatch = chat.message_content.match(/```json\n([\s\S]*?)\n```/);
-            if (jsonMatch) {
-              structuredData = JSON.parse(jsonMatch[1]);
-            } else {
-              // Try to find JSON object in the text
-              const jsonStart = chat.message_content.indexOf('{');
-              const jsonEnd = chat.message_content.lastIndexOf('}');
-              
-              if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
-                const jsonString = chat.message_content.substring(jsonStart, jsonEnd + 1);
-                structuredData = JSON.parse(jsonString);
-              }
-            }
-          } catch (error) {
-            console.log('Could not parse structured data from stored message');
-          }
+          structuredData = parseStructuredResponse(chat.message_content);
+          console.log('📦 Extracted structured data from stored message:', !!structuredData);
         }
 
         return {
@@ -138,17 +124,23 @@ const AutomationDetail = () => {
         };
       });
 
-      // Extract platforms from the last AI message that has them
-      const lastAIMessageWithPlatforms = formattedMessages
-        .reverse()
-        .find(msg => msg.isBot && msg.structuredData?.platforms);
+      // Extract platforms from any AI message that has them
+      const allPlatforms: any[] = [];
+      formattedMessages.forEach(msg => {
+        if (msg.isBot && msg.structuredData?.platforms) {
+          allPlatforms.push(...msg.structuredData.platforms);
+        }
+      });
       
-      if (lastAIMessageWithPlatforms?.structuredData?.platforms) {
-        setCurrentPlatforms(lastAIMessageWithPlatforms.structuredData.platforms);
+      // Remove duplicates and set platforms
+      const uniquePlatforms = allPlatforms.filter((platform, index, self) => 
+        index === self.findIndex(p => p.name === platform.name)
+      );
+      
+      if (uniquePlatforms.length > 0) {
+        console.log('🔗 Setting platforms from chat history:', uniquePlatforms);
+        setCurrentPlatforms(uniquePlatforms);
       }
-
-      // Restore the original order
-      formattedMessages.reverse();
 
       // Add welcome message if no chats exist
       if (formattedMessages.length === 0) {
@@ -175,15 +167,15 @@ const AutomationDetail = () => {
   };
 
   const parseStructuredResponse = (responseText: string): any => {
-    console.log('=== PARSING AI RESPONSE ===');
-    console.log('Raw response:', responseText);
+    console.log('🔍 PARSING AI RESPONSE - Length:', responseText.length);
+    console.log('📝 Response preview:', responseText.substring(0, 300));
     
     try {
       // First try to find JSON wrapped in ```json code blocks
       const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[1]);
-        console.log('✅ Successfully parsed JSON from code block:', parsed);
+        console.log('✅ Successfully parsed JSON from code block');
         return parsed;
       }
       
@@ -193,21 +185,37 @@ const AutomationDetail = () => {
       
       if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
         const jsonString = responseText.substring(jsonStart, jsonEnd + 1);
-        console.log('Extracted JSON string:', jsonString);
-        const parsed = JSON.parse(jsonString);
-        console.log('✅ Successfully parsed extracted JSON:', parsed);
-        return parsed;
+        console.log('🔄 Extracted JSON string length:', jsonString.length);
+        
+        // Try to find complete JSON object
+        let braceCount = 0;
+        let endIndex = -1;
+        
+        for (let i = 0; i < jsonString.length; i++) {
+          if (jsonString[i] === '{') {
+            braceCount++;
+          } else if (jsonString[i] === '}') {
+            braceCount--;
+            if (braceCount === 0) {
+              endIndex = i + 1;
+              break;
+            }
+          }
+        }
+        
+        if (endIndex > 0) {
+          const completeJson = jsonString.substring(0, endIndex);
+          const parsed = JSON.parse(completeJson);
+          console.log('✅ Successfully parsed extracted JSON');
+          return parsed;
+        }
       }
       
-      // Try to parse the entire response as JSON
-      const parsed = JSON.parse(responseText);
-      console.log('✅ Successfully parsed entire response as JSON:', parsed);
-      return parsed;
+      console.log('❌ No valid JSON found in response');
+      return null;
       
     } catch (error) {
       console.log('❌ JSON parsing failed:', error);
-      console.log('Response text length:', responseText.length);
-      console.log('Response preview:', responseText.substring(0, 200) + '...');
       return null;
     }
   };
@@ -298,8 +306,8 @@ const AutomationDetail = () => {
 
       if (error) throw error;
 
-      console.log('=== RAW AI RESPONSE ===');
-      console.log(data.response);
+      console.log('🤖 RAW AI RESPONSE RECEIVED');
+      console.log('📊 Response length:', data.response.length);
 
       // Try to parse structured response
       const structuredData = parseStructuredResponse(data.response);      
@@ -308,18 +316,25 @@ const AutomationDetail = () => {
       // If we have structured data, format it nicely and store it
       if (structuredData) {
         displayText = formatStructuredMessage(structuredData);
-        console.log('=== FORMATTED DISPLAY TEXT ===');
-        console.log(displayText);
+        console.log('✅ FORMATTED DISPLAY TEXT CREATED');
         
         // Update platforms immediately after parsing
         if (structuredData.platforms && Array.isArray(structuredData.platforms)) {
-          console.log('✅ Setting platforms in state:', structuredData.platforms);
-          setCurrentPlatforms(structuredData.platforms);
+          console.log('🔗 Setting new platforms:', structuredData.platforms.length);
+          setCurrentPlatforms(prev => {
+            const newPlatforms = [...prev];
+            structuredData.platforms.forEach((platform: any) => {
+              if (!newPlatforms.find(p => p.name === platform.name)) {
+                newPlatforms.push(platform);
+              }
+            });
+            return newPlatforms;
+          });
         }
 
         // Update automation_blueprint in the database if provided by AI
         if (structuredData.automation_blueprint) {
-          console.log('✅ Updating automation blueprint in DB:', structuredData.automation_blueprint);
+          console.log('🔧 Updating automation blueprint in DB');
           const { error: updateBlueprintError } = await supabase
             .from('automations')
             .update({ automation_blueprint: structuredData.automation_blueprint })
@@ -344,6 +359,8 @@ const AutomationDetail = () => {
             });
           }
         }
+      } else {
+        console.log('⚠️ No structured data found, using raw response');
       }
       
       const aiMessage = {
@@ -354,19 +371,18 @@ const AutomationDetail = () => {
         structuredData: structuredData
       };
 
-      console.log('=== FINAL AI MESSAGE OBJECT ===');
-      console.log('Has structuredData:', !!aiMessage.structuredData);
-      console.log('StructuredData content:', aiMessage.structuredData);
+      console.log('📤 ADDING AI MESSAGE TO CHAT');
+      console.log('🔧 Has structuredData:', !!aiMessage.structuredData);
 
       setMessages(prev => [...prev, aiMessage]);
 
-      // Save AI response to database
+      // Save AI response to database (save the original response to preserve structure)
       await supabase
         .from('automation_chats')
         .insert({
           automation_id: automation.id,
           sender: 'ai',
-          message_content: displayText
+          message_content: data.response // Save original response with JSON intact
         });
 
     } catch (error) {

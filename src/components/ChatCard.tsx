@@ -3,6 +3,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Bot, Plus, X, Info } from "lucide-react";
 import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
+import AutomationResponseDisplay from "./AutomationResponseDisplay";
 
 interface Message {
   id: number;
@@ -25,122 +26,6 @@ const ChatCard = ({
   dismissedAgents = new Set(),
   onAgentDismiss
 }: ChatCardProps) => {
-  const renderAgentRecommendation = (agent: any) => {
-    if (dismissedAgents.has(agent.name)) {
-      return null;
-    }
-
-    return (
-      <div key={agent.name} className="mt-4 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Bot className="w-5 h-5 text-indigo-600" />
-            <span className="font-semibold text-indigo-800">{agent.name}</span>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              onClick={() => onAgentAdd?.(agent)}
-              size="sm"
-              className="h-8 px-3 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
-            >
-              <Plus className="w-3 h-3 mr-1" />
-              Add Agent
-            </Button>
-            <Button
-              onClick={() => onAgentDismiss?.(agent.name)}
-              size="sm"
-              variant="outline"
-              className="h-8 px-3 text-xs border-red-300 text-red-600 hover:bg-red-50 rounded-lg"
-            >
-              <X className="w-3 h-3" />
-            </Button>
-          </div>
-        </div>
-        <div className="space-y-2 text-sm">
-          <p className="text-indigo-700"><span className="font-medium">Role:</span> {agent.role}</p>
-          <p className="text-indigo-700"><span className="font-medium">Goal:</span> {agent.goal}</p>
-          <p className="text-indigo-600"><span className="font-medium">Why needed:</span> {agent.why_needed}</p>
-          {agent.rules && (
-            <p className="text-indigo-600"><span className="font-medium">Rules:</span> {agent.rules}</p>
-          )}
-          {agent.memory && (
-            <p className="text-indigo-600"><span className="font-medium">Memory:</span> {agent.memory}</p>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  const renderClarificationQuestions = (questions: string[]) => {
-    return (
-      <div className="mt-4 p-4 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl border border-orange-200">
-        <div className="text-sm font-semibold text-orange-800 mb-3 flex items-center gap-2">
-          <span className="w-5 h-5 bg-orange-600 rounded-full flex items-center justify-center text-white text-xs">?</span>
-          I need some clarification:
-        </div>
-        <div className="space-y-2">
-          {questions.map((question, index) => (
-            <p key={index} className="text-orange-700 font-medium text-sm">
-              <span className="font-bold">{index + 1}.</span> {question}
-            </p>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const renderPlatformCredentials = (platforms: any[]) => {
-    return (
-      <div className="mt-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl border border-purple-200">
-        <div className="text-sm font-semibold text-purple-800 mb-3 flex items-center gap-2">
-          <Info className="w-5 h-5 text-purple-600" />
-          Required Platform Credentials:
-        </div>
-        <div className="space-y-3">
-          {platforms.map((platform, index) => (
-            <div key={index} className="border border-purple-200 rounded-lg p-3 bg-white/50">
-              <h4 className="font-semibold text-purple-800 mb-2">{platform.name}</h4>
-              <div className="space-y-1">
-                {platform.credentials?.map((cred: any, credIndex: number) => (
-                  <div key={credIndex} className="text-sm text-purple-700">
-                    <span className="font-medium">{cred.field}:</span> {cred.why_needed}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const renderSummary = (summary: string) => {
-    return (
-      <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl border border-blue-200">
-        <div className="text-sm font-semibold text-blue-800 mb-2">Summary</div>
-        <p className="text-blue-700 text-sm">{summary}</p>
-      </div>
-    );
-  };
-
-  const renderSteps = (steps: string[]) => {
-    return (
-      <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
-        <div className="text-sm font-semibold text-green-800 mb-3">Step-by-Step Workflow</div>
-        <div className="space-y-2">
-          {steps.map((step, index) => (
-            <div key={index} className="flex gap-3 text-sm">
-              <span className="min-w-[20px] h-5 bg-green-600 text-white rounded-full flex items-center justify-center text-xs font-medium">
-                {index + 1}
-              </span>
-              <p className="text-green-700">{step}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
   const formatMessageText = (text: string) => {
     // Clean the text and convert markdown-style formatting
     const cleanText = cleanDisplayText(text);
@@ -186,44 +71,20 @@ const ChatCard = ({
                     boxShadow: '0 0 20px rgba(92, 142, 246, 0.3)'
                   } : {}}
                 >
-                  {/* Show formatted text */}
-                  <div className="text-sm leading-relaxed whitespace-pre-wrap">
-                    {formatMessageText(message.text)}
-                  </div>
+                  {/* Show formatted text only if no structured data or if it's a user message */}
+                  {(!message.isBot || !structuredData) && (
+                    <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {formatMessageText(message.text)}
+                    </div>
+                  )}
                   
-                  {/* Render structured data components for bot messages */}
+                  {/* Render structured data using AutomationResponseDisplay for bot messages */}
                   {message.isBot && structuredData && (
-                    <div className="mt-4 space-y-3">
-                      {/* Render summary */}
-                      {structuredData.summary && (
-                        renderSummary(structuredData.summary)
-                      )}
-                      
-                      {/* Render steps */}
-                      {structuredData.steps && Array.isArray(structuredData.steps) && structuredData.steps.length > 0 && (
-                        renderSteps(structuredData.steps)
-                      )}
-                      
-                      {/* Render clarification questions */}
-                      {structuredData.clarification_questions && Array.isArray(structuredData.clarification_questions) && structuredData.clarification_questions.length > 0 && (
-                        renderClarificationQuestions(structuredData.clarification_questions)
-                      )}
-                      
-                      {/* Render platform credentials */}
-                      {structuredData.platforms && Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0 && (
-                        renderPlatformCredentials(structuredData.platforms)
-                      )}
-                      
-                      {/* Render agent recommendations */}
-                      {structuredData.agents && Array.isArray(structuredData.agents) && structuredData.agents.length > 0 && (
-                        <div className="border-t border-indigo-200 pt-3">
-                          <div className="text-sm font-semibold text-indigo-800 mb-3 flex items-center gap-2">
-                            <Bot className="w-5 h-5" />
-                            Recommended AI Agents:
-                          </div>
-                          {structuredData.agents.map((agent: any) => renderAgentRecommendation(agent))}
-                        </div>
-                      )}
+                    <div className="w-full">
+                      <AutomationResponseDisplay 
+                        data={structuredData} 
+                        onAgentAdd={onAgentAdd || (() => {})}
+                      />
                     </div>
                   )}
                   

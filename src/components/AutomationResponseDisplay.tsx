@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,15 +32,11 @@ interface StructuredResponse {
 interface AutomationResponseDisplayProps {
   data: StructuredResponse;
   onAgentAdd: (agent: any) => void;
+  dismissedAgents?: Set<string>;
 }
 
-const AutomationResponseDisplay = ({ data, onAgentAdd }: AutomationResponseDisplayProps) => {
+const AutomationResponseDisplay = ({ data, onAgentAdd, dismissedAgents = new Set() }: AutomationResponseDisplayProps) => {
   const [selectedPlatform, setSelectedPlatform] = useState<any>(null);
-  const [dismissedAgents, setDismissedAgents] = useState<Set<string>>(new Set());
-
-  const handleDismissAgent = (agentName: string) => {
-    setDismissedAgents(prev => new Set([...prev, agentName]));
-  };
 
   return (
     <div className="space-y-6">
@@ -178,14 +173,6 @@ const AutomationResponseDisplay = ({ data, onAgentAdd }: AutomationResponseDispl
                       >
                         <Plus className="w-4 h-4 mr-1" />
                         Add
-                      </Button>
-                      <Button
-                        onClick={() => handleDismissAgent(agent.name)}
-                        size="sm"
-                        variant="outline"
-                        className="border-red-300 text-red-600 hover:bg-red-50"
-                      >
-                        <X className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>

@@ -294,7 +294,7 @@ const AutomationDetail = () => {
       
       const aiMessage = {
         id: Date.now() + 1,
-        text: displayText,
+        text: data.response, // Use original response to preserve JSON structure
         isBot: true,
         timestamp: new Date(),
         structuredData: structuredData

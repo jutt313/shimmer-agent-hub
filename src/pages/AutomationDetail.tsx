@@ -11,6 +11,7 @@ import AIAgentForm from "@/components/AIAgentForm";
 import PlatformButtons from "@/components/PlatformButtons";
 import BlueprintCard from "@/components/BlueprintCard";
 import { AutomationBlueprint } from "@/types/automation";
+import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
 
 interface Automation {
   id: string;
@@ -28,30 +29,6 @@ interface ChatMessage {
   timestamp: string;
 }
 
-interface StructuredResponse {
-  summary?: string;
-  steps?: string[];
-  platforms?: Array<{
-    name: string;
-    credentials: Array<{
-      field: string;
-      placeholder: string;
-      link: string;
-      why_needed: string;
-    }>;
-  }>;
-  agents?: Array<{
-    name: string;
-    role: string;
-    goal: string;
-    rules: string;
-    memory: string;
-    why_needed: string;
-  }>;
-  clarification_questions?: string[];
-  automation_blueprint?: AutomationBlueprint;
-}
-
 const AutomationDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -64,6 +41,7 @@ const AutomationDetail = () => {
   const [loading, setLoading] = useState(true);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [showAIAgentForm, setShowAIAgentForm] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState<any>(null);
   const [dismissedAgents, setDismissedAgents] = useState<Set<string>>(new Set());
   const [currentPlatforms, setCurrentPlatforms] = useState<any[]>([]);
   const [showBlueprint, setShowBlueprint] = useState(false);
@@ -109,7 +87,7 @@ const AutomationDetail = () => {
         
         let structuredData = null;
         
-        // Try to extract structured data from AI messages
+        // Parse structured data from AI messages using new parser
         if (chat.sender === 'ai') {
           structuredData = parseStructuredResponse(chat.message_content);
           console.log('📦 Extracted structured data from stored message:', !!structuredData);
@@ -164,160 +142,6 @@ const AutomationDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const parseStructuredResponse = (responseText: string): any => {
-    console.log('🔍 PARSING AI RESPONSE - Length:', responseText.length);
-    console.log('📝 Response preview:', responseText.substring(0, 300));
-    
-    try {
-      // First try to find JSON wrapped in ```json code blocks
-      const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
-      if (jsonMatch) {
-        try {
-          const parsed = JSON.parse(jsonMatch[1]);
-          console.log('✅ Successfully parsed JSON from code block');
-          return parsed;
-        } catch (e) {
-          console.log('❌ JSON in code block is malformed, trying to fix...');
-          const fixedJson = fixMalformedJson(jsonMatch[1]);
-          if (fixedJson) {
-            try {
-              const parsed = JSON.parse(fixedJson);
-              console.log('✅ Fixed and parsed JSON from code block');
-              return parsed;
-            } catch (e2) {
-              console.log('❌ Could not fix JSON from code block');
-            }
-          }
-        }
-      }
-      
-      // Try to find JSON object in the text (look for { and })
-      const jsonStart = responseText.indexOf('{');
-      const jsonEnd = responseText.lastIndexOf('}');
-      
-      if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
-        const jsonString = responseText.substring(jsonStart, jsonEnd + 1);
-        console.log('🔄 Extracted JSON string length:', jsonString.length);
-        
-        // Try to find complete JSON object
-        let braceCount = 0;
-        let endIndex = -1;
-        
-        for (let i = 0; i < jsonString.length; i++) {
-          if (jsonString[i] === '{') {
-            braceCount++;
-          } else if (jsonString[i] === '}') {
-            braceCount--;
-            if (braceCount === 0) {
-              endIndex = i + 1;
-              break;
-            }
-          }
-        }
-        
-        if (endIndex > 0) {
-          const completeJson = jsonString.substring(0, endIndex);
-          try {
-            const parsed = JSON.parse(completeJson);
-            console.log('✅ Successfully parsed extracted JSON');
-            return parsed;
-          } catch (e) {
-            console.log('❌ Extracted JSON is malformed, trying to fix...');
-            const fixedJson = fixMalformedJson(completeJson);
-            if (fixedJson) {
-              try {
-                const parsed = JSON.parse(fixedJson);
-                console.log('✅ Fixed and parsed extracted JSON');
-                return parsed;
-              } catch (e2) {
-                console.log('❌ Could not fix extracted JSON');
-              }
-            }
-          }
-        }
-      }
-      
-      // Try to extract data from text patterns even without valid JSON
-      const extractedData = extractDataFromText(responseText);
-      if (extractedData) {
-        console.log('✅ Extracted data from text patterns');
-        return extractedData;
-      }
-      
-      console.log('❌ No valid JSON found in response');
-      return null;
-      
-    } catch (error) {
-      console.log('❌ JSON parsing failed:', error);
-      return null;
-    }
-  };
-
-  const fixMalformedJson = (jsonStr: string): string | null => {
-    try {
-      // Fix common JSON issues
-      let fixed = jsonStr
-        // Fix unquoted property names
-        .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
-        // Fix single quotes to double quotes
-        .replace(/'/g, '"')
-        // Fix trailing commas
-        .replace(/,(\s*[}\]])/g, '$1')
-        // Fix newlines in strings
-        .replace(/\n/g, '\\n')
-        .replace(/\r/g, '\\r')
-        .replace(/\t/g, '\\t');
-
-      // Try to parse the fixed JSON
-      JSON.parse(fixed);
-      return fixed;
-    } catch (e) {
-      console.log('❌ Could not fix malformed JSON');
-      return null;
-    }
-  };
-
-  const extractDataFromText = (text: string): any => {
-    const data: any = {};
-
-    // Extract summary
-    const summaryMatch = text.match(/Summary[:\s]*([^#\n]*)/i);
-    if (summaryMatch) {
-      data.summary = summaryMatch[1].trim();
-    }
-
-    // Extract steps
-    const stepsSection = text.match(/Steps?[:\s]*\n((?:\d+\..*\n?)*)/i);
-    if (stepsSection) {
-      const steps = stepsSection[1]
-        .split(/\d+\./)
-        .filter(step => step.trim())
-        .map(step => step.trim());
-      if (steps.length > 0) {
-        data.steps = steps;
-      }
-    }
-
-    // Extract platforms
-    const platformMatches = text.match(/(?:Gmail|Asana|Slack|OpenAI)/gi);
-    if (platformMatches) {
-      const uniquePlatforms = [...new Set(platformMatches)];
-      data.platforms = uniquePlatforms.map(platform => ({
-        name: platform,
-        credentials: [
-          {
-            field: platform === 'Gmail' ? 'email' : platform === 'Asana' ? 'api_token' : platform === 'Slack' ? 'webhook_url' : 'api_key',
-            placeholder: `Enter your ${platform} credentials`,
-            link: `https://${platform.toLowerCase()}.com`,
-            why_needed: `Required to connect to ${platform}`
-          }
-        ]
-      }));
-    }
-
-    return Object.keys(data).length > 0 ? data : null;
   };
 
   const formatStructuredMessage = (structuredData: StructuredResponse): string => {
@@ -409,21 +233,20 @@ const AutomationDetail = () => {
       console.log('🤖 RAW AI RESPONSE RECEIVED');
       console.log('📊 Response length:', data.response.length);
 
-      // Try to parse structured response
+      // Parse structured response using new parser
       const structuredData = parseStructuredResponse(data.response);      
-      let displayText = data.response;
+      let displayText = cleanDisplayText(data.response);
       
       // If we have structured data, format it nicely and store it
       if (structuredData) {
-        displayText = formatStructuredMessage(structuredData);
-        console.log('✅ FORMATTED DISPLAY TEXT CREATED');
+        console.log('✅ STRUCTURED DATA FOUND');
         
         // Update platforms immediately after parsing
         if (structuredData.platforms && Array.isArray(structuredData.platforms)) {
           console.log('🔗 Setting new platforms:', structuredData.platforms.length);
           setCurrentPlatforms(prev => {
             const newPlatforms = [...prev];
-            structuredData.platforms.forEach((platform: any) => {
+            structuredData.platforms!.forEach((platform: any) => {
               if (!newPlatforms.find(p => p.name === platform.name)) {
                 newPlatforms.push(platform);
               }
@@ -460,7 +283,7 @@ const AutomationDetail = () => {
           }
         }
       } else {
-        console.log('⚠️ No structured data found, using raw response');
+        console.log('⚠️ No structured data found, using cleaned response');
       }
       
       const aiMessage = {
@@ -514,6 +337,7 @@ const AutomationDetail = () => {
 
   const handleAgentSaved = (agentName: string, agentId: string) => {
     setShowAIAgentForm(false);
+    setSelectedAgent(null);
     if (automation) {
       const confirmationMessage = `I've successfully configured your new AI Agent: "${agentName}"!`;
       
@@ -531,6 +355,7 @@ const AutomationDetail = () => {
   };
 
   const handleAgentAdd = (agent: any) => {
+    setSelectedAgent(agent);
     setShowAIAgentForm(true);
   };
 
@@ -655,12 +480,16 @@ const AutomationDetail = () => {
         />
       )}
 
-      {/* AI Agent Form Modal */}
+      {/* AI Agent Form Modal with auto-fill capability */}
       {showAIAgentForm && automation && (
         <AIAgentForm
           automationId={automation.id}
-          onClose={() => setShowAIAgentForm(false)}
+          onClose={() => {
+            setShowAIAgentForm(false);
+            setSelectedAgent(null);
+          }}
           onAgentSaved={handleAgentSaved}
+          initialAgentData={selectedAgent}
         />
       )}
     </div>

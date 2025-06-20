@@ -46,7 +46,8 @@ const AutomationResponseDisplay = ({ data, onAgentAdd, dismissedAgents = new Set
     hasAgents: !!(data.agents && data.agents.length > 0),
     hasClarificationQuestions: !!(data.clarification_questions && data.clarification_questions.length > 0),
     platformsCount: data.platforms?.length || 0,
-    agentsCount: data.agents?.length || 0
+    agentsCount: data.agents?.length || 0,
+    fullData: data
   });
 
   return (
@@ -105,7 +106,7 @@ const AutomationResponseDisplay = ({ data, onAgentAdd, dismissedAgents = new Set
         </Card>
       )}
 
-      {/* Platform Credentials */}
+      {/* Platform Credentials - Always show if platforms exist */}
       {data.platforms && data.platforms.length > 0 && (
         <Card className="border-purple-200 bg-purple-50/50">
           <CardHeader>
@@ -156,7 +157,7 @@ const AutomationResponseDisplay = ({ data, onAgentAdd, dismissedAgents = new Set
         </Card>
       )}
 
-      {/* AI Agent Recommendations */}
+      {/* AI Agent Recommendations - Always show if agents exist */}
       {data.agents && data.agents.length > 0 && (
         <Card className="border-indigo-200 bg-indigo-50/50">
           <CardHeader>

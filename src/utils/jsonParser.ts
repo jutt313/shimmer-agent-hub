@@ -21,7 +21,7 @@ export interface StructuredResponse {
   }>;
   clarification_questions?: string[];
   automation_blueprint?: any;
-  is_update?: boolean; // Flag to indicate if this is an update response
+  is_update?: boolean;
 }
 
 export const parseStructuredResponse = (responseText: string): StructuredResponse | null => {
@@ -34,10 +34,7 @@ export const parseStructuredResponse = (responseText: string): StructuredRespons
       try {
         const parsed = JSON.parse(jsonCodeBlockMatch[1]);
         console.log('✅ Successfully parsed JSON from code block');
-        
-        // Check if this is an update by looking for specific indicators
         parsed.is_update = isUpdateResponse(parsed, responseText);
-        
         return parsed;
       } catch (e) {
         console.log('❌ JSON in code block malformed, attempting fix...');
@@ -120,7 +117,6 @@ export const parseStructuredResponse = (responseText: string): StructuredRespons
 
 // Helper function to detect if this is an update response vs new automation
 const isUpdateResponse = (parsed: any, responseText: string): boolean => {
-  // Check for update indicators in the response text
   const updateKeywords = [
     'update', 'modify', 'change', 'adjust', 'edit', 'revise',
     'improved', 'enhanced', 'refined', 'optimized', 'fixed'
@@ -130,12 +126,10 @@ const isUpdateResponse = (parsed: any, responseText: string): boolean => {
     responseText.toLowerCase().includes(keyword)
   );
 
-  // Check if the response lacks major structural components (indicating it's just an update/clarification)
   const hasMinimalStructure = !parsed.automation_blueprint && 
                              (!parsed.platforms || parsed.platforms.length === 0) &&
                              (!parsed.agents || parsed.agents.length === 0);
 
-  // Check for clarification questions (usually indicates follow-up, not new automation)
   const hasQuestions = parsed.clarification_questions && parsed.clarification_questions.length > 0;
 
   return hasUpdateKeywords || hasMinimalStructure || hasQuestions;
@@ -144,18 +138,13 @@ const isUpdateResponse = (parsed: any, responseText: string): boolean => {
 const fixMalformedJson = (jsonStr: string): string | null => {
   try {
     let fixed = jsonStr
-      // Fix unquoted property names
       .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
-      // Fix single quotes to double quotes
       .replace(/'/g, '"')
-      // Fix trailing commas
       .replace(/,(\s*[}\]])/g, '$1')
-      // Fix escaped newlines in strings
       .replace(/\\n/g, '\\n')
       .replace(/\\r/g, '\\r')
       .replace(/\\t/g, '\\t');
 
-    // Test if the fixed JSON is valid
     JSON.parse(fixed);
     return fixed;
   } catch (e) {
@@ -187,6 +176,45 @@ const extractDataFromText = (text: string): StructuredResponse | null => {
     }
   }
 
+  // Extract platforms and credentials
+  const platformMatches = text.match(/(?:Platform|Credential|API|Integration)[s]?.*?(?:needed|required)[:\s]*\n?([\s\S]*?)(?:\n\n|\n#|$)/i);
+  if (platformMatches) {
+    const platformText = platformMatches[1];
+    const platformNames = platformText.match(/(?:Gmail|Google|Slack|Discord|Trello|Asana|Notion|Zapier|API|OAuth|Token|Key)/gi);
+    
+    if (platformNames && platformNames.length > 0) {
+      data.platforms = platformNames.map(name => ({
+        name: name,
+        credentials: [
+          {
+            field: `${name.toLowerCase()}_api_key`,
+            placeholder: `Enter your ${name} API key`,
+            link: `https://${name.toLowerCase()}.com/developers`,
+            why_needed: `Required to connect and interact with ${name} services`
+          }
+        ]
+      }));
+    }
+  }
+
+  // Extract AI agents
+  const agentMatches = text.match(/(?:Agent|Bot|AI)[s]?.*?(?:recommend|suggest|need)[:\s]*\n?([\s\S]*?)(?:\n\n|\n#|$)/i);
+  if (agentMatches) {
+    const agentText = agentMatches[1];
+    const agentNames = agentText.match(/(?:Email|Calendar|Task|Project|Communication|Data|Analysis|Monitor)[a-zA-Z\s]*(?:Agent|Bot|Assistant)/gi);
+    
+    if (agentNames && agentNames.length > 0) {
+      data.agents = agentNames.map(name => ({
+        name: name,
+        role: `${name} specialist`,
+        goal: `Handle ${name.toLowerCase()} related tasks automatically`,
+        rules: `Follow best practices for ${name.toLowerCase()} management`,
+        memory: `Remember user preferences for ${name.toLowerCase()}`,
+        why_needed: `Essential for automating ${name.toLowerCase()} workflows`
+      }));
+    }
+  }
+
   // Extract clarification questions
   const clarificationMatch = text.match(/(?:clarification|questions?)[:\s]*\n?((?:(?:\d+\.|\*|\-)\s*.*\n?)*)/i);
   if (clarificationMatch && clarificationMatch[1]) {
@@ -200,6 +228,14 @@ const extractDataFromText = (text: string): StructuredResponse | null => {
       data.clarification_questions = questions;
     }
   }
+
+  console.log('📊 Extracted data from text:', {
+    hasSummary: !!data.summary,
+    hasSteps: !!(data.steps && data.steps.length > 0),
+    hasPlatforms: !!(data.platforms && data.platforms.length > 0),
+    hasAgents: !!(data.agents && data.agents.length > 0),
+    hasClarificationQuestions: !!(data.clarification_questions && data.clarification_questions.length > 0)
+  });
 
   return Object.keys(data).length > 0 ? data : null;
 };

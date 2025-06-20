@@ -148,7 +148,7 @@ class AutomationExecutor {
         model: agent.model || 'gpt-4o-mini',
         api_key: agent.api_key
       });
-      console.log(`🤖 Loaded AI agent: ${agent.agent_name}`);
+      console.log(`🤖 Loaded AI agent: ${agent.agent_name} (${agent.llm_provider}/${agent.model})`);
     });
   }
 
@@ -275,7 +275,7 @@ class AutomationExecutor {
     const agent = this.aiAgents.get(agent_id)!;
     const resolvedPrompt = this.resolveVariables(input_prompt);
 
-    console.log(`🤖 Executing AI agent: ${agent.agent_name}`);
+    console.log(`🤖 Executing AI agent: ${agent.agent_name} (${agent.llm_provider}/${agent.model})`);
 
     // Build system prompt with agent configuration
     const systemPrompt = this.buildAgentSystemPrompt(agent);
@@ -291,6 +291,8 @@ class AutomationExecutor {
 
     await this.logStepExecution(step, {
       agent_name: agent.agent_name,
+      llm_provider: agent.llm_provider,
+      model: agent.model,
       input_prompt: resolvedPrompt,
       output: agentResponse
     });
@@ -379,31 +381,84 @@ class AutomationExecutor {
   private buildPlatformAPIConfig(integration: string, method: string, parameters: any, credentials: any): any {
     // Dynamic platform API configuration
     // This builds the appropriate API call based on the platform and method
-    
     const platformConfigs: Record<string, any> = {
       slack: {
         baseUrl: 'https://slack.com/api',
-        auth: `Bearer ${credentials.bot_token}`,
+        getAuthHeader: (token: string) => ({ 'Authorization': `Bearer ${token}` }),
         methods: {
           send_message: {
             endpoint: 'chat.postMessage',
             method: 'POST',
-            body: parameters
+            body: parameters // parameters should include { channel: 'CHANNEL_ID', text: 'message' }
           }
         }
       },
       gmail: {
         baseUrl: 'https://gmail.googleapis.com/gmail/v1',
-        auth: `Bearer ${credentials.access_token}`,
+        getAuthHeader: (accessToken: string) => ({ 'Authorization': `Bearer ${accessToken}` }),
         methods: {
           send_email: {
             endpoint: 'users/me/messages/send',
             method: 'POST',
-            body: parameters
+            body: parameters // parameters should be a raw email message in base64url format
           }
         }
       },
-      // Add more platforms dynamically
+      asana: {
+        baseUrl: 'https://app.asana.com/api/1.0',
+        getAuthHeader: (personalAccessToken: string) => ({ 'Authorization': `Bearer ${personalAccessToken}` }),
+        methods: {
+          create_task: {
+            endpoint: 'tasks',
+            method: 'POST',
+            body: {
+              data: {
+                ...parameters,
+                // Add default values for required fields like workspace if not in blueprint parameters
+                // e.g., workspace: credentials.workspace_id,
+              }
+            }
+          }
+        }
+      },
+      trello: {
+        baseUrl: 'https://api.trello.com/1',
+        getAuthHeader: (apiKey: string, apiToken: string) => ({ 'key': apiKey, 'token': apiToken }), // Trello uses key and token in query params or headers
+        methods: {
+          create_card: {
+            endpoint: 'cards',
+            method: 'POST',
+            body: parameters // parameters should include { name: 'Card Name', idList: 'LIST_ID', idBoard: 'BOARD_ID' }
+          }
+        }
+      },
+      microsoft_teams: { // Assuming webhook method for simplicity as per common use case
+        // No base URL needed if using direct webhook_url
+        getAuthHeader: () => ({}), // Webhooks usually don't need auth headers
+        methods: {
+          send_message: {
+            // endpoint is the full webhook_url itself
+            method: 'POST',
+            body: parameters // parameters should be { text: 'message' } for simple messages
+          }
+        }
+      },
+      help_scout: {
+        baseUrl: 'https://api.helpscout.net/v2',
+        getAuthHeader: (accessToken: string) => ({ 'Authorization': `Bearer ${accessToken}` }),
+        methods: {
+          add_label_to_ticket: { // Example method
+            endpoint: (ticketId: string) => `conversations/${ticketId}/tags`, // Dynamic endpoint
+            method: 'POST',
+            body: parameters // parameters might be { tag: 'LABEL_NAME' }
+          },
+          monitor_new_ticket: { // Trigger, not action, but placeholder for API
+            endpoint: 'conversations',
+            method: 'GET', // Or listen to webhooks
+          }
+        }
+      }
+      // Add more platforms dynamically based on user needs
     };
 
     const config = platformConfigs[integration];
@@ -416,14 +471,54 @@ class AutomationExecutor {
       throw new Error(`Method not configured for ${integration}: ${method}`);
     }
 
+    // Resolve URL for dynamic endpoints like Help Scout ticket tags
+    let url = `${config.baseUrl}/${methodConfig.endpoint}`;
+    if (typeof methodConfig.endpoint === 'function') {
+      url = `${config.baseUrl}/${methodConfig.endpoint(parameters.id || parameters.ticket_id)}`; // Pass ID to dynamic endpoint
+      delete parameters.id; // Remove ID from body if already used in URL
+      delete parameters.ticket_id;
+    } else if (integration === 'microsoft_teams') {
+      url = credentials.webhook_url; // For Teams, webhook_url is the endpoint
+    }
+
+    // Determine headers including authentication
+    let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (config.getAuthHeader) {
+        // Trello needs key/token directly in headers or query params, not standard Authorization header
+        if (integration === 'trello') {
+            headers = {
+                ...headers,
+                'key': credentials.api_key,
+                'token': credentials.api_token,
+            };
+        } else if (credentials.access_token) { // Use access_token for standard bearer auth
+            headers = {
+                ...headers,
+                ...config.getAuthHeader(credentials.access_token)
+            };
+        } else if (credentials.bot_token) { // For Slack bot_token
+            headers = {
+                ...headers,
+                ...config.getAuthHeader(credentials.bot_token)
+            };
+        } else if (credentials.personal_access_token) { // For Asana
+            headers = {
+                ...headers,
+                ...config.getAuthHeader(credentials.personal_access_token)
+            };
+        } else if (credentials.api_key && integration !== 'trello') { // Generic API key if not Trello
+            headers = {
+                ...headers,
+                ...config.getAuthHeader(credentials.api_key)
+            };
+        }
+    }
+
     return {
-      url: `${config.baseUrl}/${methodConfig.endpoint}`,
+      url: url,
       method: methodConfig.method,
-      headers: {
-        'Authorization': config.auth,
-        'Content-Type': 'application/json'
-      },
-      body: methodConfig.body
+      headers: headers,
+      body: methodConfig.body // Body is already resolved parameters
     };
   }
 

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -83,7 +82,7 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
         role: formData.role.trim(),
         goal: formData.goal.trim(),
         rules: formData.rule.trim() || null,
-        memory: formData.memory.trim() || null, // Keep as string, don't parse as JSON
+        memory: formData.memory.trim() || null,
       };
 
       // Only save to ai_agents table if we have an automationId
@@ -108,6 +107,9 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
             agent_goal: formData.goal.trim(),
             agent_rules: formData.rule.trim() || null,
             agent_memory: memoryForDB,
+            llm_provider: selectedLLM,
+            model: selectedModel,
+            api_key: formData.apiKey,
           })
           .select()
           .single();
@@ -116,7 +118,7 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
 
         toast({
           title: "Success",
-          description: `AI Agent "${formData.name}" saved!`,
+          description: `AI Agent "${formData.name}" saved with ${selectedLLM}/${selectedModel}!`,
         });
         
         onAgentSaved?.(data.agent_name, data.id, selectedLLM, selectedModel, agentConfig, formData.apiKey);
@@ -124,7 +126,7 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
         // Handle case where no automationId is provided (e.g., from Index page)
         toast({
           title: "Agent Configuration",
-          description: `AI Agent "${formData.name}" configured! This will be used for general chat.`,
+          description: `AI Agent "${formData.name}" configured with ${selectedLLM}/${selectedModel}! This will be used for general chat.`,
         });
         
         onAgentSaved?.(formData.name.trim(), undefined, selectedLLM, selectedModel, agentConfig, formData.apiKey);

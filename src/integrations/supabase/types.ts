@@ -16,9 +16,12 @@ export type Database = {
           agent_name: string
           agent_role: string | null
           agent_rules: string | null
+          api_key: string | null
           automation_id: string
           created_at: string
           id: string
+          llm_provider: string | null
+          model: string | null
           updated_at: string
         }
         Insert: {
@@ -27,9 +30,12 @@ export type Database = {
           agent_name: string
           agent_role?: string | null
           agent_rules?: string | null
+          api_key?: string | null
           automation_id: string
           created_at?: string
           id?: string
+          llm_provider?: string | null
+          model?: string | null
           updated_at?: string
         }
         Update: {
@@ -38,9 +44,12 @@ export type Database = {
           agent_name?: string
           agent_role?: string | null
           agent_rules?: string | null
+          api_key?: string | null
           automation_id?: string
           created_at?: string
           id?: string
+          llm_provider?: string | null
+          model?: string | null
           updated_at?: string
         }
         Relationships: [

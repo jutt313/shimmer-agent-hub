@@ -21,6 +21,7 @@ export interface StructuredResponse {
   }>;
   clarification_questions?: string[];
   automation_blueprint?: any;
+  is_update?: boolean; // Flag to indicate if this is an update response
 }
 
 export const parseStructuredResponse = (responseText: string): StructuredResponse | null => {
@@ -33,6 +34,10 @@ export const parseStructuredResponse = (responseText: string): StructuredRespons
       try {
         const parsed = JSON.parse(jsonCodeBlockMatch[1]);
         console.log('✅ Successfully parsed JSON from code block');
+        
+        // Check if this is an update by looking for specific indicators
+        parsed.is_update = isUpdateResponse(parsed, responseText);
+        
         return parsed;
       } catch (e) {
         console.log('❌ JSON in code block malformed, attempting fix...');
@@ -41,6 +46,7 @@ export const parseStructuredResponse = (responseText: string): StructuredRespons
           try {
             const parsed = JSON.parse(fixed);
             console.log('✅ Fixed and parsed JSON from code block');
+            parsed.is_update = isUpdateResponse(parsed, responseText);
             return parsed;
           } catch (e2) {
             console.log('❌ Could not fix JSON in code block');
@@ -76,6 +82,7 @@ export const parseStructuredResponse = (responseText: string): StructuredRespons
         try {
           const parsed = JSON.parse(jsonStr);
           console.log('✅ Successfully parsed complete JSON object');
+          parsed.is_update = isUpdateResponse(parsed, responseText);
           return parsed;
         } catch (e) {
           console.log('❌ JSON object malformed, attempting fix...');
@@ -84,6 +91,7 @@ export const parseStructuredResponse = (responseText: string): StructuredRespons
             try {
               const parsed = JSON.parse(fixed);
               console.log('✅ Fixed and parsed JSON object');
+              parsed.is_update = isUpdateResponse(parsed, responseText);
               return parsed;
             } catch (e2) {
               console.log('❌ Could not fix JSON object');
@@ -93,10 +101,11 @@ export const parseStructuredResponse = (responseText: string): StructuredRespons
       }
     }
 
-    // Method 3: Extract data from text patterns as fallback (REMOVED PLATFORM AUTO-DETECTION)
+    // Method 3: Extract data from text patterns as fallback
     const extractedData = extractDataFromText(responseText);
     if (extractedData && Object.keys(extractedData).length > 0) {
       console.log('✅ Extracted structured data from text patterns');
+      extractedData.is_update = isUpdateResponse(extractedData, responseText);
       return extractedData;
     }
 
@@ -107,6 +116,29 @@ export const parseStructuredResponse = (responseText: string): StructuredRespons
     console.error('❌ Error in parseStructuredResponse:', error);
     return null;
   }
+};
+
+// Helper function to detect if this is an update response vs new automation
+const isUpdateResponse = (parsed: any, responseText: string): boolean => {
+  // Check for update indicators in the response text
+  const updateKeywords = [
+    'update', 'modify', 'change', 'adjust', 'edit', 'revise',
+    'improved', 'enhanced', 'refined', 'optimized', 'fixed'
+  ];
+  
+  const hasUpdateKeywords = updateKeywords.some(keyword => 
+    responseText.toLowerCase().includes(keyword)
+  );
+
+  // Check if the response lacks major structural components (indicating it's just an update/clarification)
+  const hasMinimalStructure = !parsed.automation_blueprint && 
+                             (!parsed.platforms || parsed.platforms.length === 0) &&
+                             (!parsed.agents || parsed.agents.length === 0);
+
+  // Check for clarification questions (usually indicates follow-up, not new automation)
+  const hasQuestions = parsed.clarification_questions && parsed.clarification_questions.length > 0;
+
+  return hasUpdateKeywords || hasMinimalStructure || hasQuestions;
 };
 
 const fixMalformedJson = (jsonStr: string): string | null => {
@@ -154,10 +186,6 @@ const extractDataFromText = (text: string): StructuredResponse | null => {
       data.steps = steps;
     }
   }
-
-  // REMOVED: Platform auto-detection from text patterns
-  // This was causing confusion by detecting platforms from user prompts
-  // Now platforms will only come from structured JSON responses
 
   // Extract clarification questions
   const clarificationMatch = text.match(/(?:clarification|questions?)[:\s]*\n?((?:(?:\d+\.|\*|\-)\s*.*\n?)*)/i);

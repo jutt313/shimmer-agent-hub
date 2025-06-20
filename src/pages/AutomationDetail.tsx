@@ -102,11 +102,14 @@ const AutomationDetail = () => {
         };
       });
 
-      // Extract platforms from any AI message that has them
+      // Extract platforms from any AI message that has them (but only accumulate unique ones)
       const allPlatforms: any[] = [];
       formattedMessages.forEach(msg => {
         if (msg.isBot && msg.structuredData?.platforms) {
-          allPlatforms.push(...msg.structuredData.platforms);
+          // Only add platforms if this isn't marked as an update response
+          if (!msg.structuredData.is_update) {
+            allPlatforms.push(...msg.structuredData.platforms);
+          }
         }
       });
       
@@ -240,10 +243,11 @@ const AutomationDetail = () => {
       // If we have structured data, format it nicely and store it
       if (structuredData) {
         console.log('✅ STRUCTURED DATA FOUND');
+        console.log('🔄 Is update response:', structuredData.is_update);
         
-        // Update platforms immediately after parsing
-        if (structuredData.platforms && Array.isArray(structuredData.platforms)) {
-          console.log('🔗 Setting new platforms:', structuredData.platforms.length);
+        // Only update platforms if this is NOT an update response and has new platforms
+        if (!structuredData.is_update && structuredData.platforms && Array.isArray(structuredData.platforms)) {
+          console.log('🔗 Adding new platforms:', structuredData.platforms.length);
           setCurrentPlatforms(prev => {
             const newPlatforms = [...prev];
             structuredData.platforms!.forEach((platform: any) => {
@@ -255,8 +259,8 @@ const AutomationDetail = () => {
           });
         }
 
-        // Update automation_blueprint in the database if provided by AI
-        if (structuredData.automation_blueprint) {
+        // Only update automation_blueprint if provided by AI and it's a meaningful change
+        if (structuredData.automation_blueprint && !structuredData.is_update) {
           console.log('🔧 Updating automation blueprint in DB');
           const { error: updateBlueprintError } = await supabase
             .from('automations')
@@ -281,6 +285,8 @@ const AutomationDetail = () => {
               description: "Automation blueprint has been updated.",
             });
           }
+        } else if (structuredData.automation_blueprint && structuredData.is_update) {
+          console.log('📝 Skipping blueprint update - this is an update/clarification response');
         }
       } else {
         console.log('⚠️ No structured data found, using cleaned response');

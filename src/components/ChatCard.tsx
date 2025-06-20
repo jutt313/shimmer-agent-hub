@@ -60,6 +60,13 @@ const ChatCard = ({
               console.log('🔄 Parsed structured data for message:', message.id, !!structuredData);
             }
 
+            console.log('💬 Rendering message:', {
+              id: message.id,
+              isBot: message.isBot,
+              hasStructuredData: !!structuredData,
+              structuredDataKeys: structuredData ? Object.keys(structuredData) : []
+            });
+
             return (
               <div key={message.id} className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}>
                 <div className={`max-w-4xl px-6 py-4 rounded-2xl ${
@@ -71,20 +78,21 @@ const ChatCard = ({
                     boxShadow: '0 0 20px rgba(92, 142, 246, 0.3)'
                   } : {}}
                 >
-                  {/* Show formatted text only if no structured data or if it's a user message */}
-                  {(!message.isBot || !structuredData) && (
-                    <div className="text-sm leading-relaxed whitespace-pre-wrap">
-                      {formatMessageText(message.text)}
-                    </div>
-                  )}
-                  
                   {/* Render structured data using AutomationResponseDisplay for bot messages */}
                   {message.isBot && structuredData && (
-                    <div className="w-full">
+                    <div className="w-full mb-4">
                       <AutomationResponseDisplay 
                         data={structuredData} 
                         onAgentAdd={onAgentAdd || (() => {})}
+                        dismissedAgents={dismissedAgents}
                       />
+                    </div>
+                  )}
+                  
+                  {/* Show formatted text if no structured data or if it's a user message or if there's additional text */}
+                  {(!message.isBot || !structuredData || cleanDisplayText(message.text).length > 0) && (
+                    <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {formatMessageText(message.text)}
                     </div>
                   )}
                   

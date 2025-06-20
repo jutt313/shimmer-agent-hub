@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +38,16 @@ interface AutomationResponseDisplayProps {
 
 const AutomationResponseDisplay = ({ data, onAgentAdd, dismissedAgents = new Set() }: AutomationResponseDisplayProps) => {
   const [selectedPlatform, setSelectedPlatform] = useState<any>(null);
+
+  console.log('🎨 AutomationResponseDisplay rendering with data:', {
+    hasSummary: !!data.summary,
+    hasSteps: !!(data.steps && data.steps.length > 0),
+    hasPlatforms: !!(data.platforms && data.platforms.length > 0),
+    hasAgents: !!(data.agents && data.agents.length > 0),
+    hasClarificationQuestions: !!(data.clarification_questions && data.clarification_questions.length > 0),
+    platformsCount: data.platforms?.length || 0,
+    agentsCount: data.agents?.length || 0
+  });
 
   return (
     <div className="space-y-6">

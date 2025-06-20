@@ -50,9 +50,10 @@ const AutomationResponseDisplay = ({ data, onAgentAdd, dismissedAgents = new Set
     fullData: data
   });
 
+  // Always render the component structure, even if some sections are empty
   return (
     <div className="space-y-6">
-      {/* Clarification Questions */}
+      {/* Clarification Questions - Always check for this first */}
       {data.clarification_questions && data.clarification_questions.length > 0 && (
         <Card className="border-orange-200 bg-orange-50/50">
           <CardHeader>
@@ -73,7 +74,7 @@ const AutomationResponseDisplay = ({ data, onAgentAdd, dismissedAgents = new Set
         </Card>
       )}
 
-      {/* Summary */}
+      {/* Summary - Always show if exists */}
       {data.summary && (
         <Card className="border-blue-200 bg-blue-50/50">
           <CardHeader>
@@ -85,7 +86,7 @@ const AutomationResponseDisplay = ({ data, onAgentAdd, dismissedAgents = new Set
         </Card>
       )}
 
-      {/* Step-by-Step Explanation */}
+      {/* Step-by-Step Explanation - Always show if exists */}
       {data.steps && data.steps.length > 0 && (
         <Card className="border-green-200 bg-green-50/50">
           <CardHeader>
@@ -115,7 +116,7 @@ const AutomationResponseDisplay = ({ data, onAgentAdd, dismissedAgents = new Set
           <CardContent>
             <div className="space-y-4">
               {data.platforms.map((platform, index) => (
-                <div key={index} className="border border-purple-200 rounded-lg p-4 bg-white/50">
+                <div key={`platform-${index}-${platform.name}`} className="border border-purple-200 rounded-lg p-4 bg-white/50">
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="font-semibold text-purple-800">{platform.name}</h4>
                     <Button
@@ -127,8 +128,8 @@ const AutomationResponseDisplay = ({ data, onAgentAdd, dismissedAgents = new Set
                     </Button>
                   </div>
                   <div className="space-y-2">
-                    {platform.credentials.map((cred, credIndex) => (
-                      <div key={credIndex} className="flex items-center gap-2 text-sm">
+                    {platform.credentials && platform.credentials.map((cred, credIndex) => (
+                      <div key={`cred-${index}-${credIndex}`} className="flex items-center gap-2 text-sm">
                         <Badge variant="secondary">{cred.field}</Badge>
                         <TooltipProvider>
                           <Tooltip>
@@ -171,7 +172,7 @@ const AutomationResponseDisplay = ({ data, onAgentAdd, dismissedAgents = new Set
               {data.agents
                 .filter(agent => !dismissedAgents.has(agent.name))
                 .map((agent, index) => (
-                <div key={index} className="border border-indigo-200 rounded-lg p-4 bg-white/50">
+                <div key={`agent-${index}-${agent.name}`} className="border border-indigo-200 rounded-lg p-4 bg-white/50">
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <h4 className="font-semibold text-indigo-800">{agent.name}</h4>

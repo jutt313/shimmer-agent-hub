@@ -58,6 +58,15 @@ const ChatCard = ({
             if (message.isBot && !structuredData) {
               structuredData = parseStructuredResponse(message.text);
               console.log('🔄 Parsed structured data for message:', message.id, !!structuredData);
+              
+              if (structuredData) {
+                console.log('📊 Structured data contents:', {
+                  hasSummary: !!structuredData.summary,
+                  stepsCount: structuredData.steps?.length || 0,
+                  platformsCount: structuredData.platforms?.length || 0,
+                  agentsCount: structuredData.agents?.length || 0
+                });
+              }
             }
 
             console.log('💬 Rendering message:', {
@@ -78,7 +87,7 @@ const ChatCard = ({
                     boxShadow: '0 0 20px rgba(92, 142, 246, 0.3)'
                   } : {}}
                 >
-                  {/* Render structured data using AutomationResponseDisplay for bot messages */}
+                  {/* ALWAYS render structured data first if it exists for bot messages */}
                   {message.isBot && structuredData && (
                     <div className="w-full mb-4">
                       <AutomationResponseDisplay 
@@ -89,8 +98,8 @@ const ChatCard = ({
                     </div>
                   )}
                   
-                  {/* Show formatted text if no structured data or if it's a user message or if there's additional text */}
-                  {(!message.isBot || !structuredData || cleanDisplayText(message.text).length > 0) && (
+                  {/* Show formatted text only if no structured data or if there's meaningful additional text */}
+                  {(!message.isBot || !structuredData || cleanDisplayText(message.text).length > 20) && (
                     <div className="text-sm leading-relaxed whitespace-pre-wrap">
                       {formatMessageText(message.text)}
                     </div>

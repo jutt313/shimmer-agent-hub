@@ -93,7 +93,7 @@ export const parseStructuredResponse = (responseText: string): StructuredRespons
       }
     }
 
-    // Method 3: Extract data from text patterns as fallback
+    // Method 3: Extract data from text patterns as fallback (REMOVED PLATFORM AUTO-DETECTION)
     const extractedData = extractDataFromText(responseText);
     if (extractedData && Object.keys(extractedData).length > 0) {
       console.log('✅ Extracted structured data from text patterns');
@@ -155,22 +155,9 @@ const extractDataFromText = (text: string): StructuredResponse | null => {
     }
   }
 
-  // Extract platforms
-  const platformMatches = text.match(/(?:Gmail|Asana|Slack|OpenAI|Trello|Notion|Discord|Teams)/gi);
-  if (platformMatches && platformMatches.length > 0) {
-    const uniquePlatforms = [...new Set(platformMatches)];
-    data.platforms = uniquePlatforms.map(platform => ({
-      name: platform,
-      credentials: [
-        {
-          field: getPlatformCredentialField(platform),
-          placeholder: `Enter your ${platform} credentials`,
-          link: `https://${platform.toLowerCase()}.com`,
-          why_needed: `Required to connect to ${platform}`
-        }
-      ]
-    }));
-  }
+  // REMOVED: Platform auto-detection from text patterns
+  // This was causing confusion by detecting platforms from user prompts
+  // Now platforms will only come from structured JSON responses
 
   // Extract clarification questions
   const clarificationMatch = text.match(/(?:clarification|questions?)[:\s]*\n?((?:(?:\d+\.|\*|\-)\s*.*\n?)*)/i);
@@ -187,21 +174,6 @@ const extractDataFromText = (text: string): StructuredResponse | null => {
   }
 
   return Object.keys(data).length > 0 ? data : null;
-};
-
-const getPlatformCredentialField = (platform: string): string => {
-  const platformFields: Record<string, string> = {
-    'Gmail': 'email_password',
-    'Asana': 'api_token',
-    'Slack': 'webhook_url',
-    'OpenAI': 'api_key',
-    'Trello': 'api_key',
-    'Notion': 'api_token',
-    'Discord': 'webhook_url',
-    'Teams': 'webhook_url'
-  };
-  
-  return platformFields[platform] || 'api_key';
 };
 
 export const cleanDisplayText = (text: string): string => {

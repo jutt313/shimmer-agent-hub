@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,14 @@ interface AIAgentFormProps {
   automationId?: string;
   onClose: () => void;
   onAgentSaved?: (agentName: string, agentId?: string, llmProvider?: string, model?: string, config?: any, apiKey?: string) => void;
+  initialAgentData?: {
+    name: string;
+    role: string;
+    goal: string;
+    rules?: string;
+    memory?: string;
+    why_needed?: string;
+  };
 }
 
 const llmOptions = {
@@ -24,7 +32,7 @@ const llmOptions = {
   "DeepSeek": ["deepseek-chat", "deepseek-coder"]
 };
 
-const AIAgentForm = ({ automationId, onClose, onAgentSaved }: AIAgentFormProps) => {
+const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: AIAgentFormProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -39,6 +47,20 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved }: AIAgentFormProps) 
     apiKey: ""
   });
   const [isSaving, setIsSaving] = useState(false);
+
+  // Auto-fill form when initialAgentData is provided
+  useEffect(() => {
+    if (initialAgentData) {
+      setFormData({
+        name: initialAgentData.name || "",
+        role: initialAgentData.role || "",
+        rule: initialAgentData.rules || "",
+        goal: initialAgentData.goal || "",
+        memory: initialAgentData.memory || "",
+        apiKey: ""
+      });
+    }
+  }, [initialAgentData]);
 
   const handleTestAPI = () => {
     toast({

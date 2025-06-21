@@ -430,7 +430,7 @@ const AutomationDetail = () => {
       <div className="max-w-7xl mx-auto h-full flex flex-col relative z-10 pt-16">        
         {/* Main Content Area with Slide Animation */}
         <div className="flex-1 flex items-start justify-center pt-2 pb-4 relative">
-          <div className={`transition-transform duration-500 ease-in-out ${showDashboard ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'} ${showDashboard ? 'absolute' : 'relative'}`}>
+          <div className={`transition-transform duration-500 ease-in-out ${showDashboard ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'} ${showDashboard ? 'absolute' : 'relative'} w-[calc(100vw-6rem)] max-w-none mx-12`}>
             <ChatCard 
               messages={messages} 
               onAgentAdd={handleAgentAdd}
@@ -455,7 +455,7 @@ const AutomationDetail = () => {
         
         {/* Platform Buttons - Only show when not in dashboard view */}
         {!showDashboard && currentPlatforms && currentPlatforms.length > 0 && (
-          <div className="mb-4">
+          <div className="mb-4 mx-12">
             <PlatformButtons platforms={currentPlatforms} />
           </div>
         )}

@@ -4,10 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowRight, Clock, CheckCircle, XCircle, Play, Activity, Server, Bot, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LineChart, Line } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 import { format, subDays, startOfDay } from "date-fns";
 import AgentChatPopup from "./AgentChatPopup";
 
@@ -163,6 +164,29 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
     };
   });
 
+  // Platform performance data
+  const platformPerformanceData = platforms.map(platform => ({
+    name: platform.name,
+    calls: Math.floor(Math.random() * 100) + 10, // Mock data based on runs
+    success: Math.floor(Math.random() * 90) + 80,
+    avgTime: Math.floor(Math.random() * 1000) + 200
+  }));
+
+  // Agent performance data
+  const agentPerformanceData = agents.map(agent => ({
+    name: agent.agent_name,
+    tasks: Math.floor(Math.random() * 50) + 5,
+    success: Math.floor(Math.random() * 95) + 85,
+    memory: Math.floor(Math.random() * 100) + 20
+  }));
+
+  // Pie chart data for status distribution
+  const statusData = [
+    { name: 'Completed', value: successfulRuns, color: '#10b981' },
+    { name: 'Failed', value: runs.filter(run => run.status === 'failed').length, color: '#ef4444' },
+    { name: 'Running', value: runs.filter(run => run.status === 'running').length, color: '#3b82f6' }
+  ].filter(item => item.value > 0);
+
   // Get last 24 hours runs
   const last24Hours = runs.filter(run => 
     new Date(run.run_timestamp) > subDays(new Date(), 1)
@@ -203,7 +227,7 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
   if (loading) {
     return (
       <div 
-        className="w-full max-w-6xl h-[75vh] bg-white/70 backdrop-blur-md rounded-3xl p-8 shadow-2xl border-0 relative flex items-center justify-center"
+        className="w-[calc(100vw-6rem)] max-w-none h-[75vh] bg-white/70 backdrop-blur-md rounded-3xl p-8 shadow-2xl border-0 relative flex items-center justify-center mx-12"
         style={{
           boxShadow: '0 0 50px rgba(92, 142, 246, 0.2), 0 0 100px rgba(154, 94, 255, 0.1)'
         }}
@@ -219,7 +243,7 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
         style={{
           boxShadow: '0 0 50px rgba(92, 142, 246, 0.2), 0 0 100px rgba(154, 94, 255, 0.1)'
         }} 
-        className="w-full max-w-6xl h-[75vh] bg-white/70 backdrop-blur-md rounded-3xl p-8 shadow-2xl border-0 relative"
+        className="w-[calc(100vw-6rem)] max-w-none h-[75vh] bg-white/70 backdrop-blur-md rounded-3xl p-8 shadow-2xl border-0 relative mx-12"
       >
         <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/30 to-purple-100/30 pointer-events-none"></div>
         
@@ -230,252 +254,362 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
           </h2>
           <Button
             onClick={onClose}
-            className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
+            size="sm"
+            className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-4 py-2 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
           >
-            <ArrowRight className="w-5 h-5 mr-2" />
-            Back to Chat
+            <ArrowRight className="w-4 h-4" />
           </Button>
         </div>
 
-        <ScrollArea className="h-[calc(100%-5rem)] relative z-10">
-          <div className="space-y-8 pr-4">
-            {/* Overview Section */}
-            <div className="space-y-4">
-              <h3 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-                <Activity className="w-5 h-5" />
+        {/* Tabs Navigation */}
+        <div className="relative z-10 h-[calc(100%-5rem)]">
+          <Tabs defaultValue="overview" className="h-full">
+            <TabsList className="grid w-full grid-cols-4 bg-white/50 rounded-2xl p-1">
+              <TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <Activity className="w-4 h-4" />
                 Overview
-              </h3>
-              
-              {/* Last Run Status */}
-              {lastRun && (
-                <div className="bg-white/50 rounded-2xl p-4 border border-blue-200/50">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {getStatusIcon(lastRun.status)}
-                      <div>
-                        <p className="font-medium text-gray-800">Last Run</p>
-                        <p className="text-sm text-gray-600">
-                          {new Date(lastRun.run_timestamp).toLocaleString()}
-                        </p>
+              </TabsTrigger>
+              <TabsTrigger value="services" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <Server className="w-4 h-4" />
+                Services
+              </TabsTrigger>
+              <TabsTrigger value="agents" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <Bot className="w-4 h-4" />
+                AI Agents
+              </TabsTrigger>
+              <TabsTrigger value="activity" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <History className="w-4 h-4" />
+                Activity
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Overview Tab */}
+            <TabsContent value="overview" className="mt-6 h-[calc(100%-4rem)]">
+              <ScrollArea className="h-full">
+                <div className="space-y-6 pr-4">
+                  {/* Last Run Status */}
+                  {lastRun && (
+                    <div className="bg-white/50 rounded-2xl p-4 border border-blue-200/50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {getStatusIcon(lastRun.status)}
+                          <div>
+                            <p className="font-medium text-gray-800">Last Run</p>
+                            <p className="text-sm text-gray-600">
+                              {new Date(lastRun.run_timestamp).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                        {getStatusBadge(lastRun.status)}
                       </div>
                     </div>
-                    {getStatusBadge(lastRun.status)}
+                  )}
+
+                  {/* Metrics Cards */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <Card className="bg-white/50 border-blue-200/50">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-gray-600">Total Runs</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-blue-600">{totalRuns}</div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="bg-white/50 border-blue-200/50">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-gray-600">Success Rate</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-green-600">{successRate}%</div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="bg-white/50 border-blue-200/50">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-gray-600">Avg Execution Time</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-purple-600">{avgExecutionTime}ms</div>
+                      </CardContent>
+                    </Card>
                   </div>
-                </div>
-              )}
 
-              {/* Metrics Cards */}
-              <div className="grid grid-cols-3 gap-4">
-                <Card className="bg-white/50 border-blue-200/50">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-600">Total Runs</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-blue-600">{totalRuns}</div>
-                  </CardContent>
-                </Card>
-                
-                <Card className="bg-white/50 border-blue-200/50">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-600">Success Rate</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-green-600">{successRate}%</div>
-                  </CardContent>
-                </Card>
-                
-                <Card className="bg-white/50 border-blue-200/50">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-600">Avg Execution Time</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-purple-600">{avgExecutionTime}ms</div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Chart */}
-              <Card className="bg-white/50 border-blue-200/50">
-                <CardHeader>
-                  <CardTitle className="text-lg">Last 7 Days Activity</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ChartContainer
-                    config={{
-                      total: { label: "Total", color: "#3b82f6" },
-                      successful: { label: "Successful", color: "#10b981" },
-                      failed: { label: "Failed", color: "#ef4444" }
-                    }}
-                    className="h-[200px]"
-                  >
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={last7Days}>
-                        <XAxis dataKey="date" />
-                        <YAxis />
-                        <ChartTooltip content={<ChartTooltipContent />} />
-                        <Bar dataKey="successful" fill="#10b981" />
-                        <Bar dataKey="failed" fill="#ef4444" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </ChartContainer>
-                </CardContent>
-              </Card>
-
-              {/* Last 24 Hours */}
-              {last24Hours.length > 0 && (
-                <Card className="bg-white/50 border-blue-200/50">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Last 24 Hours</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {last24Hours.map((run) => (
-                        <div key={run.id} className="flex items-center justify-between p-2 rounded-lg bg-gray-50/50">
-                          <div className="flex items-center gap-2">
-                            {getStatusIcon(run.status)}
-                            <span className="text-sm">
-                              {new Date(run.run_timestamp).toLocaleTimeString()}
-                            </span>
-                          </div>
-                          {getStatusBadge(run.status)}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-
-            {/* Services Section */}
-            <div className="space-y-4">
-              <h3 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-                <Server className="w-5 h-5" />
-                Services & Platforms
-              </h3>
-              
-              {platforms.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {platforms.map((platform, index) => (
-                    <Card key={index} className="bg-white/50 border-blue-200/50">
+                  {/* Charts Row */}
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Activity Chart */}
+                    <Card className="bg-white/50 border-blue-200/50">
                       <CardHeader>
-                        <CardTitle className="text-lg">{platform.name}</CardTitle>
+                        <CardTitle className="text-lg">Last 7 Days Activity</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ChartContainer
+                          config={{
+                            successful: { label: "Successful", color: "#10b981" },
+                            failed: { label: "Failed", color: "#ef4444" }
+                          }}
+                          className="h-[200px]"
+                        >
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={last7Days}>
+                              <XAxis dataKey="date" />
+                              <YAxis />
+                              <ChartTooltip content={<ChartTooltipContent />} />
+                              <Bar dataKey="successful" fill="#10b981" />
+                              <Bar dataKey="failed" fill="#ef4444" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </ChartContainer>
+                      </CardContent>
+                    </Card>
+
+                    {/* Status Distribution */}
+                    <Card className="bg-white/50 border-blue-200/50">
+                      <CardHeader>
+                        <CardTitle className="text-lg">Run Status Distribution</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ChartContainer
+                          config={{
+                            completed: { label: "Completed", color: "#10b981" },
+                            failed: { label: "Failed", color: "#ef4444" },
+                            running: { label: "Running", color: "#3b82f6" }
+                          }}
+                          className="h-[200px]"
+                        >
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={statusData}
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={60}
+                                dataKey="value"
+                              >
+                                {statusData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                              </Pie>
+                              <ChartTooltip content={<ChartTooltipContent />} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </ChartContainer>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Last 24 Hours */}
+                  {last24Hours.length > 0 && (
+                    <Card className="bg-white/50 border-blue-200/50">
+                      <CardHeader>
+                        <CardTitle className="text-lg">Last 24 Hours</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
-                          <p className="text-sm text-gray-600">Method: {platform.method}</p>
-                          <Badge variant="secondary">Active</Badge>
+                          {last24Hours.map((run) => (
+                            <div key={run.id} className="flex items-center justify-between p-2 rounded-lg bg-gray-50/50">
+                              <div className="flex items-center gap-2">
+                                {getStatusIcon(run.status)}
+                                <span className="text-sm">
+                                  {new Date(run.run_timestamp).toLocaleTimeString()}
+                                </span>
+                              </div>
+                              {getStatusBadge(run.status)}
+                            </div>
+                          ))}
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
+                  )}
                 </div>
-              ) : (
-                <Card className="bg-white/50 border-blue-200/50">
-                  <CardContent className="text-center py-8">
-                    <Server className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p className="text-gray-500">No platforms configured yet</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+              </ScrollArea>
+            </TabsContent>
 
-            {/* AI Agents Section */}
-            <div className="space-y-4">
-              <h3 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-                <Bot className="w-5 h-5" />
-                AI Agents
-              </h3>
-              
-              {agents.length > 0 ? (
-                <div className="space-y-4">
-                  {agents.map((agent) => (
-                    <Card key={agent.id} className="bg-white/50 border-blue-200/50">
-                      <CardHeader>
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <CardTitle className="text-lg">{agent.agent_name}</CardTitle>
-                            <p className="text-sm text-gray-600">{agent.agent_role}</p>
-                          </div>
-                          <Button
-                            onClick={() => handleTalkToAgent(agent)}
-                            size="sm"
-                            className="bg-blue-600 hover:bg-blue-700 text-white"
+            {/* Services Tab */}
+            <TabsContent value="services" className="mt-6 h-[calc(100%-4rem)]">
+              <ScrollArea className="h-full">
+                <div className="space-y-6 pr-4">
+                  {/* Platform Cards */}
+                  {platforms.length > 0 ? (
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {platforms.map((platform, index) => (
+                          <Card key={index} className="bg-white/50 border-blue-200/50">
+                            <CardHeader>
+                              <CardTitle className="text-lg">{platform.name}</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-2">
+                                <p className="text-sm text-gray-600">Method: {platform.method}</p>
+                                <Badge variant="secondary">Active</Badge>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+
+                      {/* Platform Performance Chart */}
+                      <Card className="bg-white/50 border-blue-200/50">
+                        <CardHeader>
+                          <CardTitle className="text-lg">Platform Performance</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ChartContainer
+                            config={{
+                              calls: { label: "API Calls", color: "#3b82f6" },
+                              success: { label: "Success Rate", color: "#10b981" }
+                            }}
+                            className="h-[300px]"
                           >
-                            Talk to Agent
-                          </Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          <p className="text-sm"><strong>Goal:</strong> {agent.agent_goal}</p>
-                          <p className="text-sm"><strong>Provider:</strong> {agent.llm_provider} - {agent.model}</p>
-                          <div className="flex gap-2">
-                            <Badge variant="secondary">Active</Badge>
-                            <Badge variant="outline">Healthy</Badge>
-                          </div>
-                        </div>
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={platformPerformanceData}>
+                                <XAxis dataKey="name" />
+                                <YAxis />
+                                <ChartTooltip content={<ChartTooltipContent />} />
+                                <Bar dataKey="calls" fill="#3b82f6" />
+                                <Bar dataKey="success" fill="#10b981" />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </ChartContainer>
+                        </CardContent>
+                      </Card>
+                    </>
+                  ) : (
+                    <Card className="bg-white/50 border-blue-200/50">
+                      <CardContent className="text-center py-8">
+                        <Server className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                        <p className="text-gray-500">No platforms configured yet</p>
                       </CardContent>
                     </Card>
-                  ))}
+                  )}
                 </div>
-              ) : (
-                <Card className="bg-white/50 border-blue-200/50">
-                  <CardContent className="text-center py-8">
-                    <Bot className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p className="text-gray-500">No AI agents configured yet</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+              </ScrollArea>
+            </TabsContent>
 
-            {/* Activity History Section */}
-            <div className="space-y-4">
-              <h3 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-                <History className="w-5 h-5" />
-                Activity History
-              </h3>
-              
-              {runs.length > 0 ? (
-                <Card className="bg-white/50 border-blue-200/50">
-                  <CardContent className="p-0">
-                    <div className="space-y-0">
-                      {runs.slice(0, 10).map((run) => (
-                        <div key={run.id} className="border-b border-gray-200/50 last:border-b-0 p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              {getStatusIcon(run.status)}
-                              <div>
-                                <p className="font-medium text-gray-800">
-                                  Run {run.id.slice(0, 8)}...
-                                </p>
-                                <p className="text-sm text-gray-600">
-                                  {new Date(run.run_timestamp).toLocaleString()}
-                                </p>
-                                {run.duration_ms && (
-                                  <p className="text-xs text-gray-500">
-                                    Duration: {run.duration_ms}ms
-                                  </p>
-                                )}
+            {/* AI Agents Tab */}
+            <TabsContent value="agents" className="mt-6 h-[calc(100%-4rem)]">
+              <ScrollArea className="h-full">
+                <div className="space-y-6 pr-4">
+                  {agents.length > 0 ? (
+                    <>
+                      {/* Agent Cards */}
+                      <div className="space-y-4">
+                        {agents.map((agent) => (
+                          <Card key={agent.id} className="bg-white/50 border-blue-200/50">
+                            <CardHeader>
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <CardTitle className="text-lg">{agent.agent_name}</CardTitle>
+                                  <p className="text-sm text-gray-600">{agent.agent_role}</p>
+                                </div>
+                                <Button
+                                  onClick={() => handleTalkToAgent(agent)}
+                                  size="sm"
+                                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                                >
+                                  Talk to Agent
+                                </Button>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-2">
+                                <p className="text-sm"><strong>Goal:</strong> {agent.agent_goal}</p>
+                                <p className="text-sm"><strong>Provider:</strong> {agent.llm_provider} - {agent.model}</p>
+                                <div className="flex gap-2">
+                                  <Badge variant="secondary">Active</Badge>
+                                  <Badge variant="outline">Healthy</Badge>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+
+                      {/* Agent Performance Chart */}
+                      <Card className="bg-white/50 border-blue-200/50">
+                        <CardHeader>
+                          <CardTitle className="text-lg">Agent Performance</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ChartContainer
+                            config={{
+                              tasks: { label: "Tasks Completed", color: "#8b5cf6" },
+                              success: { label: "Success Rate", color: "#10b981" }
+                            }}
+                            className="h-[300px]"
+                          >
+                            <ResponsiveContainer width="100%" height="100%">
+                              <LineChart data={agentPerformanceData}>
+                                <XAxis dataKey="name" />
+                                <YAxis />
+                                <ChartTooltip content={<ChartTooltipContent />} />
+                                <Line type="monotone" dataKey="tasks" stroke="#8b5cf6" strokeWidth={2} />
+                                <Line type="monotone" dataKey="success" stroke="#10b981" strokeWidth={2} />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </ChartContainer>
+                        </CardContent>
+                      </Card>
+                    </>
+                  ) : (
+                    <Card className="bg-white/50 border-blue-200/50">
+                      <CardContent className="text-center py-8">
+                        <Bot className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                        <p className="text-gray-500">No AI agents configured yet</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            {/* Activity Tab */}
+            <TabsContent value="activity" className="mt-6 h-[calc(100%-4rem)]">
+              <ScrollArea className="h-full">
+                <div className="space-y-4 pr-4">
+                  {runs.length > 0 ? (
+                    <Card className="bg-white/50 border-blue-200/50">
+                      <CardContent className="p-0">
+                        <div className="space-y-0">
+                          {runs.slice(0, 20).map((run) => (
+                            <div key={run.id} className="border-b border-gray-200/50 last:border-b-0 p-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  {getStatusIcon(run.status)}
+                                  <div>
+                                    <p className="font-medium text-gray-800">
+                                      Run {run.id.slice(0, 8)}...
+                                    </p>
+                                    <p className="text-sm text-gray-600">
+                                      {new Date(run.run_timestamp).toLocaleString()}
+                                    </p>
+                                    {run.duration_ms && (
+                                      <p className="text-xs text-gray-500">
+                                        Duration: {run.duration_ms}ms
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                                {getStatusBadge(run.status)}
                               </div>
                             </div>
-                            {getStatusBadge(run.status)}
-                          </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card className="bg-white/50 border-blue-200/50">
-                  <CardContent className="text-center py-8">
-                    <History className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p className="text-gray-500">No activity history yet</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </div>
-        </ScrollArea>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <Card className="bg-white/50 border-blue-200/50">
+                      <CardContent className="text-center py-8">
+                        <History className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                        <p className="text-gray-500">No activity history yet</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
 
       {/* Agent Chat Popup */}

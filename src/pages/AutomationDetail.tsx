@@ -123,11 +123,11 @@ const AutomationDetail = () => {
         setCurrentPlatforms(uniquePlatforms);
       }
 
-      // Add welcome message if no chats exist
+      // Add custom welcome message instead of generic one
       if (formattedMessages.length === 0) {
         const welcomeMessage = {
           id: 1,
-          text: `Welcome to your automation "${automationData.title}"! I'm here to help you build and customize this automation. What would you like to work on?`,
+          text: `I am YusrAI, how can I help you to build "${automationData.title}"?`,
           isBot: true,
           timestamp: new Date()
         };
@@ -427,6 +427,7 @@ const AutomationDetail = () => {
             dismissedAgents={dismissedAgents}
             onAgentDismiss={handleAgentDismiss}
             automationId={automation.id}
+            isLoading={sendingMessage}
           />
         </div>
         
@@ -456,7 +457,7 @@ const AutomationDetail = () => {
                 value={newMessage} 
                 onChange={e => setNewMessage(e.target.value)} 
                 onKeyPress={handleKeyPress} 
-                placeholder={sendingMessage ? "AI is thinking..." : "Ask about this automation..."} 
+                placeholder={sendingMessage ? "YusrAI is building..." : "Ask about this automation..."} 
                 disabled={sendingMessage}
                 className="rounded-3xl bg-white/80 backdrop-blur-sm border-0 px-6 py-4 text-lg focus:outline-none focus:ring-0 shadow-lg" 
                 style={{

@@ -1,9 +1,9 @@
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Bot, Plus, X, Info } from "lucide-react";
+import { Bot, Plus, X } from "lucide-react";
 import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
-import AutomationResponseDisplay from "./AutomationResponseDisplay";
+import { useEffect, useRef } from "react";
 
 interface Message {
   id: number;
@@ -18,7 +18,8 @@ interface ChatCardProps {
   onAgentAdd?: (agent: any) => void;
   dismissedAgents?: Set<string>;
   onAgentDismiss?: (agentName: string) => void;
-  automationId?: string; // Add automationId for AutomationResponseDisplay
+  automationId?: string;
+  isLoading?: boolean;
 }
 
 const ChatCard = ({
@@ -26,10 +27,18 @@ const ChatCard = ({
   onAgentAdd,
   dismissedAgents = new Set(),
   onAgentDismiss,
-  automationId = "temp-automation-id" // Default fallback for non-automation contexts
+  automationId = "temp-automation-id",
+  isLoading = false
 }: ChatCardProps) => {
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when new messages are added
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading]);
+
   const formatMessageText = (text: string) => {
-    // Clean the text and convert markdown-style formatting
     const cleanText = cleanDisplayText(text);
     
     return cleanText
@@ -43,6 +52,121 @@ const ChatCard = ({
       ));
   };
 
+  const renderStructuredContent = (structuredData: StructuredResponse) => {
+    const content = [];
+
+    // Summary
+    if (structuredData.summary) {
+      content.push(
+        <div key="summary" className="mb-4">
+          <h3 className="font-semibold text-gray-800 mb-2">Automation Summary</h3>
+          <p className="text-gray-700">{structuredData.summary}</p>
+        </div>
+      );
+    }
+
+    // Steps
+    if (structuredData.steps && structuredData.steps.length > 0) {
+      content.push(
+        <div key="steps" className="mb-4">
+          <h3 className="font-semibold text-gray-800 mb-2">Step-by-Step Workflow</h3>
+          <ol className="list-decimal list-inside space-y-1 text-gray-700">
+            {structuredData.steps.map((step, index) => (
+              <li key={index}>{step}</li>
+            ))}
+          </ol>
+        </div>
+      );
+    }
+
+    // Platforms
+    if (structuredData.platforms && structuredData.platforms.length > 0) {
+      content.push(
+        <div key="platforms" className="mb-4">
+          <h3 className="font-semibold text-gray-800 mb-2">Required Platform Credentials</h3>
+          {structuredData.platforms.map((platform, index) => (
+            <div key={index} className="mb-3">
+              <h4 className="font-medium text-gray-800">{platform.name}</h4>
+              {platform.credentials && platform.credentials.length > 0 && (
+                <ul className="list-disc list-inside ml-4 text-gray-700">
+                  {platform.credentials.map((cred, credIndex) => (
+                    <li key={credIndex}>
+                      <strong>{cred.field.replace(/_/g, ' ').toUpperCase()}</strong>: {cred.why_needed}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // Clarification Questions
+    if (structuredData.clarification_questions && structuredData.clarification_questions.length > 0) {
+      content.push(
+        <div key="clarification" className="mb-4">
+          <h3 className="font-semibold text-yellow-800 mb-2">I need some clarification:</h3>
+          <ol className="list-decimal list-inside space-y-1 text-yellow-700">
+            {structuredData.clarification_questions.map((question, index) => (
+              <li key={index}>{question}</li>
+            ))}
+          </ol>
+        </div>
+      );
+    }
+
+    // AI Agents (only these get cards)
+    if (structuredData.agents && structuredData.agents.length > 0) {
+      content.push(
+        <div key="agents" className="mb-4">
+          <h3 className="font-semibold text-blue-800 mb-3">Recommended AI Agents</h3>
+          <div className="space-y-3">
+            {structuredData.agents.map((agent, index) => {
+              if (dismissedAgents.has(agent.name)) return null;
+              
+              return (
+                <div key={index} className="border rounded-lg p-4 bg-blue-50/50 border-blue-200">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h4 className="font-semibold text-blue-800">{agent.name}</h4>
+                      <p className="text-sm text-blue-600">{agent.role}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => onAgentAdd?.(agent)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 text-xs rounded-md"
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Add
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onAgentDismiss?.(agent.name)}
+                        className="border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-1 text-xs rounded-md"
+                      >
+                        <X className="w-3 h-3 mr-1" />
+                        Dismiss
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-2 text-sm text-gray-700">
+                    <p><strong>Goal:</strong> {agent.goal}</p>
+                    <p><strong>Why needed:</strong> {agent.why_needed}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    return content;
+  };
+
   return (
     <div 
       style={{
@@ -52,31 +176,13 @@ const ChatCard = ({
     >
       <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/30 to-purple-100/30 pointer-events-none"></div>
       
-      <ScrollArea className="h-full relative z-10">
+      <ScrollArea className="h-full relative z-10" ref={scrollAreaRef}>
         <div className="space-y-6 pr-4">
           {messages.map(message => {
-            // Parse structured data from message text if not already parsed
             let structuredData = message.structuredData;
             if (message.isBot && !structuredData) {
               structuredData = parseStructuredResponse(message.text);
-              console.log('🔄 Parsed structured data for message:', message.id, !!structuredData);
-              
-              if (structuredData) {
-                console.log('📊 Structured data contents:', {
-                  hasSummary: !!structuredData.summary,
-                  stepsCount: structuredData.steps?.length || 0,
-                  platformsCount: structuredData.platforms?.length || 0,
-                  agentsCount: structuredData.agents?.length || 0
-                });
-              }
             }
-
-            console.log('💬 Rendering message:', {
-              id: message.id,
-              isBot: message.isBot,
-              hasStructuredData: !!structuredData,
-              structuredDataKeys: structuredData ? Object.keys(structuredData) : []
-            });
 
             return (
               <div key={message.id} className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}>
@@ -89,19 +195,13 @@ const ChatCard = ({
                     boxShadow: '0 0 20px rgba(92, 142, 246, 0.3)'
                   } : {}}
                 >
-                  {/* ALWAYS render structured data first if it exists for bot messages */}
-                  {message.isBot && structuredData && (
-                    <div className="w-full mb-4">
-                      <AutomationResponseDisplay 
-                        response={structuredData}
-                        automationId={automationId}
-                        onSave={() => {}}
-                      />
+                  {/* Render structured content for bot messages */}
+                  {message.isBot && structuredData ? (
+                    <div className="text-sm leading-relaxed">
+                      {renderStructuredContent(structuredData)}
                     </div>
-                  )}
-                  
-                  {/* Show formatted text only if no structured data or if there's meaningful additional text */}
-                  {(!message.isBot || !structuredData || cleanDisplayText(message.text).length > 20) && (
+                  ) : (
+                    /* Show formatted text for user messages or if no structured data */
                     <div className="text-sm leading-relaxed whitespace-pre-wrap">
                       {formatMessageText(message.text)}
                     </div>
@@ -117,6 +217,21 @@ const ChatCard = ({
               </div>
             );
           })}
+          
+          {/* Loading indicator */}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="max-w-4xl px-6 py-4 rounded-2xl bg-gradient-to-r from-blue-100/80 to-purple-100/80 text-gray-800 border border-blue-200/50">
+                <div className="flex items-center space-x-2">
+                  <Bot className="w-4 h-4 animate-pulse" />
+                  <span className="text-sm">YusrAI is thinking...</span>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Invisible div for auto-scroll */}
+          <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
     </div>

@@ -17,7 +17,7 @@ const Index = () => {
   const [currentAgentConfig, setCurrentAgentConfig] = useState(null);
   const [messages, setMessages] = useState([{
     id: 1,
-    text: "Hello! I'm your AI assistant powered by OpenAI. How can I help you today?",
+    text: "I am YusrAI, your AI assistant powered by OpenAI. How can I help you today?",
     isBot: true,
     timestamp: new Date()
   }]);
@@ -167,7 +167,10 @@ const Index = () => {
       <div className="max-w-6xl mx-auto h-full flex flex-col relative z-10">
         {/* Main Chat Card - Made much larger */}
         <div className="flex-1 flex items-center justify-center mb-6">
-          <ChatCard messages={messages} />
+          <ChatCard 
+            messages={messages} 
+            isLoading={isLoading}
+          />
         </div>
         
         {/* Input Section */}
@@ -190,7 +193,7 @@ const Index = () => {
                 value={message} 
                 onChange={e => setMessage(e.target.value)} 
                 onKeyPress={handleKeyPress} 
-                placeholder={isLoading ? "AI is thinking..." : "Type your message here..."} 
+                placeholder={isLoading ? "YusrAI is thinking..." : "Type your message here..."} 
                 disabled={isLoading}
                 className="rounded-3xl bg-white/80 backdrop-blur-sm border-0 px-6 py-4 text-lg focus:outline-none focus:ring-0 shadow-lg" 
                 style={{

@@ -9,6 +9,44 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      agent_test_results: {
+        Row: {
+          ai_agent_id: string | null
+          created_at: string
+          id: string
+          technical_details: Json | null
+          test_message: string | null
+          test_status: string
+          tested_at: string
+        }
+        Insert: {
+          ai_agent_id?: string | null
+          created_at?: string
+          id?: string
+          technical_details?: Json | null
+          test_message?: string | null
+          test_status: string
+          tested_at?: string
+        }
+        Update: {
+          ai_agent_id?: string | null
+          created_at?: string
+          id?: string
+          technical_details?: Json | null
+          test_message?: string | null
+          test_status?: string
+          tested_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_test_results_ai_agent_id_fkey"
+            columns: ["ai_agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_agents: {
         Row: {
           agent_goal: string | null
@@ -174,6 +212,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      credential_test_results: {
+        Row: {
+          created_at: string
+          id: string
+          platform_credential_id: string | null
+          technical_details: Json | null
+          test_message: string | null
+          test_status: string
+          tested_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          platform_credential_id?: string | null
+          technical_details?: Json | null
+          test_message?: string | null
+          test_status: string
+          tested_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          platform_credential_id?: string | null
+          technical_details?: Json | null
+          test_message?: string | null
+          test_status?: string
+          tested_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credential_test_results_platform_credential_id_fkey"
+            columns: ["platform_credential_id"]
+            isOneToOne: false
+            referencedRelation: "platform_credentials"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       platform_credentials: {
         Row: {

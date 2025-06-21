@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
     apiKey: ""
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
 
   // Auto-fill form when initialAgentData is provided
   useEffect(() => {
@@ -61,12 +63,81 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
     }
   }, [initialAgentData]);
 
-  const handleTestAPI = () => {
-    toast({
-      title: "Test Connection",
-      description: "API testing functionality is not yet implemented for AI agents.",
-      variant: "default",
-    });
+  const handleTestAPI = async () => {
+    if (!formData.name || !selectedLLM || !selectedModel || !formData.role || !formData.goal || !formData.apiKey) {
+      toast({
+        title: "Error",
+        description: "Please fill all required fields before testing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTesting(true);
+    try {
+      console.log('🤖 Testing AI Agent:', formData.name);
+
+      // First save the agent temporarily to get an ID for testing
+      const agentConfig = {
+        automation_id: automationId || '00000000-0000-0000-0000-000000000000',
+        agent_name: formData.name.trim(),
+        agent_role: formData.role.trim(),
+        agent_goal: formData.goal.trim(),
+        agent_rules: formData.rule.trim() || null,
+        agent_memory: formData.memory.trim() ? { context: formData.memory.trim() } : null,
+        llm_provider: selectedLLM,
+        model: selectedModel,
+        api_key: formData.apiKey,
+      };
+
+      const { data: tempAgent, error: saveError } = await supabase
+        .from('ai_agents')
+        .insert(agentConfig)
+        .select()
+        .single();
+
+      if (saveError) throw saveError;
+
+      // Test the agent
+      const { data, error } = await supabase.functions.invoke('test-credential', {
+        body: {
+          type: 'agent',
+          agent_id: tempAgent.id
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast({
+          title: "✅ Test Successful",
+          description: data.user_message,
+        });
+      } else {
+        toast({
+          title: "❌ Test Failed",
+          description: data.user_message,
+          variant: "destructive",
+        });
+        console.error('Agent test technical details:', data.technical_details);
+      }
+
+      // Delete the temporary agent after testing
+      await supabase
+        .from('ai_agents')
+        .delete()
+        .eq('id', tempAgent.id);
+
+    } catch (error: any) {
+      console.error('AI Agent test error:', error);
+      toast({
+        title: "Test Failed",
+        description: `Failed to test AI Agent: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setTesting(false);
+    }
   };
 
   const handleSave = async () => {
@@ -289,10 +360,11 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
               />
               <Button
                 onClick={handleTestAPI}
+                disabled={testing}
                 className="rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
                 style={{ boxShadow: '0 0 20px rgba(92, 142, 246, 0.3)' }}
               >
-                Test
+                {testing ? "Testing..." : "Test"}
               </Button>
             </div>
           </div>

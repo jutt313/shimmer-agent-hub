@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface PlatformCredentialFormProps {
   platform: {
@@ -22,9 +24,11 @@ interface PlatformCredentialFormProps {
 
 const PlatformCredentialForm = ({ platform, onClose }: PlatformCredentialFormProps) => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState<Record<string, boolean>>({});
   const [testing, setTesting] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const handleInputChange = (field: string, value: string) => {
     setCredentials(prev => ({ ...prev, [field]: value }));
@@ -35,18 +39,47 @@ const PlatformCredentialForm = ({ platform, onClose }: PlatformCredentialFormPro
   };
 
   const handleTest = async () => {
+    if (!credentials || Object.keys(credentials).length === 0) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields before testing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setTesting(true);
     try {
-      // Simulate API test - replace with actual testing logic
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      toast({
-        title: "Success",
-        description: `${platform.name} credentials tested successfully!`,
+      console.log('🧪 Testing platform credentials:', platform.name);
+      
+      const { data, error } = await supabase.functions.invoke('test-credential', {
+        body: {
+          type: 'platform',
+          platform_name: platform.name,
+          credential_fields: credentials
+        }
       });
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast({
+          title: "✅ Test Successful",
+          description: data.user_message,
+        });
+      } else {
+        toast({
+          title: "❌ Test Failed",
+          description: data.user_message,
+          variant: "destructive",
+        });
+        console.error('Test technical details:', data.technical_details);
+      }
     } catch (error) {
+      console.error('Test error:', error);
       toast({
         title: "Test Failed",
-        description: "Failed to verify credentials. Please check and try again.",
+        description: "Failed to test credentials. Please check your connection and try again.",
         variant: "destructive",
       });
     } finally {
@@ -55,20 +88,79 @@ const PlatformCredentialForm = ({ platform, onClose }: PlatformCredentialFormPro
   };
 
   const handleSave = async () => {
-    try {
-      // Save credentials logic here
-      console.log('Saving credentials for', platform.name, credentials);
-      toast({
-        title: "Saved",
-        description: `${platform.name} credentials saved successfully!`,
-      });
-      onClose();
-    } catch (error) {
+    if (!credentials || Object.keys(credentials).length === 0) {
       toast({
         title: "Error",
-        description: "Failed to save credentials. Please try again.",
+        description: "Please fill in all required fields before saving.",
         variant: "destructive",
       });
+      return;
+    }
+
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to save credentials.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      console.log('💾 Saving platform credentials for:', platform.name);
+
+      // Check if credentials already exist for this platform and user
+      const { data: existingCreds } = await supabase
+        .from('platform_credentials')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('platform_name', platform.name)
+        .single();
+
+      const credentialData = {
+        user_id: user.id,
+        platform_name: platform.name,
+        credential_type: 'api',
+        credentials: JSON.stringify(credentials),
+        is_active: true
+      };
+
+      let result;
+      if (existingCreds) {
+        // Update existing credentials
+        result = await supabase
+          .from('platform_credentials')
+          .update(credentialData)
+          .eq('id', existingCreds.id)
+          .select()
+          .single();
+      } else {
+        // Insert new credentials
+        result = await supabase
+          .from('platform_credentials')
+          .insert(credentialData)
+          .select()
+          .single();
+      }
+
+      if (result.error) throw result.error;
+
+      toast({
+        title: "✅ Saved Successfully",
+        description: `${platform.name} credentials have been saved securely.`,
+      });
+      
+      onClose();
+    } catch (error: any) {
+      console.error('Save error:', error);
+      toast({
+        title: "Save Failed",
+        description: `Failed to save ${platform.name} credentials: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -176,11 +268,11 @@ const PlatformCredentialForm = ({ platform, onClose }: PlatformCredentialFormPro
             
             <Button
               onClick={handleSave}
-              disabled={Object.keys(credentials).length === 0}
+              disabled={saving || Object.keys(credentials).length === 0}
               className="flex-1 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 border-0"
               style={{ boxShadow: '0 0 20px rgba(79, 70, 229, 0.3)' }}
             >
-              Save Credentials
+              {saving ? "Saving..." : "Save Credentials"}
             </Button>
           </div>
         </div>

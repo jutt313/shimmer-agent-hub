@@ -1,5 +1,7 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -276,6 +278,102 @@ Example Response for "Create an automation to summarize emails and post to Slack
 
 Remember: EVERY response must be valid JSON with ALL required fields AND complete api_config for each platform. This ensures the UI displays all sections properly AND the automation can execute against any platform dynamically.`;
 
+// Function to retrieve relevant knowledge from the universal knowledge store
+const retrieveRelevantKnowledge = async (message: string, messages: any[], supabase: any): Promise<string> => {
+  try {
+    console.log('Retrieving relevant knowledge for:', message.substring(0, 100));
+
+    // Extract keywords from the current message and conversation
+    const allText = [message, ...messages.map((m: any) => m.text)].join(' ').toLowerCase();
+    const keywords = allText.match(/\b\w{4,}\b/g) || [];
+    const uniqueKeywords = [...new Set(keywords)].slice(0, 10); // Top 10 unique keywords
+
+    console.log('Searching with keywords:', uniqueKeywords);
+
+    // Search for relevant knowledge entries
+    const { data: knowledgeEntries, error } = await supabase
+      .from('universal_knowledge_store')
+      .select('*')
+      .or(
+        uniqueKeywords.map(keyword => 
+          `title.ilike.%${keyword}%,summary.ilike.%${keyword}%,tags.cs.{${keyword}}`
+        ).join(',')
+      )
+      .order('priority', { ascending: false })
+      .order('usage_count', { ascending: false })
+      .limit(5);
+
+    if (error) {
+      console.error('Error retrieving knowledge:', error);
+      return '';
+    }
+
+    if (!knowledgeEntries || knowledgeEntries.length === 0) {
+      console.log('No relevant knowledge found');
+      return '';
+    }
+
+    console.log(`Found ${knowledgeEntries.length} relevant knowledge entries`);
+
+    // Update usage count for retrieved entries
+    const entryIds = knowledgeEntries.map((entry: any) => entry.id);
+    await supabase
+      .from('universal_knowledge_store')
+      .update({ 
+        usage_count: knowledgeEntries[0].usage_count + 1,
+        last_used: new Date().toISOString()
+      })
+      .in('id', entryIds);
+
+    // Format knowledge for inclusion in prompt
+    const formattedKnowledge = knowledgeEntries.map((entry: any) => {
+      return `**${entry.category.replace('_', ' ')}**: ${entry.title}
+Summary: ${entry.summary}
+Details: ${JSON.stringify(entry.details, null, 2)}
+Tags: ${entry.tags.join(', ')}`;
+    }).join('\n\n');
+
+    return `\n\n=== RELEVANT KNOWLEDGE FROM PAST EXPERIENCES ===\n${formattedKnowledge}\n=== END KNOWLEDGE CONTEXT ===\n\n`;
+
+  } catch (error) {
+    console.error('Failed to retrieve knowledge:', error);
+    return '';
+  }
+};
+
+// Function to store insights from conversations
+const storeConversationInsights = async (message: string, response: string, supabase: any): Promise<void> => {
+  try {
+    // Extract potential platform mentions
+    const platformMentions = message.toLowerCase().match(/\b(gmail|slack|trello|discord|notion|github|openai|claude|stripe|twilio|sendgrid|hubspot|salesforce|shopify|linkedin|twitter|facebook|instagram|youtube|dropbox|google|microsoft|zoom|teams|asana|monday|jira|confluence|figma|canva|mailchimp|constant contact|airtable|zapier|make|ifttt)\b/g);
+
+    if (platformMentions && platformMentions.length > 0) {
+      const insights = {
+        category: 'conversation_insights',
+        title: `User Interest: ${platformMentions.join(', ')} Integration`,
+        summary: `User showed interest in ${platformMentions.join(', ')} platform integration`,
+        details: {
+          user_query: message.substring(0, 200),
+          mentioned_platforms: platformMentions,
+          response_type: response.includes('"automation_blueprint"') ? 'automation_created' : 'information_provided',
+          timestamp: new Date().toISOString()
+        },
+        tags: [...platformMentions, 'user_interest', 'platform_integration'],
+        priority: 5,
+        source_type: 'conversation'
+      };
+
+      await supabase
+        .from('universal_knowledge_store')
+        .insert(insights);
+
+      console.log('Stored conversation insight for platforms:', platformMentions);
+    }
+  } catch (error) {
+    console.error('Failed to store conversation insights:', error);
+  }
+};
+
 // Function to get API endpoint based on LLM provider
 const getApiEndpoint = (llmProvider: string) => {
   switch (llmProvider.toLowerCase()) {
@@ -307,33 +405,44 @@ const getAuthHeader = (llmProvider: string, apiKey: string) => {
 };
 
 // Function to build system prompt from agent configuration
-const buildSystemPrompt = (agentConfig: any) => {
-  if (!agentConfig) return DEFAULT_SYSTEM_PROMPT;
+const buildSystemPrompt = (agentConfig: any, knowledgeContext: string) => {
+  let systemPrompt = DEFAULT_SYSTEM_PROMPT;
   
-  let systemPrompt = '';
-  
-  if (agentConfig.role) {
-    systemPrompt += `Role: ${agentConfig.role}\n\n`;
-  }
-  
-  if (agentConfig.goal) {
-    systemPrompt += `Goal: ${agentConfig.goal}\n\n`;
-  }
-  
-  if (agentConfig.rules) {
-    systemPrompt += `Rules: ${agentConfig.rules}\n\n`;
-  }
-  
-  if (agentConfig.memory) {
-    try {
-      const memoryObj = typeof agentConfig.memory === 'string' ? JSON.parse(agentConfig.memory) : agentConfig.memory;
-      systemPrompt += `Memory Context: ${JSON.stringify(memoryObj)}\n\n`;
-    } catch (e) {
-      systemPrompt += `Memory Context: ${agentConfig.memory}\n\n`;
+  if (agentConfig) {
+    systemPrompt = '';
+    
+    if (agentConfig.role) {
+      systemPrompt += `Role: ${agentConfig.role}\n\n`;
+    }
+    
+    if (agentConfig.goal) {
+      systemPrompt += `Goal: ${agentConfig.goal}\n\n`;
+    }
+    
+    if (agentConfig.rules) {
+      systemPrompt += `Rules: ${agentConfig.rules}\n\n`;
+    }
+    
+    if (agentConfig.memory) {
+      try {
+        const memoryObj = typeof agentConfig.memory === 'string' ? JSON.parse(agentConfig.memory) : agentConfig.memory;
+        systemPrompt += `Memory Context: ${JSON.stringify(memoryObj)}\n\n`;
+      } catch (e) {
+        systemPrompt += `Memory Context: ${agentConfig.memory}\n\n`;
+      }
+    }
+    
+    if (!systemPrompt) {
+      systemPrompt = DEFAULT_SYSTEM_PROMPT;
     }
   }
+
+  // Add knowledge context to the system prompt
+  if (knowledgeContext) {
+    systemPrompt += knowledgeContext;
+  }
   
-  return systemPrompt || DEFAULT_SYSTEM_PROMPT;
+  return systemPrompt;
 };
 
 serve(async (req) => {
@@ -354,6 +463,14 @@ serve(async (req) => {
 
     console.log('Received request with:', { llmProvider, model, hasApiKey: !!apiKey, hasAgentConfig: !!agentConfig });
 
+    // Initialize Supabase client for knowledge retrieval
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Retrieve relevant knowledge before generating response
+    const knowledgeContext = await retrieveRelevantKnowledge(message, messages, supabase);
+
     // Use provided API key or fallback to environment variable
     const effectiveApiKey = apiKey || Deno.env.get('OPENAI_API_KEY');
     
@@ -361,9 +478,9 @@ serve(async (req) => {
       throw new Error('No API key provided');
     }
 
-    // Build system prompt from agent configuration
-    const systemPrompt = buildSystemPrompt(agentConfig);
-    console.log('Using system prompt:', systemPrompt.substring(0, 200) + '...');
+    // Build system prompt from agent configuration and knowledge
+    const systemPrompt = buildSystemPrompt(agentConfig, knowledgeContext);
+    console.log('Using system prompt with knowledge context');
 
     // Get API endpoint and auth headers based on LLM provider
     const apiEndpoint = getApiEndpoint(llmProvider);
@@ -430,6 +547,9 @@ serve(async (req) => {
     } else {
       aiResponse = data.choices[0].message.content;
     }
+
+    // Store conversation insights for learning (async, don't await)
+    storeConversationInsights(message, aiResponse, supabase);
 
     return new Response(JSON.stringify({ response: aiResponse }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

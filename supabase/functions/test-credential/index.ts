@@ -33,6 +33,36 @@ interface PlatformConfig {
   }>;
 }
 
+// Store credential testing insights
+const storeCredentialInsights = async (platformName: string, testStatus: string, errorDetails: any, supabase: any): Promise<void> => {
+  try {
+    const insights = {
+      category: 'credential_knowledge',
+      title: `${platformName} Credential ${testStatus === 'success' ? 'Success' : 'Failure'} Pattern`,
+      summary: `${testStatus === 'success' ? 'Working' : 'Failed'} credential configuration for ${platformName}`,
+      details: {
+        platform: platformName,
+        test_result: testStatus,
+        error_details: errorDetails,
+        timestamp: new Date().toISOString(),
+        success_indicators: testStatus === 'success' ? ['valid_format', 'proper_permissions', 'active_token'] : [],
+        failure_indicators: testStatus === 'failed' ? [errorDetails.status_code, errorDetails.error_type] : []
+      },
+      tags: [platformName.toLowerCase(), 'credential_test', testStatus, 'authentication'],
+      priority: testStatus === 'failed' ? 8 : 6,
+      source_type: 'credential_test'
+    };
+
+    await supabase
+      .from('universal_knowledge_store')
+      .insert(insights);
+
+    console.log(`Stored credential insight for ${platformName}: ${testStatus}`);
+  } catch (error) {
+    console.error('Failed to store credential insights:', error);
+  }
+};
+
 // Dynamic Platform API Configuration Builder (same as execute-automation)
 const buildDynamicPlatformConfig = (
   platformName: string,
@@ -333,6 +363,14 @@ serve(async (req) => {
     if (insertError) {
       console.error('Failed to store test result:', insertError);
     }
+
+    // Store credential insights for learning (async, don't await)
+    storeCredentialInsights(
+      credential.platform_name, 
+      testResponse.ok ? 'success' : 'failed', 
+      technicalDetails, 
+      supabase
+    );
 
     return new Response(JSON.stringify({
       success: testResponse.ok,

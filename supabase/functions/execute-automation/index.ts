@@ -33,6 +33,67 @@ interface PlatformConfig {
   }>;
 }
 
+// Store automation execution insights
+const storeExecutionInsights = async (automationId: string, executionLog: any[], status: string, supabase: any): Promise<void> => {
+  try {
+    // Analyze execution patterns
+    const failedSteps = executionLog.filter(log => log.status === 'error');
+    const successfulSteps = executionLog.filter(log => log.status === 'success');
+    
+    if (failedSteps.length > 0) {
+      // Store error patterns
+      for (const failedStep of failedSteps) {
+        const errorInsight = {
+          category: 'error_solutions',
+          title: `Automation Step Failure: ${failedStep.step_name}`,
+          summary: `Common failure pattern in ${failedStep.step_name} step`,
+          details: {
+            step_type: failedStep.step_id,
+            error_message: failedStep.error,
+            automation_context: automationId,
+            failure_frequency: 1,
+            common_causes: [failedStep.error],
+            suggested_solutions: ['Check credentials', 'Verify API permissions', 'Review endpoint configuration']
+          },
+          tags: ['automation_error', 'step_failure', failedStep.step_name.toLowerCase().replace(/\s+/g, '_')],
+          priority: 7,
+          source_type: 'automation_execution'
+        };
+
+        await supabase
+          .from('universal_knowledge_store')
+          .insert(errorInsight);
+      }
+    }
+
+    if (successfulSteps.length > 0 && status === 'completed') {
+      // Store successful patterns
+      const successInsight = {
+        category: 'automation_patterns',
+        title: `Successful Automation Pattern: ${successfulSteps.length} Steps`,
+        summary: `Working automation pattern with ${successfulSteps.length} successful steps`,
+        details: {
+          step_sequence: successfulSteps.map(s => s.step_name),
+          execution_time: executionLog[executionLog.length - 1]?.timestamp,
+          success_rate: (successfulSteps.length / executionLog.length) * 100,
+          automation_id: automationId
+        },
+        tags: ['success_pattern', 'automation_completed', `${successfulSteps.length}_steps`],
+        priority: 6,
+        source_type: 'automation_execution'
+      };
+
+      await supabase
+        .from('universal_knowledge_store')
+        .insert(successInsight);
+    }
+
+    console.log(`Stored execution insights for automation ${automationId}`);
+  } catch (error) {
+    console.error('Failed to store execution insights:', error);
+  }
+};
+
 // Dynamic Platform API Configuration Builder
 const buildDynamicPlatformConfig = (
   platformName: string,
@@ -325,14 +386,19 @@ serve(async (req) => {
 
       // Update run record with success
       const duration = Date.now() - startTime;
+      const finalStatus = executionLog.some(log => log.status === 'error') ? 'failed' : 'completed';
+      
       await supabase
         .from('automation_runs')
         .update({
-          status: 'completed',
+          status: finalStatus,
           duration_ms: duration,
           details_log: executionLog
         })
         .eq('id', runRecord.id);
+
+      // Store execution insights for learning (async, don't await)
+      storeExecutionInsights(automationId, executionLog, finalStatus, supabase);
 
       return new Response(JSON.stringify({
         success: true,
@@ -354,6 +420,9 @@ serve(async (req) => {
           details_log: [...executionLog, { error: error.message, timestamp: new Date().toISOString() }]
         })
         .eq('id', runRecord.id);
+
+      // Store execution insights for learning (async, don't await)
+      storeExecutionInsights(automationId, executionLog, 'failed', supabase);
 
       throw error;
     }

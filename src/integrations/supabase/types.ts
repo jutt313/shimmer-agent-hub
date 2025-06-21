@@ -295,6 +295,51 @@ export type Database = {
           },
         ]
       }
+      universal_knowledge_store: {
+        Row: {
+          category: string
+          created_at: string
+          details: Json
+          id: string
+          last_used: string | null
+          priority: number | null
+          source_type: string | null
+          summary: string | null
+          tags: string[] | null
+          title: string
+          updated_at: string
+          usage_count: number | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          details?: Json
+          id?: string
+          last_used?: string | null
+          priority?: number | null
+          source_type?: string | null
+          summary?: string | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+          usage_count?: number | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          details?: Json
+          id?: string
+          last_used?: string | null
+          priority?: number | null
+          source_type?: string | null
+          summary?: string | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+          usage_count?: number | null
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           created_at: string

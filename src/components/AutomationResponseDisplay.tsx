@@ -1,18 +1,20 @@
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Bot, Plus, X, Info } from "lucide-react";
 import { useState } from "react";
-import PlatformCredentialForm from "./PlatformCredentialForm";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, ChevronRight, Save, CheckCircle } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
-interface StructuredResponse {
+interface AutomationResponse {
   summary?: string;
   steps?: string[];
   platforms?: Array<{
     name: string;
-    credentials: Array<{
+    api_config?: any;
+    credentials?: Array<{
       field: string;
       placeholder: string;
       link: string;
@@ -28,194 +30,272 @@ interface StructuredResponse {
     why_needed: string;
   }>;
   clarification_questions?: string[];
+  automation_blueprint?: any;
 }
 
 interface AutomationResponseDisplayProps {
-  data: StructuredResponse;
-  onAgentAdd: (agent: any) => void;
-  dismissedAgents?: Set<string>;
+  response: AutomationResponse;
+  automationId: string;
+  onSave?: () => void;
 }
 
-const AutomationResponseDisplay = ({ data, onAgentAdd, dismissedAgents = new Set() }: AutomationResponseDisplayProps) => {
-  const [selectedPlatform, setSelectedPlatform] = useState<any>(null);
-
-  console.log('🎨 AutomationResponseDisplay rendering with data:', {
-    hasSummary: !!data.summary,
-    hasSteps: !!(data.steps && data.steps.length > 0),
-    hasPlatforms: !!(data.platforms && data.platforms.length > 0),
-    hasAgents: !!(data.agents && data.agents.length > 0),
-    hasClarificationQuestions: !!(data.clarification_questions && data.clarification_questions.length > 0),
-    platformsCount: data.platforms?.length || 0,
-    agentsCount: data.agents?.length || 0,
-    fullData: data
+const AutomationResponseDisplay = ({ response, automationId, onSave }: AutomationResponseDisplayProps) => {
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    summary: true,
+    steps: true,
+    platforms: false,
+    agents: false,
+    blueprint: false
   });
+  const { toast } = useToast();
 
-  // Always render the component structure, even if some sections are empty
+  const toggleSection = (section: string) => {
+    setOpenSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  const saveAutomation = async () => {
+    setSaving(true);
+    try {
+      // Update automation with both blueprint and platforms config
+      const { error } = await supabase
+        .from('automations')
+        .update({
+          automation_blueprint: response.automation_blueprint,
+          platforms_config: response.platforms || [], // Save the platforms config from AI response
+          status: 'active',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', automationId);
+
+      if (error) throw error;
+
+      setSaved(true);
+      toast({
+        title: "Success",
+        description: "Automation blueprint and platform configurations saved successfully!",
+      });
+      
+      if (onSave) onSave();
+    } catch (error) {
+      console.error('Error saving automation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save automation. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!response) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        No automation response to display
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* Clarification Questions - Always check for this first */}
-      {data.clarification_questions && data.clarification_questions.length > 0 && (
-        <Card className="border-orange-200 bg-orange-50/50">
+      {/* Summary Section */}
+      {response.summary && (
+        <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
           <CardHeader>
-            <CardTitle className="text-orange-800 flex items-center gap-2">
-              <Info className="w-5 h-5" />
-              Clarification Needed
-            </CardTitle>
+            <CardTitle className="text-lg text-blue-800">📋 Automation Summary</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {data.clarification_questions.map((question, index) => (
-                <p key={index} className="text-orange-700 font-medium">
-                  {index + 1}. {question}
-                </p>
-              ))}
-            </div>
+            <p className="text-gray-700">{response.summary}</p>
           </CardContent>
         </Card>
       )}
 
-      {/* Summary - Always show if exists */}
-      {data.summary && (
-        <Card className="border-blue-200 bg-blue-50/50">
-          <CardHeader>
-            <CardTitle className="text-blue-800">Automation Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-blue-700">{data.summary}</p>
-          </CardContent>
+      {/* Steps Section */}
+      {response.steps && response.steps.length > 0 && (
+        <Card>
+          <Collapsible open={openSections.steps} onOpenChange={() => toggleSection('steps')}>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    🔄 Automation Steps ({response.steps.length})
+                  </CardTitle>
+                  {openSections.steps ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
+                <ol className="space-y-3">
+                  {response.steps.map((step, index) => (
+                    <li key={index} className="flex items-start gap-3">
+                      <Badge variant="outline" className="mt-1">{index + 1}</Badge>
+                      <span className="text-gray-700">{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
         </Card>
       )}
 
-      {/* Step-by-Step Explanation - Always show if exists */}
-      {data.steps && data.steps.length > 0 && (
-        <Card className="border-green-200 bg-green-50/50">
-          <CardHeader>
-            <CardTitle className="text-green-800">Step-by-Step Workflow</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ol className="space-y-3">
-              {data.steps.map((step, index) => (
-                <li key={index} className="flex gap-3">
-                  <Badge variant="outline" className="min-w-[24px] h-6 rounded-full flex items-center justify-center text-xs">
-                    {index + 1}
-                  </Badge>
-                  <span className="text-green-700">{step}</span>
-                </li>
-              ))}
-            </ol>
-          </CardContent>
+      {/* Platforms Section */}
+      {response.platforms && response.platforms.length > 0 && (
+        <Card>
+          <Collapsible open={openSections.platforms} onOpenChange={() => toggleSection('platforms')}>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    🔗 Required Platforms ({response.platforms.length})
+                  </CardTitle>
+                  {openSections.platforms ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
+                <div className="space-y-4">
+                  {response.platforms.map((platform, index) => (
+                    <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                      <h4 className="font-semibold text-gray-800 mb-2">{platform.name}</h4>
+                      {platform.api_config && (
+                        <div className="mb-3">
+                          <Badge variant="secondary" className="mb-2">Dynamic API Config Generated</Badge>
+                          <div className="text-sm text-gray-600">
+                            <p><strong>Base URL:</strong> {platform.api_config.base_url}</p>
+                            <p><strong>Auth Type:</strong> {platform.api_config.auth_type}</p>
+                            <p><strong>Methods:</strong> {Object.keys(platform.api_config.methods || {}).length} available</p>
+                          </div>
+                        </div>
+                      )}
+                      {platform.credentials && platform.credentials.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 mb-2">Required Credentials:</p>
+                          <ul className="space-y-1">
+                            {platform.credentials.map((cred, credIndex) => (
+                              <li key={credIndex} className="text-sm text-gray-600">
+                                <Badge variant="outline" className="mr-2">{cred.field}</Badge>
+                                {cred.why_needed}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
         </Card>
       )}
 
-      {/* Platform Credentials - Always show if platforms exist */}
-      {data.platforms && data.platforms.length > 0 && (
-        <Card className="border-purple-200 bg-purple-50/50">
-          <CardHeader>
-            <CardTitle className="text-purple-800">Required Platform Credentials</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {data.platforms.map((platform, index) => (
-                <div key={`platform-${index}-${platform.name}`} className="border border-purple-200 rounded-lg p-4 bg-white/50">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-purple-800">{platform.name}</h4>
-                    <Button
-                      onClick={() => setSelectedPlatform(platform)}
-                      size="sm"
-                      className="bg-purple-600 hover:bg-purple-700 text-white"
-                    >
-                      Configure
-                    </Button>
-                  </div>
-                  <div className="space-y-2">
-                    {platform.credentials && platform.credentials.map((cred, credIndex) => (
-                      <div key={`cred-${index}-${credIndex}`} className="flex items-center gap-2 text-sm">
-                        <Badge variant="secondary">{cred.field}</Badge>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Info className="w-4 h-4 text-purple-600" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="max-w-xs">
-                                <p className="font-medium">Why needed:</p>
-                                <p className="text-sm mb-2">{cred.why_needed}</p>
-                                <p className="font-medium">Get it here:</p>
-                                <a href={cred.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
-                                  {cred.link}
-                                </a>
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+      {/* AI Agents Section */}
+      {response.agents && response.agents.length > 0 && (
+        <Card>
+          <Collapsible open={openSections.agents} onOpenChange={() => toggleSection('agents')}>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    🤖 AI Agents ({response.agents.length})
+                  </CardTitle>
+                  {openSections.agents ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
+                <div className="space-y-4">
+                  {response.agents.map((agent, index) => (
+                    <div key={index} className="border rounded-lg p-4 bg-blue-50">
+                      <h4 className="font-semibold text-blue-800 mb-2">{agent.name}</h4>
+                      <div className="space-y-2 text-sm">
+                        <p><strong>Role:</strong> {agent.role}</p>
+                        <p><strong>Goal:</strong> {agent.goal}</p>
+                        <p><strong>Rules:</strong> {agent.rules}</p>
+                        <p><strong>Why Needed:</strong> {agent.why_needed}</p>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </CardContent>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
         </Card>
       )}
 
-      {/* AI Agent Recommendations - Always show if agents exist */}
-      {data.agents && data.agents.length > 0 && (
-        <Card className="border-indigo-200 bg-indigo-50/50">
+      {/* Blueprint Section */}
+      {response.automation_blueprint && (
+        <Card>
+          <Collapsible open={openSections.blueprint} onOpenChange={() => toggleSection('blueprint')}>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    📋 Automation Blueprint
+                  </CardTitle>
+                  {openSections.blueprint ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <pre className="text-sm overflow-auto max-h-64">
+                    {JSON.stringify(response.automation_blueprint, null, 2)}
+                  </pre>
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+      )}
+
+      {/* Clarification Questions */}
+      {response.clarification_questions && response.clarification_questions.length > 0 && (
+        <Card className="border-yellow-200 bg-yellow-50">
           <CardHeader>
-            <CardTitle className="text-indigo-800 flex items-center gap-2">
-              <Bot className="w-5 h-5" />
-              Recommended AI Agents
-            </CardTitle>
+            <CardTitle className="text-lg text-yellow-800">❓ Clarification Needed</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {data.agents
-                .filter(agent => !dismissedAgents.has(agent.name))
-                .map((agent, index) => (
-                <div key={`agent-${index}-${agent.name}`} className="border border-indigo-200 rounded-lg p-4 bg-white/50">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h4 className="font-semibold text-indigo-800">{agent.name}</h4>
-                      <p className="text-sm text-indigo-600 mb-2">{agent.role}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => onAgentAdd(agent)}
-                        size="sm"
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                      >
-                        <Plus className="w-4 h-4 mr-1" />
-                        Add
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="font-medium text-indigo-700">Goal:</span>
-                      <p className="text-indigo-600">{agent.goal}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-indigo-700">Rules:</span>
-                      <p className="text-indigo-600">{agent.rules}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-indigo-700">Why needed:</span>
-                      <p className="text-indigo-600">{agent.why_needed}</p>
-                    </div>
-                  </div>
-                </div>
+            <ul className="space-y-2">
+              {response.clarification_questions.map((question, index) => (
+                <li key={index} className="text-yellow-700">• {question}</li>
               ))}
-            </div>
+            </ul>
           </CardContent>
         </Card>
       )}
 
-      {/* Platform Credential Form Modal */}
-      {selectedPlatform && (
-        <PlatformCredentialForm
-          platform={selectedPlatform}
-          onClose={() => setSelectedPlatform(null)}
-        />
+      {/* Save Button */}
+      {response.automation_blueprint && (
+        <div className="flex justify-center pt-4">
+          <Button
+            onClick={saveAutomation}
+            disabled={saving || saved}
+            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-2 rounded-xl shadow-lg"
+          >
+            {saved ? (
+              <>
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Saved Successfully
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                {saving ? "Saving..." : "Save Automation"}
+              </>
+            )}
+          </Button>
+        </div>
       )}
     </div>
   );

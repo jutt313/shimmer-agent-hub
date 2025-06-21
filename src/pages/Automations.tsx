@@ -1,5 +1,4 @@
 
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -19,6 +18,8 @@ interface Automation {
   status: string;
   created_at: string;
   updated_at: string;
+  automation_blueprint?: any;
+  platforms_config?: any;
 }
 
 const Automations = () => {
@@ -92,7 +93,8 @@ const Automations = () => {
             user_id: user.id,
             title: title.trim(),
             description: description.trim() || null,
-            status: 'draft'
+            status: 'draft',
+            platforms_config: null // Initialize platforms_config as null
           }
         ])
         .select()
@@ -310,4 +312,3 @@ const Automations = () => {
 };
 
 export default Automations;
-

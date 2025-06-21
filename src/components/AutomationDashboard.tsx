@@ -50,7 +50,45 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
 
   useEffect(() => {
     fetchDashboardData();
-    setupRealtimeSubscriptions();
+    
+    // Setup real-time subscriptions with unique channel names
+    const runsChannel = supabase
+      .channel(`automation-runs-${automationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'automation_runs',
+          filter: `automation_id=eq.${automationId}`
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
+      .subscribe();
+
+    const agentsChannel = supabase
+      .channel(`ai-agents-${automationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'ai_agents',
+          filter: `automation_id=eq.${automationId}`
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
+      .subscribe();
+
+    // Cleanup function
+    return () => {
+      supabase.removeChannel(runsChannel);
+      supabase.removeChannel(agentsChannel);
+    };
   }, [automationId]);
 
   const fetchDashboardData = async () => {
@@ -97,40 +135,6 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
     } finally {
       setLoading(false);
     }
-  };
-
-  const setupRealtimeSubscriptions = () => {
-    const channel = supabase
-      .channel('dashboard-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'automation_runs',
-          filter: `automation_id=eq.${automationId}`
-        },
-        () => {
-          fetchDashboardData();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'ai_agents',
-          filter: `automation_id=eq.${automationId}`
-        },
-        () => {
-          fetchDashboardData();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   };
 
   // Calculate metrics

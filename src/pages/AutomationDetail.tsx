@@ -426,6 +426,7 @@ const AutomationDetail = () => {
             onAgentAdd={handleAgentAdd}
             dismissedAgents={dismissedAgents}
             onAgentDismiss={handleAgentDismiss}
+            automationId={automation.id}
           />
         </div>
         

@@ -18,13 +18,15 @@ interface ChatCardProps {
   onAgentAdd?: (agent: any) => void;
   dismissedAgents?: Set<string>;
   onAgentDismiss?: (agentName: string) => void;
+  automationId?: string; // Add automationId for AutomationResponseDisplay
 }
 
 const ChatCard = ({
   messages,
   onAgentAdd,
   dismissedAgents = new Set(),
-  onAgentDismiss
+  onAgentDismiss,
+  automationId = "temp-automation-id" // Default fallback for non-automation contexts
 }: ChatCardProps) => {
   const formatMessageText = (text: string) => {
     // Clean the text and convert markdown-style formatting
@@ -91,9 +93,9 @@ const ChatCard = ({
                   {message.isBot && structuredData && (
                     <div className="w-full mb-4">
                       <AutomationResponseDisplay 
-                        data={structuredData} 
-                        onAgentAdd={onAgentAdd || (() => {})}
-                        dismissedAgents={dismissedAgents}
+                        response={structuredData}
+                        automationId={automationId}
+                        onSave={() => {}}
                       />
                     </div>
                   )}

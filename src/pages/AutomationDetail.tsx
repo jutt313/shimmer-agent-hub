@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Send, ArrowLeft, Bot } from "lucide-react";
+import { Send, ArrowLeft, Bot, BarChart3 } from "lucide-react";
 import ChatCard from "@/components/ChatCard";
+import AutomationDashboard from "@/components/AutomationDashboard";
 import AIAgentForm from "@/components/AIAgentForm";
 import PlatformButtons from "@/components/PlatformButtons";
 import BlueprintCard from "@/components/BlueprintCard";
@@ -45,6 +46,7 @@ const AutomationDetail = () => {
   const [dismissedAgents, setDismissedAgents] = useState<Set<string>>(new Set());
   const [currentPlatforms, setCurrentPlatforms] = useState<any[]>([]);
   const [showBlueprint, setShowBlueprint] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
 
   useEffect(() => {
     if (!user || !id) {
@@ -407,6 +409,13 @@ const AutomationDetail = () => {
             <ArrowLeft className="w-5 h-5 mr-2" />
             Back
           </Button>
+          <Button
+            onClick={() => setShowDashboard(!showDashboard)}
+            className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
+          >
+            <BarChart3 className="w-5 h-5 mr-2" />
+            {showDashboard ? 'Show Chat' : 'Dashboard'}
+          </Button>
           <div>
             <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               {automation?.title}
@@ -419,65 +428,80 @@ const AutomationDetail = () => {
       </div>
       
       <div className="max-w-7xl mx-auto h-full flex flex-col relative z-10 pt-16">        
-        {/* Chat Card */}
-        <div className="flex-1 flex items-start justify-center pt-2 pb-4">
-          <ChatCard 
-            messages={messages} 
-            onAgentAdd={handleAgentAdd}
-            dismissedAgents={dismissedAgents}
-            onAgentDismiss={handleAgentDismiss}
-            automationId={automation.id}
-            isLoading={sendingMessage}
-          />
+        {/* Main Content Area with Slide Animation */}
+        <div className="flex-1 flex items-start justify-center pt-2 pb-4 relative">
+          <div className={`transition-transform duration-500 ease-in-out ${showDashboard ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'} ${showDashboard ? 'absolute' : 'relative'}`}>
+            <ChatCard 
+              messages={messages} 
+              onAgentAdd={handleAgentAdd}
+              dismissedAgents={dismissedAgents}
+              onAgentDismiss={handleAgentDismiss}
+              automationId={automation.id}
+              isLoading={sendingMessage}
+            />
+          </div>
+          
+          <div className={`transition-transform duration-500 ease-in-out ${showDashboard ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} ${showDashboard ? 'relative' : 'absolute'}`}>
+            {showDashboard && (
+              <AutomationDashboard
+                automationId={automation.id}
+                automationTitle={automation.title}
+                automationBlueprint={automation.automation_blueprint}
+                onClose={() => setShowDashboard(false)}
+              />
+            )}
+          </div>
         </div>
         
-        {/* Platform Buttons */}
-        {currentPlatforms && currentPlatforms.length > 0 && (
+        {/* Platform Buttons - Only show when not in dashboard view */}
+        {!showDashboard && currentPlatforms && currentPlatforms.length > 0 && (
           <div className="mb-4">
             <PlatformButtons platforms={currentPlatforms} />
           </div>
         )}
         
-        {/* Input Section */}
-        <div className="space-y-4 pb-6">
-          <div className="flex gap-4 items-end px-[60px]">
-            <Button
-              onClick={() => setShowAIAgentForm(true)}
-              className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-6 py-4 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
-              style={{
-                boxShadow: '0 0 25px rgba(147, 51, 234, 0.3)'
-              }}
-            >
-              <Bot className="w-5 h-5 mr-2" />
-              AI Agent
-            </Button>
-            
-            <div className="flex-1 relative">
-              <Input 
-                value={newMessage} 
-                onChange={e => setNewMessage(e.target.value)} 
-                onKeyPress={handleKeyPress} 
-                placeholder={sendingMessage ? "YusrAI is building..." : "Ask about this automation..."} 
-                disabled={sendingMessage}
-                className="rounded-3xl bg-white/80 backdrop-blur-sm border-0 px-6 py-4 text-lg focus:outline-none focus:ring-0 shadow-lg" 
+        {/* Input Section - Only show when not in dashboard view */}
+        {!showDashboard && (
+          <div className="space-y-4 pb-6">
+            <div className="flex gap-4 items-end px-[60px]">
+              <Button
+                onClick={() => setShowAIAgentForm(true)}
+                className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-6 py-4 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
                 style={{
-                  boxShadow: '0 0 25px rgba(154, 94, 255, 0.2)'
-                }} 
-              />
+                  boxShadow: '0 0 25px rgba(147, 51, 234, 0.3)'
+                }}
+              >
+                <Bot className="w-5 h-5 mr-2" />
+                AI Agent
+              </Button>
+              
+              <div className="flex-1 relative">
+                <Input 
+                  value={newMessage} 
+                  onChange={e => setNewMessage(e.target.value)} 
+                  onKeyPress={handleKeyPress} 
+                  placeholder={sendingMessage ? "YusrAI is building..." : "Ask about this automation..."} 
+                  disabled={sendingMessage}
+                  className="rounded-3xl bg-white/80 backdrop-blur-sm border-0 px-6 py-4 text-lg focus:outline-none focus:ring-0 shadow-lg" 
+                  style={{
+                    boxShadow: '0 0 25px rgba(154, 94, 255, 0.2)'
+                  }} 
+                />
+              </div>
+              
+              <Button 
+                onClick={() => handleSendMessage(newMessage)}
+                disabled={sendingMessage || !newMessage.trim()}
+                className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-4 shadow-lg hover:shadow-xl transition-all duration-300 border-0 disabled:opacity-50" 
+                style={{
+                  boxShadow: '0 0 30px rgba(92, 142, 246, 0.3)'
+                }}
+              >
+                <Send className={`w-6 h-6 ${sendingMessage ? 'animate-pulse' : ''}`} />
+              </Button>
             </div>
-            
-            <Button 
-              onClick={() => handleSendMessage(newMessage)}
-              disabled={sendingMessage || !newMessage.trim()}
-              className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-4 shadow-lg hover:shadow-xl transition-all duration-300 border-0 disabled:opacity-50" 
-              style={{
-                boxShadow: '0 0 30px rgba(92, 142, 246, 0.3)'
-              }}
-            >
-              <Send className={`w-6 h-6 ${sendingMessage ? 'animate-pulse' : ''}`} />
-            </Button>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Blueprint Card - Right side slide-out panel */}

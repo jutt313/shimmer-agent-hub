@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -84,20 +85,6 @@ const KnowledgeAdmin = () => {
     tags: '',
     priority: 1
   });
-
-  // Load OpenAI API key from localStorage
-  useEffect(() => {
-    const savedApiKey = localStorage.getItem('openai_api_key');
-    if (savedApiKey) {
-      setOpenAiApiKey(savedApiKey);
-    }
-  }, []);
-
-  // Save OpenAI API key to localStorage
-  const saveApiKey = (key: string) => {
-    localStorage.setItem('openai_api_key', key);
-    setOpenAiApiKey(key);
-  };
 
   // Check if currently blocked
   useEffect(() => {

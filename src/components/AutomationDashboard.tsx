@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -113,7 +114,7 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
       if (agentsError) throw agentsError;
       setAgents(agentsData || []);
 
-      // Extract platforms from blueprint and calculate real performance
+      // Extract platforms from blueprint - only real platforms
       if (automationBlueprint?.steps) {
         const extractedPlatforms = automationBlueprint.steps
           .filter((step: any) => step.action?.integration)
@@ -137,18 +138,18 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
     }
   };
 
-  // Calculate metrics
+  // Calculate real metrics from actual data
   const totalRuns = runs.length;
   const successfulRuns = runs.filter(run => run.status === 'completed').length;
   const successRate = totalRuns > 0 ? Math.round((successfulRuns / totalRuns) * 100) : 0;
-  const avgExecutionTime = runs.length > 0 
+  const avgExecutionTime = runs.length > 0 && runs.filter(run => run.duration_ms).length > 0
     ? Math.round(runs.filter(run => run.duration_ms).reduce((acc, run) => acc + (run.duration_ms || 0), 0) / runs.filter(run => run.duration_ms).length)
     : 0;
 
   // Get last run
   const lastRun = runs[0];
 
-  // Prepare chart data
+  // Prepare chart data from real runs
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const date = startOfDay(subDays(new Date(), 6 - i));
     const dayRuns = runs.filter(run => 
@@ -163,9 +164,8 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
     };
   });
 
-  // Calculate real platform performance data based on actual runs
+  // Calculate real platform performance data
   const platformPerformanceData = platforms.map(platform => {
-    // Count runs that used this platform
     const platformRuns = runs.filter(run => 
       run.details_log && 
       JSON.stringify(run.details_log).toLowerCase().includes(platform.name.toLowerCase())
@@ -174,7 +174,6 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
     const successfulPlatformRuns = platformRuns.filter(run => run.status === 'completed');
     const successRate = platformRuns.length > 0 ? Math.round((successfulPlatformRuns.length / platformRuns.length) * 100) : 0;
     
-    // Calculate average response time for this platform
     const avgTime = platformRuns.length > 0 && platformRuns.filter(run => run.duration_ms).length > 0
       ? Math.round(platformRuns.filter(run => run.duration_ms).reduce((acc, run) => acc + (run.duration_ms || 0), 0) / platformRuns.filter(run => run.duration_ms).length)
       : 0;
@@ -187,15 +186,26 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
     };
   });
 
-  // Agent performance data
-  const agentPerformanceData = agents.map(agent => ({
-    name: agent.agent_name,
-    tasks: Math.floor(Math.random() * 50) + 5,
-    success: Math.floor(Math.random() * 95) + 85,
-    memory: Math.floor(Math.random() * 100) + 20
-  }));
+  // Real agent performance data based on actual runs
+  const agentPerformanceData = agents.map(agent => {
+    // Count runs that involved this agent
+    const agentRuns = runs.filter(run => 
+      run.details_log && 
+      JSON.stringify(run.details_log).toLowerCase().includes(agent.agent_name.toLowerCase())
+    );
+    
+    const successfulAgentRuns = agentRuns.filter(run => run.status === 'completed');
+    const agentSuccessRate = agentRuns.length > 0 ? Math.round((successfulAgentRuns.length / agentRuns.length) * 100) : 0;
 
-  // Pie chart data for status distribution
+    return {
+      name: agent.agent_name,
+      tasks: agentRuns.length,
+      success: agentSuccessRate,
+      memory: agent.agent_memory ? JSON.stringify(agent.agent_memory).length : 0
+    };
+  });
+
+  // Real status distribution from actual runs
   const statusData = [
     { name: 'Completed', value: successfulRuns, color: '#10b981' },
     { name: 'Failed', value: runs.filter(run => run.status === 'failed').length, color: '#ef4444' },
@@ -303,7 +313,7 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
               <ScrollArea className="h-full">
                 <div className="space-y-6 pr-4">
                   {/* Last Run Status */}
-                  {lastRun && (
+                  {lastRun ? (
                     <div className="bg-white/50 rounded-2xl p-4 border border-blue-200/50">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -317,6 +327,10 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                         </div>
                         {getStatusBadge(lastRun.status)}
                       </div>
+                    </div>
+                  ) : (
+                    <div className="bg-white/50 rounded-2xl p-4 border border-blue-200/50 text-center">
+                      <p className="text-gray-500">No automation runs yet</p>
                     </div>
                   )}
 
@@ -350,70 +364,74 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                     </Card>
                   </div>
 
-                  {/* Charts Row */}
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Activity Chart */}
-                    <Card className="bg-white/50 border-blue-200/50">
-                      <CardHeader>
-                        <CardTitle className="text-lg">Last 7 Days Activity</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ChartContainer
-                          config={{
-                            successful: { label: "Successful", color: "#10b981" },
-                            failed: { label: "Failed", color: "#ef4444" }
-                          }}
-                          className="h-[200px]"
-                        >
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={last7Days}>
-                              <XAxis dataKey="date" />
-                              <YAxis />
-                              <ChartTooltip content={<ChartTooltipContent />} />
-                              <Bar dataKey="successful" fill="#10b981" />
-                              <Bar dataKey="failed" fill="#ef4444" />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </ChartContainer>
-                      </CardContent>
-                    </Card>
+                  {/* Charts Row - Only show if there's data */}
+                  {runs.length > 0 && (
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Activity Chart */}
+                      <Card className="bg-white/50 border-blue-200/50">
+                        <CardHeader>
+                          <CardTitle className="text-lg">Last 7 Days Activity</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ChartContainer
+                            config={{
+                              successful: { label: "Successful", color: "#10b981" },
+                              failed: { label: "Failed", color: "#ef4444" }
+                            }}
+                            className="h-[200px]"
+                          >
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={last7Days}>
+                                <XAxis dataKey="date" />
+                                <YAxis />
+                                <ChartTooltip content={<ChartTooltipContent />} />
+                                <Bar dataKey="successful" fill="#10b981" />
+                                <Bar dataKey="failed" fill="#ef4444" />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </ChartContainer>
+                        </CardContent>
+                      </Card>
 
-                    {/* Status Distribution */}
-                    <Card className="bg-white/50 border-blue-200/50">
-                      <CardHeader>
-                        <CardTitle className="text-lg">Run Status Distribution</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ChartContainer
-                          config={{
-                            completed: { label: "Completed", color: "#10b981" },
-                            failed: { label: "Failed", color: "#ef4444" },
-                            running: { label: "Running", color: "#3b82f6" }
-                          }}
-                          className="h-[200px]"
-                        >
-                          <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                              <Pie
-                                data={statusData}
-                                cx="50%"
-                                cy="50%"
-                                outerRadius={60}
-                                dataKey="value"
-                              >
-                                {statusData.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={entry.color} />
-                                ))}
-                              </Pie>
-                              <ChartTooltip content={<ChartTooltipContent />} />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </ChartContainer>
-                      </CardContent>
-                    </Card>
-                  </div>
+                      {/* Status Distribution - Only show if there's status data */}
+                      {statusData.length > 0 && (
+                        <Card className="bg-white/50 border-blue-200/50">
+                          <CardHeader>
+                            <CardTitle className="text-lg">Run Status Distribution</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <ChartContainer
+                              config={{
+                                completed: { label: "Completed", color: "#10b981" },
+                                failed: { label: "Failed", color: "#ef4444" },
+                                running: { label: "Running", color: "#3b82f6" }
+                              }}
+                              className="h-[200px]"
+                            >
+                              <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                  <Pie
+                                    data={statusData}
+                                    cx="50%"
+                                    cy="50%"
+                                    outerRadius={60}
+                                    dataKey="value"
+                                  >
+                                    {statusData.map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                  </Pie>
+                                  <ChartTooltip content={<ChartTooltipContent />} />
+                                </PieChart>
+                              </ResponsiveContainer>
+                            </ChartContainer>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  )}
 
-                  {/* Last 24 Hours */}
+                  {/* Last 24 Hours - Only show if there are recent runs */}
                   {last24Hours.length > 0 && (
                     <Card className="bg-white/50 border-blue-200/50">
                       <CardHeader>
@@ -444,7 +462,6 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
             <TabsContent value="services" className="mt-6 h-[calc(100%-4rem)]">
               <ScrollArea className="h-full">
                 <div className="space-y-6 pr-4">
-                  {/* Platform Cards */}
                   {platforms.length > 0 ? (
                     <>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -457,7 +474,7 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                               <div className="space-y-2">
                                 <p className="text-sm text-gray-600">Method: {platform.method}</p>
                                 <div className="flex gap-2">
-                                  <Badge variant="secondary">Active</Badge>
+                                  <Badge variant="secondary">Configured</Badge>
                                   <Badge variant="outline">
                                     {platformPerformanceData.find(p => p.name === platform.name)?.calls || 0} calls
                                   </Badge>
@@ -468,33 +485,35 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                         ))}
                       </div>
 
-                      {/* Platform Performance Chart */}
-                      <Card className="bg-white/50 border-blue-200/50">
-                        <CardHeader>
-                          <CardTitle className="text-lg">Platform Performance</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ChartContainer
-                            config={{
-                              calls: { label: "API Calls", color: "#3b82f6" },
-                              success: { label: "Success Rate %", color: "#10b981" },
-                              avgTime: { label: "Avg Time (ms)", color: "#f59e0b" }
-                            }}
-                            className="h-[300px]"
-                          >
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={platformPerformanceData}>
-                                <XAxis dataKey="name" />
-                                <YAxis />
-                                <ChartTooltip content={<ChartTooltipContent />} />
-                                <Bar dataKey="calls" fill="#3b82f6" name="API Calls" />
-                                <Bar dataKey="success" fill="#10b981" name="Success Rate %" />
-                                <Bar dataKey="avgTime" fill="#f59e0b" name="Avg Time (ms)" />
-                              </BarChart>
-                            </ResponsiveContainer>
-                          </ChartContainer>
-                        </CardContent>
-                      </Card>
+                      {/* Platform Performance Chart - Only show if there's performance data */}
+                      {platformPerformanceData.some(p => p.calls > 0) && (
+                        <Card className="bg-white/50 border-blue-200/50">
+                          <CardHeader>
+                            <CardTitle className="text-lg">Platform Performance</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <ChartContainer
+                              config={{
+                                calls: { label: "API Calls", color: "#3b82f6" },
+                                success: { label: "Success Rate %", color: "#10b981" },
+                                avgTime: { label: "Avg Time (ms)", color: "#f59e0b" }
+                              }}
+                              className="h-[300px]"
+                            >
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={platformPerformanceData.filter(p => p.calls > 0)}>
+                                  <XAxis dataKey="name" />
+                                  <YAxis />
+                                  <ChartTooltip content={<ChartTooltipContent />} />
+                                  <Bar dataKey="calls" fill="#3b82f6" name="API Calls" />
+                                  <Bar dataKey="success" fill="#10b981" name="Success Rate %" />
+                                  <Bar dataKey="avgTime" fill="#f59e0b" name="Avg Time (ms)" />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </ChartContainer>
+                          </CardContent>
+                        </Card>
+                      )}
                     </>
                   ) : (
                     <Card className="bg-white/50 border-blue-200/50">
@@ -514,7 +533,6 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                 <div className="space-y-6 pr-4">
                   {agents.length > 0 ? (
                     <>
-                      {/* Agent Cards */}
                       <div className="space-y-4">
                         {agents.map((agent) => (
                           <Card key={agent.id} className="bg-white/50 border-blue-200/50">
@@ -539,7 +557,9 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                                 <p className="text-sm"><strong>Provider:</strong> {agent.llm_provider} - {agent.model}</p>
                                 <div className="flex gap-2">
                                   <Badge variant="secondary">Active</Badge>
-                                  <Badge variant="outline">Healthy</Badge>
+                                  <Badge variant="outline">
+                                    {agentPerformanceData.find(a => a.name === agent.agent_name)?.tasks || 0} tasks
+                                  </Badge>
                                 </div>
                               </div>
                             </CardContent>
@@ -547,31 +567,33 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                         ))}
                       </div>
 
-                      {/* Agent Performance Chart */}
-                      <Card className="bg-white/50 border-blue-200/50">
-                        <CardHeader>
-                          <CardTitle className="text-lg">Agent Performance</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ChartContainer
-                            config={{
-                              tasks: { label: "Tasks Completed", color: "#8b5cf6" },
-                              success: { label: "Success Rate", color: "#10b981" }
-                            }}
-                            className="h-[300px]"
-                          >
-                            <ResponsiveContainer width="100%" height="100%">
-                              <LineChart data={agentPerformanceData}>
-                                <XAxis dataKey="name" />
-                                <YAxis />
-                                <ChartTooltip content={<ChartTooltipContent />} />
-                                <Line type="monotone" dataKey="tasks" stroke="#8b5cf6" strokeWidth={2} />
-                                <Line type="monotone" dataKey="success" stroke="#10b981" strokeWidth={2} />
-                              </LineChart>
-                            </ResponsiveContainer>
-                          </ChartContainer>
-                        </CardContent>
-                      </Card>
+                      {/* Agent Performance Chart - Only show if agents have activity */}
+                      {agentPerformanceData.some(a => a.tasks > 0) && (
+                        <Card className="bg-white/50 border-blue-200/50">
+                          <CardHeader>
+                            <CardTitle className="text-lg">Agent Performance</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <ChartContainer
+                              config={{
+                                tasks: { label: "Tasks Completed", color: "#8b5cf6" },
+                                success: { label: "Success Rate", color: "#10b981" }
+                              }}
+                              className="h-[300px]"
+                            >
+                              <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={agentPerformanceData.filter(a => a.tasks > 0)}>
+                                  <XAxis dataKey="name" />
+                                  <YAxis />
+                                  <ChartTooltip content={<ChartTooltipContent />} />
+                                  <Line type="monotone" dataKey="tasks" stroke="#8b5cf6" strokeWidth={2} />
+                                  <Line type="monotone" dataKey="success" stroke="#10b981" strokeWidth={2} />
+                                </LineChart>
+                              </ResponsiveContainer>
+                            </ChartContainer>
+                          </CardContent>
+                        </Card>
+                      )}
                     </>
                   ) : (
                     <Card className="bg-white/50 border-blue-200/50">

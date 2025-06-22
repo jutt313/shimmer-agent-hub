@@ -25,23 +25,13 @@ export const useErrorHandler = () => {
       userAction: context?.userAction,
     };
 
+    console.log('🔴 Error handler called:', errorInfo);
     setCurrentError(errorInfo);
     
-    // Show toast notification
-    toast({
-      title: "Error Detected",
-      description: "Click the error indicator to analyze this error with AI assistance",
-      variant: "destructive",
-      action: (
-        <button 
-          onClick={() => setShowErrorModal(true)}
-          className="text-sm bg-white text-red-600 px-3 py-1 rounded hover:bg-red-50"
-        >
-          Analyze
-        </button>
-      ),
-    });
-  }, [toast]);
+    // Don't show toast for every error, just set the indicator to red
+    // The user can click the indicator to see the error
+    
+  }, []);
 
   const clearError = useCallback(() => {
     setCurrentError(null);

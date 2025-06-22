@@ -7,7 +7,7 @@ import ErrorAnalysisModal from "./ErrorAnalysisModal";
 const ErrorIndicator = () => {
   const { currentError, showErrorModal, setShowErrorModal, clearError, handleError } = useErrorHandler();
   const [hasError, setHasError] = useState(false);
-  const [position, setPosition] = useState({ x: window.innerWidth - 70, y: window.innerHeight - 70 });
+  const [position, setPosition] = useState({ x: window.innerWidth - 80, y: window.innerHeight - 120 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -15,6 +15,7 @@ const ErrorIndicator = () => {
   // Global error listener
   useEffect(() => {
     const handleGlobalError = (event: ErrorEvent) => {
+      console.log('🚨 Global error caught:', event.error);
       setHasError(true);
       handleError(event.error, {
         fileName: event.filename || 'Unknown file',
@@ -23,11 +24,25 @@ const ErrorIndicator = () => {
     };
 
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.log('🚨 Promise rejection caught:', event.reason);
       setHasError(true);
       handleError(event.reason, {
         fileName: 'Promise rejection',
         userAction: 'Async operation'
       });
+    };
+
+    // Also capture console errors
+    const originalConsoleError = console.error;
+    console.error = (...args) => {
+      originalConsoleError.apply(console, args);
+      if (args.length > 0 && typeof args[0] === 'string' && args[0].toLowerCase().includes('error')) {
+        setHasError(true);
+        handleError(args.join(' '), {
+          fileName: 'Console error',
+          userAction: 'Application runtime'
+        });
+      }
     };
 
     window.addEventListener('error', handleGlobalError);
@@ -36,8 +51,22 @@ const ErrorIndicator = () => {
     return () => {
       window.removeEventListener('error', handleGlobalError);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      console.error = originalConsoleError;
     };
   }, [handleError]);
+
+  // Update position when window resizes
+  useEffect(() => {
+    const handleResize = () => {
+      setPosition(prev => ({
+        x: Math.min(prev.x, window.innerWidth - 80),
+        y: Math.min(prev.y, window.innerHeight - 120)
+      }));
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Handle dragging
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -58,12 +87,12 @@ const ErrorIndicator = () => {
         const newY = e.clientY - dragOffset.y;
         
         // Keep within screen bounds
-        const maxX = window.innerWidth - 40;
-        const maxY = window.innerHeight - 40;
+        const maxX = window.innerWidth - 60;
+        const maxY = window.innerHeight - 60;
         
         setPosition({
-          x: Math.max(0, Math.min(newX, maxX)),
-          y: Math.max(0, Math.min(newY, maxY))
+          x: Math.max(10, Math.min(newX, maxX)),
+          y: Math.max(10, Math.min(newY, maxY))
         });
       }
     };
@@ -113,7 +142,7 @@ const ErrorIndicator = () => {
   return (
     <>
       <div 
-        className="fixed z-50"
+        className="fixed z-[9999]"
         style={{ 
           left: `${position.x}px`, 
           top: `${position.y}px`,
@@ -124,23 +153,23 @@ const ErrorIndicator = () => {
           ref={buttonRef}
           onMouseDown={handleMouseDown}
           onClick={handleClick}
-          className={`rounded-full w-10 h-10 shadow-lg transition-all duration-300 border-2 ${
+          className={`rounded-full w-14 h-14 shadow-2xl transition-all duration-300 border-2 ${
             isActive
-              ? 'bg-red-500 hover:bg-red-600 border-red-300 animate-pulse' 
-              : 'bg-blue-500 hover:bg-blue-600 border-blue-300'
+              ? 'bg-red-500 hover:bg-red-600 border-red-300 animate-pulse shadow-red-500/50' 
+              : 'bg-blue-500 hover:bg-blue-600 border-blue-300 shadow-blue-500/30'
           }`}
           title={isActive ? "Error detected - Click for AI analysis" : "AI Assistant - Click for help"}
         >
           {isActive ? (
-            <AlertTriangle className="w-4 h-4 text-white" />
+            <AlertTriangle className="w-6 h-6 text-white" />
           ) : (
-            <HelpCircle className="w-4 h-4 text-white" />
+            <HelpCircle className="w-6 h-6 text-white" />
           )}
         </Button>
         
         {/* Error indicator badge */}
         {isActive && (
-          <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-600 rounded-full flex items-center justify-center">
+          <div className="absolute -top-2 -right-2 w-5 h-5 bg-red-600 rounded-full flex items-center justify-center animate-bounce">
             <span className="text-white text-xs font-bold">!</span>
           </div>
         )}

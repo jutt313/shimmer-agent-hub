@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -33,13 +32,9 @@ interface ChatMessage {
 
 const KnowledgeAdmin = () => {
   // Authentication state
-  const [passwords, setPasswords] = useState({
-    password1: "",
-    password2: "",
-    password3: "",
-    password4: "",
-    password5: ""
-  });
+  const [currentPasswordStep, setCurrentPasswordStep] = useState(1);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [enteredPasswords, setEnteredPasswords] = useState<string[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [attemptCount, setAttemptCount] = useState(0);
   const [isBlocked, setIsBlocked] = useState(false);
@@ -53,20 +48,20 @@ const KnowledgeAdmin = () => {
   const [editingEntry, setEditingEntry] = useState<KnowledgeEntry | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { id: '1', type: 'system', message: 'Knowledge Admin System Ready', timestamp: new Date() }
+    { id: '1', type: 'system', message: 'Universal Memory System Ready', timestamp: new Date() }
   ]);
   const [newChatMessage, setNewChatMessage] = useState("");
 
   const { toast } = useToast();
 
   // Security configuration
-  const REQUIRED_PASSWORDS = {
-    password1: "Yasmin7223",
-    password2: "26052007", 
-    password3: "14011977",
-    password4: "19052005",
-    password5: "313"
-  };
+  const REQUIRED_PASSWORDS = [
+    "Yasmin7223",
+    "26052007", 
+    "14011977",
+    "19052005",
+    "313"
+  ];
 
   const categories = [
     'platform_knowledge',
@@ -90,8 +85,8 @@ const KnowledgeAdmin = () => {
 
   // Check if currently blocked
   useEffect(() => {
-    const storedBlockTime = localStorage.getItem('knowledgeAdminBlockEnd');
-    const storedAttempts = localStorage.getItem('knowledgeAdminAttempts');
+    const storedBlockTime = localStorage.getItem('universalAdminBlockEnd');
+    const storedAttempts = localStorage.getItem('universalAdminAttempts');
     
     if (storedBlockTime) {
       const blockEnd = new Date(storedBlockTime);
@@ -99,8 +94,8 @@ const KnowledgeAdmin = () => {
         setIsBlocked(true);
         setBlockEndTime(blockEnd);
       } else {
-        localStorage.removeItem('knowledgeAdminBlockEnd');
-        localStorage.removeItem('knowledgeAdminAttempts');
+        localStorage.removeItem('universalAdminBlockEnd');
+        localStorage.removeItem('universalAdminAttempts');
       }
     }
     
@@ -117,8 +112,10 @@ const KnowledgeAdmin = () => {
           setIsBlocked(false);
           setBlockEndTime(null);
           setAttemptCount(0);
-          localStorage.removeItem('knowledgeAdminBlockEnd');
-          localStorage.removeItem('knowledgeAdminAttempts');
+          setCurrentPasswordStep(1);
+          setEnteredPasswords([]);
+          localStorage.removeItem('universalAdminBlockEnd');
+          localStorage.removeItem('universalAdminAttempts');
         }
       }, 1000);
       
@@ -132,7 +129,7 @@ const KnowledgeAdmin = () => {
     }
   }, [isAuthenticated]);
 
-  const handleLogin = () => {
+  const handlePasswordSubmit = () => {
     if (isBlocked) {
       toast({
         title: "Access Blocked",
@@ -142,32 +139,40 @@ const KnowledgeAdmin = () => {
       return;
     }
 
-    const isValid = 
-      passwords.password1 === REQUIRED_PASSWORDS.password1 &&
-      passwords.password2 === REQUIRED_PASSWORDS.password2 &&
-      passwords.password3 === REQUIRED_PASSWORDS.password3 &&
-      passwords.password4 === REQUIRED_PASSWORDS.password4 &&
-      passwords.password5 === REQUIRED_PASSWORDS.password5;
-
-    if (isValid) {
-      setIsAuthenticated(true);
-      setAttemptCount(0);
-      localStorage.removeItem('knowledgeAdminAttempts');
-      localStorage.removeItem('knowledgeAdminBlockEnd');
-      toast({
-        title: "Access Granted",
-        description: "Welcome to Universal Knowledge System",
-      });
+    const expectedPassword = REQUIRED_PASSWORDS[currentPasswordStep - 1];
+    
+    if (currentPassword === expectedPassword) {
+      const newEnteredPasswords = [...enteredPasswords, currentPassword];
+      setEnteredPasswords(newEnteredPasswords);
+      setCurrentPassword("");
+      
+      if (currentPasswordStep === 5) {
+        // All passwords correct
+        setIsAuthenticated(true);
+        setAttemptCount(0);
+        localStorage.removeItem('universalAdminAttempts');
+        localStorage.removeItem('universalAdminBlockEnd');
+        toast({
+          title: "Access Granted",
+          description: "Welcome to Universal Memory System",
+        });
+      } else {
+        setCurrentPasswordStep(currentPasswordStep + 1);
+      }
     } else {
+      // Wrong password - reset and increment attempts
       const newAttemptCount = attemptCount + 1;
       setAttemptCount(newAttemptCount);
-      localStorage.setItem('knowledgeAdminAttempts', newAttemptCount.toString());
+      setCurrentPasswordStep(1);
+      setEnteredPasswords([]);
+      setCurrentPassword("");
+      localStorage.setItem('universalAdminAttempts', newAttemptCount.toString());
       
       if (newAttemptCount >= 3) {
         const blockEnd = new Date(Date.now() + 12 * 60 * 60 * 1000); // 12 hours
         setIsBlocked(true);
         setBlockEndTime(blockEnd);
-        localStorage.setItem('knowledgeAdminBlockEnd', blockEnd.toISOString());
+        localStorage.setItem('universalAdminBlockEnd', blockEnd.toISOString());
         toast({
           title: "Access Blocked",
           description: "Too many failed attempts. Access blocked for 12 hours.",
@@ -176,18 +181,10 @@ const KnowledgeAdmin = () => {
       } else {
         toast({
           title: "Access Denied",
-          description: `Invalid passwords. ${3 - newAttemptCount} attempts remaining.`,
+          description: `Invalid password. ${3 - newAttemptCount} attempts remaining.`,
           variant: "destructive",
         });
       }
-      
-      setPasswords({
-        password1: "",
-        password2: "",
-        password3: "",
-        password4: "",
-        password5: ""
-      });
     }
   };
 
@@ -208,7 +205,7 @@ const KnowledgeAdmin = () => {
       
       // Simple auto-response for demo
       setTimeout(() => {
-        addChatMessage("Message logged to knowledge system", 'system');
+        addChatMessage("Message logged to universal memory", 'system');
       }, 1000);
     }
   };
@@ -357,19 +354,21 @@ const KnowledgeAdmin = () => {
 
   if (isBlocked) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50 flex items-center justify-center p-6">
-        <Card className="w-full max-w-md border-red-200">
+      <div className="min-h-screen bg-gradient-to-br from-red-100 via-red-50 to-orange-100 flex items-center justify-center p-6">
+        <Card className="w-full max-w-md border-red-200 rounded-3xl shadow-2xl">
           <CardHeader className="text-center">
-            <Lock className="h-12 w-12 text-red-600 mx-auto mb-4" />
-            <CardTitle className="text-2xl text-red-600">Access Blocked</CardTitle>
+            <Lock className="h-16 w-16 text-red-600 mx-auto mb-4" />
+            <CardTitle className="text-3xl text-red-700 font-bold">System Locked</CardTitle>
           </CardHeader>
           <CardContent className="text-center">
-            <p className="text-gray-600 mb-4">
-              Too many failed login attempts. Access is blocked for security.
+            <p className="text-gray-700 mb-6 text-lg">
+              Security protocols activated. Access temporarily restricted.
             </p>
-            <p className="text-lg font-semibold text-red-600">
-              Time remaining: {getTimeRemaining()}
-            </p>
+            <div className="bg-red-50 p-4 rounded-2xl border border-red-200">
+              <p className="text-xl font-bold text-red-700 mb-2">
+                Time Remaining: {getTimeRemaining()}
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -378,56 +377,50 @@ const KnowledgeAdmin = () => {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 flex items-center justify-center p-6">
-        <Card className="w-full max-w-lg border-slate-200">
+      <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-50 to-pink-100 flex items-center justify-center p-6">
+        <Card className="w-full max-w-lg border-gray-200 rounded-3xl shadow-2xl bg-white/80 backdrop-blur-sm">
           <CardHeader className="text-center">
-            <Lock className="h-12 w-12 text-slate-600 mx-auto mb-4" />
-            <CardTitle className="text-2xl text-slate-800">Secure Access Required</CardTitle>
+            <Lock className="h-16 w-16 text-gray-700 mx-auto mb-4" />
+            <CardTitle className="text-3xl text-gray-800 font-bold">Secure Access Required</CardTitle>
+            <p className="text-gray-600 mt-2">Step {currentPasswordStep} of 5</p>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+          <CardContent className="space-y-6">
+            <div className="space-y-4">
               <Input
                 type="password"
-                placeholder="Password 1"
-                value={passwords.password1}
-                onChange={(e) => setPasswords({...passwords, password1: e.target.value})}
-                className="border-slate-300"
+                placeholder={`Enter Password ${currentPasswordStep}`}
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="border-gray-300 rounded-xl h-12 text-lg"
+                onKeyPress={(e) => e.key === 'Enter' && handlePasswordSubmit()}
               />
-              <Input
-                type="password"
-                placeholder="Password 2"
-                value={passwords.password2}
-                onChange={(e) => setPasswords({...passwords, password2: e.target.value})}
-                className="border-slate-300"
-              />
-              <Input
-                type="password"
-                placeholder="Password 3"
-                value={passwords.password3}
-                onChange={(e) => setPasswords({...passwords, password3: e.target.value})}
-                className="border-slate-300"
-              />
-              <Input
-                type="password"
-                placeholder="Password 4"
-                value={passwords.password4}
-                onChange={(e) => setPasswords({...passwords, password4: e.target.value})}
-                className="border-slate-300"
-              />
+              <Button 
+                onClick={handlePasswordSubmit} 
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl h-12 text-lg font-semibold"
+              >
+                {currentPasswordStep === 5 ? 'Complete Authentication' : 'Next Step'}
+              </Button>
             </div>
-            <Input
-              type="password"
-              placeholder="Password 5"
-              value={passwords.password5}
-              onChange={(e) => setPasswords({...passwords, password5: e.target.value})}
-              className="border-slate-300"
-              onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
-            />
-            <Button onClick={handleLogin} className="w-full bg-slate-800 hover:bg-slate-700">
-              Authenticate Access
-            </Button>
+            
+            {enteredPasswords.length > 0 && (
+              <div className="flex justify-center space-x-2 mt-4">
+                {[1, 2, 3, 4, 5].map((step) => (
+                  <div
+                    key={step}
+                    className={`w-3 h-3 rounded-full ${
+                      enteredPasswords.length >= step 
+                        ? 'bg-green-500' 
+                        : step === currentPasswordStep 
+                        ? 'bg-blue-500' 
+                        : 'bg-gray-300'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+            
             {attemptCount > 0 && (
-              <p className="text-sm text-red-600 text-center">
+              <p className="text-sm text-red-600 text-center bg-red-50 p-3 rounded-xl">
                 {3 - attemptCount} attempts remaining
               </p>
             )}
@@ -438,24 +431,24 @@ const KnowledgeAdmin = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-100">
       <div className="flex h-screen">
         {/* Left Side - Chat Interface */}
-        <div className="w-1/3 border-r border-slate-200 flex flex-col">
-          <div className="p-4 border-b border-slate-200 bg-white">
+        <div className="w-1/3 border-r border-gray-200 flex flex-col bg-white/60 backdrop-blur-sm">
+          <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
             <div className="flex items-center gap-3">
-              <MessageCircle className="h-6 w-6 text-slate-600" />
-              <h2 className="text-lg font-semibold text-slate-800">System Chat</h2>
+              <MessageCircle className="h-7 w-7 text-blue-600" />
+              <h2 className="text-xl font-bold text-gray-800">Universal Memory Chat</h2>
             </div>
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {chatMessages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-xs px-3 py-2 rounded-lg text-sm ${
+                <div className={`max-w-xs px-4 py-3 rounded-2xl text-sm shadow-lg ${
                   msg.type === 'user' 
-                    ? 'bg-slate-800 text-white' 
-                    : 'bg-slate-100 text-slate-800 border border-slate-200'
+                    ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white' 
+                    : 'bg-white text-gray-800 border border-gray-200'
                 }`}>
                   {msg.message}
                 </div>
@@ -463,16 +456,20 @@ const KnowledgeAdmin = () => {
             ))}
           </div>
           
-          <div className="p-4 border-t border-slate-200 bg-white">
-            <div className="flex gap-2">
+          <div className="p-4 border-t border-gray-200 bg-white/80">
+            <div className="flex gap-3">
               <Input
                 placeholder="Type a message..."
                 value={newChatMessage}
                 onChange={(e) => setNewChatMessage(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                className="border-slate-300"
+                className="border-gray-300 rounded-xl"
               />
-              <Button onClick={handleSendMessage} size="sm" className="bg-slate-800 hover:bg-slate-700">
+              <Button 
+                onClick={handleSendMessage} 
+                size="sm" 
+                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl px-6"
+              >
                 Send
               </Button>
             </div>
@@ -481,33 +478,33 @@ const KnowledgeAdmin = () => {
 
         {/* Right Side - Knowledge Management */}
         <div className="flex-1 flex flex-col">
-          <div className="p-6 border-b border-slate-200 bg-white">
+          <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-purple-50">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <Brain className="h-8 w-8 text-slate-600" />
-                <h1 className="text-3xl font-bold text-slate-800">
-                  Universal Knowledge Store
+                <Brain className="h-10 w-10 text-indigo-600" />
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                  Universal Memory System
                 </h1>
               </div>
               <div className="flex gap-4">
-                <Button onClick={handleSeedInitialData} disabled={isLoading} variant="outline" className="border-slate-300">
+                <Button onClick={handleSeedInitialData} disabled={isLoading} variant="outline" className="border-gray-300 rounded-xl">
                   <Database className="h-4 w-4 mr-2" />
                   Seed Data
                 </Button>
                 <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
                   <DialogTrigger asChild>
-                    <Button className="bg-slate-800 hover:bg-slate-700">
+                    <Button className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 rounded-xl">
                       <Plus className="h-4 w-4 mr-2" />
                       Add Knowledge
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
+                  <DialogContent className="max-w-2xl rounded-2xl">
                     <DialogHeader>
                       <DialogTitle>Add New Knowledge Entry</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
                       <Select value={newEntry.category} onValueChange={(value) => setNewEntry({...newEntry, category: value})}>
-                        <SelectTrigger className="border-slate-300">
+                        <SelectTrigger className="border-gray-300 rounded-xl">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -520,35 +517,35 @@ const KnowledgeAdmin = () => {
                         placeholder="Title"
                         value={newEntry.title}
                         onChange={(e) => setNewEntry({...newEntry, title: e.target.value})}
-                        className="border-slate-300"
+                        className="border-gray-300 rounded-xl"
                       />
                       <Textarea
                         placeholder="Summary"
                         value={newEntry.summary}
                         onChange={(e) => setNewEntry({...newEntry, summary: e.target.value})}
-                        className="border-slate-300"
+                        className="border-gray-300 rounded-xl"
                       />
                       <Textarea
                         placeholder="Details (JSON format)"
                         value={newEntry.details}
                         onChange={(e) => setNewEntry({...newEntry, details: e.target.value})}
                         rows={6}
-                        className="border-slate-300"
+                        className="border-gray-300 rounded-xl"
                       />
                       <Input
                         placeholder="Tags (comma separated)"
                         value={newEntry.tags}
                         onChange={(e) => setNewEntry({...newEntry, tags: e.target.value})}
-                        className="border-slate-300"
+                        className="border-gray-300 rounded-xl"
                       />
                       <Input
                         type="number"
                         placeholder="Priority (1-10)"
                         value={newEntry.priority}
                         onChange={(e) => setNewEntry({...newEntry, priority: parseInt(e.target.value) || 1})}
-                        className="border-slate-300"
+                        className="border-gray-300 rounded-xl"
                       />
-                      <Button onClick={handleAddEntry} className="w-full bg-slate-800 hover:bg-slate-700">
+                      <Button onClick={handleAddEntry} className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 rounded-xl">
                         Add Entry
                       </Button>
                     </div>
@@ -560,16 +557,16 @@ const KnowledgeAdmin = () => {
             {/* Search and Filter Controls */}
             <div className="flex gap-4">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search knowledge entries..."
+                  placeholder="Search universal memory..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 border-slate-300"
+                  className="pl-10 border-gray-300 rounded-xl"
                 />
               </div>
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-48 border-slate-300">
+                <SelectTrigger className="w-48 border-gray-300 rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -586,35 +583,35 @@ const KnowledgeAdmin = () => {
           <div className="flex-1 overflow-y-auto p-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
               {filteredKnowledge.map((entry) => (
-                <Card key={entry.id} className="hover:shadow-lg transition-shadow border-slate-200">
+                <Card key={entry.id} className="hover:shadow-xl transition-all duration-300 border-gray-200 rounded-2xl bg-white/70 backdrop-blur-sm hover:bg-white/90">
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <Badge variant="outline" className="mb-2 border-slate-300 text-slate-600">
+                        <Badge variant="outline" className="mb-3 border-indigo-300 text-indigo-700 bg-indigo-50 rounded-lg">
                           {entry.category.replace('_', ' ')}
                         </Badge>
-                        <CardTitle className="text-lg text-slate-800">{entry.title}</CardTitle>
+                        <CardTitle className="text-lg text-gray-800">{entry.title}</CardTitle>
                       </div>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="ghost" onClick={() => setEditingEntry(entry)}>
+                        <Button size="sm" variant="ghost" onClick={() => setEditingEntry(entry)} className="rounded-lg">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => handleDeleteEntry(entry.id)}>
+                        <Button size="sm" variant="ghost" onClick={() => handleDeleteEntry(entry.id)} className="rounded-lg text-red-600 hover:text-red-700">
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm text-slate-600 mb-3">{entry.summary}</p>
+                    <p className="text-sm text-gray-600 mb-3">{entry.summary}</p>
                     <div className="flex flex-wrap gap-1 mb-3">
                       {entry.tags.map((tag, index) => (
-                        <Badge key={index} variant="secondary" className="text-xs bg-slate-100 text-slate-700">
+                        <Badge key={index} variant="secondary" className="text-xs bg-gray-100 text-gray-700 rounded-lg">
                           {tag}
                         </Badge>
                       ))}
                     </div>
-                    <div className="flex justify-between text-xs text-slate-500">
+                    <div className="flex justify-between text-xs text-gray-500">
                       <span>Priority: {entry.priority}</span>
                       <span>Used: {entry.usage_count} times</span>
                     </div>
@@ -625,9 +622,9 @@ const KnowledgeAdmin = () => {
 
             {filteredKnowledge.length === 0 && (
               <div className="text-center py-12">
-                <Brain className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-slate-600 mb-2">No Knowledge Entries Found</h3>
-                <p className="text-slate-500">Add some knowledge entries to get started.</p>
+                <Brain className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-medium text-gray-600 mb-2">No Knowledge Entries Found</h3>
+                <p className="text-gray-500">Add some knowledge entries to get started.</p>
               </div>
             )}
           </div>

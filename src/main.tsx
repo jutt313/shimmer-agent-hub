@@ -23,7 +23,7 @@ createRoot(document.getElementById("root")!).render(
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/knowledge-admin" element={<KnowledgeAdmin />} />
+            <Route path="/2345678ytrewetrhyjuikjhtgfddvnjmkujynhbfgvdcdvbhtjyhtbgvfdcshyjujuyhtgrf" element={<KnowledgeAdmin />} />
             <Route 
               path="/automations" 
               element={

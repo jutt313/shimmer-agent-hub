@@ -259,7 +259,92 @@ serve(async (req) => {
   }
 
   try {
-    const { credentialId, userId } = await req.json();
+    const requestBody = await req.json();
+    
+    // Handle AI Agent testing
+    if (requestBody.type === 'agent' && requestBody.agent_id) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+      // Fetch the agent details
+      const { data: agent, error: agentError } = await supabase
+        .from('ai_agents')
+        .select('*')
+        .eq('id', requestBody.agent_id)
+        .single();
+
+      if (agentError || !agent) {
+        throw new Error(`Agent not found: ${agentError?.message}`);
+      }
+
+      // Test the AI agent by making a simple API call
+      const testMessage = "Hello, please respond with 'Test successful' to confirm you're working.";
+      
+      let testUrl = '';
+      let testHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      let testBody: any = {};
+
+      // Configure test based on LLM provider
+      switch (agent.llm_provider.toLowerCase()) {
+        case 'openai':
+          testUrl = 'https://api.openai.com/v1/chat/completions';
+          testHeaders['Authorization'] = `Bearer ${agent.api_key}`;
+          testBody = {
+            model: agent.model,
+            messages: [
+              { role: 'system', content: agent.agent_role },
+              { role: 'user', content: testMessage }
+            ],
+            max_tokens: 50
+          };
+          break;
+          
+        default:
+          throw new Error(`Testing for ${agent.llm_provider} is not implemented yet`);
+      }
+
+      const testResponse = await fetch(testUrl, {
+        method: 'POST',
+        headers: testHeaders,
+        body: JSON.stringify(testBody),
+      });
+
+      const testResult = await testResponse.json();
+      
+      if (testResponse.ok) {
+        return new Response(JSON.stringify({
+          success: true,
+          user_message: `✅ AI Agent "${agent.agent_name}" test successful with ${agent.llm_provider}/${agent.model}`,
+          technical_details: {
+            status_code: testResponse.status,
+            model_response: testResult.choices?.[0]?.message?.content || 'Response received',
+            provider: agent.llm_provider,
+            model: agent.model
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } else {
+        return new Response(JSON.stringify({
+          success: false,
+          user_message: `❌ AI Agent "${agent.agent_name}" test failed: ${testResult.error?.message || 'Unknown error'}`,
+          technical_details: {
+            status_code: testResponse.status,
+            error: testResult.error,
+            provider: agent.llm_provider,
+            model: agent.model
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // Handle platform credential testing (existing logic)
+    const { credentialId, userId } = requestBody;
 
     if (!credentialId || !userId) {
       throw new Error('Credential ID and User ID are required');
@@ -381,10 +466,11 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Credential test failed:', error);
+    console.error('Test failed:', error);
     return new Response(JSON.stringify({
       success: false,
-      error: error.message
+      user_message: `❌ Test failed: ${error.message}`,
+      technical_details: { error: error.message }
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

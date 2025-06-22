@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -114,7 +113,7 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
       if (agentsError) throw agentsError;
       setAgents(agentsData || []);
 
-      // Extract platforms from blueprint
+      // Extract platforms from blueprint and calculate real performance
       if (automationBlueprint?.steps) {
         const extractedPlatforms = automationBlueprint.steps
           .filter((step: any) => step.action?.integration)
@@ -164,13 +163,29 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
     };
   });
 
-  // Platform performance data
-  const platformPerformanceData = platforms.map(platform => ({
-    name: platform.name,
-    calls: Math.floor(Math.random() * 100) + 10, // Mock data based on runs
-    success: Math.floor(Math.random() * 90) + 80,
-    avgTime: Math.floor(Math.random() * 1000) + 200
-  }));
+  // Calculate real platform performance data based on actual runs
+  const platformPerformanceData = platforms.map(platform => {
+    // Count runs that used this platform
+    const platformRuns = runs.filter(run => 
+      run.details_log && 
+      JSON.stringify(run.details_log).toLowerCase().includes(platform.name.toLowerCase())
+    );
+    
+    const successfulPlatformRuns = platformRuns.filter(run => run.status === 'completed');
+    const successRate = platformRuns.length > 0 ? Math.round((successfulPlatformRuns.length / platformRuns.length) * 100) : 0;
+    
+    // Calculate average response time for this platform
+    const avgTime = platformRuns.length > 0 && platformRuns.filter(run => run.duration_ms).length > 0
+      ? Math.round(platformRuns.filter(run => run.duration_ms).reduce((acc, run) => acc + (run.duration_ms || 0), 0) / platformRuns.filter(run => run.duration_ms).length)
+      : 0;
+
+    return {
+      name: platform.name,
+      calls: platformRuns.length,
+      success: successRate,
+      avgTime: avgTime
+    };
+  });
 
   // Agent performance data
   const agentPerformanceData = agents.map(agent => ({
@@ -441,7 +456,12 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                             <CardContent>
                               <div className="space-y-2">
                                 <p className="text-sm text-gray-600">Method: {platform.method}</p>
-                                <Badge variant="secondary">Active</Badge>
+                                <div className="flex gap-2">
+                                  <Badge variant="secondary">Active</Badge>
+                                  <Badge variant="outline">
+                                    {platformPerformanceData.find(p => p.name === platform.name)?.calls || 0} calls
+                                  </Badge>
+                                </div>
                               </div>
                             </CardContent>
                           </Card>
@@ -457,7 +477,8 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                           <ChartContainer
                             config={{
                               calls: { label: "API Calls", color: "#3b82f6" },
-                              success: { label: "Success Rate", color: "#10b981" }
+                              success: { label: "Success Rate %", color: "#10b981" },
+                              avgTime: { label: "Avg Time (ms)", color: "#f59e0b" }
                             }}
                             className="h-[300px]"
                           >
@@ -466,8 +487,9 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                                 <XAxis dataKey="name" />
                                 <YAxis />
                                 <ChartTooltip content={<ChartTooltipContent />} />
-                                <Bar dataKey="calls" fill="#3b82f6" />
-                                <Bar dataKey="success" fill="#10b981" />
+                                <Bar dataKey="calls" fill="#3b82f6" name="API Calls" />
+                                <Bar dataKey="success" fill="#10b981" name="Success Rate %" />
+                                <Bar dataKey="avgTime" fill="#f59e0b" name="Avg Time (ms)" />
                               </BarChart>
                             </ResponsiveContainer>
                           </ChartContainer>

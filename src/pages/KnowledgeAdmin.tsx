@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
-import { Trash2, Edit, Search, Plus, Database, Brain, Lock, MessageCircle } from "lucide-react";
+import { Trash2, Edit, Search, Plus, Database, Brain, Lock, MessageCircle, Send, Bot } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface KnowledgeEntry {
@@ -25,7 +25,7 @@ interface KnowledgeEntry {
 
 interface ChatMessage {
   id: string;
-  type: 'user' | 'system';
+  type: 'user' | 'system' | 'ai';
   message: string;
   timestamp: Date;
 }
@@ -48,9 +48,12 @@ const KnowledgeAdmin = () => {
   const [editingEntry, setEditingEntry] = useState<KnowledgeEntry | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { id: '1', type: 'system', message: 'Universal Memory System Ready', timestamp: new Date() }
+    { id: '1', type: 'system', message: 'Universal Memory System Ready - Connected to OpenAI', timestamp: new Date() }
   ]);
   const [newChatMessage, setNewChatMessage] = useState("");
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [openAiApiKey, setOpenAiApiKey] = useState("");
+  const [selectedChatCategory, setSelectedChatCategory] = useState("");
 
   const { toast } = useToast();
 
@@ -82,6 +85,20 @@ const KnowledgeAdmin = () => {
     tags: '',
     priority: 1
   });
+
+  // Load OpenAI API key from localStorage
+  useEffect(() => {
+    const savedApiKey = localStorage.getItem('openai_api_key');
+    if (savedApiKey) {
+      setOpenAiApiKey(savedApiKey);
+    }
+  }, []);
+
+  // Save OpenAI API key to localStorage
+  const saveApiKey = (key: string) => {
+    localStorage.setItem('openai_api_key', key);
+    setOpenAiApiKey(key);
+  };
 
   // Check if currently blocked
   useEffect(() => {
@@ -188,7 +205,7 @@ const KnowledgeAdmin = () => {
     }
   };
 
-  const addChatMessage = (message: string, type: 'user' | 'system' = 'user') => {
+  const addChatMessage = (message: string, type: 'user' | 'system' | 'ai' = 'user') => {
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
       type,
@@ -198,16 +215,76 @@ const KnowledgeAdmin = () => {
     setChatMessages(prev => [...prev, newMessage]);
   };
 
+  const sendToOpenAI = async (message: string) => {
+    if (!openAiApiKey) {
+      toast({
+        title: "API Key Required",
+        description: "Please enter your OpenAI API key first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsChatLoading(true);
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openAiApiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: `You are an AI assistant for the Universal Memory System. Help manage knowledge entries and provide insights about the knowledge database. The available categories are: ${categories.join(', ')}. When user asks to add something, provide structured suggestions.`
+            },
+            {
+              role: 'user',
+              content: message
+            }
+          ],
+          max_tokens: 500,
+          temperature: 0.7
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI response');
+      }
+
+      const data = await response.json();
+      const aiResponse = data.choices[0].message.content;
+      
+      addChatMessage(aiResponse, 'ai');
+    } catch (error) {
+      console.error('OpenAI API Error:', error);
+      addChatMessage("Sorry, I couldn't process your request. Please check your API key.", 'system');
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
   const handleSendMessage = () => {
     if (newChatMessage.trim()) {
-      addChatMessage(newChatMessage);
-      setNewChatMessage("");
+      let fullMessage = newChatMessage;
       
-      // Simple auto-response for demo
-      setTimeout(() => {
-        addChatMessage("Message logged to universal memory", 'system');
-      }, 1000);
+      // Add category context if selected
+      if (selectedChatCategory) {
+        fullMessage = `[Category: ${selectedChatCategory}] ${newChatMessage}`;
+      }
+      
+      addChatMessage(fullMessage);
+      sendToOpenAI(fullMessage);
+      setNewChatMessage("");
+      setSelectedChatCategory("");
     }
+  };
+
+  const handleQuickCategorySelect = (category: string) => {
+    setSelectedChatCategory(category);
+    setNewChatMessage(`Tell me about ${category.replace('_', ' ')} and suggest improvements`);
   };
 
   const fetchKnowledge = async () => {
@@ -433,12 +510,38 @@ const KnowledgeAdmin = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-100">
       <div className="flex h-screen">
-        {/* Left Side - Chat Interface */}
+        {/* Left Side - Enhanced Chat Interface */}
         <div className="w-1/3 border-r border-gray-200 flex flex-col bg-white/60 backdrop-blur-sm">
           <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 mb-4">
               <MessageCircle className="h-7 w-7 text-blue-600" />
-              <h2 className="text-xl font-bold text-gray-800">Universal Memory Chat</h2>
+              <h2 className="text-xl font-bold text-gray-800">AI Chat Assistant</h2>
+            </div>
+            
+            {/* OpenAI API Key Input */}
+            <div className="mb-4">
+              <Input
+                type="password"
+                placeholder="Enter OpenAI API Key"
+                value={openAiApiKey}
+                onChange={(e) => saveApiKey(e.target.value)}
+                className="border-gray-300 rounded-xl text-sm"
+              />
+            </div>
+
+            {/* Quick Category Buttons */}
+            <div className="grid grid-cols-2 gap-2">
+              {categories.slice(0, 4).map((cat) => (
+                <Button
+                  key={cat}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleQuickCategorySelect(cat)}
+                  className="text-xs rounded-lg border-blue-200 hover:bg-blue-50"
+                >
+                  {cat.replace('_', ' ')}
+                </Button>
+              ))}
             </div>
           </div>
           
@@ -448,18 +551,44 @@ const KnowledgeAdmin = () => {
                 <div className={`max-w-xs px-4 py-3 rounded-2xl text-sm shadow-lg ${
                   msg.type === 'user' 
                     ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white' 
+                    : msg.type === 'ai'
+                    ? 'bg-gradient-to-r from-green-100 to-blue-100 text-gray-800 border border-green-200'
                     : 'bg-white text-gray-800 border border-gray-200'
                 }`}>
+                  {msg.type === 'ai' && <Bot className="w-4 h-4 inline mr-2" />}
                   {msg.message}
                 </div>
               </div>
             ))}
+            
+            {isChatLoading && (
+              <div className="flex justify-start">
+                <div className="bg-gradient-to-r from-green-100 to-blue-100 text-gray-800 border border-green-200 px-4 py-3 rounded-2xl">
+                  <Bot className="w-4 h-4 inline mr-2 animate-pulse" />
+                  AI is thinking...
+                </div>
+              </div>
+            )}
           </div>
           
-          <div className="p-4 border-t border-gray-200 bg-white/80">
+          <div className="p-4 border-t border-gray-200 bg-white/80 space-y-3">
+            {/* Category Selection for Chat */}
+            <Select value={selectedChatCategory} onValueChange={setSelectedChatCategory}>
+              <SelectTrigger className="border-gray-300 rounded-xl">
+                <SelectValue placeholder="Select category for context" />
+              </SelectTrigger>
+              <SelectContent className="bg-white border border-gray-200 rounded-xl shadow-lg z-50">
+                {categories.map(cat => (
+                  <SelectItem key={cat} value={cat} className="hover:bg-blue-50">
+                    {cat.replace('_', ' ')}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
             <div className="flex gap-3">
               <Input
-                placeholder="Type a message..."
+                placeholder="Ask AI about knowledge entries..."
                 value={newChatMessage}
                 onChange={(e) => setNewChatMessage(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
@@ -467,10 +596,11 @@ const KnowledgeAdmin = () => {
               />
               <Button 
                 onClick={handleSendMessage} 
+                disabled={isChatLoading || !openAiApiKey}
                 size="sm" 
-                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl px-6"
+                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl px-4"
               >
-                Send
+                <Send className="w-4 h-4" />
               </Button>
             </div>
           </div>
@@ -507,9 +637,11 @@ const KnowledgeAdmin = () => {
                         <SelectTrigger className="border-gray-300 rounded-xl">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-white border border-gray-200 rounded-xl shadow-lg z-50">
                           {categories.map(cat => (
-                            <SelectItem key={cat} value={cat}>{cat.replace('_', ' ')}</SelectItem>
+                            <SelectItem key={cat} value={cat} className="hover:bg-blue-50">
+                              {cat.replace('_', ' ')}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -569,10 +701,12 @@ const KnowledgeAdmin = () => {
                 <SelectTrigger className="w-48 border-gray-300 rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
+                <SelectContent className="bg-white border border-gray-200 rounded-xl shadow-lg z-50">
+                  <SelectItem value="all" className="hover:bg-blue-50">All Categories</SelectItem>
                   {categories.map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat.replace('_', ' ')}</SelectItem>
+                    <SelectItem key={cat} value={cat} className="hover:bg-blue-50">
+                      {cat.replace('_', ' ')}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>

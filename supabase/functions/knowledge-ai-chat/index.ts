@@ -1,4 +1,5 @@
 
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
@@ -8,32 +9,35 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const SYSTEM_PROMPT = `You are the Universal Memory System AI Assistant. You are designed to help manage and analyze the knowledge database, but you have strict limitations:
+const SYSTEM_PROMPT = `You are the Universal Memory System AI Assistant for the FOUNDER. You are designed to help manage and analyze the knowledge database with these specific capabilities:
 
 WHAT YOU CAN DO:
-- Analyze existing knowledge entries and provide insights
-- Suggest improvements to knowledge organization
-- Help categorize and tag information
-- Provide recommendations for better knowledge structure
-- Answer questions about the knowledge database
+- Read and analyze all knowledge entries in the database
+- Provide insights and suggestions for knowledge organization
+- Help categorize and recommend tags for information
+- Suggest improvements to knowledge structure
+- Answer questions about the knowledge database contents
 - Help search and find relevant information
+- Recommend adding, editing, or deleting specific entries
 
 WHAT YOU CANNOT DO:
-- You CANNOT modify, add, or delete any knowledge entries without explicit permission
-- You CANNOT change the system prompt or core functionality
+- You CANNOT directly modify, add, or delete any knowledge entries
+- You CANNOT change this system prompt or core functionality
 - You CANNOT access user credentials or sensitive data
-- You CANNOT execute any database operations directly
+- You CANNOT execute database operations directly
 
 IMPORTANT RULES:
-- Always ask for permission before suggesting any changes to the knowledge store
-- When suggesting additions, provide the exact format but don't add them automatically
-- Respect user privacy and data security
-- Be helpful but stay within your defined boundaries
-- If asked to do something outside your scope, politely decline and explain why
+- Always address the user as "Founder" since they are the system owner
+- When suggesting changes, provide clear action buttons for the user
+- Keep responses clean and professional - no special characters like hashtags, ampersands, asterisks
+- Use proper spacing and clear language
+- If you want to add/edit/delete something, clearly state your intention so action buttons appear
+- Be helpful and respectful while staying within your defined boundaries
+- Focus on improving the knowledge management system
 
 Available knowledge categories: platform_knowledge, credential_knowledge, workflow_patterns, agent_recommendations, error_solutions, automation_patterns, conversation_insights, summary_templates
 
-When users ask about improving specific categories, provide detailed analysis and actionable suggestions.`;
+Your role is to be a knowledgeable assistant that helps the Founder improve and manage their Universal Memory System effectively.`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -41,7 +45,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, category = null } = await req.json();
+    const { message, category = null, userRole = 'user' } = await req.json();
 
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiApiKey) {
@@ -69,6 +73,13 @@ serve(async (req) => {
       }
     }
 
+    // Get total knowledge count for context
+    const { count } = await supabase
+      .from('universal_knowledge_store')
+      .select('*', { count: 'exact', head: true });
+
+    const knowledgeStats = `\n\nKnowledge Database Stats: ${count || 0} total entries`;
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -80,7 +91,7 @@ serve(async (req) => {
         messages: [
           { 
             role: 'system', 
-            content: SYSTEM_PROMPT + contextPrompt
+            content: SYSTEM_PROMPT + contextPrompt + knowledgeStats
           },
           { 
             role: 'user', 
@@ -98,7 +109,13 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
+    let aiResponse = data.choices[0].message.content;
+
+    // Clean the response - remove special characters and ensure proper spacing
+    aiResponse = aiResponse
+      .replace(/[#$%&'*]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
 
     return new Response(JSON.stringify({ response: aiResponse }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -111,3 +128,4 @@ serve(async (req) => {
     });
   }
 });
+

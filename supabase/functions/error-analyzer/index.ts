@@ -21,6 +21,9 @@ FRONTEND FILES:
 - src/components/AIAgentForm.tsx: AI agent configuration
 - src/components/ExecuteAutomationButton.tsx: Automation execution interface
 - src/components/KnowledgeChat.tsx: AI-powered knowledge assistant
+- src/components/ErrorIndicator.tsx: Floating error indicator button
+- src/components/ErrorAnalysisModal.tsx: Error analysis and chat interface
+- src/components/ErrorBoundary.tsx: React error boundary component
 
 BACKEND EDGE FUNCTIONS:
 - execute-automation: Runs automation workflows with API integrations
@@ -28,6 +31,7 @@ BACKEND EDGE FUNCTIONS:
 - chat-ai: General AI chat functionality
 - knowledge-ai-chat: Knowledge system AI assistant
 - seed-knowledge-store: Populates knowledge database
+- error-analyzer: Analyzes errors and provides AI-powered solutions
 
 DATABASE TABLES:
 - automations: Stores automation blueprints and configurations
@@ -36,6 +40,7 @@ DATABASE TABLES:
 - automation_runs: Execution logs and results
 - universal_knowledge_store: System knowledge and patterns
 - credential_test_results: Test results for credentials
+- error_conversations: Stores error analysis conversations
 
 COMMON ERROR PATTERNS:
 1. API Key Issues: Invalid or missing credentials for platforms
@@ -51,10 +56,10 @@ serve(async (req) => {
   }
 
   try {
-    const { error, stackTrace, userAction, fileName, userId } = await req.json();
+    const { error, stackTrace, userAction, fileName, userId, conversationId, chatMessage, isNewError = true } = await req.json();
 
-    if (!error) {
-      throw new Error('Error information is required');
+    if (!error && !chatMessage) {
+      throw new Error('Error information or chat message is required');
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -66,8 +71,48 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured');
     }
 
-    // Analyze the error using OpenAI
-    const analysisPrompt = `
+    let conversationRecord = null;
+    let currentConversation = [];
+
+    // Handle existing conversation or create new one
+    if (conversationId && !isNewError) {
+      // Get existing conversation
+      const { data: existingConv } = await supabase
+        .from('error_conversations')
+        .select('*')
+        .eq('id', conversationId)
+        .single();
+      
+      if (existingConv) {
+        conversationRecord = existingConv;
+        currentConversation = existingConv.conversation_history || [];
+      }
+    } else if (isNewError) {
+      // Create new conversation for new error
+      const { data: newConv, error: createError } = await supabase
+        .from('error_conversations')
+        .insert({
+          user_id: userId,
+          error_message: error,
+          stack_trace: stackTrace,
+          file_name: fileName,
+          user_action: userAction,
+          conversation_history: []
+        })
+        .select('*')
+        .single();
+
+      if (createError) throw createError;
+      conversationRecord = newConv;
+    }
+
+    // Prepare the prompt based on whether it's initial analysis or follow-up chat
+    let analysisPrompt;
+    let systemMessage = 'You are a helpful technical assistant for the YusrAI Automation Tool. Provide clear, actionable solutions to errors.';
+
+    if (isNewError) {
+      // Initial error analysis
+      analysisPrompt = `
 You are an expert developer for the YusrAI Automation Tool. Analyze this error and provide a helpful solution.
 
 CODEBASE CONTEXT:
@@ -87,6 +132,28 @@ Please provide:
 
 Keep your response helpful, clear, and actionable. Focus on practical solutions.
 `;
+    } else {
+      // Follow-up chat message
+      const conversationHistory = currentConversation.map(msg => 
+        `${msg.role}: ${msg.content}`
+      ).join('\n');
+
+      analysisPrompt = `
+You are helping with an ongoing error analysis. Here's the context:
+
+ORIGINAL ERROR:
+- Error Message: ${conversationRecord?.error_message}
+- Stack Trace: ${conversationRecord?.stack_trace || 'Not provided'}
+- File: ${conversationRecord?.file_name || 'Unknown'}
+
+CONVERSATION HISTORY:
+${conversationHistory}
+
+USER'S NEW QUESTION: ${chatMessage}
+
+Please provide a helpful response based on the error context and conversation history.
+`;
+    }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -99,7 +166,7 @@ Keep your response helpful, clear, and actionable. Focus on practical solutions.
         messages: [
           {
             role: 'system',
-            content: 'You are a helpful technical assistant for the YusrAI Automation Tool. Provide clear, actionable solutions to errors.'
+            content: systemMessage
           },
           {
             role: 'user',
@@ -118,42 +185,65 @@ Keep your response helpful, clear, and actionable. Focus on practical solutions.
     const aiResult = await response.json();
     const analysis = aiResult.choices[0].message.content;
 
-    // Store error analysis for learning
-    const errorRecord = {
-      user_id: userId,
-      error_message: error,
-      stack_trace: stackTrace,
-      file_name: fileName,
-      user_action: userAction,
-      ai_analysis: analysis,
-      created_at: new Date().toISOString()
-    };
+    // Update conversation history
+    if (isNewError) {
+      currentConversation.push({
+        role: 'assistant',
+        content: analysis,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      currentConversation.push({
+        role: 'user',
+        content: chatMessage,
+        timestamp: new Date().toISOString()
+      });
+      currentConversation.push({
+        role: 'assistant',
+        content: analysis,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Update conversation in database
+    if (conversationRecord) {
+      await supabase
+        .from('error_conversations')
+        .update({
+          conversation_history: currentConversation,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', conversationRecord.id);
+    }
 
     // Store in knowledge base for future reference
-    await supabase
-      .from('universal_knowledge_store')
-      .insert({
-        category: 'error_solutions',
-        title: `Error Solution: ${error.substring(0, 100)}`,
-        summary: `Automated solution for error in ${fileName || 'unknown file'}`,
-        details: {
-          original_error: error,
-          stack_trace: stackTrace,
-          file_name: fileName,
-          user_action: userAction,
-          solution: analysis,
-          error_type: categorizeError(error)
-        },
-        tags: ['error_analysis', 'automated_solution', fileName?.toLowerCase() || 'unknown'],
-        priority: 8,
-        source_type: 'error_analyzer'
-      });
+    if (isNewError) {
+      await supabase
+        .from('universal_knowledge_store')
+        .insert({
+          category: 'error_solutions',
+          title: `Error Solution: ${error.substring(0, 100)}`,
+          summary: `Automated solution for error in ${fileName || 'unknown file'}`,
+          details: {
+            original_error: error,
+            stack_trace: stackTrace,
+            file_name: fileName,
+            user_action: userAction,
+            solution: analysis,
+            error_type: categorizeError(error)
+          },
+          tags: ['error_analysis', 'automated_solution', fileName?.toLowerCase() || 'unknown'],
+          priority: 8,
+          source_type: 'error_analyzer'
+        });
+    }
 
     return new Response(JSON.stringify({
       success: true,
       analysis: analysis,
-      errorId: errorRecord.created_at,
-      category: categorizeError(error)
+      conversationId: conversationRecord?.id,
+      category: categorizeError(error || conversationRecord?.error_message || 'general'),
+      conversationHistory: currentConversation
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

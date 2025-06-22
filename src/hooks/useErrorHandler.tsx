@@ -30,7 +30,7 @@ export const useErrorHandler = () => {
     // Show toast notification
     toast({
       title: "Error Detected",
-      description: "Click to analyze this error with AI assistance",
+      description: "Click the error indicator to analyze this error with AI assistance",
       variant: "destructive",
       action: (
         <button 

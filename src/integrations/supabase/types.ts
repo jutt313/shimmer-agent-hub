@@ -254,6 +254,42 @@ export type Database = {
           },
         ]
       }
+      error_conversations: {
+        Row: {
+          conversation_history: Json
+          created_at: string
+          error_message: string
+          file_name: string | null
+          id: string
+          stack_trace: string | null
+          updated_at: string
+          user_action: string | null
+          user_id: string | null
+        }
+        Insert: {
+          conversation_history?: Json
+          created_at?: string
+          error_message: string
+          file_name?: string | null
+          id?: string
+          stack_trace?: string | null
+          updated_at?: string
+          user_action?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          conversation_history?: Json
+          created_at?: string
+          error_message?: string
+          file_name?: string | null
+          id?: string
+          stack_trace?: string | null
+          updated_at?: string
+          user_action?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       platform_credentials: {
         Row: {
           created_at: string

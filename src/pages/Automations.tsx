@@ -8,10 +8,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Bot, Calendar, LogOut, MessageCircle, Settings } from "lucide-react";
+import { Plus, Bot, Calendar, MessageCircle, Settings, HelpCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import NotificationDropdown from "@/components/NotificationDropdown";
-import SeedNotificationsButton from "@/components/SeedNotificationsButton";
 import SettingsModal from "@/components/SettingsModal";
 import { createNotification, notificationTemplates } from "@/utils/notificationHelpers";
 
@@ -31,9 +30,10 @@ const Automations = () => {
   const [loading, setLoading] = useState(true);
   const [createLoading, setCreateLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -167,11 +167,6 @@ const Automations = () => {
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/auth");
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'text-green-600 bg-green-100';
@@ -207,14 +202,18 @@ const Automations = () => {
             </div>
             <div className="flex gap-4">
               <NotificationDropdown />
-              <SeedNotificationsButton />
               <Button
-                onClick={handleSignOut}
+                onClick={() => setIsSettingsOpen(true)}
                 variant="outline"
-                className="rounded-xl border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:shadow-xl text-red-600 hover:text-red-700"
+                className="rounded-xl border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:shadow-xl"
               >
-                <LogOut className="w-4 h-4 mr-2" />
-                Sign Out
+                <Settings className="w-5 h-5" />
+              </Button>
+              <Button
+                variant="outline"
+                className="rounded-xl border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:shadow-xl text-blue-600 hover:text-blue-700"
+              >
+                <HelpCircle className="w-5 h-5" />
               </Button>
             </div>
           </div>
@@ -347,6 +346,9 @@ const Automations = () => {
           )}
         </div>
       </div>
+
+      {/* Settings Modal */}
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
   );
 };

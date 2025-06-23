@@ -1,16 +1,18 @@
 
 import { useState } from 'react';
-import { User, Mail, Lock, Save } from 'lucide-react';
+import { User, Mail, Lock, Save, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 const ProfileSettingsTab = () => {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   
   const [profileData, setProfileData] = useState({
@@ -37,6 +39,23 @@ const ProfileSettingsTab = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate("/auth");
+      toast({
+        title: "Signed out",
+        description: "You have been successfully signed out",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to sign out",
+        variant: "destructive",
+      });
     }
   };
 
@@ -125,6 +144,28 @@ const ProfileSettingsTab = () => {
               />
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg rounded-2xl">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-red-600">
+            <LogOut className="w-5 h-5" />
+            Account Actions
+          </CardTitle>
+          <CardDescription>
+            Sign out of your account or manage account settings
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            onClick={handleSignOut}
+            variant="outline"
+            className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Sign Out
+          </Button>
         </CardContent>
       </Card>
 

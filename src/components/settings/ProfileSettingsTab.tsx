@@ -60,11 +60,11 @@ const ProfileSettingsTab = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg rounded-2xl">
+    <div className="space-y-6 pb-6">
+      <Card className="bg-gradient-to-br from-green-50/50 to-blue-50/50 backdrop-blur-sm border border-green-100 shadow-lg rounded-2xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <User className="w-5 h-5 text-blue-600" />
+            <User className="w-5 h-5 text-green-600" />
             Profile Information
           </CardTitle>
           <CardDescription>
@@ -80,7 +80,7 @@ const ProfileSettingsTab = () => {
                 value={profileData.name}
                 onChange={(e) => setProfileData(prev => ({ ...prev, name: e.target.value }))}
                 placeholder="Enter your full name"
-                className="rounded-xl"
+                className="rounded-xl border-green-200 focus:border-green-400 focus:ring-green-400"
               />
             </div>
             <div>
@@ -91,17 +91,17 @@ const ProfileSettingsTab = () => {
                 value={profileData.email}
                 onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
                 placeholder="Enter your email"
-                className="rounded-xl"
+                className="rounded-xl border-green-200 focus:border-green-400 focus:ring-green-400"
               />
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg rounded-2xl">
+      <Card className="bg-gradient-to-br from-green-50/50 to-blue-50/50 backdrop-blur-sm border border-green-100 shadow-lg rounded-2xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Lock className="w-5 h-5 text-blue-600" />
+            <Lock className="w-5 h-5 text-green-600" />
             Change Password
           </CardTitle>
           <CardDescription>
@@ -117,7 +117,7 @@ const ProfileSettingsTab = () => {
               value={profileData.currentPassword}
               onChange={(e) => setProfileData(prev => ({ ...prev, currentPassword: e.target.value }))}
               placeholder="Enter current password"
-              className="rounded-xl"
+              className="rounded-xl border-green-200 focus:border-green-400 focus:ring-green-400"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -129,7 +129,7 @@ const ProfileSettingsTab = () => {
                 value={profileData.newPassword}
                 onChange={(e) => setProfileData(prev => ({ ...prev, newPassword: e.target.value }))}
                 placeholder="Enter new password"
-                className="rounded-xl"
+                className="rounded-xl border-green-200 focus:border-green-400 focus:ring-green-400"
               />
             </div>
             <div>
@@ -140,40 +140,27 @@ const ProfileSettingsTab = () => {
                 value={profileData.confirmPassword}
                 onChange={(e) => setProfileData(prev => ({ ...prev, confirmPassword: e.target.value }))}
                 placeholder="Confirm new password"
-                className="rounded-xl"
+                className="rounded-xl border-green-200 focus:border-green-400 focus:ring-green-400"
               />
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg rounded-2xl">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-red-600">
-            <LogOut className="w-5 h-5" />
-            Account Actions
-          </CardTitle>
-          <CardDescription>
-            Sign out of your account or manage account settings
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button
-            onClick={handleSignOut}
-            variant="outline"
-            className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300"
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Sign Out
-          </Button>
-        </CardContent>
-      </Card>
-
-      <div className="flex justify-end">
+      <div className="flex justify-between items-center">
+        <Button
+          onClick={handleSignOut}
+          variant="outline"
+          className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300"
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          Sign Out
+        </Button>
+        
         <Button
           onClick={handleSaveProfile}
           disabled={loading}
-          className="rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+          className="rounded-xl bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700"
         >
           <Save className="w-4 h-4 mr-2" />
           {loading ? 'Saving...' : 'Save Changes'}

@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Settings, User, Bell, Bot, Key, Shield, Trash2, Edit } from 'lucide-react';
+import { Settings, User, Bell, Bot, Key, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -10,11 +10,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import AutomationSettingsTab from './settings/AutomationSettingsTab';
@@ -35,10 +30,10 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden bg-white/95 backdrop-blur-md border-0 shadow-2xl rounded-3xl">
-        <DialogHeader>
-          <DialogTitle className="text-2xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
-            <Settings className="w-6 h-6 text-blue-600" />
+      <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden bg-white/98 backdrop-blur-md border-0 shadow-2xl rounded-3xl">
+        <DialogHeader className="pb-4">
+          <DialogTitle className="text-2xl bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent flex items-center gap-2">
+            <Settings className="w-6 h-6 text-green-600" />
             Settings
           </DialogTitle>
           <DialogDescription>
@@ -46,58 +41,65 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
           </DialogDescription>
         </DialogHeader>
         
-        <Tabs defaultValue="profile" className="h-[600px] overflow-hidden">
-          <TabsList className="grid w-full grid-cols-6 bg-gray-100 rounded-xl">
-            <TabsTrigger value="profile" className="flex items-center gap-1 text-xs">
+        <Tabs defaultValue="profile" className="flex-1 flex flex-col min-h-0">
+          <TabsList className="grid w-full grid-cols-6 bg-green-50 rounded-xl border border-green-100">
+            <TabsTrigger value="profile" className="flex items-center gap-1 text-xs data-[state=active]:bg-green-100 data-[state=active]:text-green-700">
               <User className="w-3 h-3" />
               Profile
             </TabsTrigger>
-            <TabsTrigger value="automations" className="flex items-center gap-1 text-xs">
+            <TabsTrigger value="automations" className="flex items-center gap-1 text-xs data-[state=active]:bg-green-100 data-[state=active]:text-green-700">
               <Bot className="w-3 h-3" />
               Automations
             </TabsTrigger>
-            <TabsTrigger value="notifications" className="flex items-center gap-1 text-xs">
+            <TabsTrigger value="notifications" className="flex items-center gap-1 text-xs data-[state=active]:bg-green-100 data-[state=active]:text-green-700">
               <Bell className="w-3 h-3" />
               Notifications
             </TabsTrigger>
-            <TabsTrigger value="ai-agents" className="flex items-center gap-1 text-xs">
+            <TabsTrigger value="ai-agents" className="flex items-center gap-1 text-xs data-[state=active]:bg-green-100 data-[state=active]:text-green-700">
               <Bot className="w-3 h-3" />
               AI Agents
             </TabsTrigger>
-            <TabsTrigger value="credentials" className="flex items-center gap-1 text-xs">
+            <TabsTrigger value="credentials" className="flex items-center gap-1 text-xs data-[state=active]:bg-green-100 data-[state=active]:text-green-700">
               <Key className="w-3 h-3" />
               Credentials
             </TabsTrigger>
-            <TabsTrigger value="privacy" className="flex items-center gap-1 text-xs">
+            <TabsTrigger value="privacy" className="flex items-center gap-1 text-xs data-[state=active]:bg-green-100 data-[state=active]:text-green-700">
               <Shield className="w-3 h-3" />
               Privacy
             </TabsTrigger>
           </TabsList>
           
-          <div className="h-[540px] overflow-y-auto mt-4">
-            <TabsContent value="profile">
-              <ProfileSettingsTab />
-            </TabsContent>
+          <div className="flex-1 relative">
+            <div className="absolute inset-0 overflow-y-auto custom-scrollbar">
+              <div className="p-4 space-y-6">
+                <TabsContent value="profile" className="mt-0">
+                  <ProfileSettingsTab />
+                </TabsContent>
+                
+                <TabsContent value="automations" className="mt-0">
+                  <AutomationSettingsTab />
+                </TabsContent>
+                
+                <TabsContent value="notifications" className="mt-0">
+                  <NotificationSettingsTab />
+                </TabsContent>
+                
+                <TabsContent value="ai-agents" className="mt-0">
+                  <AIAgentSettingsTab />
+                </TabsContent>
+                
+                <TabsContent value="credentials" className="mt-0">
+                  <PlatformCredentialsTab />
+                </TabsContent>
+                
+                <TabsContent value="privacy" className="mt-0">
+                  <DataPrivacyTab />
+                </TabsContent>
+              </div>
+            </div>
             
-            <TabsContent value="automations">
-              <AutomationSettingsTab />
-            </TabsContent>
-            
-            <TabsContent value="notifications">
-              <NotificationSettingsTab />
-            </TabsContent>
-            
-            <TabsContent value="ai-agents">
-              <AIAgentSettingsTab />
-            </TabsContent>
-            
-            <TabsContent value="credentials">
-              <PlatformCredentialsTab />
-            </TabsContent>
-            
-            <TabsContent value="privacy">
-              <DataPrivacyTab />
-            </TabsContent>
+            {/* Gradient fade at bottom */}
+            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white/90 to-transparent pointer-events-none"></div>
           </div>
         </Tabs>
       </DialogContent>

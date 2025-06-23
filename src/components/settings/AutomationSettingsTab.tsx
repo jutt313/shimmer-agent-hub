@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Bot, Trash2, Edit, Eye, AlertTriangle, Clock, Globe } from 'lucide-react';
+import { Bot, Trash2, Eye, Calendar, Zap, Key, AlertTriangle, Settings as SettingsIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
-import AutomationDetailsModal from './AutomationDetailsModal';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Badge } from '@/components/ui/badge';
 
 interface Automation {
   id: string;
@@ -20,15 +21,33 @@ interface Automation {
   description?: string;
 }
 
+interface AIAgent {
+  id: string;
+  agent_name: string;
+  agent_role?: string;
+  llm_provider?: string;
+  model?: string;
+  created_at: string;
+}
+
+interface PlatformCredential {
+  id: string;
+  platform_name: string;
+  credential_type: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 const AutomationSettingsTab = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [automations, setAutomations] = useState<Automation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedAutomation, setSelectedAutomation] = useState<Automation | null>(null);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [expandedAutomation, setExpandedAutomation] = useState<string | null>(null);
+  const [agents, setAgents] = useState<Record<string, AIAgent[]>>({});
+  const [credentials, setCredentials] = useState<PlatformCredential[]>([]);
   
-  const [settings, setSettings] = useState({
+  const [defaultSettings, setDefaultSettings] = useState({
     defaultErrorHandling: 'stop',
     maxExecutionTime: '300',
     timezone: 'UTC',
@@ -38,6 +57,7 @@ const AutomationSettingsTab = () => {
 
   useEffect(() => {
     fetchAutomations();
+    fetchCredentials();
   }, [user]);
 
   const fetchAutomations = async () => {
@@ -62,6 +82,37 @@ const AutomationSettingsTab = () => {
     }
   };
 
+  const fetchCredentials = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('platform_credentials')
+        .select('*')
+        .eq('user_id', user?.id)
+        .eq('is_active', true);
+
+      if (error) throw error;
+      setCredentials(data || []);
+    } catch (error) {
+      console.error('Error fetching credentials:', error);
+    }
+  };
+
+  const fetchAgentsForAutomation = async (automationId: string) => {
+    if (agents[automationId]) return; // Already fetched
+
+    try {
+      const { data, error } = await supabase
+        .from('ai_agents')
+        .select('*')
+        .eq('automation_id', automationId);
+
+      if (error) throw error;
+      setAgents(prev => ({ ...prev, [automationId]: data || [] }));
+    } catch (error) {
+      console.error('Error fetching agents:', error);
+    }
+  };
+
   const handleDeleteAutomation = async (automationId: string) => {
     try {
       const { error } = await supabase
@@ -73,6 +124,12 @@ const AutomationSettingsTab = () => {
       if (error) throw error;
       
       setAutomations(prev => prev.filter(a => a.id !== automationId));
+      setAgents(prev => {
+        const newAgents = { ...prev };
+        delete newAgents[automationId];
+        return newAgents;
+      });
+      
       toast({
         title: "Success",
         description: "Automation deleted successfully",
@@ -87,21 +144,31 @@ const AutomationSettingsTab = () => {
     }
   };
 
+  const toggleAutomationExpanded = (automationId: string) => {
+    if (expandedAutomation === automationId) {
+      setExpandedAutomation(null);
+    } else {
+      setExpandedAutomation(automationId);
+      fetchAgentsForAutomation(automationId);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'text-green-600 bg-green-100';
-      case 'paused': return 'text-yellow-600 bg-yellow-100';
-      case 'error': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'active': return 'bg-green-100 text-green-800 border-green-200';
+      case 'paused': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'error': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
   return (
-    <div className="space-y-6">
-      <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg rounded-2xl">
+    <div className="space-y-6 pb-6">
+      {/* Default Settings */}
+      <Card className="bg-gradient-to-br from-green-50/50 to-blue-50/50 backdrop-blur-sm border border-green-100 shadow-lg rounded-2xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-blue-600" />
+            <SettingsIcon className="w-5 h-5 text-green-600" />
             Default Automation Settings
           </CardTitle>
           <CardDescription>
@@ -113,10 +180,10 @@ const AutomationSettingsTab = () => {
             <div>
               <Label htmlFor="errorHandling">Default Error Handling</Label>
               <Select
-                value={settings.defaultErrorHandling}
-                onValueChange={(value) => setSettings(prev => ({ ...prev, defaultErrorHandling: value }))}
+                value={defaultSettings.defaultErrorHandling}
+                onValueChange={(value) => setDefaultSettings(prev => ({ ...prev, defaultErrorHandling: value }))}
               >
-                <SelectTrigger className="rounded-xl">
+                <SelectTrigger className="rounded-xl border-green-200 focus:border-green-400">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -129,10 +196,10 @@ const AutomationSettingsTab = () => {
             <div>
               <Label htmlFor="timezone">Timezone</Label>
               <Select
-                value={settings.timezone}
-                onValueChange={(value) => setSettings(prev => ({ ...prev, timezone: value }))}
+                value={defaultSettings.timezone}
+                onValueChange={(value) => setDefaultSettings(prev => ({ ...prev, timezone: value }))}
               >
-                <SelectTrigger className="rounded-xl">
+                <SelectTrigger className="rounded-xl border-green-200 focus:border-green-400">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -152,9 +219,9 @@ const AutomationSettingsTab = () => {
               <Input
                 id="maxExecutionTime"
                 type="number"
-                value={settings.maxExecutionTime}
-                onChange={(e) => setSettings(prev => ({ ...prev, maxExecutionTime: e.target.value }))}
-                className="rounded-xl"
+                value={defaultSettings.maxExecutionTime}
+                onChange={(e) => setDefaultSettings(prev => ({ ...prev, maxExecutionTime: e.target.value }))}
+                className="rounded-xl border-green-200 focus:border-green-400 focus:ring-green-400"
               />
             </div>
             <div>
@@ -162,10 +229,10 @@ const AutomationSettingsTab = () => {
               <Input
                 id="maxRetries"
                 type="number"
-                value={settings.maxRetries}
-                onChange={(e) => setSettings(prev => ({ ...prev, maxRetries: e.target.value }))}
-                className="rounded-xl"
-                disabled={!settings.autoRetry}
+                value={defaultSettings.maxRetries}
+                onChange={(e) => setDefaultSettings(prev => ({ ...prev, maxRetries: e.target.value }))}
+                className="rounded-xl border-green-200 focus:border-green-400 focus:ring-green-400"
+                disabled={!defaultSettings.autoRetry}
               />
             </div>
           </div>
@@ -173,28 +240,29 @@ const AutomationSettingsTab = () => {
           <div className="flex items-center space-x-2">
             <Switch
               id="autoRetry"
-              checked={settings.autoRetry}
-              onCheckedChange={(checked) => setSettings(prev => ({ ...prev, autoRetry: checked }))}
+              checked={defaultSettings.autoRetry}
+              onCheckedChange={(checked) => setDefaultSettings(prev => ({ ...prev, autoRetry: checked }))}
             />
             <Label htmlFor="autoRetry">Enable automatic retry on failure</Label>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg rounded-2xl">
+      {/* Individual Automations */}
+      <Card className="bg-gradient-to-br from-green-50/50 to-blue-50/50 backdrop-blur-sm border border-green-100 shadow-lg rounded-2xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Bot className="w-5 h-5 text-blue-600" />
+            <Bot className="w-5 h-5 text-green-600" />
             Your Automations ({automations.length})
           </CardTitle>
           <CardDescription>
-            Manage all your automation workflows
+            Manage your automation workflows, agents, and credentials
           </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto"></div>
               <p className="mt-2 text-gray-600">Loading automations...</p>
             </div>
           ) : automations.length === 0 ? (
@@ -205,62 +273,122 @@ const AutomationSettingsTab = () => {
           ) : (
             <div className="space-y-3">
               {automations.map((automation) => (
-                <div
-                  key={automation.id}
-                  className="flex items-center justify-between p-4 bg-white rounded-xl shadow-sm border"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                      <h4 className="font-medium text-gray-900">{automation.title}</h4>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(automation.status)}`}>
-                        {automation.status}
-                      </span>
-                    </div>
-                    {automation.description && (
-                      <p className="text-sm text-gray-600 mt-1">{automation.description}</p>
-                    )}
-                    <p className="text-xs text-gray-400 mt-1">
-                      Created: {new Date(automation.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedAutomation(automation);
-                        setShowDetailsModal(true);
-                      }}
-                      className="rounded-xl"
+                <Collapsible key={automation.id}>
+                  <div className="bg-white rounded-xl shadow-sm border border-green-100">
+                    <CollapsibleTrigger 
+                      onClick={() => toggleAutomationExpanded(automation.id)}
+                      className="w-full p-4 flex items-center justify-between hover:bg-green-50/50 transition-colors rounded-xl"
                     >
-                      <Eye className="w-3 h-3" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDeleteAutomation(automation.id)}
-                      className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
+                      <div className="flex items-center gap-3 flex-1 text-left">
+                        <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-blue-600 rounded-lg flex items-center justify-center">
+                          <Bot className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-1">
+                            <h4 className="font-medium text-gray-900">{automation.title}</h4>
+                            <Badge className={`text-xs ${getStatusColor(automation.status)}`}>
+                              {automation.status}
+                            </Badge>
+                          </div>
+                          {automation.description && (
+                            <p className="text-sm text-gray-600">{automation.description}</p>
+                          )}
+                          <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            Created: {new Date(automation.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteAutomation(automation.id);
+                          }}
+                          className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                        <Eye className="w-4 h-4 text-gray-400" />
+                      </div>
+                    </CollapsibleTrigger>
+
+                    <CollapsibleContent>
+                      <div className="px-4 pb-4 border-t border-green-100 mt-4 pt-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* AI Agents Section */}
+                          <div>
+                            <h5 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
+                              <Zap className="w-4 h-4 text-green-600" />
+                              AI Agents ({agents[automation.id]?.length || 0})
+                            </h5>
+                            {agents[automation.id]?.length > 0 ? (
+                              <div className="space-y-2">
+                                {agents[automation.id].map((agent) => (
+                                  <div key={agent.id} className="p-3 bg-green-50 rounded-lg border border-green-100">
+                                    <h6 className="font-medium text-sm text-gray-900">{agent.agent_name}</h6>
+                                    {agent.agent_role && (
+                                      <p className="text-xs text-gray-600">{agent.agent_role}</p>
+                                    )}
+                                    <div className="flex gap-1 mt-1">
+                                      {agent.llm_provider && (
+                                        <Badge variant="outline" className="text-xs">
+                                          {agent.llm_provider}
+                                        </Badge>
+                                      )}
+                                      {agent.model && (
+                                        <Badge variant="outline" className="text-xs">
+                                          {agent.model}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">No AI agents configured</p>
+                            )}
+                          </div>
+
+                          {/* Available Credentials Section */}
+                          <div>
+                            <h5 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
+                              <Key className="w-4 h-4 text-green-600" />
+                              Available Credentials ({credentials.length})
+                            </h5>
+                            {credentials.length > 0 ? (
+                              <div className="space-y-2">
+                                {credentials.map((credential) => (
+                                  <div key={credential.id} className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                    <h6 className="font-medium text-sm text-gray-900">{credential.platform_name}</h6>
+                                    <p className="text-xs text-gray-600">{credential.credential_type}</p>
+                                    <div className="flex items-center justify-between mt-1">
+                                      <Badge variant={credential.is_active ? "default" : "secondary"} className="text-xs">
+                                        {credential.is_active ? 'Active' : 'Inactive'}
+                                      </Badge>
+                                      <span className="text-xs text-gray-400">
+                                        {new Date(credential.created_at).toLocaleDateString()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">No credentials configured</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CollapsibleContent>
                   </div>
-                </div>
+                </Collapsible>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
-
-      {selectedAutomation && (
-        <AutomationDetailsModal
-          automation={selectedAutomation}
-          isOpen={showDetailsModal}
-          onClose={() => {
-            setShowDetailsModal(false);
-            setSelectedAutomation(null);
-          }}
-        />
-      )}
     </div>
   );
 };

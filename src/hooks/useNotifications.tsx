@@ -89,8 +89,10 @@ export const useNotifications = () => {
 
       if (error) throw error;
       
-      setNotifications(data || []);
-      updateUnreadCount(data || []);
+      // Cast the data to our Notification type to fix TypeScript issues
+      const typedNotifications = (data || []) as Notification[];
+      setNotifications(typedNotifications);
+      updateUnreadCount(typedNotifications);
     } catch (error) {
       console.error('Error fetching notifications:', error);
       toast({

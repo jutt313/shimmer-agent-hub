@@ -43,7 +43,6 @@ const NotificationDropdown = () => {
   };
 
   const handleHelpClick = (notification: Notification) => {
-    // Trigger the error handler to open the help chat with notification context
     handleError(`Help request for notification: ${notification.title}`, {
       fileName: 'Notification System',
       userAction: `User clicked help for: ${notification.message}`
@@ -103,6 +102,7 @@ const NotificationDropdown = () => {
           <div className="p-4 text-center text-gray-500">
             <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
             <p>No notifications yet</p>
+            <p className="text-xs mt-1">Notifications will appear here when you create automations or they run</p>
           </div>
         ) : (
           notifications.map((notification) => (

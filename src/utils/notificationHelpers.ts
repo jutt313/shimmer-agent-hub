@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export const createNotification = async (
@@ -10,23 +9,20 @@ export const createNotification = async (
   metadata: any = {}
 ) => {
   try {
-    const { data, error } = await supabase
-      .from('notifications')
-      .insert([
-        {
-          user_id: userId,
-          title,
-          message,
-          type,
-          category,
-          metadata
-        }
-      ])
-      .select()
-      .single();
+    // Use the edge function instead of direct database insertion to bypass RLS
+    const { data, error } = await supabase.functions.invoke('create-notification', {
+      body: {
+        userId,
+        title,
+        message,
+        type,
+        category,
+        metadata
+      }
+    });
 
     if (error) throw error;
-    return data;
+    return data.notification;
   } catch (error) {
     console.error('Error creating notification:', error);
     throw error;

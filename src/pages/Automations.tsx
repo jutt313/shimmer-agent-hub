@@ -187,7 +187,7 @@ const Automations = () => {
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-r from-purple-300/20 to-blue-300/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
       
       <div className="relative z-10 p-6">
-        {/* Header - Added NotificationDropdown */}
+        {/* Header */}
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-8">
             <div>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -12,6 +11,7 @@ import { Plus, Bot, Calendar, MessageCircle, Settings, HelpCircle } from "lucide
 import { useNavigate } from "react-router-dom";
 import NotificationDropdown from "@/components/NotificationDropdown";
 import SettingsModal from "@/components/SettingsModal";
+import HelpChatModal from "@/components/HelpChatModal";
 import { createNotification, notificationTemplates } from "@/utils/notificationHelpers";
 
 interface Automation {
@@ -31,6 +31,7 @@ const Automations = () => {
   const [createLoading, setCreateLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const { user } = useAuth();
@@ -210,6 +211,7 @@ const Automations = () => {
                 <Settings className="w-5 h-5" />
               </Button>
               <Button
+                onClick={() => setIsHelpOpen(true)}
                 variant="outline"
                 className="rounded-xl border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:shadow-xl text-blue-600 hover:text-blue-700"
               >
@@ -349,6 +351,9 @@ const Automations = () => {
 
       {/* Settings Modal */}
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      
+      {/* Help Chat Modal */}
+      <HelpChatModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
     </div>
   );
 };

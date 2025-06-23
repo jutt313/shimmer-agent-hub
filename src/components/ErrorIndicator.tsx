@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { AlertTriangle, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,22 @@ const ErrorIndicator = () => {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
 
-  // Global error listener
+  // Listen for React Error Boundary errors
+  useEffect(() => {
+    const handleReactError = (event: CustomEvent) => {
+      console.log('🚨 React error caught by ErrorIndicator:', event.detail);
+      setHasError(true);
+      handleError(event.detail.error, {
+        fileName: event.detail.fileName || 'React Component',
+        userAction: event.detail.userAction || 'Component Rendering'
+      });
+    };
+
+    window.addEventListener('react-error', handleReactError as EventListener);
+    return () => window.removeEventListener('react-error', handleReactError as EventListener);
+  }, [handleError]);
+
+  // Global error listeners
   useEffect(() => {
     const handleGlobalError = (event: ErrorEvent) => {
       console.log('🚨 Global error caught:', event.error);
@@ -32,11 +48,12 @@ const ErrorIndicator = () => {
       });
     };
 
-    // Also capture console errors
+    // Console error listener
     const originalConsoleError = console.error;
     console.error = (...args) => {
       originalConsoleError.apply(console, args);
       if (args.length > 0 && typeof args[0] === 'string' && args[0].toLowerCase().includes('error')) {
+        console.log('🚨 Console error detected:', args.join(' '));
         setHasError(true);
         handleError(args.join(' '), {
           fileName: 'Console error',
@@ -77,6 +94,7 @@ const ErrorIndicator = () => {
         y: e.clientY - rect.top
       });
       setIsDragging(true);
+      e.preventDefault();
     }
   };
 
@@ -119,19 +137,15 @@ const ErrorIndicator = () => {
       return;
     }
 
-    if (currentError) {
+    if (currentError || hasError) {
       setShowErrorModal(true);
     } else {
       // For testing - simulate an error
-      const testError = {
-        message: "Test error: API connection failed",
-        stack: "Error: Test error\n    at testFunction (ErrorIndicator.tsx:45:1)",
+      console.log('🧪 Testing error system...');
+      setHasError(true);
+      handleError("Test error: System check initiated", {
         fileName: "ErrorIndicator.tsx",
         userAction: "Testing error analysis system"
-      };
-      handleError(testError.message, {
-        fileName: testError.fileName,
-        userAction: testError.userAction
       });
       setShowErrorModal(true);
     }
@@ -139,6 +153,7 @@ const ErrorIndicator = () => {
 
   const isActive = hasError || currentError;
 
+  // Always render the component
   return (
     <>
       <div 
@@ -153,7 +168,7 @@ const ErrorIndicator = () => {
           ref={buttonRef}
           onMouseDown={handleMouseDown}
           onClick={handleClick}
-          className={`rounded-full w-14 h-14 shadow-2xl transition-all duration-300 border-2 ${
+          className={`rounded-full w-12 h-12 shadow-lg transition-all duration-300 border-2 hover:scale-110 ${
             isActive
               ? 'bg-red-500 hover:bg-red-600 border-red-300 animate-pulse shadow-red-500/50' 
               : 'bg-blue-500 hover:bg-blue-600 border-blue-300 shadow-blue-500/30'
@@ -161,15 +176,15 @@ const ErrorIndicator = () => {
           title={isActive ? "Error detected - Click for AI analysis" : "AI Assistant - Click for help"}
         >
           {isActive ? (
-            <AlertTriangle className="w-6 h-6 text-white" />
+            <AlertTriangle className="w-5 h-5 text-white" />
           ) : (
-            <HelpCircle className="w-6 h-6 text-white" />
+            <HelpCircle className="w-5 h-5 text-white" />
           )}
         </Button>
         
         {/* Error indicator badge */}
         {isActive && (
-          <div className="absolute -top-2 -right-2 w-5 h-5 bg-red-600 rounded-full flex items-center justify-center animate-bounce">
+          <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 rounded-full flex items-center justify-center animate-bounce">
             <span className="text-white text-xs font-bold">!</span>
           </div>
         )}
@@ -184,7 +199,7 @@ const ErrorIndicator = () => {
             clearError();
           }}
           error={currentError || {
-            message: "Test error: API connection failed",
+            message: "Test error: System check initiated",
             stack: "Error: Test error\n    at testFunction (ErrorIndicator.tsx:45:1)",
             fileName: "ErrorIndicator.tsx",
             userAction: "Testing error analysis system"

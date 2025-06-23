@@ -25,9 +25,10 @@ class ErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Error caught by boundary:', error, errorInfo);
+    console.error('🚨 Error caught by ErrorBoundary:', error, errorInfo);
     
     // Dispatch a custom event that the ErrorIndicator can listen to
+    console.log('🚨 Dispatching react-error event...');
     window.dispatchEvent(new CustomEvent('react-error', {
       detail: {
         error,

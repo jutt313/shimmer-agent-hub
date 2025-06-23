@@ -25,15 +25,20 @@ export const useErrorHandler = () => {
       userAction: context?.userAction,
     };
 
-    console.log('🔴 Error handler called:', errorInfo);
+    console.log('🔴 Error handler called with:', errorInfo);
     setCurrentError(errorInfo);
     
-    // Don't show toast for every error, just set the indicator to red
-    // The user can click the indicator to see the error
+    // Optional: Show a subtle toast notification
+    toast({
+      title: "Error detected",
+      description: "Click the red help icon for AI analysis",
+      duration: 3000,
+    });
     
-  }, []);
+  }, [toast]);
 
   const clearError = useCallback(() => {
+    console.log('🟢 Clearing error state');
     setCurrentError(null);
     setShowErrorModal(false);
   }, []);

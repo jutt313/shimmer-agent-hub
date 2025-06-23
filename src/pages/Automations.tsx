@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import ChatCard from '@/components/ChatCard';
 import HelpChatModal from '@/components/HelpChatModal';
@@ -42,6 +43,7 @@ const Automations = () => {
   const navigate = useNavigate();
   const [showChatCard, setShowChatCard] = useState(false);
   const [newAutomationName, setNewAutomationName] = useState('');
+  const [newAutomationDescription, setNewAutomationDescription] = useState('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [creatingAutomation, setCreatingAutomation] = useState(false);
   const [automations, setAutomations] = useState<Automation[]>([]);
@@ -105,7 +107,7 @@ const Automations = () => {
         .from('automations')
         .insert({
           title: newAutomationName.trim(),
-          description: null,
+          description: newAutomationDescription.trim() || null,
           status: 'draft',
           user_id: user?.id
         })
@@ -121,6 +123,7 @@ const Automations = () => {
 
       setShowCreateDialog(false);
       setNewAutomationName('');
+      setNewAutomationDescription('');
       navigate(`/automations/${data.id}`);
     } catch (error) {
       console.error('Error creating automation:', error);
@@ -214,29 +217,53 @@ const Automations = () => {
                   Create Automation
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
+              <DialogContent className="sm:max-w-md bg-gradient-to-br from-blue-50 via-white to-purple-50 border-0 shadow-2xl">
                 <DialogHeader>
-                  <DialogTitle>Create New Automation</DialogTitle>
-                  <DialogDescription>
-                    Enter a name for your new automation to get started.
+                  <DialogTitle className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    Create New Automation
+                  </DialogTitle>
+                  <DialogDescription className="text-gray-600">
+                    Enter details for your new automation to get started with AI-powered workflows.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
-                  <Input
-                    placeholder="Enter automation name..."
-                    value={newAutomationName}
-                    onChange={(e) => setNewAutomationName(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && createNewAutomation()}
-                  />
-                  <div className="flex gap-2 justify-end">
-                    <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-2 block">
+                      Automation Name *
+                    </label>
+                    <Input
+                      placeholder="e.g., Email Marketing Campaign, Lead Generation..."
+                      value={newAutomationName}
+                      onChange={(e) => setNewAutomationName(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && createNewAutomation()}
+                      className="rounded-xl border-blue-200 focus:border-purple-400 focus:ring-purple-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-2 block">
+                      Description (Optional)
+                    </label>
+                    <Textarea
+                      placeholder="Describe what this automation should do..."
+                      value={newAutomationDescription}
+                      onChange={(e) => setNewAutomationDescription(e.target.value)}
+                      className="rounded-xl border-blue-200 focus:border-purple-400 focus:ring-purple-400 min-h-[80px]"
+                    />
+                  </div>
+                  <div className="flex gap-3 justify-end pt-4">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowCreateDialog(false)}
+                      className="rounded-xl"
+                    >
                       Cancel
                     </Button>
                     <Button 
                       onClick={createNewAutomation}
                       disabled={creatingAutomation || !newAutomationName.trim()}
+                      className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl"
                     >
-                      {creatingAutomation ? 'Creating...' : 'Create'}
+                      {creatingAutomation ? 'Creating...' : 'Create Automation'}
                     </Button>
                   </div>
                 </div>
@@ -258,29 +285,53 @@ const Automations = () => {
                   Create Your First Automation
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
+              <DialogContent className="sm:max-w-md bg-gradient-to-br from-blue-50 via-white to-purple-50 border-0 shadow-2xl">
                 <DialogHeader>
-                  <DialogTitle>Create New Automation</DialogTitle>
-                  <DialogDescription>
-                    Enter a name for your new automation to get started.
+                  <DialogTitle className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    Create New Automation
+                  </DialogTitle>
+                  <DialogDescription className="text-gray-600">
+                    Enter details for your new automation to get started with AI-powered workflows.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
-                  <Input
-                    placeholder="Enter automation name..."
-                    value={newAutomationName}
-                    onChange={(e) => setNewAutomationName(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && createNewAutomation()}
-                  />
-                  <div className="flex gap-2 justify-end">
-                    <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-2 block">
+                      Automation Name *
+                    </label>
+                    <Input
+                      placeholder="e.g., Email Marketing Campaign, Lead Generation..."
+                      value={newAutomationName}
+                      onChange={(e) => setNewAutomationName(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && createNewAutomation()}
+                      className="rounded-xl border-blue-200 focus:border-purple-400 focus:ring-purple-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-2 block">
+                      Description (Optional)
+                    </label>
+                    <Textarea
+                      placeholder="Describe what this automation should do..."
+                      value={newAutomationDescription}
+                      onChange={(e) => setNewAutomationDescription(e.target.value)}
+                      className="rounded-xl border-blue-200 focus:border-purple-400 focus:ring-purple-400 min-h-[80px]"
+                    />
+                  </div>
+                  <div className="flex gap-3 justify-end pt-4">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowCreateDialog(false)}
+                      className="rounded-xl"
+                    >
                       Cancel
                     </Button>
                     <Button 
                       onClick={createNewAutomation}
                       disabled={creatingAutomation || !newAutomationName.trim()}
+                      className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl"
                     >
-                      {creatingAutomation ? 'Creating...' : 'Create'}
+                      {creatingAutomation ? 'Creating...' : 'Create Automation'}
                     </Button>
                   </div>
                 </div>

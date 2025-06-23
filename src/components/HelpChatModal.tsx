@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -140,11 +139,11 @@ const HelpChatModal = ({ isOpen, onClose, initialMessage, initialContext }: Help
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md h-[600px] bg-white border border-green-200 shadow-2xl rounded-2xl p-0 flex flex-col">
+      <DialogContent className="max-w-md h-[600px] bg-white border border-blue-200 shadow-2xl rounded-2xl p-0 flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-green-100 bg-gradient-to-r from-green-50 to-blue-50 rounded-t-2xl">
+        <div className="flex items-center justify-between p-4 border-b border-blue-100 bg-gradient-to-r from-blue-50 to-purple-50 rounded-t-2xl">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-600 rounded-full flex items-center justify-center">
+            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
               <MessageCircle className="w-4 h-4 text-white" />
             </div>
             <h3 className="font-semibold text-gray-800">AI Help Assistant</h3>
@@ -164,7 +163,7 @@ const HelpChatModal = ({ isOpen, onClose, initialMessage, initialContext }: Help
                   className={`flex gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   {message.role === 'assistant' && (
-                    <div className="w-6 h-6 bg-gradient-to-r from-green-500 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                    <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
                       <Bot className="w-3 h-3 text-white" />
                     </div>
                   )}
@@ -172,8 +171,8 @@ const HelpChatModal = ({ isOpen, onClose, initialMessage, initialContext }: Help
                   <div className={`max-w-[80%] ${message.role === 'user' ? 'order-2' : ''}`}>
                     <div className={`p-3 rounded-2xl text-sm ${
                       message.role === 'user' 
-                        ? 'bg-gradient-to-r from-green-500 to-blue-600 text-white' 
-                        : 'bg-green-50 text-gray-800 border border-green-100'
+                        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white' 
+                        : 'bg-blue-50 text-gray-800 border border-blue-100'
                     }`}>
                       {message.content}
                     </div>
@@ -197,10 +196,10 @@ const HelpChatModal = ({ isOpen, onClose, initialMessage, initialContext }: Help
               
               {isLoading && (
                 <div className="flex gap-2 justify-start">
-                  <div className="w-6 h-6 bg-gradient-to-r from-green-500 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                  <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
                     <Bot className="w-3 h-3 text-white" />
                   </div>
-                  <div className="p-3 rounded-2xl bg-green-50 border border-green-100">
+                  <div className="p-3 rounded-2xl bg-blue-50 border border-blue-100">
                     <div className="flex items-center gap-2 text-gray-600 text-sm">
                       <Loader2 className="w-3 h-3 animate-spin" />
                       <span>Thinking...</span>
@@ -213,9 +212,9 @@ const HelpChatModal = ({ isOpen, onClose, initialMessage, initialContext }: Help
         </div>
 
         {/* Input Area with Glow Effect */}
-        <div className="p-4 border-t border-green-100 bg-gradient-to-r from-green-50/50 to-blue-50/50">
+        <div className="p-4 border-t border-blue-100 bg-gradient-to-r from-blue-50/50 to-purple-50/50">
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-blue-500 rounded-xl blur-sm opacity-20"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-xl blur-sm opacity-20"></div>
             <div className="relative flex gap-2">
               <Input
                 ref={inputRef}
@@ -224,12 +223,12 @@ const HelpChatModal = ({ isOpen, onClose, initialMessage, initialContext }: Help
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
                 disabled={isLoading}
-                className="flex-1 bg-white border-green-200 rounded-xl focus:border-green-400 focus:ring-green-400/30"
+                className="flex-1 bg-white border-blue-200 rounded-xl focus:border-blue-400 focus:ring-blue-400/30"
               />
               <Button 
                 onClick={sendMessage}
                 disabled={isLoading || !inputMessage.trim()}
-                className="rounded-xl bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700"
+                className="rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
                 size="sm"
               >
                 {isLoading ? (

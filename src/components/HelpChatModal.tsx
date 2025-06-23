@@ -1,6 +1,6 @@
 
 import { useState, useRef, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -14,8 +14,7 @@ import {
   Bot, 
   User,
   Loader2,
-  X,
-  HelpCircle
+  X
 } from 'lucide-react';
 
 interface HelpChatModalProps {
@@ -46,18 +45,7 @@ const HelpChatModal = ({ isOpen, onClose, initialMessage, initialContext }: Help
     if (isOpen && !isInitialized) {
       const welcomeMessage: ChatMessage = {
         role: 'assistant',
-        content: `Hello! I'm your AI assistant for this automation platform. I can help you with:
-
-• Understanding notifications and their meanings
-• Troubleshooting errors and technical issues  
-• Explaining how automations work
-• Managing AI agents and credentials
-• Platform features and workflows
-• General questions about the tool
-
-${initialContext ? `\n**Context:** ${initialContext}\n` : ''}
-
-How can I assist you today?`,
+        content: `Hi! I'm your AI assistant. I can help you with automations, troubleshooting, and platform features. How can I assist you today?${initialContext ? `\n\nContext: ${initialContext}` : ''}`,
         timestamp: new Date().toISOString()
       };
 
@@ -65,7 +53,6 @@ How can I assist you today?`,
       
       if (initialMessage) {
         setInputMessage(initialMessage);
-        // Auto-focus input so user can send the pre-filled message
         setTimeout(() => inputRef.current?.focus(), 100);
       }
       
@@ -118,7 +105,7 @@ How can I assist you today?`,
 
       const assistantMessage: ChatMessage = {
         role: 'assistant',
-        content: data.response || 'I apologize, but I encountered an issue processing your request. Please try again.',
+        content: data.response || 'Sorry, I encountered an issue. Please try again.',
         timestamp: new Date().toISOString()
       };
 
@@ -128,7 +115,7 @@ How can I assist you today?`,
       
       const errorMessage: ChatMessage = {
         role: 'assistant',
-        content: 'I\'m sorry, I\'m having trouble connecting right now. Please check your connection and try again, or contact support if the issue persists.',
+        content: 'I\'m having trouble connecting. Please check your connection and try again.',
         timestamp: new Date().toISOString()
       };
 
@@ -151,132 +138,107 @@ How can I assist you today?`,
     }
   };
 
-  const quickActions = [
-    "How do I create an automation?",
-    "What do these notifications mean?",
-    "How to fix connection errors?",
-    "Explain AI agent settings",
-    "Platform credentials help"
-  ];
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl h-[80vh] bg-white/95 backdrop-blur-md border-0 shadow-2xl rounded-3xl p-0 flex flex-col">
-        <DialogHeader className="p-6 pb-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-t-3xl flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                <MessageCircle className="w-5 h-5 text-white" />
-              </div>
-              <DialogTitle className="text-xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                AI Help Assistant
-              </DialogTitle>
+      <DialogContent className="max-w-md h-[600px] bg-white border border-green-200 shadow-2xl rounded-2xl p-0 flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-green-100 bg-gradient-to-r from-green-50 to-blue-50 rounded-t-2xl">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-600 rounded-full flex items-center justify-center">
+              <MessageCircle className="w-4 h-4 text-white" />
             </div>
-            <Button variant="ghost" size="sm" onClick={onClose} className="rounded-full">
-              <X className="w-4 h-4" />
-            </Button>
+            <h3 className="font-semibold text-gray-800">AI Help Assistant</h3>
           </div>
-        </DialogHeader>
+          <Button variant="ghost" size="sm" onClick={onClose} className="rounded-full hover:bg-gray-100">
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
 
         {/* Chat Messages */}
-        <div className="flex-1 p-6 pt-4 overflow-hidden flex flex-col">
-          <ScrollArea ref={scrollAreaRef} className="flex-1 pr-4">
-            <div className="space-y-4">
+        <div className="flex-1 overflow-hidden">
+          <ScrollArea ref={scrollAreaRef} className="h-full p-4">
+            <div className="space-y-3">
               {messages.map((message, index) => (
                 <div
                   key={index}
-                  className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  className={`flex gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   {message.role === 'assistant' && (
-                    <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                      <Bot className="w-4 h-4 text-white" />
+                    <div className="w-6 h-6 bg-gradient-to-r from-green-500 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                      <Bot className="w-3 h-3 text-white" />
                     </div>
                   )}
                   
-                  <div className={`max-w-[75%] ${message.role === 'user' ? 'order-2' : ''}`}>
-                    <Card className={`p-3 ${
+                  <div className={`max-w-[80%] ${message.role === 'user' ? 'order-2' : ''}`}>
+                    <div className={`p-3 rounded-2xl text-sm ${
                       message.role === 'user' 
-                        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white' 
-                        : 'bg-white/80 backdrop-blur-sm border-gray-200'
-                    } shadow-lg`}>
-                      <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                        {message.content}
-                      </div>
-                    </Card>
+                        ? 'bg-gradient-to-r from-green-500 to-blue-600 text-white' 
+                        : 'bg-green-50 text-gray-800 border border-green-100'
+                    }`}>
+                      {message.content}
+                    </div>
                     <div className={`text-xs text-gray-500 mt-1 ${
                       message.role === 'user' ? 'text-right' : 'text-left'
                     }`}>
-                      {new Date(message.timestamp).toLocaleTimeString()}
+                      {new Date(message.timestamp).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
                     </div>
                   </div>
 
                   {message.role === 'user' && (
-                    <div className="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                      <User className="w-4 h-4 text-white" />
+                    <div className="w-6 h-6 bg-gray-400 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                      <User className="w-3 h-3 text-white" />
                     </div>
                   )}
                 </div>
               ))}
               
               {isLoading && (
-                <div className="flex gap-3 justify-start">
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                    <Bot className="w-4 h-4 text-white" />
+                <div className="flex gap-2 justify-start">
+                  <div className="w-6 h-6 bg-gradient-to-r from-green-500 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                    <Bot className="w-3 h-3 text-white" />
                   </div>
-                  <Card className="p-3 bg-white/80 backdrop-blur-sm border-gray-200 shadow-lg">
-                    <div className="flex items-center gap-2 text-gray-500">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">Thinking...</span>
+                  <div className="p-3 rounded-2xl bg-green-50 border border-green-100">
+                    <div className="flex items-center gap-2 text-gray-600 text-sm">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <span>Thinking...</span>
                     </div>
-                  </Card>
+                  </div>
                 </div>
               )}
             </div>
           </ScrollArea>
+        </div>
 
-          {/* Quick Actions (only show if no messages yet) */}
-          {messages.length <= 1 && (
-            <div className="mt-4 flex-shrink-0">
-              <p className="text-sm text-gray-600 mb-2">Quick help topics:</p>
-              <div className="flex flex-wrap gap-2">
-                {quickActions.map((action, index) => (
-                  <Button
-                    key={index}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setInputMessage(action)}
-                    className="text-xs rounded-full bg-white/80 backdrop-blur-sm hover:bg-blue-50"
-                  >
-                    <HelpCircle className="w-3 h-3 mr-1" />
-                    {action}
-                  </Button>
-                ))}
-              </div>
+        {/* Input Area with Glow Effect */}
+        <div className="p-4 border-t border-green-100 bg-gradient-to-r from-green-50/50 to-blue-50/50">
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-blue-500 rounded-xl blur-sm opacity-20"></div>
+            <div className="relative flex gap-2">
+              <Input
+                ref={inputRef}
+                placeholder="Ask me anything..."
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                disabled={isLoading}
+                className="flex-1 bg-white border-green-200 rounded-xl focus:border-green-400 focus:ring-green-400/30"
+              />
+              <Button 
+                onClick={sendMessage}
+                disabled={isLoading || !inputMessage.trim()}
+                className="rounded-xl bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700"
+                size="sm"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+              </Button>
             </div>
-          )}
-
-          {/* Input Area */}
-          <div className="flex gap-2 mt-4 flex-shrink-0">
-            <Input
-              ref={inputRef}
-              placeholder="Ask me anything about the platform..."
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              disabled={isLoading}
-              className="flex-1 rounded-xl bg-white/80 backdrop-blur-sm border-gray-200 shadow-lg focus:ring-2 focus:ring-blue-500/50"
-            />
-            <Button 
-              onClick={sendMessage}
-              disabled={isLoading || !inputMessage.trim()}
-              className="rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg"
-            >
-              {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-            </Button>
           </div>
         </div>
       </DialogContent>

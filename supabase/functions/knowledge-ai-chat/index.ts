@@ -8,43 +8,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const SYSTEM_PROMPT = `You are the AI Help Assistant for the YusrAI Automation Platform. You are a comprehensive help system that assists users with all aspects of the platform.
+const SYSTEM_PROMPT = `You are a helpful AI assistant for the YusrAI Automation Platform. Keep your responses concise and clear.
 
-YOUR CAPABILITIES:
-- Help with automations: creation, configuration, troubleshooting
-- Explain notifications and their meanings
-- Assist with error diagnosis and solutions
-- Guide users through platform features
-- Help with AI agent configuration
-- Explain platform credentials and connections
-- Provide workflow guidance
-- Answer general questions about the tool
+You help users with:
+- Creating and managing automations
+- Understanding notifications and alerts
+- Troubleshooting errors and issues
+- Platform features and workflows
+- AI agent configuration
+- Credential management
 
-PLATFORM KNOWLEDGE:
-- This is an AI automation platform for creating intelligent workflows
-- Users can create automations that connect to various platforms (social media, email, CRM, etc.)
-- AI agents power the automations using different LLM providers
-- The platform has credentials management for external services
-- Users get notifications about automation status and system events
-- There's a universal knowledge system that stores patterns and solutions
-- Error handling includes automatic analysis and user support
+RESPONSE GUIDELINES:
+- Keep responses short and to the point (2-3 sentences max)
+- Use simple, everyday language
+- Be friendly but professional
+- Focus on practical solutions
+- Ask clarifying questions if needed
 
-COMMUNICATION STYLE:
-- Be friendly, helpful, and professional
-- Use clear, simple language without too much technical jargon
-- Provide step-by-step guidance when explaining processes
-- Ask clarifying questions when the user's request is unclear
-- Offer specific, actionable advice
-- When dealing with errors, focus on solutions rather than just explanations
-
-RESPONSE FORMAT:
-- Keep responses concise but comprehensive
-- Use bullet points for lists and steps
-- Highlight important information
-- Suggest follow-up actions when helpful
-- If you need more information to help better, ask specific questions
-
-Remember: You are here to help users succeed with their automation platform, not to build automations for them, but to help them understand and use the platform effectively.`;
+Avoid technical jargon and overly complex explanations.`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -59,53 +40,17 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured');
     }
 
-    // Initialize Supabase client to get context about user's platform usage
+    // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get relevant context from knowledge base
-    let contextPrompt = "";
-    if (category && category !== 'general_help') {
-      const { data: entries, error } = await supabase
-        .from('universal_knowledge_store')
-        .select('title, summary, tags, priority')
-        .eq('category', category)
-        .order('priority', { ascending: false })
-        .limit(5);
-
-      if (!error && entries && entries.length > 0) {
-        contextPrompt = `\n\nRelevant knowledge from platform:\n` + 
-          entries.map(entry => `- ${entry.title}: ${entry.summary}`).join('\n');
-      }
-    }
-
-    // Get recent error patterns for better help
-    const { data: recentErrors } = await supabase
-      .from('universal_knowledge_store')
-      .select('title, summary')
-      .eq('category', 'error_solutions')
-      .order('created_at', { ascending: false })
-      .limit(3);
-
-    if (recentErrors && recentErrors.length > 0) {
-      contextPrompt += `\n\nRecent error solutions:\n` + 
-        recentErrors.map(error => `- ${error.title}: ${error.summary}`).join('\n');
-    }
-
-    // Get platform stats for context
+    // Get basic platform context
     const { count: automationsCount } = await supabase
       .from('automations')
       .select('*', { count: 'exact', head: true });
 
-    const { count: knowledgeCount } = await supabase
-      .from('universal_knowledge_store')
-      .select('*', { count: 'exact', head: true });
-
-    const platformStats = `\n\nPlatform Context:
-- Total automations in system: ${automationsCount || 0}
-- Knowledge base entries: ${knowledgeCount || 0}
-- Available categories: platform_knowledge, credential_knowledge, workflow_patterns, agent_recommendations, error_solutions, automation_patterns`;
+    const platformContext = `Platform has ${automationsCount || 0} automations. Keep responses helpful and concise.`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -118,14 +63,14 @@ serve(async (req) => {
         messages: [
           { 
             role: 'system', 
-            content: SYSTEM_PROMPT + contextPrompt + platformStats
+            content: SYSTEM_PROMPT + '\n' + platformContext
           },
           { 
             role: 'user', 
             content: message 
           }
         ],
-        max_tokens: 1000,
+        max_tokens: 150,
         temperature: 0.7,
       }),
     });
@@ -138,7 +83,7 @@ serve(async (req) => {
     const data = await response.json();
     let aiResponse = data.choices[0].message.content;
 
-    // Clean and format the response
+    // Clean the response
     aiResponse = aiResponse
       .replace(/[#$%&'*]/g, '')
       .replace(/\s+/g, ' ')
@@ -151,7 +96,7 @@ serve(async (req) => {
     console.error('Error in knowledge-ai-chat function:', error);
     return new Response(JSON.stringify({ 
       error: error.message,
-      response: "I'm having trouble connecting right now. Please try again in a moment, or check that your internet connection is working properly."
+      response: "I'm having trouble connecting right now. Please try again."
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -30,8 +30,8 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden bg-white/98 backdrop-blur-md border-0 shadow-2xl rounded-3xl">
-        <DialogHeader className="pb-4">
+      <DialogContent className="max-w-6xl max-h-[90vh] bg-white/98 backdrop-blur-md border-0 shadow-2xl rounded-3xl flex flex-col">
+        <DialogHeader className="pb-4 flex-shrink-0">
           <DialogTitle className="text-2xl bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent flex items-center gap-2">
             <Settings className="w-6 h-6 text-green-600" />
             Settings
@@ -42,7 +42,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
         </DialogHeader>
         
         <Tabs defaultValue="profile" className="flex-1 flex flex-col min-h-0">
-          <TabsList className="grid w-full grid-cols-6 bg-green-50 rounded-xl border border-green-100">
+          <TabsList className="grid w-full grid-cols-6 bg-green-50 rounded-xl border border-green-100 flex-shrink-0">
             <TabsTrigger value="profile" className="flex items-center gap-1 text-xs data-[state=active]:bg-green-100 data-[state=active]:text-green-700">
               <User className="w-3 h-3" />
               Profile
@@ -69,37 +69,34 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
             </TabsTrigger>
           </TabsList>
           
-          <div className="flex-1 relative">
-            <div className="absolute inset-0 overflow-y-auto custom-scrollbar">
-              <div className="p-4 space-y-6">
-                <TabsContent value="profile" className="mt-0">
+          <div className="flex-1 min-h-0 mt-4">
+            <div className="h-full overflow-y-auto custom-scrollbar">
+              <div className="p-4">
+                <TabsContent value="profile" className="mt-0 h-full">
                   <ProfileSettingsTab />
                 </TabsContent>
                 
-                <TabsContent value="automations" className="mt-0">
+                <TabsContent value="automations" className="mt-0 h-full">
                   <AutomationSettingsTab />
                 </TabsContent>
                 
-                <TabsContent value="notifications" className="mt-0">
+                <TabsContent value="notifications" className="mt-0 h-full">
                   <NotificationSettingsTab />
                 </TabsContent>
                 
-                <TabsContent value="ai-agents" className="mt-0">
+                <TabsContent value="ai-agents" className="mt-0 h-full">
                   <AIAgentSettingsTab />
                 </TabsContent>
                 
-                <TabsContent value="credentials" className="mt-0">
+                <TabsContent value="credentials" className="mt-0 h-full">
                   <PlatformCredentialsTab />
                 </TabsContent>
                 
-                <TabsContent value="privacy" className="mt-0">
+                <TabsContent value="privacy" className="mt-0 h-full">
                   <DataPrivacyTab />
                 </TabsContent>
               </div>
             </div>
-            
-            {/* Gradient fade at bottom */}
-            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white/90 to-transparent pointer-events-none"></div>
           </div>
         </Tabs>
       </DialogContent>

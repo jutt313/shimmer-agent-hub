@@ -186,7 +186,10 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          is_pinned: boolean | null
+          notification_enabled: boolean | null
           platforms_config: Json | null
+          priority: number | null
           status: string
           title: string
           updated_at: string
@@ -197,7 +200,10 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_pinned?: boolean | null
+          notification_enabled?: boolean | null
           platforms_config?: Json | null
+          priority?: number | null
           status?: string
           title: string
           updated_at?: string
@@ -208,7 +214,10 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_pinned?: boolean | null
+          notification_enabled?: boolean | null
           platforms_config?: Json | null
+          priority?: number | null
           status?: string
           title?: string
           updated_at?: string
@@ -370,6 +379,30 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          full_name: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          id: string
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       universal_knowledge_store: {
         Row: {
           category: string
@@ -412,6 +445,30 @@ export type Database = {
           title?: string
           updated_at?: string
           usage_count?: number | null
+        }
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          created_at: string | null
+          id: string
+          notification_preferences: Json | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          notification_preferences?: Json | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          notification_preferences?: Json | null
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }

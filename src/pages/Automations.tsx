@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -7,10 +8,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Bot, Calendar, MessageCircle, Settings, HelpCircle } from "lucide-react";
+import { Plus, Bot, Calendar, MessageCircle, HelpCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import NotificationDropdown from "@/components/NotificationDropdown";
-import SettingsModal from "@/components/SettingsModal";
 import HelpChatModal from "@/components/HelpChatModal";
 import { createNotification, notificationTemplates } from "@/utils/notificationHelpers";
 
@@ -30,7 +30,6 @@ const Automations = () => {
   const [loading, setLoading] = useState(true);
   const [createLoading, setCreateLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -228,13 +227,6 @@ const Automations = () => {
             <div className="flex gap-4">
               <NotificationDropdown />
               <Button
-                onClick={() => setIsSettingsOpen(true)}
-                variant="outline"
-                className="rounded-xl border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:shadow-xl"
-              >
-                <Settings className="w-5 h-5" />
-              </Button>
-              <Button
                 onClick={() => setIsHelpOpen(true)}
                 variant="outline"
                 className="rounded-xl border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:shadow-xl text-blue-600 hover:text-blue-700"
@@ -373,9 +365,6 @@ const Automations = () => {
         </div>
       </div>
 
-      {/* Settings Modal */}
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
-      
       {/* Help Chat Modal */}
       <HelpChatModal 
         isOpen={isHelpOpen} 

@@ -28,9 +28,9 @@ const NotificationDropdown = () => {
       case 'ai_agent':
         return <Zap className="w-4 h-4 text-purple-500" />;
       case 'platform_integration':
-        return <Calendar className="w-4 h-4 text-green-500" />;
+        return <Calendar className="w-4 h-4 text-blue-500" />;
       case 'knowledge_system':
-        return <BookOpen className="w-4 h-4 text-orange-500" />;
+        return <BookOpen className="w-4 h-4 text-purple-500" />;
       default:
         return <Bell className="w-4 h-4 text-gray-500" />;
     }
@@ -123,13 +123,13 @@ const NotificationDropdown = () => {
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
-          className="relative rounded-xl border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300"
+          className="relative rounded-xl border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-200"
         >
           <Bell className="w-5 h-5" />
           {unreadCount > 0 && (
             <Badge 
               variant="destructive" 
-              className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-gradient-to-r from-red-500 to-red-600"
+              className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-gradient-to-r from-blue-500 to-purple-600"
             >
               {unreadCount > 99 ? '99+' : unreadCount}
             </Badge>
@@ -141,7 +141,7 @@ const NotificationDropdown = () => {
         align="end"
       >
         <DropdownMenuLabel className="flex items-center justify-between p-4">
-          <span className="text-lg font-semibold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+          <span className="text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Notifications
           </span>
           <div className="flex gap-2">
@@ -191,7 +191,7 @@ const NotificationDropdown = () => {
             )}
           </div>
         </DropdownMenuLabel>
-        <DropdownMenuSeparator className="bg-gradient-to-r from-green-200 via-blue-200 to-green-200" />
+        <DropdownMenuSeparator className="bg-gradient-to-r from-blue-200 via-purple-200 to-blue-200" />
         
         {loading ? (
           <div className="p-4 text-center text-gray-500">
@@ -200,7 +200,7 @@ const NotificationDropdown = () => {
           </div>
         ) : notifications.length === 0 ? (
           <div className="p-6 text-center text-gray-500">
-            <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
+            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-3">
               <Bell className="w-6 h-6 text-white" />
             </div>
             <p className="font-medium">No notifications yet</p>
@@ -211,10 +211,10 @@ const NotificationDropdown = () => {
             {notifications.map((notification) => (
               <DropdownMenuItem
                 key={notification.id}
-                className="p-0 cursor-pointer focus:bg-gray-50 mx-1 rounded-lg"
+                className="p-0 cursor-pointer focus:bg-gray-50 mx-1 rounded-lg transition-all duration-150"
                 onClick={() => handleNotificationClick(notification)}
               >
-                <div className={`w-full p-3 rounded-lg ${!notification.is_read ? 'bg-gradient-to-r from-blue-50 to-green-50' : 'hover:bg-gray-50'}`}>
+                <div className={`w-full p-3 rounded-lg transition-all duration-150 ${!notification.is_read ? 'bg-gradient-to-r from-blue-50 to-purple-50' : 'hover:bg-gray-50'}`}>
                   <div className="flex items-start justify-between">
                     <div className="flex items-start space-x-3 flex-1">
                       <div className="mt-1">
@@ -224,7 +224,7 @@ const NotificationDropdown = () => {
                         <p className="text-sm font-medium text-gray-900 truncate">
                           {notification.title}
                         </p>
-                        <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                        <p className="text-xs text-gray-600 mt-1 break-words">
                           {notification.message}
                         </p>
                         <p className="text-xs text-gray-400 mt-1">
@@ -234,7 +234,7 @@ const NotificationDropdown = () => {
                     </div>
                     <div className="flex items-center space-x-1 ml-2">
                       {!notification.is_read && (
-                        <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-green-500 rounded-full"></div>
+                        <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
                       )}
                       <Button
                         variant="ghost"

@@ -60,7 +60,7 @@ const ChatCard = ({
       content.push(
         <div key="summary" className="mb-4">
           <h3 className="font-semibold text-gray-800 mb-2">Automation Summary</h3>
-          <p className="text-gray-700">{structuredData.summary}</p>
+          <p className="text-gray-700 break-words">{structuredData.summary}</p>
         </div>
       );
     }
@@ -72,7 +72,7 @@ const ChatCard = ({
           <h3 className="font-semibold text-gray-800 mb-2">Step-by-Step Workflow</h3>
           <ol className="list-decimal list-inside space-y-1 text-gray-700">
             {structuredData.steps.map((step, index) => (
-              <li key={index}>{step}</li>
+              <li key={index} className="break-words">{step}</li>
             ))}
           </ol>
         </div>
@@ -86,11 +86,11 @@ const ChatCard = ({
           <h3 className="font-semibold text-gray-800 mb-2">Required Platform Credentials</h3>
           {structuredData.platforms.map((platform, index) => (
             <div key={index} className="mb-3">
-              <h4 className="font-medium text-gray-800">{platform.name}</h4>
+              <h4 className="font-medium text-gray-800 break-words">{platform.name}</h4>
               {platform.credentials && platform.credentials.length > 0 && (
                 <ul className="list-disc list-inside ml-4 text-gray-700">
                   {platform.credentials.map((cred, credIndex) => (
-                    <li key={credIndex}>
+                    <li key={credIndex} className="break-words">
                       <strong>{cred.field.replace(/_/g, ' ').toUpperCase()}</strong>: {cred.why_needed}
                     </li>
                   ))}
@@ -109,7 +109,7 @@ const ChatCard = ({
           <h3 className="font-semibold text-yellow-800 mb-2">I need some clarification:</h3>
           <ol className="list-decimal list-inside space-y-1 text-yellow-700">
             {structuredData.clarification_questions.map((question, index) => (
-              <li key={index}>{question}</li>
+              <li key={index} className="break-words">{question}</li>
             ))}
           </ol>
         </div>
@@ -128,11 +128,11 @@ const ChatCard = ({
               return (
                 <div key={index} className="border rounded-lg p-4 bg-blue-50/50 border-blue-200">
                   <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h4 className="font-semibold text-blue-800">{agent.name}</h4>
-                      <p className="text-sm text-blue-600">{agent.role}</p>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-blue-800 break-words">{agent.name}</h4>
+                      <p className="text-sm text-blue-600 break-words">{agent.role}</p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 ml-2">
                       <Button
                         size="sm"
                         onClick={() => onAgentAdd?.(agent)}
@@ -153,8 +153,8 @@ const ChatCard = ({
                     </div>
                   </div>
                   <div className="space-y-2 text-sm text-gray-700">
-                    <p><strong>Goal:</strong> {agent.goal}</p>
-                    <p><strong>Why needed:</strong> {agent.why_needed}</p>
+                    <p className="break-words"><strong>Goal:</strong> {agent.goal}</p>
+                    <p className="break-words"><strong>Why needed:</strong> {agent.why_needed}</p>
                   </div>
                 </div>
               );
@@ -190,19 +190,19 @@ const ChatCard = ({
                   message.isBot 
                     ? 'bg-gradient-to-r from-blue-100/80 to-purple-100/80 text-gray-800 border border-blue-200/50' 
                     : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
-                  } transition-all duration-300`} 
+                  } transition-all duration-300 overflow-hidden`} 
                   style={!message.isBot ? {
                     boxShadow: '0 0 20px rgba(92, 142, 246, 0.3)'
                   } : {}}
                 >
                   {/* Render structured content for bot messages */}
                   {message.isBot && structuredData ? (
-                    <div className="text-sm leading-relaxed">
+                    <div className="text-sm leading-relaxed break-words">
                       {renderStructuredContent(structuredData)}
                     </div>
                   ) : (
                     /* Show formatted text for user messages or if no structured data */
-                    <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                    <div className="text-sm leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
                       {formatMessageText(message.text)}
                     </div>
                   )}

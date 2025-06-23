@@ -8,10 +8,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Bot, Calendar, LogOut, MessageCircle } from "lucide-react";
+import { Plus, Bot, Calendar, LogOut, MessageCircle, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import NotificationDropdown from "@/components/NotificationDropdown";
 import SeedNotificationsButton from "@/components/SeedNotificationsButton";
+import SettingsModal from "@/components/SettingsModal";
 import { createNotification, notificationTemplates } from "@/utils/notificationHelpers";
 
 interface Automation {

@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Bot, Trash2, Eye, Calendar, Zap, Key, AlertTriangle, Settings as SettingsIcon, ChevronDown, ChevronRight } from 'lucide-react';
+import { Bot, Trash2, Eye, Calendar, Zap, Key, AlertTriangle, Settings as SettingsIcon, ChevronDown, ChevronRight, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';

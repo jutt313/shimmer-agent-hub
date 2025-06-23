@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -427,9 +428,9 @@ const AutomationDetail = () => {
         </div>
       </div>
       
-      <div className="max-w-7xl mx-auto h-full flex flex-col relative z-10 pt-16">        
-        {/* Main Content Area with Slide Animation */}
-        <div className="flex-1 flex items-start justify-center pt-2 pb-4 relative">
+      <div className="max-w-7xl mx-auto h-full flex flex-col relative z-10 pt-20">        
+        {/* Main Content Area with Slide Animation - Reduced top padding */}
+        <div className="flex-1 flex items-start justify-center pt-1 pb-2 relative">
           <div className={`transition-transform duration-500 ease-in-out ${showDashboard ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'} ${showDashboard ? 'absolute' : 'relative'} w-[calc(100vw-6rem)] max-w-none mx-12`}>
             <ChatCard 
               messages={messages} 
@@ -453,20 +454,20 @@ const AutomationDetail = () => {
           </div>
         </div>
         
-        {/* Platform Buttons - Only show when not in dashboard view */}
+        {/* Platform Buttons - Reduced margin */}
         {!showDashboard && currentPlatforms && currentPlatforms.length > 0 && (
-          <div className="mb-4 mx-12">
+          <div className="mb-2 mx-12">
             <PlatformButtons platforms={currentPlatforms} />
           </div>
         )}
         
-        {/* Input Section - Only show when not in dashboard view */}
+        {/* Input Section - Reduced padding and improved positioning */}
         {!showDashboard && (
-          <div className="space-y-4 pb-6">
+          <div className="space-y-4 pb-4">
             <div className="flex gap-4 items-end px-[60px]">
               <Button
                 onClick={() => setShowAIAgentForm(true)}
-                className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-6 py-4 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
+                className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-6 py-4 shadow-lg hover:shadow-xl transition-all duration-300 border-0 flex-shrink-0"
                 style={{
                   boxShadow: '0 0 25px rgba(147, 51, 234, 0.3)'
                 }}
@@ -475,14 +476,14 @@ const AutomationDetail = () => {
                 AI Agent
               </Button>
               
-              <div className="flex-1 relative">
+              <div className="flex-1 relative min-w-0">
                 <Input 
                   value={newMessage} 
                   onChange={e => setNewMessage(e.target.value)} 
                   onKeyPress={handleKeyPress} 
                   placeholder={sendingMessage ? "YusrAI is building..." : "Ask about this automation..."} 
                   disabled={sendingMessage}
-                  className="rounded-3xl bg-white/80 backdrop-blur-sm border-0 px-6 py-4 text-lg focus:outline-none focus:ring-0 shadow-lg" 
+                  className="rounded-3xl bg-white/80 backdrop-blur-sm border-0 px-6 py-4 text-lg focus:outline-none focus:ring-0 shadow-lg w-full" 
                   style={{
                     boxShadow: '0 0 25px rgba(154, 94, 255, 0.2)'
                   }} 
@@ -492,7 +493,7 @@ const AutomationDetail = () => {
               <Button 
                 onClick={() => handleSendMessage(newMessage)}
                 disabled={sendingMessage || !newMessage.trim()}
-                className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-4 shadow-lg hover:shadow-xl transition-all duration-300 border-0 disabled:opacity-50" 
+                className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-4 shadow-lg hover:shadow-xl transition-all duration-300 border-0 disabled:opacity-50 flex-shrink-0" 
                 style={{
                   boxShadow: '0 0 30px rgba(92, 142, 246, 0.3)'
                 }}

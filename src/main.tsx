@@ -33,7 +33,7 @@ createRoot(document.getElementById("root")!).render(
               } 
             />
             <Route 
-              path="/automation/:id" 
+              path="/automations/:id" 
               element={
                 <ProtectedRoute>
                   <AutomationDetail />

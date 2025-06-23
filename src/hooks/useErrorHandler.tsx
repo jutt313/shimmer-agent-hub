@@ -13,12 +13,14 @@ interface ErrorInfo {
 export const useErrorHandler = () => {
   const [currentError, setCurrentError] = useState<ErrorInfo | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
+  const [onHelpChatCallback, setOnHelpChatCallback] = useState<((message: string, context: string) => void) | null>(null);
   const { toast } = useToast();
 
   const handleError = useCallback((error: Error | string, context?: {
     fileName?: string;
     userAction?: string;
     additionalContext?: string;
+    onHelpChat?: (message: string, context: string) => void;
   }) => {
     const errorInfo: ErrorInfo = {
       message: typeof error === 'string' ? error : error.message,
@@ -30,12 +32,16 @@ export const useErrorHandler = () => {
 
     console.log('🔴 Error handler called with:', errorInfo);
     setCurrentError(errorInfo);
+    setOnHelpChatCallback(() => context?.onHelpChat || null);
     
-    // Optional: Show a subtle toast notification
+    // Show error modal
+    setShowErrorModal(true);
+    
+    // Show toast with help option
     toast({
       title: "Error detected",
-      description: "Click the red help icon for AI analysis",
-      duration: 3000,
+      description: "Click to get AI help with this error",
+      duration: 5000,
     });
     
   }, [toast]);
@@ -44,6 +50,7 @@ export const useErrorHandler = () => {
     console.log('🟢 Clearing error state');
     setCurrentError(null);
     setShowErrorModal(false);
+    setOnHelpChatCallback(null);
   }, []);
 
   return {
@@ -52,5 +59,6 @@ export const useErrorHandler = () => {
     setShowErrorModal,
     handleError,
     clearError,
+    onHelpChatCallback,
   };
 };

@@ -34,6 +34,8 @@ const Automations = () => {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [helpInitialMessage, setHelpInitialMessage] = useState<string>('');
+  const [helpInitialContext, setHelpInitialContext] = useState<string>('');
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -107,6 +109,11 @@ const Automations = () => {
 
       if (error) {
         console.error('Supabase error:', error);
+        
+        // Open help chat with error context
+        setHelpInitialMessage('I got an error while creating an automation. Can you help me understand what went wrong?');
+        setHelpInitialContext(`Error creating automation: ${error.message}`);
+        setIsHelpOpen(true);
         throw error;
       }
 
@@ -177,6 +184,12 @@ const Automations = () => {
     }
   };
 
+  const openHelpWithContext = (message: string, context?: string) => {
+    setHelpInitialMessage(message);
+    setHelpInitialContext(context || '');
+    setIsHelpOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
@@ -202,7 +215,9 @@ const Automations = () => {
               <p className="text-gray-600 mt-2">Create and manage your AI automations</p>
             </div>
             <div className="flex gap-4">
-              <NotificationDropdown />
+              <NotificationDropdown 
+                onHelpNeeded={(message: string) => openHelpWithContext(message, 'Notification Help')}
+              />
               <Button
                 onClick={() => setIsSettingsOpen(true)}
                 variant="outline"
@@ -353,7 +368,19 @@ const Automations = () => {
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
       
       {/* Help Chat Modal */}
-      <HelpChatModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+      <HelpChatModal 
+        isOpen={isHelpOpen} 
+        onClose={() => {
+          setIsHelpOpen(false);
+          // Clear initial message/context when closing
+          setTimeout(() => {
+            setHelpInitialMessage('');
+            setHelpInitialContext('');
+          }, 300);
+        }}
+        initialMessage={helpInitialMessage}
+        initialContext={helpInitialContext}
+      />
     </div>
   );
 };

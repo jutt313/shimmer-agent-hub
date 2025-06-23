@@ -71,6 +71,23 @@ export const useNotifications = () => {
           updateUnreadCount();
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('Notification deleted:', payload);
+          const deletedNotification = payload.old as Notification;
+          setNotifications(prev => 
+            prev.filter(n => n.id !== deletedNotification.id)
+          );
+          updateUnreadCount();
+        }
+      )
       .subscribe();
 
     return () => {
@@ -89,7 +106,6 @@ export const useNotifications = () => {
 
       if (error) throw error;
       
-      // Cast the data to our Notification type to fix TypeScript issues
       const typedNotifications = (data || []) as Notification[];
       setNotifications(typedNotifications);
       updateUnreadCount(typedNotifications);
@@ -141,12 +157,87 @@ export const useNotifications = () => {
     }
   };
 
+  const deleteNotification = async (notificationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', notificationId)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "Notification deleted",
+      });
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete notification",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteAllRead = async () => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('user_id', user?.id)
+        .eq('is_read', true);
+
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "All read notifications deleted",
+      });
+    } catch (error) {
+      console.error('Error deleting read notifications:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete read notifications",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteAllNotifications = async () => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+      
+      setUnreadCount(0);
+      toast({
+        title: "Success",
+        description: "All notifications deleted",
+      });
+    } catch (error) {
+      console.error('Error deleting all notifications:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete all notifications",
+        variant: "destructive",
+      });
+    }
+  };
+
   return {
     notifications,
     unreadCount,
     loading,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
+    deleteAllRead,
+    deleteAllNotifications,
     refetch: fetchNotifications
   };
 };

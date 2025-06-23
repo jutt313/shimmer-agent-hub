@@ -4,23 +4,42 @@ import { Button } from "@/components/ui/button";
 import { Play, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { createNotification, notificationTemplates } from "@/utils/notificationHelpers";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ExecuteAutomationButtonProps {
   automationId: string;
+  automationTitle: string;
   disabled?: boolean;
 }
 
-const ExecuteAutomationButton = ({ automationId, disabled = false }: ExecuteAutomationButtonProps) => {
+const ExecuteAutomationButton = ({ 
+  automationId, 
+  automationTitle, 
+  disabled = false 
+}: ExecuteAutomationButtonProps) => {
   const [isExecuting, setIsExecuting] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const handleExecute = async () => {
-    if (!automationId || isExecuting) return;
+    if (!automationId || isExecuting || !user?.id) return;
 
     setIsExecuting(true);
     
     try {
       console.log('🚀 Executing automation:', automationId);
+      
+      // Create notification for automation start
+      const startTemplate = notificationTemplates.automationRunStarted(automationTitle);
+      await createNotification(
+        user.id,
+        startTemplate.title,
+        startTemplate.message,
+        startTemplate.type,
+        startTemplate.category,
+        { automation_id: automationId, automation_title: automationTitle }
+      );
       
       const { data, error } = await supabase.functions.invoke('execute-automation', {
         body: {
@@ -33,8 +52,29 @@ const ExecuteAutomationButton = ({ automationId, disabled = false }: ExecuteAuto
       });
 
       if (error) {
+        // Create notification for automation failure
+        const failTemplate = notificationTemplates.automationRunFailed(automationTitle, error.message);
+        await createNotification(
+          user.id,
+          failTemplate.title,
+          failTemplate.message,
+          failTemplate.type,
+          failTemplate.category,
+          { automation_id: automationId, automation_title: automationTitle, error: error.message }
+        );
         throw error;
       }
+
+      // Create notification for automation success
+      const successTemplate = notificationTemplates.automationRunCompleted(automationTitle);
+      await createNotification(
+        user.id,
+        successTemplate.title,
+        successTemplate.message,
+        successTemplate.type,
+        successTemplate.category,
+        { automation_id: automationId, automation_title: automationTitle, run_id: data.run_id }
+      );
 
       toast({
         title: "Automation Started",

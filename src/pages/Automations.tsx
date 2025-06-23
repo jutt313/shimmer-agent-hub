@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Plus, Bot, Calendar, LogOut, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import NotificationDropdown from "@/components/NotificationDropdown";
+import { createNotification, notificationTemplates } from "@/utils/notificationHelpers";
 
 interface Automation {
   id: string;
@@ -106,6 +107,18 @@ const Automations = () => {
       }
 
       console.log('Automation created successfully:', data);
+      
+      // Create notification for successful automation creation
+      const template = notificationTemplates.automationCreated(data.title);
+      await createNotification(
+        user.id,
+        template.title,
+        template.message,
+        template.type,
+        template.category,
+        { automation_id: data.id, automation_title: data.title }
+      );
+
       setAutomations([data, ...automations]);
       setTitle("");
       setDescription("");
@@ -119,6 +132,22 @@ const Automations = () => {
       navigate(`/automation/${data.id}`);
     } catch (error) {
       console.error('Error creating automation:', error);
+      
+      // Create notification for automation creation failure
+      try {
+        const errorTemplate = notificationTemplates.criticalError(`Failed to create automation: ${title}`);
+        await createNotification(
+          user.id,
+          errorTemplate.title,
+          errorTemplate.message,
+          errorTemplate.type,
+          errorTemplate.category,
+          { attempted_title: title, error: error instanceof Error ? error.message : 'Unknown error' }
+        );
+      } catch (notifError) {
+        console.error('Failed to create error notification:', notifError);
+      }
+      
       toast({
         title: "Error",
         description: "Failed to create automation. Please try again.",

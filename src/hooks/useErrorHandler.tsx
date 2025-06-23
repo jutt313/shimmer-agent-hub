@@ -7,6 +7,7 @@ interface ErrorInfo {
   stack?: string;
   fileName?: string;
   userAction?: string;
+  additionalContext?: string;
 }
 
 export const useErrorHandler = () => {
@@ -17,12 +18,14 @@ export const useErrorHandler = () => {
   const handleError = useCallback((error: Error | string, context?: {
     fileName?: string;
     userAction?: string;
+    additionalContext?: string;
   }) => {
     const errorInfo: ErrorInfo = {
       message: typeof error === 'string' ? error : error.message,
       stack: typeof error === 'object' ? error.stack : undefined,
       fileName: context?.fileName,
       userAction: context?.userAction,
+      additionalContext: context?.additionalContext,
     };
 
     console.log('🔴 Error handler called with:', errorInfo);

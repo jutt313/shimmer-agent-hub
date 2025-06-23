@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Plus, MessageCircle, Bot, Zap, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -124,7 +123,12 @@ const Automations = () => {
       setShowCreateDialog(false);
       setNewAutomationName('');
       setNewAutomationDescription('');
-      navigate(`/automations/${data.id}`);
+      
+      // Use setTimeout to ensure the dialog closes before navigation
+      setTimeout(() => {
+        navigate(`/automations/${data.id}`, { replace: true });
+      }, 100);
+      
     } catch (error) {
       console.error('Error creating automation:', error);
       toast({

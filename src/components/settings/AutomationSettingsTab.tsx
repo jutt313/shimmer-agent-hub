@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Bot, Trash2, Eye, Calendar, Zap, Key, AlertTriangle, Settings as SettingsIcon } from 'lucide-react';
+import { Bot, Trash2, Eye, Calendar, Zap, Key, AlertTriangle, Settings as SettingsIcon, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,8 +10,8 @@ import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface Automation {
   id: string;
@@ -98,7 +98,7 @@ const AutomationSettingsTab = () => {
   };
 
   const fetchAgentsForAutomation = async (automationId: string) => {
-    if (agents[automationId]) return; // Already fetched
+    if (agents[automationId]) return;
 
     try {
       const { data, error } = await supabase
@@ -163,12 +163,12 @@ const AutomationSettingsTab = () => {
   };
 
   return (
-    <div className="space-y-6 pb-6">
-      {/* Default Settings */}
-      <Card className="bg-gradient-to-br from-green-50/50 to-blue-50/50 backdrop-blur-sm border border-green-100 shadow-lg rounded-2xl">
+    <div className="space-y-6">
+      {/* Default Settings Card */}
+      <Card className="bg-white/70 backdrop-blur-sm border border-green-200/50 shadow-lg rounded-2xl">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <SettingsIcon className="w-5 h-5 text-green-600" />
+          <CardTitle className="flex items-center gap-2 text-green-700">
+            <SettingsIcon className="w-5 h-5" />
             Default Automation Settings
           </CardTitle>
           <CardDescription>
@@ -176,9 +176,9 @@ const AutomationSettingsTab = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="errorHandling">Default Error Handling</Label>
+              <Label htmlFor="errorHandling" className="text-gray-700">Default Error Handling</Label>
               <Select
                 value={defaultSettings.defaultErrorHandling}
                 onValueChange={(value) => setDefaultSettings(prev => ({ ...prev, defaultErrorHandling: value }))}
@@ -194,7 +194,7 @@ const AutomationSettingsTab = () => {
               </Select>
             </div>
             <div>
-              <Label htmlFor="timezone">Timezone</Label>
+              <Label htmlFor="timezone" className="text-gray-700">Timezone</Label>
               <Select
                 value={defaultSettings.timezone}
                 onValueChange={(value) => setDefaultSettings(prev => ({ ...prev, timezone: value }))}
@@ -213,9 +213,9 @@ const AutomationSettingsTab = () => {
             </div>
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="maxExecutionTime">Max Execution Time (seconds)</Label>
+              <Label htmlFor="maxExecutionTime" className="text-gray-700">Max Execution Time (seconds)</Label>
               <Input
                 id="maxExecutionTime"
                 type="number"
@@ -225,7 +225,7 @@ const AutomationSettingsTab = () => {
               />
             </div>
             <div>
-              <Label htmlFor="maxRetries">Max Retry Attempts</Label>
+              <Label htmlFor="maxRetries" className="text-gray-700">Max Retry Attempts</Label>
               <Input
                 id="maxRetries"
                 type="number"
@@ -243,20 +243,26 @@ const AutomationSettingsTab = () => {
               checked={defaultSettings.autoRetry}
               onCheckedChange={(checked) => setDefaultSettings(prev => ({ ...prev, autoRetry: checked }))}
             />
-            <Label htmlFor="autoRetry">Enable automatic retry on failure</Label>
+            <Label htmlFor="autoRetry" className="text-gray-700">Enable automatic retry on failure</Label>
+          </div>
+
+          <div className="pt-4">
+            <Button className="bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white rounded-xl">
+              Save Default Settings
+            </Button>
           </div>
         </CardContent>
       </Card>
 
       {/* Individual Automations */}
-      <Card className="bg-gradient-to-br from-green-50/50 to-blue-50/50 backdrop-blur-sm border border-green-100 shadow-lg rounded-2xl">
+      <Card className="bg-white/70 backdrop-blur-sm border border-green-200/50 shadow-lg rounded-2xl">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bot className="w-5 h-5 text-green-600" />
+          <CardTitle className="flex items-center gap-2 text-green-700">
+            <Bot className="w-5 h-5" />
             Your Automations ({automations.length})
           </CardTitle>
           <CardDescription>
-            Manage your automation workflows, agents, and credentials
+            Click on any automation to view its settings, agents, and credentials
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -269,121 +275,234 @@ const AutomationSettingsTab = () => {
             <div className="text-center py-8">
               <Bot className="w-12 h-12 mx-auto text-gray-400 mb-4" />
               <p className="text-gray-600">No automations created yet</p>
+              <p className="text-sm text-gray-500 mt-2">Create your first automation to manage its settings here</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {automations.map((automation) => (
-                <Collapsible key={automation.id}>
-                  <div className="bg-white rounded-xl shadow-sm border border-green-100">
-                    <CollapsibleTrigger 
-                      onClick={() => toggleAutomationExpanded(automation.id)}
-                      className="w-full p-4 flex items-center justify-between hover:bg-green-50/50 transition-colors rounded-xl"
-                    >
-                      <div className="flex items-center gap-3 flex-1 text-left">
-                        <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-blue-600 rounded-lg flex items-center justify-center">
-                          <Bot className="w-5 h-5 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-1">
-                            <h4 className="font-medium text-gray-900">{automation.title}</h4>
-                            <Badge className={`text-xs ${getStatusColor(automation.status)}`}>
-                              {automation.status}
-                            </Badge>
+                <Card key={automation.id} className="bg-white/80 backdrop-blur-sm border border-green-100 shadow-sm rounded-xl overflow-hidden">
+                  <Collapsible
+                    open={expandedAutomation === automation.id}
+                    onOpenChange={() => toggleAutomationExpanded(automation.id)}
+                  >
+                    <CollapsibleTrigger className="w-full">
+                      <CardHeader className="hover:bg-green-50/50 transition-colors cursor-pointer">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-blue-600 rounded-xl flex items-center justify-center">
+                              <Bot className="w-5 h-5 text-white" />
+                            </div>
+                            <div className="text-left">
+                              <div className="flex items-center gap-3">
+                                <h3 className="font-semibold text-gray-900">{automation.title}</h3>
+                                <Badge className={`text-xs ${getStatusColor(automation.status)}`}>
+                                  {automation.status}
+                                </Badge>
+                              </div>
+                              {automation.description && (
+                                <p className="text-sm text-gray-600 mt-1">{automation.description}</p>
+                              )}
+                              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                Created: {new Date(automation.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
                           </div>
-                          {automation.description && (
-                            <p className="text-sm text-gray-600">{automation.description}</p>
-                          )}
-                          <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            Created: {new Date(automation.created_at).toLocaleDateString()}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteAutomation(automation.id);
+                              }}
+                              className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                            {expandedAutomation === automation.id ? (
+                              <ChevronDown className="w-5 h-5 text-gray-500" />
+                            ) : (
+                              <ChevronRight className="w-5 h-5 text-gray-500" />
+                            )}
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteAutomation(automation.id);
-                          }}
-                          className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                        <Eye className="w-4 h-4 text-gray-400" />
-                      </div>
+                      </CardHeader>
                     </CollapsibleTrigger>
 
                     <CollapsibleContent>
-                      <div className="px-4 pb-4 border-t border-green-100 mt-4 pt-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {/* AI Agents Section */}
-                          <div>
-                            <h5 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
-                              <Zap className="w-4 h-4 text-green-600" />
-                              AI Agents ({agents[automation.id]?.length || 0})
-                            </h5>
-                            {agents[automation.id]?.length > 0 ? (
-                              <div className="space-y-2">
-                                {agents[automation.id].map((agent) => (
-                                  <div key={agent.id} className="p-3 bg-green-50 rounded-lg border border-green-100">
-                                    <h6 className="font-medium text-sm text-gray-900">{agent.agent_name}</h6>
-                                    {agent.agent_role && (
-                                      <p className="text-xs text-gray-600">{agent.agent_role}</p>
-                                    )}
-                                    <div className="flex gap-1 mt-1">
-                                      {agent.llm_provider && (
-                                        <Badge variant="outline" className="text-xs">
-                                          {agent.llm_provider}
-                                        </Badge>
-                                      )}
-                                      {agent.model && (
-                                        <Badge variant="outline" className="text-xs">
-                                          {agent.model}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
+                      <CardContent className="border-t border-green-100 bg-green-50/30">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 py-6">
+                          {/* Automation Settings */}
+                          <div className="space-y-4">
+                            <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                              <SettingsIcon className="w-4 h-4 text-green-600" />
+                              Automation Settings
+                            </h4>
+                            <div className="space-y-3 bg-white/70 p-4 rounded-xl border border-green-100">
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <Label className="text-xs text-gray-600">Error Handling</Label>
+                                  <Select defaultValue="stop">
+                                    <SelectTrigger className="h-8 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="stop">Stop execution</SelectItem>
+                                      <SelectItem value="retry">Retry automatically</SelectItem>
+                                      <SelectItem value="continue">Continue</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div>
+                                  <Label className="text-xs text-gray-600">Timezone</Label>
+                                  <Select defaultValue="UTC">
+                                    <SelectTrigger className="h-8 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="UTC">UTC</SelectItem>
+                                      <SelectItem value="America/New_York">Eastern</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
                               </div>
-                            ) : (
-                              <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">No AI agents configured</p>
-                            )}
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <Label className="text-xs text-gray-600">Max Time (s)</Label>
+                                  <Input defaultValue="300" className="h-8 text-xs" />
+                                </div>
+                                <div>
+                                  <Label className="text-xs text-gray-600">Max Retries</Label>
+                                  <Input defaultValue="3" className="h-8 text-xs" />
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Switch id={`retry-${automation.id}`} />
+                                <Label htmlFor={`retry-${automation.id}`} className="text-xs text-gray-600">
+                                  Auto retry on failure
+                                </Label>
+                              </div>
+                            </div>
                           </div>
 
-                          {/* Available Credentials Section */}
-                          <div>
-                            <h5 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
-                              <Key className="w-4 h-4 text-green-600" />
-                              Available Credentials ({credentials.length})
-                            </h5>
-                            {credentials.length > 0 ? (
-                              <div className="space-y-2">
-                                {credentials.map((credential) => (
-                                  <div key={credential.id} className="p-3 bg-blue-50 rounded-lg border border-blue-100">
-                                    <h6 className="font-medium text-sm text-gray-900">{credential.platform_name}</h6>
-                                    <p className="text-xs text-gray-600">{credential.credential_type}</p>
-                                    <div className="flex items-center justify-between mt-1">
-                                      <Badge variant={credential.is_active ? "default" : "secondary"} className="text-xs">
-                                        {credential.is_active ? 'Active' : 'Inactive'}
-                                      </Badge>
-                                      <span className="text-xs text-gray-400">
-                                        {new Date(credential.created_at).toLocaleDateString()}
-                                      </span>
+                          {/* AI Agents */}
+                          <div className="space-y-4">
+                            <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                              <Zap className="w-4 h-4 text-purple-600" />
+                              AI Agents ({agents[automation.id]?.length || 0})
+                            </h4>
+                            <div className="bg-white/70 p-4 rounded-xl border border-green-100 max-h-48 overflow-y-auto">
+                              {agents[automation.id]?.length > 0 ? (
+                                <div className="space-y-2">
+                                  {agents[automation.id].map((agent) => (
+                                    <div key={agent.id} className="p-3 bg-purple-50 rounded-lg border border-purple-100">
+                                      <h5 className="font-medium text-sm text-gray-900">{agent.agent_name}</h5>
+                                      {agent.agent_role && (
+                                        <p className="text-xs text-gray-600">{agent.agent_role}</p>
+                                      )}
+                                      <div className="flex gap-1 mt-1">
+                                        {agent.llm_provider && (
+                                          <Badge variant="outline" className="text-xs">
+                                            {agent.llm_provider}
+                                          </Badge>
+                                        )}
+                                        {agent.model && (
+                                          <Badge variant="outline" className="text-xs">
+                                            {agent.model}
+                                          </Badge>
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
-                                ))}
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-gray-500 text-center py-4">No AI agents configured</p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Available Credentials */}
+                          <div className="space-y-4">
+                            <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                              <Key className="w-4 h-4 text-blue-600" />
+                              Available Credentials ({credentials.length})
+                            </h4>
+                            <div className="bg-white/70 p-4 rounded-xl border border-green-100 max-h-48 overflow-y-auto">
+                              {credentials.length > 0 ? (
+                                <div className="space-y-2">
+                                  {credentials.map((credential) => (
+                                    <div key={credential.id} className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                      <h5 className="font-medium text-sm text-gray-900">{credential.platform_name}</h5>
+                                      <p className="text-xs text-gray-600">{credential.credential_type}</p>
+                                      <div className="flex items-center justify-between mt-1">
+                                        <Badge variant={credential.is_active ? "default" : "secondary"} className="text-xs">
+                                          {credential.is_active ? 'Active' : 'Inactive'}
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-gray-500 text-center py-4">No credentials configured</p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Data Privacy Settings */}
+                          <div className="space-y-4">
+                            <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                              <Shield className="w-4 h-4 text-green-600" />
+                              Data Privacy Settings
+                            </h4>
+                            <div className="bg-white/70 p-4 rounded-xl border border-green-100 space-y-3">
+                              <div>
+                                <Label className="text-xs text-gray-600">Data Retention</Label>
+                                <Select defaultValue="30days">
+                                  <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="7days">7 days</SelectItem>
+                                    <SelectItem value="30days">30 days</SelectItem>
+                                    <SelectItem value="90days">90 days</SelectItem>
+                                    <SelectItem value="1year">1 year</SelectItem>
+                                  </SelectContent>
+                                </Select>
                               </div>
-                            ) : (
-                              <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">No credentials configured</p>
-                            )}
+                              <div className="space-y-2">
+                                <div className="flex items-center space-x-2">
+                                  <Switch id={`logs-${automation.id}`} defaultChecked />
+                                  <Label htmlFor={`logs-${automation.id}`} className="text-xs text-gray-600">
+                                    Keep execution logs
+                                  </Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <Switch id={`data-${automation.id}`} defaultChecked />
+                                  <Label htmlFor={`data-${automation.id}`} className="text-xs text-gray-600">
+                                    Store processed data
+                                  </Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <Switch id={`analytics-${automation.id}`} />
+                                  <Label htmlFor={`analytics-${automation.id}`} className="text-xs text-gray-600">
+                                    Anonymous analytics
+                                  </Label>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                        
+                        <div className="pt-4 border-t border-green-200">
+                          <Button className="bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white rounded-xl">
+                            Save Automation Settings
+                          </Button>
+                        </div>
+                      </CardContent>
                     </CollapsibleContent>
-                  </div>
-                </Collapsible>
+                  </Collapsible>
+                </Card>
               ))}
             </div>
           )}

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -431,7 +430,7 @@ const AutomationDetail = () => {
       <div className="max-w-7xl mx-auto h-full flex flex-col relative z-10 pt-20">        
         {/* Main Content Area with Slide Animation - Reduced top padding */}
         <div className="flex-1 flex items-start justify-center pt-1 pb-2 relative">
-          <div className={`transition-transform duration-500 ease-in-out ${showDashboard ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'} ${showDashboard ? 'absolute' : 'relative'} w-[calc(100vw-6rem)] max-w-none mx-12`}>
+          <div className={`transition-transform duration-500 ease-in-out ${showDashboard ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'} ${showDashboard ? 'absolute' : 'relative'} w-full px-12`}>
             <ChatCard 
               messages={messages} 
               onAgentAdd={handleAgentAdd}
@@ -442,7 +441,7 @@ const AutomationDetail = () => {
             />
           </div>
           
-          <div className={`transition-transform duration-500 ease-in-out ${showDashboard ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} ${showDashboard ? 'relative' : 'absolute'}`}>
+          <div className={`transition-transform duration-500 ease-in-out ${showDashboard ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} ${showDashboard ? 'relative' : 'absolute'} w-full px-12`}>
             {showDashboard && (
               <AutomationDashboard
                 automationId={automation.id}

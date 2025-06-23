@@ -97,6 +97,7 @@ export const useNotifications = () => {
 
   const fetchNotifications = async () => {
     try {
+      console.log('Fetching notifications for user:', user?.id);
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
@@ -104,8 +105,12 @@ export const useNotifications = () => {
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching notifications:', error);
+        throw error;
+      }
       
+      console.log('Fetched notifications:', data);
       const typedNotifications = (data || []) as Notification[];
       setNotifications(typedNotifications);
       updateUnreadCount(typedNotifications);
@@ -129,44 +134,72 @@ export const useNotifications = () => {
 
   const markAsRead = async (notificationId: string) => {
     try {
+      console.log('Marking notification as read:', notificationId);
       const { error } = await supabase
         .from('notifications')
         .update({ is_read: true })
         .eq('id', notificationId)
         .eq('user_id', user?.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error marking notification as read:', error);
+        throw error;
+      }
     } catch (error) {
       console.error('Error marking notification as read:', error);
+      toast({
+        title: "Error",
+        description: "Failed to mark notification as read",
+        variant: "destructive",
+      });
     }
   };
 
   const markAllAsRead = async () => {
     try {
+      console.log('Marking all notifications as read for user:', user?.id);
       const { error } = await supabase
         .from('notifications')
         .update({ is_read: true })
         .eq('user_id', user?.id)
         .eq('is_read', false);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error marking all notifications as read:', error);
+        throw error;
+      }
       
       setUnreadCount(0);
+      toast({
+        title: "Success",
+        description: "All notifications marked as read",
+      });
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
+      toast({
+        title: "Error",
+        description: "Failed to mark all notifications as read",
+        variant: "destructive",
+      });
     }
   };
 
   const deleteNotification = async (notificationId: string) => {
     try {
+      console.log('Deleting notification:', notificationId, 'for user:', user?.id);
+      
       const { error } = await supabase
         .from('notifications')
         .delete()
         .eq('id', notificationId)
         .eq('user_id', user?.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Delete error details:', error);
+        throw error;
+      }
       
+      console.log('Notification deleted successfully');
       toast({
         title: "Success",
         description: "Notification deleted",
@@ -183,13 +216,17 @@ export const useNotifications = () => {
 
   const deleteAllRead = async () => {
     try {
+      console.log('Deleting all read notifications for user:', user?.id);
       const { error } = await supabase
         .from('notifications')
         .delete()
         .eq('user_id', user?.id)
         .eq('is_read', true);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error deleting read notifications:', error);
+        throw error;
+      }
       
       toast({
         title: "Success",
@@ -207,12 +244,16 @@ export const useNotifications = () => {
 
   const deleteAllNotifications = async () => {
     try {
+      console.log('Deleting all notifications for user:', user?.id);
       const { error } = await supabase
         .from('notifications')
         .delete()
         .eq('user_id', user?.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error deleting all notifications:', error);
+        throw error;
+      }
       
       setUnreadCount(0);
       toast({

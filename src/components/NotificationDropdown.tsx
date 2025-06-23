@@ -43,9 +43,11 @@ const NotificationDropdown = () => {
   };
 
   const handleHelpClick = (notification: Notification) => {
+    console.log('Help icon clicked for notification:', notification.title);
     handleError(`Help request for notification: ${notification.title}`, {
       fileName: 'Notification System',
-      userAction: `User clicked help for: ${notification.message}`
+      userAction: `User clicked help for: ${notification.message}`,
+      additionalContext: `Notification ID: ${notification.id}, Type: ${notification.type}, Category: ${notification.category}`
     });
   };
 
@@ -97,7 +99,10 @@ const NotificationDropdown = () => {
         <DropdownMenuSeparator />
         
         {loading ? (
-          <div className="p-4 text-center text-gray-500">Loading...</div>
+          <div className="p-4 text-center text-gray-500">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="mt-2 text-sm">Loading notifications...</p>
+          </div>
         ) : notifications.length === 0 ? (
           <div className="p-4 text-center text-gray-500">
             <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -139,7 +144,8 @@ const NotificationDropdown = () => {
                         handleHelpClick(notification);
                         setIsOpen(false);
                       }}
-                      className="h-6 w-6 p-0 hover:bg-gray-200"
+                      className="h-6 w-6 p-0 hover:bg-gray-200 opacity-70 hover:opacity-100 transition-opacity"
+                      title="Get help with this notification"
                     >
                       <HelpCircle className="w-3 h-3 text-gray-500" />
                     </Button>

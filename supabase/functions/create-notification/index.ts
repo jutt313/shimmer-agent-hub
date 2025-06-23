@@ -13,16 +13,23 @@ serve(async (req) => {
   }
 
   try {
+    // Use service role key for bypassing RLS
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
     )
 
     const { userId, title, message, type, category, metadata = {} } = await req.json()
 
     if (!userId || !title || !message || !type || !category) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields' }),
+        JSON.stringify({ error: 'Missing required fields: userId, title, message, type, category' }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -34,13 +41,15 @@ serve(async (req) => {
     const validTypes = ['automation_status', 'error', 'ai_agent', 'platform_integration', 'knowledge_system']
     if (!validTypes.includes(type)) {
       return new Response(
-        JSON.stringify({ error: 'Invalid notification type' }),
+        JSON.stringify({ error: 'Invalid notification type. Must be one of: ' + validTypes.join(', ') }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       )
     }
+
+    console.log('Creating notification for user:', userId, 'with type:', type)
 
     const { data, error } = await supabaseClient
       .from('notifications')
@@ -60,13 +69,15 @@ serve(async (req) => {
     if (error) {
       console.error('Error creating notification:', error)
       return new Response(
-        JSON.stringify({ error: 'Failed to create notification' }),
+        JSON.stringify({ error: 'Failed to create notification', details: error.message }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       )
     }
+
+    console.log('Notification created successfully:', data)
 
     return new Response(
       JSON.stringify({ success: true, notification: data }),
@@ -79,7 +90,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in create-notification function:', error)
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ error: 'Internal server error', details: error.message }),
       { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

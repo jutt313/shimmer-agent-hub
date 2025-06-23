@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Plus, Bot, Calendar, LogOut, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import NotificationDropdown from "@/components/NotificationDropdown";
+import SeedNotificationsButton from "@/components/SeedNotificationsButton";
 import { createNotification, notificationTemplates } from "@/utils/notificationHelpers";
 
 interface Automation {
@@ -95,7 +97,7 @@ const Automations = () => {
             title: title.trim(),
             description: description.trim() || null,
             status: 'draft',
-            platforms_config: null // Initialize platforms_config as null
+            platforms_config: null
           }
         ])
         .select()
@@ -109,15 +111,21 @@ const Automations = () => {
       console.log('Automation created successfully:', data);
       
       // Create notification for successful automation creation
-      const template = notificationTemplates.automationCreated(data.title);
-      await createNotification(
-        user.id,
-        template.title,
-        template.message,
-        template.type,
-        template.category,
-        { automation_id: data.id, automation_title: data.title }
-      );
+      try {
+        const template = notificationTemplates.automationCreated(data.title);
+        await createNotification(
+          user.id,
+          template.title,
+          template.message,
+          template.type,
+          template.category,
+          { automation_id: data.id, automation_title: data.title }
+        );
+        console.log('Creation notification sent successfully');
+      } catch (notifError) {
+        console.error('Failed to create notification:', notifError);
+        // Don't throw here - automation was created successfully
+      }
 
       setAutomations([data, ...automations]);
       setTitle("");
@@ -198,6 +206,7 @@ const Automations = () => {
             </div>
             <div className="flex gap-4">
               <NotificationDropdown />
+              <SeedNotificationsButton />
               <Button
                 onClick={handleSignOut}
                 variant="outline"

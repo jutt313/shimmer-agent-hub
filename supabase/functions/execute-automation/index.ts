@@ -15,7 +15,13 @@ serve(async (req) => {
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
     )
 
     const { automation_id, trigger_data } = await req.json()
@@ -47,6 +53,18 @@ serve(async (req) => {
     const startTime = new Date()
 
     try {
+      // Create notification for automation run started
+      await supabaseClient.functions.invoke('create-notification', {
+        body: {
+          userId: automation.user_id,
+          title: 'Automation Started',
+          message: `Your automation "${automation.title}" has started running.`,
+          type: 'automation_status',
+          category: 'execution',
+          metadata: { automation_id: automation.id, run_id: runId }
+        }
+      });
+
       const { data: run, error: runError } = await supabaseClient
         .from('automation_runs')
         .insert([
@@ -112,6 +130,18 @@ serve(async (req) => {
         console.error('Error updating run status:', updateError)
       }
 
+      // Create notification for successful completion
+      await supabaseClient.functions.invoke('create-notification', {
+        body: {
+          userId: automation.user_id,
+          title: 'Automation Completed',
+          message: `Your automation "${automation.title}" has completed successfully.`,
+          type: 'automation_status',
+          category: 'execution',
+          metadata: { automation_id: automation.id, run_id: runId, duration_ms: duration }
+        }
+      });
+
       console.log(`✅ Automation execution completed: ${automation.title}`)
 
       return new Response(
@@ -160,6 +190,18 @@ serve(async (req) => {
           }
         })
         .eq('id', runId)
+
+      // Create notification for failed execution
+      await supabaseClient.functions.invoke('create-notification', {
+        body: {
+          userId: automation.user_id,
+          title: 'Automation Failed',
+          message: `Your automation "${automation.title}" failed: ${executionError.message}`,
+          type: 'automation_status',
+          category: 'error',
+          metadata: { automation_id: automation.id, run_id: runId, error: executionError.message }
+        }
+      });
 
       return new Response(
         JSON.stringify({ 

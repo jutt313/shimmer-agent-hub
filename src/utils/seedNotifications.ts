@@ -1,45 +1,49 @@
 
-import { createNotification, notificationTemplates } from './notificationHelpers';
+import { createNotification } from './notificationHelpers';
 
-export const seedExampleNotifications = async (userId: string) => {
+export const seedExampleNotifications = async (userId: string): Promise<boolean> => {
   try {
-    console.log('🌱 Seeding example notifications for user:', userId);
+    console.log('Starting to seed example notifications for user:', userId);
 
-    // Create various types of notifications to demonstrate the system
     const notifications = [
       {
-        ...notificationTemplates.automationCreated('Email Marketing Automation'),
-        metadata: { automation_id: 'example-1', automation_title: 'Email Marketing Automation' }
+        title: 'Welcome to the Platform!',
+        message: 'Thank you for joining our automation platform. Get started by creating your first automation.',
+        type: 'ai_agent' as const,
+        category: 'welcome',
+        metadata: { source: 'onboarding', priority: 'high' }
       },
       {
-        ...notificationTemplates.automationRunCompleted('Lead Qualification Flow'),
-        metadata: { automation_id: 'example-2', automation_title: 'Lead Qualification Flow', run_id: 'run-123' }
+        title: 'Sample Automation Created',
+        message: 'A sample "Lead Qualification Flow" automation has been created to help you get started.',
+        type: 'automation_status' as const,
+        category: 'creation',
+        metadata: { automation_name: 'Lead Qualification Flow', sample: true }
       },
       {
-        ...notificationTemplates.aiAgentCreated('Customer Support Agent'),
-        metadata: { agent_id: 'agent-1', agent_name: 'Customer Support Agent' }
+        title: 'Platform Integration Available',
+        message: 'You can now connect your CRM and email platforms to enhance your automations.',
+        type: 'platform_integration' as const,
+        category: 'info',
+        metadata: { available_platforms: ['CRM', 'Email', 'Calendar'] }
       },
       {
-        ...notificationTemplates.platformCredentialTest('Gmail', true),
-        metadata: { platform: 'Gmail', test_result: 'success' }
+        title: 'Knowledge Base Updated',
+        message: 'New automation templates and best practices have been added to your knowledge base.',
+        type: 'knowledge_system' as const,
+        category: 'update',
+        metadata: { new_entries: 5, category: 'templates' }
       },
       {
-        ...notificationTemplates.knowledgeEntryAdded('API Integration Best Practices'),
-        metadata: { entry_id: 'knowledge-1', entry_title: 'API Integration Best Practices' }
-      },
-      {
-        ...notificationTemplates.automationRunFailed('Data Sync Automation', 'API rate limit exceeded'),
-        metadata: { automation_id: 'example-3', automation_title: 'Data Sync Automation', error: 'API rate limit exceeded' }
-      },
-      {
-        ...notificationTemplates.criticalError('Database connection timeout'),
-        metadata: { error_type: 'database', component: 'connection_pool' }
+        title: 'Sample Automation Executed',
+        message: 'Your sample automation ran successfully and processed 3 test leads.',
+        type: 'automation_status' as const,
+        category: 'execution',
+        metadata: { leads_processed: 3, execution_time: '2.3s' }
       }
     ];
 
-    // Create notifications with slight delays to show realistic timing
-    for (let i = 0; i < notifications.length; i++) {
-      const notification = notifications[i];
+    for (const notification of notifications) {
       await createNotification(
         userId,
         notification.title,
@@ -50,13 +54,13 @@ export const seedExampleNotifications = async (userId: string) => {
       );
       
       // Add small delay between notifications
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    console.log('✅ Example notifications seeded successfully');
+    console.log('Successfully seeded', notifications.length, 'example notifications');
     return true;
   } catch (error) {
-    console.error('❌ Error seeding notifications:', error);
+    console.error('Error seeding example notifications:', error);
     return false;
   }
 };

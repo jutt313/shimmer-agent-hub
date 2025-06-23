@@ -39,6 +39,17 @@ class ErrorBoundary extends React.Component<
     }));
   }
 
+  handleOpenHelpChat = (message: string, context: string) => {
+    // Since this is the error boundary, we'll just log this for now
+    // In a real implementation, this would open the global help chat
+    console.log('🆘 Help requested from ErrorBoundary:', message, context);
+    
+    // Try to dispatch a global event for help chat
+    window.dispatchEvent(new CustomEvent('open-help-chat', {
+      detail: { message, context }
+    }));
+  };
+
   render() {
     if (this.state.hasError) {
       return (
@@ -73,6 +84,7 @@ class ErrorBoundary extends React.Component<
               <ErrorAnalysisModal
                 isOpen={this.state.showAnalysis}
                 onClose={() => this.setState({ showAnalysis: false })}
+                onOpenHelpChat={this.handleOpenHelpChat}
                 error={{
                   message: this.state.error.message,
                   stack: this.state.error.stack,

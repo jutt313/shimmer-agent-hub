@@ -40,6 +40,17 @@ const Automations = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Listen for global help chat requests
+  useEffect(() => {
+    const handleOpenHelpChat = (event: CustomEvent) => {
+      const { message, context } = event.detail;
+      openHelpWithContext(message, context);
+    };
+
+    window.addEventListener('open-help-chat', handleOpenHelpChat as EventListener);
+    return () => window.removeEventListener('open-help-chat', handleOpenHelpChat as EventListener);
+  }, []);
+
   useEffect(() => {
     if (!user) {
       navigate("/auth");
@@ -215,9 +226,7 @@ const Automations = () => {
               <p className="text-gray-600 mt-2">Create and manage your AI automations</p>
             </div>
             <div className="flex gap-4">
-              <NotificationDropdown 
-                onHelpNeeded={(message: string) => openHelpWithContext(message, 'Notification Help')}
-              />
+              <NotificationDropdown />
               <Button
                 onClick={() => setIsSettingsOpen(true)}
                 variant="outline"

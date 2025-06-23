@@ -151,6 +151,13 @@ const ErrorIndicator = () => {
     }
   };
 
+  const handleOpenHelpChat = (message: string, context: string) => {
+    // Dispatch a global event for opening help chat
+    window.dispatchEvent(new CustomEvent('open-help-chat', {
+      detail: { message, context }
+    }));
+  };
+
   const isActive = hasError || currentError;
 
   // Always render the component
@@ -198,6 +205,7 @@ const ErrorIndicator = () => {
             setHasError(false);
             clearError();
           }}
+          onOpenHelpChat={handleOpenHelpChat}
           error={currentError || {
             message: "Test error: System check initiated",
             stack: "Error: Test error\n    at testFunction (ErrorIndicator.tsx:45:1)",

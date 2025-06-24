@@ -1,4 +1,3 @@
-
 import { AutomationBlueprint } from '@/types/automation';
 import { buildDynamicPlatformConfig, getDynamicMethodConfig, buildDynamicURL } from './dynamicPlatformConfig';
 import { supabase } from '@/integrations/supabase/client';
@@ -75,9 +74,8 @@ export class AutomationExecutor {
               await this.updateRunProgress();
             } catch (retryError: any) {
               this.logStep(step.id, 'failed', `Step failed after retry: ${retryError.message}`, retryError.message);
-              if (step.on_error !== 'continue') {
-                throw retryError;
-              }
+              // After retry fails, stop execution unless explicitly told to continue
+              throw retryError;
             }
           } else {
             // Default: stop on error

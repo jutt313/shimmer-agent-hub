@@ -1,4 +1,3 @@
-
 interface ProblemAnalysis {
   category: string;
   problem: string;
@@ -8,8 +7,12 @@ interface ProblemAnalysis {
   error_type: string;
 }
 
+interface ProblemKeywords {
+  [key: string]: string[];
+}
+
 export const analyzeProblem = (userMessage: string, aiResponse: string): ProblemAnalysis | null => {
-  const problemKeywords = {
+  const problemKeywords: ProblemKeywords = {
     workflow: ['step', 'flow', 'process', 'sequence', 'workflow', 'missing step'],
     platform: ['gmail', 'google', 'slack', 'notion', 'openai', 'zapier', 'platform'],
     error: ['error', 'failed', 'broken', 'not working', 'issue', 'problem'],
@@ -34,7 +37,7 @@ export const analyzeProblem = (userMessage: string, aiResponse: string): Problem
   };
 };
 
-const detectCategory = (message: string, keywords: any): string | null => {
+const detectCategory = (message: string, keywords: ProblemKeywords): string | null => {
   const lowerMessage = message.toLowerCase();
   
   for (const [category, words] of Object.entries(keywords)) {

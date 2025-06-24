@@ -1,99 +1,82 @@
 
 import { useState, useCallback } from 'react';
-import { globalAbusePreventionMiddleware } from '@/utils/abusePreventionMiddleware';
-import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { globalErrorLogger } from '@/utils/errorLogger';
 
-interface UseAbuseProtectionOptions {
-  action: string;
-  showToastOnBlock?: boolean;
-  onBlocked?: (reason: string) => void;
+interface AbuseMetrics {
+  suspiciousIPs: Set<string>;
+  failedAttempts: Map<string, number>;
+  blockedUsers: Set<string>;
+  lastCleanup: number;
 }
 
-export function useAbuseProtection(options: UseAbuseProtectionOptions) {
-  const [isBlocked, setIsBlocked] = useState(false);
-  const [requiresCaptcha, setRequiresCaptcha] = useState(false);
-  const { user } = useAuth();
+export const useAbuseProtection = () => {
+  const [metrics, setMetrics] = useState<AbuseMetrics>({
+    suspiciousIPs: new Set(),
+    failedAttempts: new Map(),
+    blockedUsers: new Set(),
+    lastCleanup: Date.now(),
+  });
   const { toast } = useToast();
 
-  const checkPermission = useCallback(async (): Promise<boolean> => {
-    try {
-      const result = await globalAbusePreventionMiddleware.checkRequest(
-        user?.id || null,
-        options.action
-      );
+  const isBlocked = useCallback((identifier: string): boolean => {
+    return metrics.blockedUsers.has(identifier) || 
+           metrics.suspiciousIPs.has(identifier) ||
+           (metrics.failedAttempts.get(identifier) || 0) >= 5;
+  }, [metrics]);
 
-      if (!result.allowed) {
-        setIsBlocked(true);
-        setRequiresCaptcha(result.requiresCaptcha || false);
+  const recordFailedAttempt = useCallback((identifier: string) => {
+    setMetrics(prev => {
+      const newFailedAttempts = new Map(prev.failedAttempts);
+      const currentCount = newFailedAttempts.get(identifier) || 0;
+      newFailedAttempts.set(identifier, currentCount + 1);
 
-        globalErrorLogger.log('WARN', 'Request blocked by abuse prevention', {
-          userId: user?.id,
-          action: options.action,
-          reason: result.reason
-        });
-
-        if (options.showToastOnBlock !== false) {
-          toast({
-            title: "Request Blocked",
-            description: result.reason || "Too many requests. Please try again later.",
-            variant: "destructive",
-            duration: 5000,
-          });
-        }
-
-        options.onBlocked?.(result.reason || 'Request blocked');
-        return false;
+      const newSuspiciousIPs = new Set(prev.suspiciousIPs);
+      if (currentCount >= 3) {
+        newSuspiciousIPs.add(identifier);
       }
 
-      setIsBlocked(false);
-      setRequiresCaptcha(false);
-      return true;
-    } catch (error: any) {
-      globalErrorLogger.log('ERROR', 'Abuse protection check failed', {
-        error: error.message,
-        action: options.action,
-        userId: user?.id
-      });
-      
-      // Fail open - allow the action if check fails
-      return true;
-    }
-  }, [user?.id, options, toast]);
-
-  const executeWithProtection = useCallback(async <T>(
-    operation: () => Promise<T>
-  ): Promise<T | null> => {
-    const allowed = await checkPermission();
-    
-    if (!allowed) {
-      return null;
-    }
-
-    try {
-      return await operation();
-    } catch (error: any) {
-      globalErrorLogger.log('ERROR', 'Protected operation failed', {
-        error: error.message,
-        action: options.action,
-        userId: user?.id
-      });
-      throw error;
-    }
-  }, [checkPermission, options.action, user?.id]);
-
-  const resetBlock = useCallback(() => {
-    setIsBlocked(false);
-    setRequiresCaptcha(false);
+      return {
+        ...prev,
+        failedAttempts: newFailedAttempts,
+        suspiciousIPs: newSuspiciousIPs,
+      };
+    });
   }, []);
+
+  const blockUser = useCallback((identifier: string) => {
+    setMetrics(prev => ({
+      ...prev,
+      blockedUsers: new Set([...prev.blockedUsers, identifier]),
+    }));
+    
+    toast({
+      title: "Security Alert",
+      description: "User has been blocked due to suspicious activity",
+      variant: "destructive",
+    });
+  }, [toast]);
+
+  const cleanup = useCallback(() => {
+    const now = Date.now();
+    if (now - metrics.lastCleanup > 3600000) { // 1 hour
+      setMetrics(prev => ({
+        suspiciousIPs: new Set(),
+        failedAttempts: new Map(),
+        blockedUsers: prev.blockedUsers,
+        lastCleanup: now,
+      }));
+    }
+  }, [metrics.lastCleanup]);
 
   return {
     isBlocked,
-    requiresCaptcha,
-    checkPermission,
-    executeWithProtection,
-    resetBlock,
-    isSuspicious: user?.id ? globalAbusePreventionMiddleware.isUserSuspicious(user.id) : false
+    recordFailedAttempt,
+    blockUser,
+    cleanup,
+    metrics: {
+      suspiciousCount: metrics.suspiciousIPs.size,
+      failedCount: metrics.failedAttempts.size,
+      blockedCount: metrics.blockedUsers.size,
+    }
   };
-}
+};

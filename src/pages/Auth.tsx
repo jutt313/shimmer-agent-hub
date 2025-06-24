@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -122,13 +121,11 @@ const Auth = () => {
           <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/30 to-purple-100/30 pointer-events-none"></div>
           
           <CardHeader className="text-center relative z-10">
-            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <img 
-                src="/lovable-uploads/6b9580a6-e2cd-4056-95a9-7f730cbf6025.png" 
-                alt="Yusrai Logo" 
-                className="w-10 h-10 object-contain"
-              />
-            </div>
+            <img 
+              src="/lovable-uploads/6b9580a6-e2cd-4056-95a9-7f730cbf6025.png" 
+              alt="Yusrai Logo" 
+              className="w-16 h-16 mx-auto mb-4 hover:scale-110 transition-transform duration-300"
+            />
             <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               Reset Password
             </CardTitle>
@@ -191,13 +188,11 @@ const Auth = () => {
         <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/30 to-purple-100/30 pointer-events-none"></div>
         
         <CardHeader className="text-center relative z-10">
-          <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-            <img 
-              src="/lovable-uploads/6b9580a6-e2cd-4056-95a9-7f730cbf6025.png" 
-              alt="Yusrai Logo" 
-              className="w-12 h-12 object-contain"
-            />
-          </div>
+          <img 
+            src="/lovable-uploads/6b9580a6-e2cd-4056-95a9-7f730cbf6025.png" 
+            alt="Yusrai Logo" 
+            className="w-20 h-20 mx-auto mb-6 hover:scale-110 transition-transform duration-300"
+          />
           <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             {isLogin ? "Welcome Back" : "Create Account"}
           </CardTitle>

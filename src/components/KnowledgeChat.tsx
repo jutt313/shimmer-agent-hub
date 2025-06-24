@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/components/ui/use-toast";
-import { Bot, Send, Plus, Edit, Trash2, User, Crown } from "lucide-react";
+import { Bot, Send, User, Crown } from "lucide-react";
 import ProblemCategorizer from "./ProblemCategorizer";
 import { analyzeProblem } from "@/utils/problemAnalyzer";
 
@@ -15,10 +15,6 @@ interface ChatMessage {
   type: 'user' | 'ai' | 'system';
   message: string;
   timestamp: Date;
-  actionButtons?: {
-    type: 'add' | 'edit' | 'delete';
-    data?: any;
-  }[];
   showProblemCard?: boolean;
   problemData?: any;
 }
@@ -57,13 +53,12 @@ const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const addMessage = (message: string, type: 'user' | 'ai' | 'system' = 'user', actionButtons?: any[], showProblemCard = false, problemData?: any) => {
+  const addMessage = (message: string, type: 'user' | 'ai' | 'system' = 'user', showProblemCard = false, problemData?: any) => {
     const newMsg: ChatMessage = {
       id: Date.now().toString(),
       type,
       message,
       timestamp: new Date(),
-      actionButtons,
       showProblemCard,
       problemData
     };
@@ -74,54 +69,46 @@ const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
   const sendToAI = async (message: string) => {
     setIsLoading(true);
     try {
-      // Get relevant knowledge for context
-      const { data: knowledgeData, error: knowledgeError } = await supabase
-        .from('universal_knowledge_store')
-        .select('*')
-        .or(`title.ilike.%${message}%,summary.ilike.%${message}%,tags.cs.{${message.toLowerCase()}}`)
-        .limit(3);
-
-      const knowledgeContext = knowledgeData && knowledgeData.length > 0 
-        ? `\n\nRelevant Knowledge:\n${knowledgeData.map(k => `- ${k.title}: ${k.summary}`).join('\n')}`
-        : '';
+      console.log('Sending message to AI:', message);
 
       const { data, error } = await supabase.functions.invoke('knowledge-ai-chat', {
         body: { 
-          message: message + knowledgeContext,
+          message: message,
           category: selectedCategory || null,
           userRole: 'founder',
           context: 'problem_solving'
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
       
-      let aiResponse = data.response
-        .replace(/[#$%&'*]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
+      console.log('AI response received:', data);
+      
+      let aiResponse = data.response || "I'm sorry, I couldn't process your request.";
 
       // Analyze if this is a problem that should be categorized
       const problemAnalysis = analyzeProblem(message, aiResponse);
+      console.log('Problem analysis:', problemAnalysis);
       
-      let messageId;
       if (problemAnalysis) {
         // Add AI response with problem card
-        messageId = addMessage(
-          aiResponse, 
-          'ai', 
-          undefined, 
-          true, 
-          problemAnalysis
-        );
+        addMessage(aiResponse, 'ai', true, problemAnalysis);
       } else {
         // Regular AI response
-        messageId = addMessage(aiResponse, 'ai');
+        addMessage(aiResponse, 'ai');
       }
 
     } catch (error) {
       console.error('AI Chat Error:', error);
       addMessage("Sorry, I encountered an issue. Please try again.", 'system');
+      toast({
+        title: "Error",
+        description: "Failed to get AI response. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -246,12 +233,13 @@ const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
             placeholder="Describe your problem or ask a question..."
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+            onKeyPress={(e) => e.key === 'Enter' && !isLoading && handleSendMessage()}
             className="text-sm"
+            disabled={isLoading}
           />
           <Button 
             onClick={handleSendMessage} 
-            disabled={isLoading}
+            disabled={isLoading || !newMessage.trim()}
             size="sm"
             className="bg-blue-500 hover:bg-blue-600"
           >

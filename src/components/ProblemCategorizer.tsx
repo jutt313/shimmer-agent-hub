@@ -47,7 +47,10 @@ const ProblemCategorizer = ({ problemData, onSave, onDismiss }: ProblemCategoriz
           source_type: 'ai_categorized'
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
       toast({
         title: "Problem Stored",

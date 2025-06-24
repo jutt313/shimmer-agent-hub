@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
@@ -103,8 +102,8 @@ serve(async (req) => {
             content: message 
           }
         ],
-        max_tokens: 400,
-        temperature: 0.3,
+        max_tokens: 500,
+        temperature: 0.2,
       }),
     });
 
@@ -116,11 +115,9 @@ serve(async (req) => {
     const data = await response.json();
     let aiResponse = data.choices[0].message.content;
 
-    // Clean and enhance response
+    // Clean response but keep structure
     aiResponse = aiResponse
       .replace(/[#$%&'*]/g, '')
-      .replace(/\*\*/g, '')
-      .replace(/\s+/g, ' ')
       .trim();
 
     // Update usage count for used knowledge

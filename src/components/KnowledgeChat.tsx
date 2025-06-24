@@ -6,9 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/components/ui/use-toast";
-import { Bot, Send, User, Crown } from "lucide-react";
+import { Bot, Send, User, Crown, Plus, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import ProblemCategorizer from "./ProblemCategorizer";
 import { analyzeProblem } from "@/utils/problemAnalyzer";
+import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
 
 interface ChatMessage {
   id: string;
@@ -17,6 +19,7 @@ interface ChatMessage {
   timestamp: Date;
   showProblemCard?: boolean;
   problemData?: any;
+  structuredData?: StructuredResponse;
 }
 
 interface KnowledgeChatProps {
@@ -28,13 +31,14 @@ const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
     { 
       id: '1', 
       type: 'system', 
-      message: 'Hello! I am your Universal Memory AI. I can help you solve problems and automatically organize solutions in our knowledge store. Just tell me about any issue you\'re facing!', 
+      message: 'Hello! I am your Universal Memory AI. I can help you solve problems and automatically organize solutions in our knowledge store. Just tell me about any automation you want to create!', 
       timestamp: new Date() 
     }
   ]);
   const [newMessage, setNewMessage] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [dismissedAgents, setDismissedAgents] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -53,14 +57,15 @@ const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const addMessage = (message: string, type: 'user' | 'ai' | 'system' = 'user', showProblemCard = false, problemData?: any) => {
+  const addMessage = (message: string, type: 'user' | 'ai' | 'system' = 'user', showProblemCard = false, problemData?: any, structuredData?: StructuredResponse) => {
     const newMsg: ChatMessage = {
       id: Date.now().toString(),
       type,
       message,
       timestamp: new Date(),
       showProblemCard,
-      problemData
+      problemData,
+      structuredData
     };
     setMessages(prev => [...prev, newMsg]);
     return newMsg.id;
@@ -76,7 +81,7 @@ const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
           message: message,
           category: selectedCategory || null,
           userRole: 'founder',
-          context: 'problem_solving'
+          context: 'automation_creation'
         }
       });
 
@@ -89,16 +94,20 @@ const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
       
       let aiResponse = data.response || "I'm sorry, I couldn't process your request.";
 
+      // Parse structured response from AI
+      const structuredData = parseStructuredResponse(aiResponse);
+      console.log('Parsed structured data:', structuredData);
+
       // Analyze if this is a problem that should be categorized
       const problemAnalysis = analyzeProblem(message, aiResponse);
       console.log('Problem analysis:', problemAnalysis);
       
       if (problemAnalysis) {
         // Add AI response with problem card
-        addMessage(aiResponse, 'ai', true, problemAnalysis);
+        addMessage(aiResponse, 'ai', true, problemAnalysis, structuredData);
       } else {
-        // Regular AI response
-        addMessage(aiResponse, 'ai');
+        // Regular AI response with structured data
+        addMessage(aiResponse, 'ai', false, undefined, structuredData);
       }
 
     } catch (error) {
@@ -150,6 +159,134 @@ const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
     ));
   };
 
+  const handleAgentAdd = (agent: any) => {
+    toast({
+      title: "Agent Recommended",
+      description: `${agent.name} has been suggested for your automation.`,
+    });
+  };
+
+  const handleAgentDismiss = (agentName: string) => {
+    setDismissedAgents(prev => new Set([...prev, agentName]));
+  };
+
+  const renderStructuredContent = (structuredData: StructuredResponse) => {
+    const content = [];
+
+    // Summary
+    if (structuredData.summary) {
+      content.push(
+        <div key="summary" className="mb-4">
+          <h4 className="font-medium text-blue-800 mb-2">Automation Summary</h4>
+          <p className="text-sm text-gray-700 bg-white p-3 rounded border">{structuredData.summary}</p>
+        </div>
+      );
+    }
+
+    // Steps
+    if (structuredData.steps && structuredData.steps.length > 0) {
+      content.push(
+        <div key="steps" className="mb-4">
+          <h4 className="font-medium text-blue-800 mb-2">Step-by-Step Workflow</h4>
+          <ol className="list-decimal list-inside space-y-1 text-sm text-gray-700 bg-white p-3 rounded border">
+            {structuredData.steps.map((step, index) => (
+              <li key={index}>{step}</li>
+            ))}
+          </ol>
+        </div>
+      );
+    }
+
+    // Platforms
+    if (structuredData.platforms && structuredData.platforms.length > 0) {
+      content.push(
+        <div key="platforms" className="mb-4">
+          <h4 className="font-medium text-blue-800 mb-2">Required Platform Credentials</h4>
+          <div className="bg-white p-3 rounded border space-y-3">
+            {structuredData.platforms.map((platform, index) => (
+              <div key={index}>
+                <h5 className="font-medium text-gray-800">{platform.name}</h5>
+                {platform.credentials && platform.credentials.length > 0 && (
+                  <ul className="list-disc list-inside ml-4 text-sm text-gray-700">
+                    {platform.credentials.map((cred, credIndex) => (
+                      <li key={credIndex}>
+                        <strong>{cred.field.replace(/_/g, ' ').toUpperCase()}</strong>: {cred.why_needed}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // AI Agents
+    if (structuredData.agents && structuredData.agents.length > 0) {
+      content.push(
+        <div key="agents" className="mb-4">
+          <h4 className="font-medium text-blue-800 mb-3">Recommended AI Agents</h4>
+          <div className="space-y-3">
+            {structuredData.agents.map((agent, index) => {
+              if (dismissedAgents.has(agent.name)) return null;
+              
+              return (
+                <div key={index} className="border rounded-lg p-4 bg-blue-50/50 border-blue-200">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1">
+                      <h5 className="font-semibold text-blue-800">{agent.name}</h5>
+                      <p className="text-sm text-blue-600">{agent.role}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => handleAgentAdd(agent)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 text-xs"
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Add
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleAgentDismiss(agent.name)}
+                        className="border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-1 text-xs"
+                      >
+                        <X className="w-3 h-3 mr-1" />
+                        Dismiss
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-1 text-sm text-gray-700">
+                    <p><strong>Goal:</strong> {agent.goal}</p>
+                    <p><strong>Why needed:</strong> {agent.why_needed}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // Clarification Questions
+    if (structuredData.clarification_questions && structuredData.clarification_questions.length > 0) {
+      content.push(
+        <div key="clarification" className="mb-4">
+          <h4 className="font-medium text-yellow-800 mb-2">I need some clarification:</h4>
+          <ol className="list-decimal list-inside space-y-1 text-sm text-yellow-700 bg-yellow-50 p-3 rounded border border-yellow-200">
+            {structuredData.clarification_questions.map((question, index) => (
+              <li key={index}>{question}</li>
+            ))}
+          </ol>
+        </div>
+      );
+    }
+
+    return content;
+  };
+
   return (
     <div className="h-full flex flex-col bg-white rounded-2xl border border-gray-200 shadow-lg">
       {/* Header */}
@@ -159,7 +296,7 @@ const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
           <Crown className="h-4 w-4 text-yellow-500" />
           <h3 className="text-lg font-semibold text-gray-800">Universal Memory AI</h3>
         </div>
-        <p className="text-sm text-gray-600">Your personal problem-solving and knowledge management AI</p>
+        <p className="text-sm text-gray-600">Your automation expert with comprehensive workflow guidance</p>
       </div>
 
       {/* Messages */}
@@ -168,17 +305,26 @@ const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
           {messages.map((msg) => (
             <div key={msg.id}>
               <div className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className="max-w-xs">
+                <div className="max-w-4xl">
                   <div className={`px-4 py-3 rounded-2xl text-sm ${
                     msg.type === 'user' 
                       ? 'bg-blue-500 text-white' 
                       : msg.type === 'ai'
-                      ? 'bg-gray-100 text-gray-800'
+                      ? 'bg-gray-50 text-gray-800 border border-gray-200'
                       : 'bg-green-50 text-green-800 border border-green-200'
                   }`}>
                     {msg.type === 'user' && <User className="w-4 h-4 inline mr-2" />}
                     {msg.type === 'ai' && <Bot className="w-4 h-4 inline mr-2 text-blue-600" />}
-                    <span>{msg.message}</span>
+                    
+                    {/* Show structured content for AI messages if available */}
+                    {msg.type === 'ai' && msg.structuredData ? (
+                      <div className="space-y-3">
+                        <div className="whitespace-pre-wrap">{cleanDisplayText(msg.message)}</div>
+                        {renderStructuredContent(msg.structuredData)}
+                      </div>
+                    ) : (
+                      <span className="whitespace-pre-wrap">{msg.message}</span>
+                    )}
                   </div>
                   
                   <p className="text-xs text-gray-500 mt-1">
@@ -202,9 +348,9 @@ const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
           
           {isLoading && (
             <div className="flex justify-start">
-              <div className="bg-gray-100 text-gray-800 px-4 py-3 rounded-2xl">
+              <div className="bg-gray-50 text-gray-800 px-4 py-3 rounded-2xl border border-gray-200">
                 <Bot className="w-4 h-4 inline mr-2 animate-pulse text-blue-600" />
-                <span className="text-sm">AI is analyzing your problem...</span>
+                <span className="text-sm">AI is creating your comprehensive automation plan...</span>
               </div>
             </div>
           )}
@@ -230,7 +376,7 @@ const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
         
         <div className="flex gap-2">
           <Input
-            placeholder="Describe your problem or ask a question..."
+            placeholder="Describe the automation you want to create..."
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && !isLoading && handleSendMessage()}

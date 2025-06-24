@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { AutomationBlueprint } from '@/types/automation';
 
 // Automation scheduler service for cron-based triggers
 export interface ScheduleConfig {
@@ -220,16 +221,22 @@ export class AutomationScheduler {
       }
 
       automations?.forEach(automation => {
-        const blueprint = automation.automation_blueprint;
-        if (blueprint?.trigger?.type === 'scheduled' && blueprint.trigger.cron_expression) {
-          const scheduleConfig: ScheduleConfig = {
-            automationId: automation.id,
-            cronExpression: blueprint.trigger.cron_expression,
-            timezone: 'UTC', // Default timezone
-            isActive: true
-          };
+        try {
+          // Properly cast the blueprint to our expected type
+          const blueprint = automation.automation_blueprint as AutomationBlueprint;
           
-          this.addSchedule(scheduleConfig);
+          if (blueprint?.trigger?.type === 'scheduled' && blueprint.trigger.cron_expression) {
+            const scheduleConfig: ScheduleConfig = {
+              automationId: automation.id,
+              cronExpression: blueprint.trigger.cron_expression,
+              timezone: 'UTC', // Default timezone
+              isActive: true
+            };
+            
+            this.addSchedule(scheduleConfig);
+          }
+        } catch (parseError) {
+          console.error(`Failed to parse blueprint for automation ${automation.id}:`, parseError);
         }
       });
 

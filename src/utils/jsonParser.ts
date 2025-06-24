@@ -1,4 +1,3 @@
-
 export interface StructuredResponse {
   summary?: string;
   steps?: string[];
@@ -351,13 +350,24 @@ const isUpdateResponse = (parsed: any, responseText: string): boolean => {
     responseText.toLowerCase().includes(keyword)
   );
 
+  // NEW LOGIC: If response contains comprehensive platform data or blueprint, it's NOT an update
+  const isComprehensiveResponse = !!parsed.automation_blueprint || 
+                                 (parsed.platforms && Array.isArray(parsed.platforms) && parsed.platforms.length > 0) ||
+                                 (parsed.agents && Array.isArray(parsed.agents) && parsed.agents.length > 0);
+
+  // If it's a comprehensive response with actual data, and no explicit update keywords, it's NOT an update
+  if (isComprehensiveResponse && !hasUpdateKeywords) {
+    return false;
+  }
+
   const hasMinimalStructure = !parsed.automation_blueprint && 
                              (!parsed.platforms || parsed.platforms.length === 0) &&
                              (!parsed.agents || parsed.agents.length === 0);
 
   const hasQuestions = parsed.clarification_questions && parsed.clarification_questions.length > 0;
 
-  return hasUpdateKeywords || hasMinimalStructure || hasQuestions;
+  // Only return true if explicit update keywords OR minimal structure with questions
+  return hasUpdateKeywords || (hasMinimalStructure && hasQuestions);
 };
 
 const fixMalformedJson = (jsonStr: string): string | null => {

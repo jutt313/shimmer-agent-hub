@@ -1,4 +1,3 @@
-
 export interface StructuredResponse {
   summary?: string;
   steps?: string[];
@@ -25,21 +24,32 @@ export interface StructuredResponse {
 }
 
 export const parseStructuredResponse = (responseText: string): StructuredResponse | null => {
-  console.log('🔍 Parsing structured response - Length:', responseText.length);
+  console.log('🔍 Enhanced parsing - Length:', responseText.length);
   
   try {
-    // Method 1: Try to find JSON in code blocks first
+    // Method 1: Priority - JSON in code blocks with validation
     const jsonCodeBlockMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
     if (jsonCodeBlockMatch) {
       try {
         const parsed = JSON.parse(jsonCodeBlockMatch[1]);
         console.log('✅ Successfully parsed JSON from code block');
-        console.log('📊 Parsed data keys:', Object.keys(parsed));
-        parsed.is_update = isUpdateResponse(parsed, responseText);
-        return validateAndFixStructuredData(parsed);
+        
+        // Validate completeness
+        const validation = validateStructuredData(parsed);
+        if (validation.isComplete) {
+          console.log('✅ Complete structured data found');
+          parsed.is_update = isUpdateResponse(parsed, responseText);
+          return validateAndFixStructuredData(parsed);
+        } else {
+          console.log('⚠️ Incomplete structured data:', validation.missing);
+          // Try to enhance with extracted data
+          const enhanced = enhanceWithExtractedData(parsed, responseText);
+          enhanced.is_update = isUpdateResponse(enhanced, responseText);
+          return validateAndFixStructuredData(enhanced);
+        }
       } catch (e) {
-        console.log('❌ JSON in code block malformed, attempting fix...');
-        const fixed = fixMalformedJson(jsonCodeBlockMatch[1]);
+        console.log('❌ JSON in code block malformed, attempting advanced fix...');
+        const fixed = advancedJsonFix(jsonCodeBlockMatch[1]);
         if (fixed) {
           try {
             const parsed = JSON.parse(fixed);
@@ -47,45 +57,34 @@ export const parseStructuredResponse = (responseText: string): StructuredRespons
             parsed.is_update = isUpdateResponse(parsed, responseText);
             return validateAndFixStructuredData(parsed);
           } catch (e2) {
-            console.log('❌ Could not fix JSON in code block');
+            console.log('❌ Advanced JSON fix failed');
           }
         }
       }
     }
 
-    // Method 2: Look for complete JSON objects
+    // Method 2: Complete JSON objects with validation
     const jsonObjectMatch = responseText.match(/\{[\s\S]*\}/);
     if (jsonObjectMatch) {
-      let jsonStr = jsonObjectMatch[0];
+      let jsonStr = extractCompleteJson(jsonObjectMatch[0]);
       
-      // Find the complete JSON object by counting braces
-      let braceCount = 0;
-      let endIndex = -1;
-      
-      for (let i = 0; i < jsonStr.length; i++) {
-        if (jsonStr[i] === '{') {
-          braceCount++;
-        } else if (jsonStr[i] === '}') {
-          braceCount--;
-          if (braceCount === 0) {
-            endIndex = i + 1;
-            break;
-          }
-        }
-      }
-      
-      if (endIndex > 0) {
-        jsonStr = jsonStr.substring(0, endIndex);
-        
+      if (jsonStr) {
         try {
           const parsed = JSON.parse(jsonStr);
           console.log('✅ Successfully parsed complete JSON object');
-          console.log('📊 Parsed data keys:', Object.keys(parsed));
-          parsed.is_update = isUpdateResponse(parsed, responseText);
-          return validateAndFixStructuredData(parsed);
+          
+          const validation = validateStructuredData(parsed);
+          if (validation.isComplete) {
+            parsed.is_update = isUpdateResponse(parsed, responseText);
+            return validateAndFixStructuredData(parsed);
+          } else {
+            const enhanced = enhanceWithExtractedData(parsed, responseText);
+            enhanced.is_update = isUpdateResponse(enhanced, responseText);
+            return validateAndFixStructuredData(enhanced);
+          }
         } catch (e) {
-          console.log('❌ JSON object malformed, attempting fix...');
-          const fixed = fixMalformedJson(jsonStr);
+          console.log('❌ JSON object malformed, attempting advanced fix...');
+          const fixed = advancedJsonFix(jsonStr);
           if (fixed) {
             try {
               const parsed = JSON.parse(fixed);
@@ -93,17 +92,17 @@ export const parseStructuredResponse = (responseText: string): StructuredRespons
               parsed.is_update = isUpdateResponse(parsed, responseText);
               return validateAndFixStructuredData(parsed);
             } catch (e2) {
-              console.log('❌ Could not fix JSON object');
+              console.log('❌ Advanced JSON object fix failed');
             }
           }
         }
       }
     }
 
-    // Method 3: Extract data from text patterns as fallback
-    const extractedData = extractDataFromText(responseText);
+    // Method 3: Enhanced text extraction as fallback
+    const extractedData = enhancedExtractDataFromText(responseText);
     if (extractedData && Object.keys(extractedData).length > 0) {
-      console.log('✅ Extracted structured data from text patterns');
+      console.log('✅ Extracted enhanced structured data from text patterns');
       extractedData.is_update = isUpdateResponse(extractedData, responseText);
       return validateAndFixStructuredData(extractedData);
     }
@@ -112,13 +111,222 @@ export const parseStructuredResponse = (responseText: string): StructuredRespons
     return null;
     
   } catch (error) {
-    console.error('❌ Error in parseStructuredResponse:', error);
+    console.error('❌ Error in enhanced parseStructuredResponse:', error);
     return null;
   }
 };
 
-// New function to validate and ensure all required fields are present
-const validateAndFixStructuredData = (data: any): StructuredResponse => {
+// Enhanced validation function
+const validateStructuredData = (data: any): { isComplete: boolean; missing: string[] } => {
+  const missing: string[] = [];
+  
+  if (!data.summary || data.summary.length < 10) {
+    missing.push('summary');
+  }
+  
+  if (!data.steps || !Array.isArray(data.steps) || data.steps.length < 3) {
+    missing.push('steps (minimum 3 required)');
+  }
+  
+  if (!data.platforms || !Array.isArray(data.platforms) || data.platforms.length === 0) {
+    missing.push('platforms');
+  } else {
+    data.platforms.forEach((platform: any, index: number) => {
+      if (!platform.credentials || platform.credentials.length === 0) {
+        missing.push(`platforms[${index}].credentials`);
+      }
+    });
+  }
+  
+  if (!data.agents || !Array.isArray(data.agents) || data.agents.length === 0) {
+    missing.push('agents');
+  }
+  
+  return {
+    isComplete: missing.length === 0,
+    missing
+  };
+};
+
+// Enhanced data extraction with better patterns
+const enhancedExtractDataFromText = (text: string): StructuredResponse | null => {
+  const data: StructuredResponse = {};
+
+  // Enhanced summary extraction
+  const summaryPatterns = [
+    /(?:Summary|Automation Summary|This automation)[:\s]*([^.\n]+(?:\.[^.\n]+){0,2})/i,
+    /^([^.\n]*(?:automation|workflow|system)[^.\n]*\.)/i,
+    /I['']ll help you create ([^.\n]+automation[^.\n]*\.)/i
+  ];
+  
+  for (const pattern of summaryPatterns) {
+    const match = text.match(pattern);
+    if (match && match[1] && match[1].trim().length > 15) {
+      data.summary = match[1].trim();
+      break;
+    }
+  }
+
+  // Enhanced steps extraction with multiple patterns
+  const stepsPatterns = [
+    /(?:Steps?|Step-by-Step|Workflow|Process)[:\s]*\n?((?:(?:\d+\.|\*|\-)\s*[^\n]+\n?){3,})/i,
+    /(?:Here's how it works|The process includes)[:\s]*\n?((?:(?:\d+\.|\*|\-)\s*[^\n]+\n?){3,})/i
+  ];
+
+  for (const pattern of stepsPatterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      const steps = match[1]
+        .split(/(?:\d+\.|\*|\-)/)
+        .filter(step => step.trim())
+        .map(step => step.trim().replace(/\n/g, ' '))
+        .filter(step => step.length > 10);
+      
+      if (steps.length >= 3) {
+        data.steps = steps;
+        break;
+      }
+    }
+  }
+
+  // Enhanced platform extraction with API details
+  const platformKeywords = [
+    'Gmail', 'Google', 'Slack', 'Discord', 'Notion', 'Trello', 'Asana', 'Monday', 
+    'Jira', 'Confluence', 'Zendesk', 'Salesforce', 'HubSpot', 'Pipedrive',
+    'Stripe', 'PayPal', 'Twilio', 'SendGrid', 'Mailchimp', 'ConvertKit',
+    'OpenAI', 'Anthropic', 'Claude', 'ChatGPT', 'Zapier', 'Make', 'IFTTT',
+    'Shopify', 'WooCommerce', 'WordPress', 'Webflow', 'Airtable', 'ClickUp',
+    'Microsoft', 'Teams', 'Outlook', 'OneDrive', 'SharePoint', 'Azure',
+    'AWS', 'GCP', 'Dropbox', 'Box', 'GitHub', 'GitLab', 'Bitbucket'
+  ];
+  
+  const foundPlatforms = new Set<string>();
+  const lowerText = text.toLowerCase();
+  
+  platformKeywords.forEach(keyword => {
+    if (lowerText.includes(keyword.toLowerCase())) {
+      foundPlatforms.add(keyword);
+    }
+  });
+
+  if (foundPlatforms.size > 0) {
+    data.platforms = Array.from(foundPlatforms).map(platformName => ({
+      name: platformName,
+      credentials: [
+        {
+          field: "api_key",
+          placeholder: `Enter your ${platformName} API key`,
+          link: `https://${platformName.toLowerCase().replace(' ', '')}.com/developers`,
+          why_needed: `Required to connect and interact with ${platformName} services`
+        }
+      ]
+    }));
+  }
+
+  // Enhanced agent extraction
+  const agentPatterns = [
+    /(?:Agent|AI Agent|Assistant)[s]?\s*(?:recommended?|suggested?|needed?)[:\s]*([^.\n]+)/gi,
+    /(?:I recommend|I suggest|You'll need).*?([A-Z][a-zA-Z]*(?:Agent|Manager|Analyzer|Handler|Processor))/gi
+  ];
+
+  const agentNames = new Set<string>();
+  agentPatterns.forEach(pattern => {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      if (match[1]) {
+        agentNames.add(match[1].trim());
+      }
+    }
+  });
+
+  // Fallback agent creation
+  if (agentNames.size === 0 && (data.summary || data.steps)) {
+    agentNames.add('AutomationManager');
+  }
+
+  if (agentNames.size > 0) {
+    data.agents = Array.from(agentNames).map(agentName => ({
+      name: agentName,
+      role: `${agentName} specialist for automation workflows`,
+      goal: `Manage and coordinate ${agentName.toLowerCase().replace('agent', '').replace('manager', '')} related tasks`,
+      rules: `Follow best practices for ${agentName.toLowerCase()} operations and error handling`,
+      memory: `Previous ${agentName.toLowerCase()} interactions and successful automation patterns`,
+      why_needed: `Essential for reliable ${agentName.toLowerCase()} automation execution and monitoring`
+    }));
+  }
+
+  console.log('📊 Enhanced extracted data:', {
+    hasSummary: !!data.summary,
+    stepsCount: data.steps?.length || 0,
+    platformsCount: data.platforms?.length || 0,
+    agentsCount: data.agents?.length || 0
+  });
+
+  return Object.keys(data).length > 0 ? data : null;
+};
+
+// Advanced JSON fixing with better error handling
+const advancedJsonFix = (jsonStr: string): string | null => {
+  try {
+    let fixed = jsonStr
+      // Fix unquoted keys
+      .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
+      // Fix single quotes to double quotes
+      .replace(/'/g, '"')
+      // Remove trailing commas
+      .replace(/,(\s*[}\]])/g, '$1')
+      // Fix escaped characters
+      .replace(/\\n/g, '\\n')
+      .replace(/\\r/g, '\\r')
+      .replace(/\\t/g, '\\t')
+      // Fix common quote issues
+      .replace(/"([^"]*)"([^",}\]]*)"([^"]*)":/g, '"$1$2$3":');
+
+    // Test if fixed JSON is valid
+    JSON.parse(fixed);
+    return fixed;
+  } catch (e) {
+    console.log('❌ Advanced JSON fix failed');
+    return null;
+  }
+};
+
+// Extract complete JSON object by counting braces
+const extractCompleteJson = (jsonStr: string): string | null => {
+  let braceCount = 0;
+  let endIndex = -1;
+  
+  for (let i = 0; i < jsonStr.length; i++) {
+    if (jsonStr[i] === '{') {
+      braceCount++;
+    } else if (jsonStr[i] === '}') {
+      braceCount--;
+      if (braceCount === 0) {
+        endIndex = i + 1;
+        break;
+      }
+    }
+  }
+  
+  return endIndex > 0 ? jsonStr.substring(0, endIndex) : null;
+};
+
+// Enhance parsed data with extracted information
+const enhanceWithExtractedData = (parsedData: any, responseText: string): StructuredResponse => {
+  const extracted = enhancedExtractDataFromText(responseText);
+  
+  return {
+    summary: parsedData.summary || extracted?.summary || "Automation workflow created",
+    steps: parsedData.steps || extracted?.steps || [],
+    platforms: parsedData.platforms || extracted?.platforms || [],
+    agents: parsedData.agents || extracted?.agents || [],
+    clarification_questions: parsedData.clarification_questions || [],
+    automation_blueprint: parsedData.automation_blueprint || null,
+    is_update: parsedData.is_update || false
+  };
+};
+
+export const validateAndFixStructuredData = (data: any): StructuredResponse => {
   const validated: StructuredResponse = {
     summary: data.summary || "Automation workflow created",
     steps: data.steps || [],
@@ -203,135 +411,7 @@ const fixMalformedJson = (jsonStr: string): string | null => {
   }
 };
 
-const extractDataFromText = (text: string): StructuredResponse | null => {
-  const data: StructuredResponse = {};
-
-  // Extract summary - more aggressive pattern matching
-  const summaryMatches = [
-    text.match(/(?:Summary|Automation Summary)[:\s]*\n?([^\n#]*?)(?:\n|$)/i),
-    text.match(/(?:This automation|This workflow|This system)[^.]*?[.]/i),
-    text.match(/^([^.\n]*automation[^.\n]*[.])/i)
-  ];
-  
-  for (const match of summaryMatches) {
-    if (match && match[1] && match[1].trim().length > 10) {
-      data.summary = match[1].trim();
-      break;
-    }
-  }
-
-  // Extract steps with multiple patterns
-  const stepsPatterns = [
-    /(?:Steps?|Step-by-Step|Workflow)[:\s]*\n?((?:(?:\d+\.|\*|\-)\s*.*\n?)*)/i,
-    /(?:Process|Flow)[:\s]*\n?((?:(?:\d+\.|\*|\-)\s*.*\n?)*)/i,
-    /(?:How it works)[:\s]*\n?((?:(?:\d+\.|\*|\-)\s*.*\n?)*)/i
-  ];
-
-  for (const pattern of stepsPatterns) {
-    const match = text.match(pattern);
-    if (match && match[1]) {
-      const steps = match[1]
-        .split(/(?:\d+\.|\*|\-)/)
-        .filter(step => step.trim())
-        .map(step => step.trim().replace(/\n/g, ' '))
-        .filter(step => step.length > 5);
-      
-      if (steps.length > 0) {
-        data.steps = steps;
-        break;
-      }
-    }
-  }
-
-  // Enhanced platform extraction
-  const platformKeywords = ['Gmail', 'Google', 'Slack', 'Discord', 'Trello', 'Asana', 'Notion', 'Zapier', 'Salesforce', 'HubSpot', 'OpenAI', 'Anthropic', 'SendGrid', 'Twilio', 'Stripe', 'PayPal', 'Zoom', 'Microsoft', 'Teams', 'Office365', 'Dropbox', 'OneDrive', 'Jira', 'Confluence', 'GitHub', 'GitLab', 'AWS', 'Azure', 'GCP'];
-  
-  const foundPlatforms = new Set<string>();
-  platformKeywords.forEach(keyword => {
-    if (text.toLowerCase().includes(keyword.toLowerCase())) {
-      foundPlatforms.add(keyword);
-    }
-  });
-
-  if (foundPlatforms.size > 0) {
-    data.platforms = Array.from(foundPlatforms).map(platformName => ({
-      name: platformName,
-      credentials: [
-        {
-          field: "api_key",
-          placeholder: `Enter your ${platformName} API key`,
-          link: `https://${platformName.toLowerCase()}.com/developers`,
-          why_needed: `Required to connect and interact with ${platformName} services`
-        }
-      ]
-    }));
-  }
-
-  // Enhanced AI agent extraction
-  const agentPatterns = [
-    /(?:Agent|Bot|AI)[s]?.*?(?:recommend|suggest|need)[:\s]*\n?([\s\S]*?)(?:\n\n|\n#|$)/i,
-    /(?:AI|Intelligence|Assistant|Analyzer|Manager|Handler)/gi
-  ];
-
-  const agentKeywords = ['EmailSummarizer', 'DataAnalyzer', 'ContentCreator', 'TaskManager', 'SentimentAnalyzer', 'LeadQualifier', 'CustomerSupport', 'ProjectManager', 'ReportGenerator', 'QualityChecker'];
-  
-  const foundAgents = new Set<string>();
-  agentKeywords.forEach(keyword => {
-    if (text.toLowerCase().includes(keyword.toLowerCase())) {
-      foundAgents.add(keyword);
-    }
-  });
-
-  // If no specific agents found, create a generic one based on context
-  if (foundAgents.size === 0 && (data.summary || data.steps)) {
-    foundAgents.add('AutomationAssistant');
-  }
-
-  if (foundAgents.size > 0) {
-    data.agents = Array.from(foundAgents).map(agentName => ({
-      name: agentName,
-      role: `${agentName} specialist`,
-      goal: `Handle ${agentName.toLowerCase()} related tasks automatically`,
-      rules: `Follow best practices for ${agentName.toLowerCase()} operations`,
-      memory: `Previous ${agentName.toLowerCase()} interactions and preferences`,
-      why_needed: `Essential for automating ${agentName.toLowerCase()} workflows efficiently`
-    }));
-  }
-
-  // Extract clarification questions
-  const clarificationPatterns = [
-    /(?:clarification|questions?|need to know)[:\s]*\n?((?:(?:\d+\.|\*|\-)\s*.*\n?)*)/i,
-    /(?:Before we proceed|First, I need to understand)[:\s]*\n?([\s\S]*?)(?:\n\n|$)/i
-  ];
-
-  for (const pattern of clarificationPatterns) {
-    const match = text.match(pattern);
-    if (match && match[1]) {
-      const questions = match[1]
-        .split(/(?:\d+\.|\*|\-)/)
-        .filter(q => q.trim())
-        .map(q => q.trim().replace(/\n/g, ' '))
-        .filter(q => q.length > 10 && q.includes('?'));
-      
-      if (questions.length > 0) {
-        data.clarification_questions = questions;
-        break;
-      }
-    }
-  }
-
-  console.log('📊 Extracted data from text:', {
-    hasSummary: !!data.summary,
-    hasSteps: !!(data.steps && data.steps.length > 0),
-    hasPlatforms: !!(data.platforms && data.platforms.length > 0),
-    hasAgents: !!(data.agents && data.agents.length > 0),
-    hasClarificationQuestions: !!(data.clarification_questions && data.clarification_questions.length > 0)
-  });
-
-  return Object.keys(data).length > 0 ? data : null;
-};
-
-export const cleanDisplayText = (text: string): string => {
+const cleanDisplayText = (text: string): string => {
   let cleanText = text;
   
   // Remove JSON code blocks

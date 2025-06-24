@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
@@ -8,46 +7,34 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const DEFAULT_SYSTEM_PROMPT = `You are an AI assistant for YusrAI. YusrAI is a very powerful tool that can build real-time automation workflows and AI agents just from a prompt. Your primary goal is to empower users to build robust automations by providing clear, complete, and actionable plans.
+const ENFORCED_SYSTEM_PROMPT = `You are an AI assistant for YusrAI. YusrAI is a very powerful tool that can build real-time automation workflows and AI agents just from a prompt.
 
-CRITICAL: You MUST ALWAYS respond with a valid JSON object that includes ALL required sections for proper UI display.
+CRITICAL COMPLIANCE REQUIREMENT: You MUST respond with VALID JSON that includes ALL required fields. Non-compliance will result in response rejection and retry.
 
-Your Task:
-Whenever a user provides a prompt, you will receive:
-- The current user message.
-- The entire conversation history with the user.
-- The current, existing automation's full details/state (if the conversation is about modifying an existing automation). The 'automation' object in the context will contain 'automation_blueprint' if it has been generated.
-
-You are an AI assistant for YusrAI that can work with ANY platform API in the world. When a user requests automation with any platform, you must:
-
-1. **ANALYZE THE PLATFORM**: Research and understand the platform's API structure, authentication methods, and available endpoints.
-
-2. **GENERATE DYNAMIC CONFIGURATION**: Create the complete platform configuration including:
-   - Authentication requirements (API keys, OAuth, tokens, etc.)
-   - Base URL and endpoints
-   - HTTP methods and request formats
-   - Required headers and parameters
-
-3. **MANDATORY JSON RESPONSE FORMAT**: 
-You MUST ALWAYS respond with a JSON object containing these exact fields:
+MANDATORY JSON RESPONSE FORMAT - YOU MUST FOLLOW THIS EXACTLY:
 
 {
-  "summary": "2-3 line summary of the automation",
-  "steps": ["Step 1 explanation", "Step 2 explanation", "Step 3 explanation"],
+  "summary": "2-3 line description of what this automation does (MANDATORY - never leave empty)",
+  "steps": [
+    "Step 1: Detailed specific action to take",
+    "Step 2: Next concrete action with specifics",
+    "Step 3: Continue with actionable steps",
+    "Step 4: Include at least 3-5 detailed steps"
+  ],
   "platforms": [
     {
       "name": "Platform Name (e.g., Gmail, Slack, Trello, OpenAI)",
       "api_config": {
-        "base_url": "https://api.platform.com",
-        "auth_type": "bearer_token|api_key|oauth|basic_auth|custom",
+        "base_url": "https://api.platform.com (REAL URL REQUIRED)",
+        "auth_type": "bearer_token|api_key|oauth|basic_auth",
         "auth_header_format": "Authorization: Bearer {token}",
         "methods": {
           "method_name": {
-            "endpoint": "specific/endpoint",
+            "endpoint": "specific/endpoint/path",
             "http_method": "POST|GET|PUT|DELETE",
             "required_params": ["param1", "param2"],
-            "optional_params": ["param3", "param4"],
-            "example_request": {}
+            "optional_params": ["param3"],
+            "example_request": {"key": "value"}
           }
         }
       },
@@ -63,31 +50,32 @@ You MUST ALWAYS respond with a JSON object containing these exact fields:
   ],
   "agents": [
     {
-      "name": "AI Agent Name",
-      "role": "Agent's role",
-      "goal": "Specific objective for this agent",
-      "rules": "Guiding principles for the agent",
+      "name": "SpecificAgentName",
+      "role": "Detailed role description",
+      "goal": "Specific objective this agent accomplishes",
+      "rules": "Detailed operating principles",
       "memory": "Initial memory context",
-      "why_needed": "Why this agent is essential"
+      "why_needed": "Detailed explanation of why this agent is essential"
     }
   ],
   "clarification_questions": [],
   "automation_blueprint": {
     "version": "1.0.0",
-    "description": "Automation workflow description",
+    "description": "Detailed automation workflow description",
     "trigger": {
-      "type": "manual"
+      "type": "manual|scheduled|webhook",
+      "details": {}
     },
     "steps": [
       {
         "id": "step_1",
-        "name": "Step Name",
+        "name": "Descriptive Step Name",
         "type": "action",
         "action": {
           "integration": "platform_name",
-          "method": "action_method",
+          "method": "specific_method",
           "parameters": {},
-          "platform_credential_id": "credential_ref"
+          "platform_credential_id": "credential_reference"
         }
       }
     ],
@@ -95,53 +83,49 @@ You MUST ALWAYS respond with a JSON object containing these exact fields:
   }
 }
 
-CRITICAL RULES:
-1. ALWAYS include "summary" and "steps" fields - these are mandatory
-2. ALWAYS include "platforms" array with at least one platform if the automation needs external services
-3. For EVERY platform, include complete "api_config" with base_url, auth_type, auth_header_format, and methods
-4. ALWAYS include "agents" array with at least one AI agent recommendation
-5. ONLY include "clarification_questions" if you need more information before proceeding
-6. Include "automation_blueprint" for new automations or when making changes
-7. Ensure ALL JSON is properly formatted and valid
-
-Platform API Configuration Guidelines:
-- Research the platform's actual API documentation
-- Include the real base_url (e.g., "https://api.slack.com", "https://www.googleapis.com/gmail/v1")
-- Specify correct auth_type: bearer_token, api_key, oauth, basic_auth, or custom
-- Define auth_header_format exactly as the API expects
-- Map all relevant API methods with correct endpoints and parameters
-
-Common Platform Examples:
-- Slack: Bearer token, "https://slack.com/api", methods like "chat.postMessage"
-- Gmail: OAuth2, "https://www.googleapis.com/gmail/v1", methods like "users/me/messages"
-- Trello: API key + token, "https://api.trello.com/1", methods like "cards"
-- Discord: Bearer token, "https://discord.com/api/v10"
-- GitHub: Bearer token, "https://api.github.com"
-- Notion: Bearer token, "https://api.notion.com/v1"
-- Any platform: Research their API docs and generate configuration
-
-AI Agent Guidelines:
-- Always recommend at least one AI agent for automations
-- Provide specific, actionable roles and goals
-- Include relevant memory context
-- Explain clearly why the agent is needed
-
-4. **BLUEPRINT ENHANCEMENT**: Include complete API call configurations in automation_blueprint that can be executed dynamically using the api_config you provide.
-
-5. **UNIVERSAL PLATFORM SUPPORT**: You can work with ANY platform - Notion, Salesforce, Discord, LinkedIn, Facebook, Twitter, GitHub, Jira, Spotify, Zapier, HubSpot, Mailchimp, Shopify, WooCommerce, etc. Just analyze their API and generate the configuration dynamically.
-
-Example Response for "Create an automation to summarize emails and post to Slack":
+EXAMPLE CORRECT RESPONSE for "Create automation to send email notifications for new Slack messages":
 
 {
-  "summary": "This automation monitors your Gmail inbox, uses AI to summarize new emails, and posts the summaries to a designated Slack channel for quick team updates.",
+  "summary": "This automation monitors a specific Slack channel for new messages and automatically sends email notifications to designated recipients with message details and sender information.",
   "steps": [
-    "Monitor Gmail inbox for new emails using Gmail API",
-    "Extract email content and sender information",
-    "Use EmailSummarizer AI agent to create concise summaries",
-    "Format summary with sender details and key points",
-    "Post formatted summary to designated Slack channel"
+    "Connect to Slack API and monitor specified channel for new messages",
+    "Extract message content, sender information, and timestamp",
+    "Format message data into readable email template",
+    "Send email notification via Gmail API to configured recipients",
+    "Log notification status and update message tracking"
   ],
   "platforms": [
+    {
+      "name": "Slack",
+      "api_config": {
+        "base_url": "https://slack.com/api",
+        "auth_type": "bearer_token",
+        "auth_header_format": "Authorization: Bearer {token}",
+        "methods": {
+          "list_messages": {
+            "endpoint": "conversations.history",
+            "http_method": "GET",
+            "required_params": ["channel"],
+            "optional_params": ["limit", "oldest"],
+            "example_request": {"channel": "C1234567890", "limit": 10}
+          }
+        }
+      },
+      "credentials": [
+        {
+          "field": "bot_token",
+          "placeholder": "xoxb-your-bot-token",
+          "link": "https://api.slack.com/apps",
+          "why_needed": "Required to access Slack channels and read messages"
+        },
+        {
+          "field": "channel_id",
+          "placeholder": "C1234567890",
+          "link": "https://slack.com/help/articles/201402297",
+          "why_needed": "Specific channel ID to monitor for new messages"
+        }
+      ]
+    },
     {
       "name": "Gmail",
       "api_config": {
@@ -149,19 +133,12 @@ Example Response for "Create an automation to summarize emails and post to Slack
         "auth_type": "oauth",
         "auth_header_format": "Authorization: Bearer {token}",
         "methods": {
-          "list_messages": {
-            "endpoint": "users/me/messages",
-            "http_method": "GET",
-            "required_params": [],
-            "optional_params": ["q", "maxResults"],
-            "example_request": {"q": "is:unread", "maxResults": 10}
-          },
-          "get_message": {
-            "endpoint": "users/me/messages/{id}",
-            "http_method": "GET",
-            "required_params": ["id"],
-            "optional_params": ["format"],
-            "example_request": {"format": "full"}
+          "send_email": {
+            "endpoint": "users/me/messages/send",
+            "http_method": "POST",
+            "required_params": ["raw"],
+            "optional_params": [],
+            "example_request": {"raw": "base64_encoded_email"}
           }
         }
       },
@@ -170,113 +147,191 @@ Example Response for "Create an automation to summarize emails and post to Slack
           "field": "access_token",
           "placeholder": "ya29.a0...",
           "link": "https://console.cloud.google.com/apis/credentials",
-          "why_needed": "OAuth 2.0 access token for Gmail API authentication"
+          "why_needed": "OAuth access token for Gmail API authentication"
         },
         {
-          "field": "refresh_token",
-          "placeholder": "1//04...",
-          "link": "https://console.cloud.google.com/apis/credentials",
-          "why_needed": "OAuth 2.0 refresh token to maintain access"
-        }
-      ]
-    },
-    {
-      "name": "Slack",
-      "api_config": {
-        "base_url": "https://slack.com/api",
-        "auth_type": "bearer_token",
-        "auth_header_format": "Authorization: Bearer {token}",
-        "methods": {
-          "post_message": {
-            "endpoint": "chat.postMessage",
-            "http_method": "POST",
-            "required_params": ["channel", "text"],
-            "optional_params": ["as_user", "blocks", "thread_ts"],
-            "example_request": {"channel": "C1234567890", "text": "Hello World"}
-          }
-        }
-      },
-      "credentials": [
-        {
-          "field": "bot_token",
-          "placeholder": "xoxb-...",
-          "link": "https://api.slack.com/apps",
-          "why_needed": "Bot token to post messages to Slack channels"
-        },
-        {
-          "field": "channel_id",
-          "placeholder": "C1234567890",
-          "link": "https://slack.com/help/articles/201402297",
-          "why_needed": "Specific channel ID where summaries will be posted"
+          "field": "recipient_email",
+          "placeholder": "user@example.com",
+          "link": "",
+          "why_needed": "Email address where notifications will be sent"
         }
       ]
     }
   ],
   "agents": [
     {
-      "name": "EmailSummarizer",
-      "role": "Email content analyzer and summarizer",
-      "goal": "Analyze email content and create concise, actionable summaries",
-      "rules": "Keep summaries under 100 words, highlight key action items, maintain professional tone",
-      "memory": "Previous email patterns and user preferences for summary style",
-      "why_needed": "Essential for converting lengthy emails into digestible summaries for team awareness"
+      "name": "MessageProcessor",
+      "role": "Slack message analyzer and email formatter",
+      "goal": "Process Slack messages and create well-formatted email notifications",
+      "rules": "Filter out bot messages, format content for email readability, include sender context",
+      "memory": "Previous message patterns and user preferences for notification style",
+      "why_needed": "Essential for converting Slack message format into professional email notifications"
     }
   ],
+  "clarification_questions": [],
   "automation_blueprint": {
     "version": "1.0.0",
-    "description": "Email summarization and Slack notification automation",
+    "description": "Slack to email notification automation workflow",
     "trigger": {
       "type": "scheduled",
-      "cron_expression": "*/15 * * * *"
+      "details": {"cron_expression": "*/5 * * * *"}
     },
     "steps": [
       {
-        "id": "fetch_emails",
-        "name": "Fetch New Emails",
-        "type": "action",
-        "action": {
-          "integration": "gmail",
-          "method": "list_messages",
-          "parameters": {
-            "q": "is:unread",
-            "maxResults": 10
-          },
-          "platform_credential_id": "gmail_cred"
-        }
-      },
-      {
-        "id": "summarize_email",
-        "name": "Summarize Email Content",
-        "type": "ai_agent_call",
-        "ai_agent_call": {
-          "agent_id": "email_summarizer_agent",
-          "input_prompt": "Summarize this email: {{email_content}}",
-          "output_variable": "email_summary"
-        }
-      },
-      {
-        "id": "post_to_slack",
-        "name": "Post Summary to Slack",
+        "id": "fetch_messages",
+        "name": "Fetch New Slack Messages",
         "type": "action",
         "action": {
           "integration": "slack",
-          "method": "post_message",
+          "method": "list_messages",
           "parameters": {
             "channel": "{{channel_id}}",
-            "text": "📧 Email Summary: {{email_summary}}"
+            "limit": 10
           },
           "platform_credential_id": "slack_cred"
+        }
+      },
+      {
+        "id": "process_message",
+        "name": "Process Message Content",
+        "type": "ai_agent_call",
+        "ai_agent_call": {
+          "agent_id": "message_processor_agent",
+          "input_prompt": "Format this Slack message for email: {{message_content}}",
+          "output_variable": "formatted_email"
+        }
+      },
+      {
+        "id": "send_notification",
+        "name": "Send Email Notification",
+        "type": "action",
+        "action": {
+          "integration": "gmail",
+          "method": "send_email",
+          "parameters": {
+            "to": "{{recipient_email}}",
+            "subject": "New Slack Message Notification",
+            "body": "{{formatted_email}}"
+          },
+          "platform_credential_id": "gmail_cred"
         }
       }
     ],
     "variables": {
-      "email_content": "",
-      "email_summary": ""
+      "message_content": "",
+      "formatted_email": ""
     }
   }
 }
 
-Remember: EVERY response must be valid JSON with ALL required fields AND complete api_config for each platform. This ensures the UI displays all sections properly AND the automation can execute against any platform dynamically.`;
+CRITICAL RULES:
+1. NEVER respond without ALL required fields filled with meaningful content
+2. ALWAYS include at least 3-5 detailed steps
+3. ALWAYS include complete platform configurations with real API endpoints
+4. ALWAYS include detailed credential requirements
+5. ALWAYS include at least one specific AI agent recommendation
+6. ALWAYS include automation_blueprint for actionable workflows
+7. JSON must be valid and parseable - test before responding
+
+PENALTY WARNING: Incomplete responses will be rejected and you will be forced to retry.`;
+
+// JSON Schema for validation
+const REQUIRED_RESPONSE_SCHEMA = {
+  summary: 'string',
+  steps: 'array',
+  platforms: 'array',
+  agents: 'array',
+  clarification_questions: 'array',
+  automation_blueprint: 'object'
+};
+
+// Validate response structure
+const validateResponse = (response: any): { isValid: boolean; missing: string[] } => {
+  const missing: string[] = [];
+  
+  if (!response.summary || response.summary.trim().length < 10) {
+    missing.push('summary (must be descriptive, 10+ characters)');
+  }
+  
+  if (!response.steps || !Array.isArray(response.steps) || response.steps.length < 3) {
+    missing.push('steps (must be array with at least 3 detailed steps)');
+  }
+  
+  if (!response.platforms || !Array.isArray(response.platforms) || response.platforms.length === 0) {
+    missing.push('platforms (must include at least one platform with credentials)');
+  } else {
+    response.platforms.forEach((platform: any, index: number) => {
+      if (!platform.credentials || platform.credentials.length === 0) {
+        missing.push(`platforms[${index}].credentials (must include credential requirements)`);
+      }
+      if (!platform.api_config || !platform.api_config.base_url) {
+        missing.push(`platforms[${index}].api_config.base_url (must include real API endpoint)`);
+      }
+    });
+  }
+  
+  if (!response.agents || !Array.isArray(response.agents) || response.agents.length === 0) {
+    missing.push('agents (must include at least one AI agent recommendation)');
+  }
+  
+  if (!response.automation_blueprint || typeof response.automation_blueprint !== 'object') {
+    missing.push('automation_blueprint (must include executable workflow)');
+  }
+  
+  return {
+    isValid: missing.length === 0,
+    missing
+  };
+};
+
+// Extract JSON from response with multiple strategies
+const extractAndValidateJSON = (responseText: string): { json: any; isValid: boolean; missing: string[] } => {
+  let extractedJSON = null;
+  
+  // Strategy 1: Find JSON in code blocks
+  const codeBlockMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
+  if (codeBlockMatch) {
+    try {
+      extractedJSON = JSON.parse(codeBlockMatch[1]);
+    } catch (e) {
+      console.log('Failed to parse JSON from code block');
+    }
+  }
+  
+  // Strategy 2: Find complete JSON object
+  if (!extractedJSON) {
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      let braceCount = 0;
+      let endIndex = -1;
+      for (let i = 0; i < jsonMatch[0].length; i++) {
+        if (jsonMatch[0][i] === '{') braceCount++;
+        else if (jsonMatch[0][i] === '}') {
+          braceCount--;
+          if (braceCount === 0) {
+            endIndex = i + 1;
+            break;
+          }
+        }
+      }
+      
+      if (endIndex > 0) {
+        try {
+          extractedJSON = JSON.parse(jsonMatch[0].substring(0, endIndex));
+        } catch (e) {
+          console.log('Failed to parse extracted JSON object');
+        }
+      }
+    }
+  }
+  
+  if (!extractedJSON) {
+    return { json: null, isValid: false, missing: ['Valid JSON structure'] };
+  }
+  
+  const validation = validateResponse(extractedJSON);
+  return { json: extractedJSON, ...validation };
+};
 
 // Function to retrieve relevant knowledge from the universal knowledge store
 const retrieveRelevantKnowledge = async (message: string, messages: any[], supabase: any): Promise<string> => {
@@ -406,7 +461,7 @@ const getAuthHeader = (llmProvider: string, apiKey: string) => {
 
 // Function to build system prompt from agent configuration
 const buildSystemPrompt = (agentConfig: any, knowledgeContext: string) => {
-  let systemPrompt = DEFAULT_SYSTEM_PROMPT;
+  let systemPrompt = ENFORCED_SYSTEM_PROMPT;
   
   if (agentConfig) {
     systemPrompt = '';
@@ -433,7 +488,7 @@ const buildSystemPrompt = (agentConfig: any, knowledgeContext: string) => {
     }
     
     if (!systemPrompt) {
-      systemPrompt = DEFAULT_SYSTEM_PROMPT;
+      systemPrompt = ENFORCED_SYSTEM_PROMPT;
     }
   }
 
@@ -446,7 +501,6 @@ const buildSystemPrompt = (agentConfig: any, knowledgeContext: string) => {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -463,39 +517,27 @@ serve(async (req) => {
 
     console.log('Received request with:', { llmProvider, model, hasApiKey: !!apiKey, hasAgentConfig: !!agentConfig });
 
-    // Initialize Supabase client for knowledge retrieval
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Retrieve relevant knowledge before generating response
     const knowledgeContext = await retrieveRelevantKnowledge(message, messages, supabase);
-
-    // Use provided API key or fallback to environment variable
     const effectiveApiKey = apiKey || Deno.env.get('OPENAI_API_KEY');
     
     if (!effectiveApiKey) {
       throw new Error('No API key provided');
     }
 
-    // Build system prompt from agent configuration and knowledge
-    const systemPrompt = buildSystemPrompt(agentConfig, knowledgeContext);
-    console.log('Using system prompt with knowledge context');
-
-    // Get API endpoint and auth headers based on LLM provider
+    const systemPrompt = buildSystemPrompt(agentConfig, knowledgeContext) || ENFORCED_SYSTEM_PROMPT;
     const apiEndpoint = getApiEndpoint(llmProvider);
     const authHeaders = getAuthHeader(llmProvider, effectiveApiKey);
 
-    console.log('Making request to:', apiEndpoint, 'with model:', model);
-
-    // Prepare request body based on LLM provider
     let requestBody;
     
     if (llmProvider.toLowerCase() === 'claude') {
-      // Anthropic Claude format
       requestBody = {
         model: model,
-        max_tokens: 2000,
+        max_tokens: 4000,
         messages: [
           ...messages.map((msg: any) => ({
             role: msg.isBot ? 'assistant' : 'user',
@@ -503,55 +545,92 @@ serve(async (req) => {
           })),
           { role: 'user', content: message }
         ],
-        system: systemPrompt
+        system: ENFORCED_SYSTEM_PROMPT + (knowledgeContext || '')
       };
     } else {
-      // OpenAI format (also works for Grok, DeepSeek)
       requestBody = {
         model: model,
         messages: [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: ENFORCED_SYSTEM_PROMPT + (knowledgeContext || '') },
           ...messages.map((msg: any) => ({
             role: msg.isBot ? 'assistant' : 'user',
             content: msg.text
           })),
           { role: 'user', content: message }
         ],
-        max_tokens: 2000,
-        temperature: 0.7,
+        max_tokens: 4000,
+        temperature: 0.1,
       };
     }
 
-    const response = await fetch(apiEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...authHeaders,
-      },
-      body: JSON.stringify(requestBody),
-    });
+    // Retry mechanism for compliance
+    let attempts = 0;
+    let finalResponse = '';
+    
+    while (attempts < 3) {
+      console.log(`Attempt ${attempts + 1} - Making request to:`, apiEndpoint);
+      
+      const response = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        body: JSON.stringify(requestBody),
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API error:', response.status, errorText);
-      throw new Error(`${llmProvider} API error: ${response.status} - ${errorText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`${llmProvider} API error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      let aiResponse;
+      
+      if (llmProvider.toLowerCase() === 'claude') {
+        aiResponse = data.content[0].text;
+      } else {
+        aiResponse = data.choices[0].message.content;
+      }
+
+      console.log('Received response, validating...');
+      
+      // Validate the response
+      const { json, isValid, missing } = extractAndValidateJSON(aiResponse);
+      
+      if (isValid && json) {
+        console.log('✅ Response validation passed');
+        finalResponse = aiResponse;
+        break;
+      } else {
+        console.log(`❌ Response validation failed. Missing: ${missing.join(', ')}`);
+        attempts++;
+        
+        if (attempts < 3) {
+          // Add retry instruction to force compliance
+          const retryPrompt = `Your previous response was incomplete. MISSING: ${missing.join(', ')}. 
+          
+RETRY with COMPLETE JSON including ALL required fields. Your response MUST include:
+- Detailed summary (descriptive, not generic)
+- At least 3-5 specific step-by-step actions
+- Complete platform configurations with real API endpoints and credentials
+- Detailed AI agent recommendations
+- Complete automation blueprint
+
+Respond ONLY with valid JSON matching the required schema.`;
+          
+          requestBody.messages.push({ role: 'user', content: retryPrompt });
+        } else {
+          console.log('Max attempts reached, using fallback response');
+          finalResponse = aiResponse; // Use the last attempt even if incomplete
+        }
+      }
     }
 
-    const data = await response.json();
-    console.log('Received response from API');
+    // Store conversation insights
+    storeConversationInsights(message, finalResponse, supabase);
 
-    // Extract response content based on provider
-    let aiResponse;
-    if (llmProvider.toLowerCase() === 'claude') {
-      aiResponse = data.content[0].text;
-    } else {
-      aiResponse = data.choices[0].message.content;
-    }
-
-    // Store conversation insights for learning (async, don't await)
-    storeConversationInsights(message, aiResponse, supabase);
-
-    return new Response(JSON.stringify({ response: aiResponse }), {
+    return new Response(JSON.stringify({ response: finalResponse }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {

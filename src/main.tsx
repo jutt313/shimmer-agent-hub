@@ -16,6 +16,7 @@ import CookiePolicy from "./pages/CookiePolicy";
 import Disclaimer from "./pages/Disclaimer";
 import Support from "./pages/Support";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AdminRoute from "./components/AdminRoute";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -40,7 +41,16 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/cookie-policy" element={<CookiePolicy />} />
             <Route path="/disclaimer" element={<Disclaimer />} />
             <Route path="/support" element={<Support />} />
-            <Route path="/2345678ytrewetrhyjuikjhtgfddvnjmkujynhbfgvdcdvbhtjyhtbgvfdcshyjujuyhtgrf" element={<KnowledgeAdmin />} />
+            <Route 
+              path="/admin/knowledge" 
+              element={
+                <ProtectedRoute>
+                  <AdminRoute>
+                    <KnowledgeAdmin />
+                  </AdminRoute>
+                </ProtectedRoute>
+              } 
+            />
             <Route 
               path="/automations" 
               element={

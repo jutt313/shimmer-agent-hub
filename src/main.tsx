@@ -21,7 +21,7 @@ import "./index.css";
 const queryClient = new QueryClient();
 
 // Set favicon
-const favicon = document.querySelector("link[rel*='icon']") || document.createElement('link');
+const favicon = (document.querySelector("link[rel*='icon']") as HTMLLinkElement) || document.createElement('link');
 favicon.type = 'image/png';
 favicon.rel = 'shortcut icon';
 favicon.href = '/lovable-uploads/6b9580a6-e2cd-4056-95a9-7f730cbf6025.png';

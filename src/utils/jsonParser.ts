@@ -411,7 +411,7 @@ const fixMalformedJson = (jsonStr: string): string | null => {
   }
 };
 
-const cleanDisplayText = (text: string): string => {
+export const cleanDisplayText = (text: string): string => {
   let cleanText = text;
   
   // Remove JSON code blocks

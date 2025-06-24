@@ -1,257 +1,269 @@
-import { supabase } from '@/integrations/supabase/client';
-import { AutomationBlueprint } from '@/types/automation';
 
-// Automation scheduler service for cron-based triggers
-export interface ScheduleConfig {
-  automationId: string;
-  cronExpression: string;
-  timezone: string;
-  isActive: boolean;
-  nextRun?: Date;
-  lastRun?: Date;
+import { supabase } from '@/integrations/supabase/client';
+import { globalErrorLogger } from '@/utils/errorLogger';
+
+interface ScheduledAutomation {
+  id: string;
+  automation_id: string;
+  user_id: string;
+  cron_expression: string;
+  next_run: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export class AutomationScheduler {
-  private schedules = new Map<string, ScheduleConfig>();
-  private timers = new Map<string, NodeJS.Timeout>();
+  private static instance: AutomationScheduler;
+  private isRunning = false;
+  private checkInterval: number | null = null;
 
-  constructor() {
-    console.log('🕒 AutomationScheduler initialized');
+  private constructor() {}
+
+  static getInstance(): AutomationScheduler {
+    if (!AutomationScheduler.instance) {
+      AutomationScheduler.instance = new AutomationScheduler();
+    }
+    return AutomationScheduler.instance;
   }
 
-  addSchedule(config: ScheduleConfig): void {
-    console.log(`📅 Adding schedule for automation ${config.automationId}:`, config.cronExpression);
-    
-    this.schedules.set(config.automationId, config);
-    
-    if (config.isActive) {
-      this.scheduleNextExecution(config);
-    }
-  }
-
-  removeSchedule(automationId: string): void {
-    console.log(`🗑️ Removing schedule for automation ${automationId}`);
-    
-    const timer = this.timers.get(automationId);
-    if (timer) {
-      clearTimeout(timer);
-      this.timers.delete(automationId);
-    }
-    
-    this.schedules.delete(automationId);
-  }
-
-  updateSchedule(automationId: string, updates: Partial<ScheduleConfig>): void {
-    const existing = this.schedules.get(automationId);
-    if (!existing) {
-      throw new Error(`Schedule not found for automation: ${automationId}`);
-    }
-
-    const updated = { ...existing, ...updates };
-    this.schedules.set(automationId, updated);
-    
-    // Reschedule if cron expression or active status changed
-    if (updates.cronExpression || updates.isActive !== undefined) {
-      this.removeSchedule(automationId);
-      if (updated.isActive) {
-        this.scheduleNextExecution(updated);
-      }
-    }
-  }
-
-  private scheduleNextExecution(config: ScheduleConfig): void {
-    const nextRun = this.calculateNextRun(config.cronExpression, config.timezone);
-    
-    if (!nextRun) {
-      console.error(`❌ Invalid cron expression for automation ${config.automationId}: ${config.cronExpression}`);
+  async start(): Promise<void> {
+    if (this.isRunning) {
+      globalErrorLogger.log('WARN', 'Scheduler already running');
       return;
     }
 
-    const delay = nextRun.getTime() - Date.now();
-    
-    if (delay <= 0) {
-      // If the calculated time is in the past, schedule for the next valid time
-      const futureRun = this.calculateNextRun(config.cronExpression, config.timezone, new Date(Date.now() + 60000));
-      if (futureRun) {
-        this.scheduleExecution(config, futureRun);
-      }
-    } else {
-      this.scheduleExecution(config, nextRun);
+    this.isRunning = true;
+    globalErrorLogger.log('INFO', 'Automation scheduler started');
+
+    // Check for due automations every minute
+    this.checkInterval = window.setInterval(() => {
+      this.checkAndExecuteDueAutomations();
+    }, 60000);
+
+    // Initial check
+    await this.checkAndExecuteDueAutomations();
+  }
+
+  stop(): void {
+    if (this.checkInterval) {
+      clearInterval(this.checkInterval);
+      this.checkInterval = null;
     }
+    this.isRunning = false;
+    globalErrorLogger.log('INFO', 'Automation scheduler stopped');
   }
 
-  private scheduleExecution(config: ScheduleConfig, runTime: Date): void {
-    const delay = runTime.getTime() - Date.now();
-    
-    console.log(`⏰ Scheduling automation ${config.automationId} to run at ${runTime.toISOString()} (in ${Math.round(delay / 1000)}s)`);
-    
-    const timer = setTimeout(async () => {
-      console.log(`🚀 Executing scheduled automation ${config.automationId}`);
-      
-      try {
-        await this.executeAutomation(config.automationId);
-        
-        // Update last run time
-        const updatedConfig = { ...config, lastRun: new Date() };
-        this.schedules.set(config.automationId, updatedConfig);
-        
-        // Schedule next execution
-        this.scheduleNextExecution(updatedConfig);
-        
-      } catch (error) {
-        console.error(`❌ Failed to execute scheduled automation ${config.automationId}:`, error);
-        
-        // Still schedule next execution even if this one failed
-        this.scheduleNextExecution(config);
-      }
-    }, delay);
-    
-    this.timers.set(config.automationId, timer);
-  }
-
-  private async executeAutomation(automationId: string): Promise<void> {
-    // In a real implementation, this would trigger the automation execution
-    // For now, we'll use the existing execute-automation edge function
+  async scheduleAutomation(
+    automationId: string,
+    userId: string,
+    cronExpression: string
+  ): Promise<boolean> {
     try {
-      const { data, error } = await supabase.functions.invoke('execute-automation', {
-        body: {
-          automation_id: automationId,
-          trigger_data: {
-            type: 'scheduled',
-            timestamp: new Date().toISOString()
-          }
-        }
+      const nextRun = this.calculateNextRun(cronExpression);
+      
+      if (!nextRun) {
+        throw new Error('Invalid cron expression');
+      }
+
+      // Use Supabase RPC to handle scheduling in the database
+      const { error } = await supabase.rpc('schedule_automation', {
+        p_automation_id: automationId,
+        p_user_id: userId,
+        p_cron_expression: cronExpression,
+        p_next_run: nextRun.toISOString()
       });
 
-      if (error) {
-        throw new Error(error.message);
-      }
+      if (error) throw error;
 
-      console.log(`✅ Scheduled automation ${automationId} executed successfully:`, data);
-    } catch (error) {
-      console.error(`💥 Scheduled automation ${automationId} execution failed:`, error);
-      throw error;
+      globalErrorLogger.log('INFO', 'Automation scheduled successfully', {
+        automationId,
+        userId,
+        cronExpression,
+        nextRun: nextRun.toISOString()
+      });
+
+      return true;
+    } catch (error: any) {
+      globalErrorLogger.log('ERROR', 'Failed to schedule automation', {
+        automationId,
+        userId,
+        cronExpression,
+        error: error.message
+      });
+      return false;
     }
   }
 
-  private calculateNextRun(cronExpression: string, timezone: string, fromDate?: Date): Date | null {
-    // Simple cron parser - in production, use a library like 'node-cron' or 'cron-parser'
+  async unscheduleAutomation(automationId: string, userId: string): Promise<boolean> {
     try {
-      const now = fromDate || new Date();
-      const parts = cronExpression.split(' ');
-      
-      if (parts.length !== 5) {
-        throw new Error('Invalid cron format. Expected: minute hour day month weekday');
-      }
+      const { error } = await supabase.rpc('unschedule_automation', {
+        p_automation_id: automationId,
+        p_user_id: userId
+      });
 
-      const [minute, hour, day, month, weekday] = parts;
-      
-      // For demo purposes, implement basic parsing for common patterns
-      if (cronExpression === '0 9 * * *') {
-        // Daily at 9 AM
-        const next = new Date(now);
-        next.setHours(9, 0, 0, 0);
-        if (next <= now) {
-          next.setDate(next.getDate() + 1);
-        }
-        return next;
-      } else if (cronExpression === '0 * * * *') {
-        // Every hour
-        const next = new Date(now);
-        next.setMinutes(0, 0, 0);
-        next.setHours(next.getHours() + 1);
-        return next;
-      } else if (cronExpression === '*/5 * * * *') {
-        // Every 5 minutes
-        const next = new Date(now);
-        const currentMinutes = next.getMinutes();
-        const nextMinutes = Math.ceil(currentMinutes / 5) * 5;
-        next.setMinutes(nextMinutes, 0, 0);
-        if (nextMinutes >= 60) {
-          next.setHours(next.getHours() + 1);
-          next.setMinutes(0, 0, 0);
-        }
-        return next;
-      }
-      
-      // For complex expressions, you would use a proper cron library
-      console.warn(`⚠️ Complex cron expression not supported in demo: ${cronExpression}`);
-      return null;
-      
-    } catch (error) {
-      console.error('Failed to parse cron expression:', error);
-      return null;
+      if (error) throw error;
+
+      globalErrorLogger.log('INFO', 'Automation unscheduled successfully', {
+        automationId,
+        userId
+      });
+
+      return true;
+    } catch (error: any) {
+      globalErrorLogger.log('ERROR', 'Failed to unschedule automation', {
+        automationId,
+        userId,
+        error: error.message
+      });
+      return false;
     }
   }
 
-  getScheduleStatus(automationId: string): ScheduleConfig | null {
-    return this.schedules.get(automationId) || null;
-  }
-
-  getAllSchedules(): ScheduleConfig[] {
-    return Array.from(this.schedules.values());
-  }
-
-  startScheduler(): void {
-    console.log('🎯 AutomationScheduler started');
-    
-    // In a real implementation, you would load existing schedules from the database
-    this.loadSchedulesFromDatabase();
-  }
-
-  stopScheduler(): void {
-    console.log('🛑 AutomationScheduler stopped');
-    
-    // Clear all timers
-    this.timers.forEach(timer => clearTimeout(timer));
-    this.timers.clear();
-  }
-
-  private async loadSchedulesFromDatabase(): Promise<void> {
+  private async checkAndExecuteDueAutomations(): Promise<void> {
     try {
-      // Load scheduled automations from the database
-      const { data: automations, error } = await supabase
-        .from('automations')
-        .select('id, automation_blueprint')
-        .eq('status', 'active');
+      const { data: dueAutomations, error } = await supabase.rpc('get_due_automations');
 
-      if (error) {
-        console.error('Failed to load automations for scheduling:', error);
+      if (error) throw error;
+
+      if (!dueAutomations || dueAutomations.length === 0) {
         return;
       }
 
-      automations?.forEach(automation => {
-        try {
-          // Properly cast the blueprint to our expected type
-          const blueprint = automation.automation_blueprint as AutomationBlueprint;
-          
-          if (blueprint?.trigger?.type === 'scheduled' && blueprint.trigger.cron_expression) {
-            const scheduleConfig: ScheduleConfig = {
-              automationId: automation.id,
-              cronExpression: blueprint.trigger.cron_expression,
-              timezone: 'UTC', // Default timezone
-              isActive: true
-            };
-            
-            this.addSchedule(scheduleConfig);
+      globalErrorLogger.log('INFO', `Found ${dueAutomations.length} due automations`);
+
+      for (const automation of dueAutomations) {
+        await this.executeDueAutomation(automation);
+      }
+    } catch (error: any) {
+      globalErrorLogger.log('ERROR', 'Failed to check due automations', {
+        error: error.message
+      });
+    }
+  }
+
+  private async executeDueAutomation(automation: ScheduledAutomation): Promise<void> {
+    try {
+      globalErrorLogger.log('INFO', 'Executing scheduled automation', {
+        automationId: automation.automation_id,
+        userId: automation.user_id
+      });
+
+      // Execute the automation
+      const { error } = await supabase.functions.invoke('execute-automation', {
+        body: {
+          automation_id: automation.automation_id,
+          trigger_data: {
+            trigger_type: 'scheduled',
+            scheduled_time: new Date().toISOString()
           }
-        } catch (parseError) {
-          console.error(`Failed to parse blueprint for automation ${automation.id}:`, parseError);
         }
       });
 
-      console.log(`📊 Loaded ${this.schedules.size} scheduled automations`);
-    } catch (error) {
-      console.error('Error loading schedules from database:', error);
+      if (error) {
+        throw error;
+      }
+
+      // Update the next run time
+      const nextRun = this.calculateNextRun(automation.cron_expression);
+      if (nextRun) {
+        await supabase.rpc('update_next_run', {
+          p_automation_id: automation.automation_id,
+          p_next_run: nextRun.toISOString()
+        });
+      }
+
+      globalErrorLogger.log('INFO', 'Scheduled automation executed successfully', {
+        automationId: automation.automation_id
+      });
+
+    } catch (error: any) {
+      globalErrorLogger.log('ERROR', 'Failed to execute scheduled automation', {
+        automationId: automation.automation_id,
+        error: error.message
+      });
+    }
+  }
+
+  private calculateNextRun(cronExpression: string): Date | null {
+    try {
+      const now = new Date();
+      
+      // Enhanced cron parser that handles standard expressions
+      const parts = cronExpression.trim().split(/\s+/);
+      
+      if (parts.length !== 5) {
+        throw new Error('Invalid cron expression format');
+      }
+
+      const [minute, hour, dayOfMonth, month, dayOfWeek] = parts;
+      
+      const next = new Date(now);
+      next.setSeconds(0);
+      next.setMilliseconds(0);
+
+      // Parse minute
+      if (minute !== '*') {
+        const minuteValue = parseInt(minute);
+        if (isNaN(minuteValue) || minuteValue < 0 || minuteValue > 59) {
+          throw new Error('Invalid minute value');
+        }
+        next.setMinutes(minuteValue);
+      }
+
+      // Parse hour
+      if (hour !== '*') {
+        const hourValue = parseInt(hour);
+        if (isNaN(hourValue) || hourValue < 0 || hourValue > 23) {
+          throw new Error('Invalid hour value');
+        }
+        next.setHours(hourValue);
+      }
+
+      // If the calculated time is in the past, move to next occurrence
+      if (next <= now) {
+        if (minute !== '*' && hour !== '*') {
+          // Specific time - move to next day
+          next.setDate(next.getDate() + 1);
+        } else if (minute !== '*') {
+          // Specific minute - move to next hour
+          next.setHours(next.getHours() + 1);
+        } else {
+          // Every minute - move to next minute
+          next.setMinutes(next.getMinutes() + 1);
+        }
+      }
+
+      return next;
+    } catch (error: any) {
+      globalErrorLogger.log('ERROR', 'Failed to calculate next run', {
+        cronExpression,
+        error: error.message
+      });
+      return null;
+    }
+  }
+
+  async getScheduledAutomations(userId: string): Promise<ScheduledAutomation[]> {
+    try {
+      const { data, error } = await supabase
+        .from('scheduled_automations')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .order('next_run', { ascending: true });
+
+      if (error) throw error;
+
+      return data || [];
+    } catch (error: any) {
+      globalErrorLogger.log('ERROR', 'Failed to get scheduled automations', {
+        userId,
+        error: error.message
+      });
+      return [];
     }
   }
 }
 
-// Global scheduler instance
-export const globalScheduler = new AutomationScheduler();
-
-// Auto-start the scheduler when the module is imported
-if (typeof window !== 'undefined') {
-  // Only start in browser environment
-  globalScheduler.startScheduler();
-}
+export const globalScheduler = AutomationScheduler.getInstance();

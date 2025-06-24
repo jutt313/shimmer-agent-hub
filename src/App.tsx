@@ -6,6 +6,11 @@ import Index from "@/pages/Index";
 import Automations from "@/pages/Automations";
 import AutomationDetail from "@/pages/AutomationDetail";
 import KnowledgeAdmin from "@/pages/KnowledgeAdmin";
+import PrivacyPolicy from "@/pages/PrivacyPolicy";
+import TermsConditions from "@/pages/TermsConditions";
+import CookiePolicy from "@/pages/CookiePolicy";
+import Disclaimer from "@/pages/Disclaimer";
+import Support from "@/pages/Support";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ErrorIndicator from "@/components/ErrorIndicator";
 
@@ -24,6 +29,11 @@ function App() {
               <Route path="/automations" element={<Automations />} />
               <Route path="/automations/:id" element={<AutomationDetail />} />
               <Route path="/knowledge" element={<KnowledgeAdmin />} />
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+              <Route path="/terms-conditions" element={<TermsConditions />} />
+              <Route path="/cookie-policy" element={<CookiePolicy />} />
+              <Route path="/disclaimer" element={<Disclaimer />} />
+              <Route path="/support" element={<Support />} />
             </Routes>
           </Router>
         </div>

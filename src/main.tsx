@@ -10,10 +10,22 @@ import Auth from "./pages/Auth";
 import Automations from "./pages/Automations";
 import AutomationDetail from "./pages/AutomationDetail";
 import KnowledgeAdmin from "./pages/KnowledgeAdmin";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsConditions from "./pages/TermsConditions";
+import CookiePolicy from "./pages/CookiePolicy";
+import Disclaimer from "./pages/Disclaimer";
+import Support from "./pages/Support";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./index.css";
 
 const queryClient = new QueryClient();
+
+// Set favicon
+const favicon = document.querySelector("link[rel*='icon']") || document.createElement('link');
+favicon.type = 'image/png';
+favicon.rel = 'shortcut icon';
+favicon.href = '/lovable-uploads/6b9580a6-e2cd-4056-95a9-7f730cbf6025.png';
+document.getElementsByTagName('head')[0].appendChild(favicon);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -23,6 +35,11 @@ createRoot(document.getElementById("root")!).render(
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-conditions" element={<TermsConditions />} />
+            <Route path="/cookie-policy" element={<CookiePolicy />} />
+            <Route path="/disclaimer" element={<Disclaimer />} />
+            <Route path="/support" element={<Support />} />
             <Route path="/2345678ytrewetrhyjuikjhtgfddvnjmkujynhbfgvdcdvbhtjyhtbgvfdcshyjujuyhtgrf" element={<KnowledgeAdmin />} />
             <Route 
               path="/automations" 

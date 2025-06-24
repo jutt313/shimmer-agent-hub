@@ -1,13 +1,13 @@
 
 import React from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import ErrorAnalysisModal from './ErrorAnalysisModal';
+import { globalErrorLogger } from '@/utils/errorLogger';
 
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
-  showAnalysis: boolean;
+  errorInfo: React.ErrorInfo | null;
 }
 
 class ErrorBoundary extends React.Component<
@@ -16,19 +16,25 @@ class ErrorBoundary extends React.Component<
 > {
   constructor(props: { children: React.ReactNode }) {
     super(props);
-    this.state = { hasError: false, error: null, showAnalysis: false };
+    this.state = { hasError: false, error: null, errorInfo: null };
   }
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    console.log('🚨 Error Boundary caught error:', error);
-    return { hasError: true, error, showAnalysis: false };
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
+    return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('🚨 Error caught by ErrorBoundary:', error, errorInfo);
+    this.setState({ errorInfo });
     
-    // Dispatch a custom event that the ErrorIndicator can listen to
-    console.log('🚨 Dispatching react-error event...');
+    // Log to centralized error logger
+    globalErrorLogger.log('CRITICAL', 'React Error Boundary caught error', {
+      error: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack,
+      errorBoundary: true
+    });
+
+    // Dispatch event for error indicator
     window.dispatchEvent(new CustomEvent('react-error', {
       detail: {
         error,
@@ -39,60 +45,54 @@ class ErrorBoundary extends React.Component<
     }));
   }
 
-  handleOpenHelpChat = (message: string, context: string) => {
-    // Since this is the error boundary, we'll just log this for now
-    // In a real implementation, this would open the global help chat
-    console.log('🆘 Help requested from ErrorBoundary:', message, context);
-    
-    // Try to dispatch a global event for help chat
-    window.dispatchEvent(new CustomEvent('open-help-chat', {
-      detail: { message, context }
-    }));
+  handleRetry = () => {
+    this.setState({ hasError: false, error: null, errorInfo: null });
+  };
+
+  handleGoHome = () => {
+    window.location.href = '/';
   };
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6 text-center">
-            <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 via-white to-orange-50 p-6">
+          <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+            <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-6" />
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">
               Something went wrong
-            </h2>
+            </h1>
             <p className="text-gray-600 mb-6">
-              An unexpected error occurred. Our AI can help analyze and fix this issue.
+              An unexpected error occurred. We've logged this issue and will investigate.
             </p>
+            
+            {this.state.error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-left">
+                <h3 className="font-semibold text-red-800 mb-2">Error Details:</h3>
+                <p className="text-red-700 text-sm font-mono break-all">
+                  {this.state.error.message}
+                </p>
+              </div>
+            )}
             
             <div className="space-y-3">
               <Button
-                onClick={() => this.setState({ showAnalysis: true })}
+                onClick={this.handleRetry}
                 className="w-full bg-blue-600 hover:bg-blue-700"
               >
-                Get AI Analysis & Solution
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
               </Button>
               
               <Button
                 variant="outline"
-                onClick={() => this.setState({ hasError: false, error: null })}
+                onClick={this.handleGoHome}
                 className="w-full"
               >
-                Try Again
+                <Home className="h-4 w-4 mr-2" />
+                Go Home
               </Button>
             </div>
-
-            {this.state.showAnalysis && this.state.error && (
-              <ErrorAnalysisModal
-                isOpen={this.state.showAnalysis}
-                onClose={() => this.setState({ showAnalysis: false })}
-                onOpenHelpChat={this.handleOpenHelpChat}
-                error={{
-                  message: this.state.error.message,
-                  stack: this.state.error.stack,
-                  fileName: 'React Component',
-                  userAction: 'Page Rendering'
-                }}
-              />
-            )}
           </div>
         </div>
       );

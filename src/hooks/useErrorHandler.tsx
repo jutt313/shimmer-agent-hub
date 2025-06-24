@@ -1,6 +1,6 @@
 
 import { useState, useCallback } from 'react';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 interface ErrorInfo {
   message: string;
@@ -8,19 +8,20 @@ interface ErrorInfo {
   fileName?: string;
   userAction?: string;
   additionalContext?: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
 }
 
 export const useErrorHandler = () => {
   const [currentError, setCurrentError] = useState<ErrorInfo | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
-  const [onHelpChatCallback, setOnHelpChatCallback] = useState<((message: string, context: string) => void) | null>(null);
   const { toast } = useToast();
 
   const handleError = useCallback((error: Error | string, context?: {
     fileName?: string;
     userAction?: string;
     additionalContext?: string;
-    onHelpChat?: (message: string, context: string) => void;
+    severity?: 'low' | 'medium' | 'high' | 'critical';
+    showToast?: boolean;
   }) => {
     const errorInfo: ErrorInfo = {
       message: typeof error === 'string' ? error : error.message,
@@ -28,29 +29,37 @@ export const useErrorHandler = () => {
       fileName: context?.fileName,
       userAction: context?.userAction,
       additionalContext: context?.additionalContext,
+      severity: context?.severity || 'medium',
     };
 
-    console.log('🔴 Error handler called with:', errorInfo);
+    // Log to centralized error logger
+    window.dispatchEvent(new CustomEvent('app-error', {
+      detail: errorInfo
+    }));
+
     setCurrentError(errorInfo);
-    setOnHelpChatCallback(() => context?.onHelpChat || null);
     
-    // Show error modal
-    setShowErrorModal(true);
-    
-    // Show toast with help option
-    toast({
-      title: "Error detected",
-      description: "Click to get AI help with this error",
-      duration: 5000,
-    });
+    // Show toast for medium+ severity errors
+    if (context?.showToast !== false && errorInfo.severity !== 'low') {
+      const toastVariant = errorInfo.severity === 'critical' ? 'destructive' : 'default';
+      toast({
+        title: errorInfo.severity === 'critical' ? "Critical Error" : "Error",
+        description: errorInfo.message,
+        variant: toastVariant,
+        duration: errorInfo.severity === 'critical' ? 10000 : 5000,
+      });
+    }
+
+    // Auto-show modal for critical errors
+    if (errorInfo.severity === 'critical') {
+      setShowErrorModal(true);
+    }
     
   }, [toast]);
 
   const clearError = useCallback(() => {
-    console.log('🟢 Clearing error state');
     setCurrentError(null);
     setShowErrorModal(false);
-    setOnHelpChatCallback(null);
   }, []);
 
   return {
@@ -59,6 +68,5 @@ export const useErrorHandler = () => {
     setShowErrorModal,
     handleError,
     clearError,
-    onHelpChatCallback,
   };
 };

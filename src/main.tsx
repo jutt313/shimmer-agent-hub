@@ -1,4 +1,3 @@
-
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
@@ -18,6 +17,7 @@ import Support from "./pages/Support";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
 import "./index.css";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
@@ -30,47 +30,49 @@ document.getElementsByTagName('head')[0].appendChild(favicon);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-            <Route path="/terms-conditions" element={<TermsConditions />} />
-            <Route path="/cookie-policy" element={<CookiePolicy />} />
-            <Route path="/disclaimer" element={<Disclaimer />} />
-            <Route path="/support" element={<Support />} />
-            <Route 
-              path="/admin/knowledge" 
-              element={
-                <ProtectedRoute>
-                  <AdminRoute>
-                    <KnowledgeAdmin />
-                  </AdminRoute>
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/automations" 
-              element={
-                <ProtectedRoute>
-                  <Automations />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/automations/:id" 
-              element={
-                <ProtectedRoute>
-                  <AutomationDetail />
-                </ProtectedRoute>
-              } 
-            />
-          </Routes>
-          <Toaster />
-        </BrowserRouter>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+              <Route path="/terms-conditions" element={<TermsConditions />} />
+              <Route path="/cookie-policy" element={<CookiePolicy />} />
+              <Route path="/disclaimer" element={<Disclaimer />} />
+              <Route path="/support" element={<Support />} />
+              <Route 
+                path="/admin/knowledge" 
+                element={
+                  <ProtectedRoute>
+                    <AdminRoute>
+                      <KnowledgeAdmin />
+                    </AdminRoute>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/automations" 
+                element={
+                  <ProtectedRoute>
+                    <Automations />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/automations/:id" 
+                element={
+                  <ProtectedRoute>
+                    <AutomationDetail />
+                  </ProtectedRoute>
+                } 
+              />
+            </Routes>
+            <Toaster />
+          </BrowserRouter>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   </StrictMode>
 );

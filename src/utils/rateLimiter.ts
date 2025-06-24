@@ -1,4 +1,3 @@
-
 // Rate limiting system for API calls
 export interface RateLimitConfig {
   maxRequests: number;
@@ -9,6 +8,7 @@ export interface RateLimitConfig {
 export class RateLimiter {
   private buckets = new Map<string, TokenBucket>();
   private configs = new Map<string, RateLimitConfig>();
+  private abuseTracking = new Map<string, number[]>();
 
   constructor() {
     // Default rate limits for common platforms
@@ -24,7 +24,7 @@ export class RateLimiter {
     this.buckets.set(platform, new TokenBucket(config.maxRequests, config.windowMs));
   }
 
-  async checkRateLimit(platform: string): Promise<boolean> {
+  async checkRateLimit(platform: string, userId?: string): Promise<{ allowed: boolean; resetTime?: number; reason?: string }> {
     const normalizedPlatform = platform.toLowerCase();
     let bucket = this.buckets.get(normalizedPlatform);
     
@@ -35,7 +35,24 @@ export class RateLimiter {
       this.buckets.set(normalizedPlatform, bucket);
     }
     
-    return bucket.consume();
+    const allowed = bucket.consume();
+    
+    // Log suspicious activity
+    if (!allowed && userId) {
+      globalErrorLogger.log('WARN', 'Rate limit exceeded', {
+        platform,
+        userId,
+        available: bucket.getAvailableTokens(),
+        resetTime: bucket.getResetTime(),
+        suspiciousActivity: true
+      });
+    }
+    
+    return {
+      allowed,
+      resetTime: allowed ? undefined : bucket.getResetTime(),
+      reason: allowed ? undefined : `Rate limit exceeded for ${platform}`
+    };
   }
 
   async waitForRateLimit(platform: string): Promise<void> {
@@ -65,6 +82,38 @@ export class RateLimiter {
       available: bucket.getAvailableTokens(),
       resetTime: bucket.getResetTime()
     };
+  }
+
+  checkAbusePattern(userId: string, action: string): { isAbusive: boolean; severity: 'low' | 'medium' | 'high' | 'critical' } {
+    const userKey = `${userId}-${action}`;
+    const now = Date.now();
+    const window = 60000; // 1 minute window
+    
+    if (!this.abuseTracking.has(userKey)) {
+      this.abuseTracking.set(userKey, []);
+    }
+    
+    const actions = this.abuseTracking.get(userKey)!;
+    
+    // Clean old entries
+    const recentActions = actions.filter(timestamp => now - timestamp < window);
+    this.abuseTracking.set(userKey, recentActions);
+    
+    // Add current action
+    recentActions.push(now);
+    
+    // Determine abuse severity
+    if (recentActions.length > 100) {
+      return { isAbusive: true, severity: 'critical' };
+    } else if (recentActions.length > 50) {
+      return { isAbusive: true, severity: 'high' };
+    } else if (recentActions.length > 25) {
+      return { isAbusive: true, severity: 'medium' };
+    } else if (recentActions.length > 15) {
+      return { isAbusive: true, severity: 'low' };
+    }
+    
+    return { isAbusive: false, severity: 'low' };
   }
 }
 

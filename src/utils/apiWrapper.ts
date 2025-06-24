@@ -1,5 +1,5 @@
-
 import { globalErrorLogger } from './errorLogger';
+import { globalAbusePreventionMiddleware } from './abusePreventionMiddleware';
 
 interface ApiRequestOptions extends RequestInit {
   timeout?: number;
@@ -25,8 +25,29 @@ class ApiWrapper {
 
   async request<T>(
     endpoint: string,
-    options: ApiRequestOptions = {}
+    options: ApiRequestOptions = {},
+    userId?: string
   ): Promise<ApiResponse<T>> {
+    // Check abuse prevention before making request
+    const abuseCheck = await globalAbusePreventionMiddleware.checkRequest(
+      userId || null,
+      `api:${endpoint}`
+    );
+
+    if (!abuseCheck.allowed) {
+      globalErrorLogger.log('WARN', 'API request blocked by abuse prevention', {
+        endpoint,
+        reason: abuseCheck.reason,
+        userId
+      });
+
+      return {
+        data: null,
+        error: abuseCheck.reason || 'Request blocked due to suspicious activity',
+        success: false,
+      };
+    }
+
     const {
       timeout = this.defaultTimeout,
       retries = this.defaultRetries,
@@ -49,7 +70,8 @@ class ApiWrapper {
           url,
           method: fetchOptions.method || 'GET',
           attempt: attempt + 1,
-          maxAttempts: retries + 1
+          maxAttempts: retries + 1,
+          userId
         });
 
         const controller = new AbortController();
@@ -73,7 +95,8 @@ class ApiWrapper {
         globalErrorLogger.log('DEBUG', 'API Request successful', {
           url,
           status: response.status,
-          attempt: attempt + 1
+          attempt: attempt + 1,
+          userId
         });
 
         return {
@@ -89,7 +112,8 @@ class ApiWrapper {
           url,
           error: error.message,
           attempt: attempt + 1,
-          maxAttempts: retries + 1
+          maxAttempts: retries + 1,
+          userId
         });
 
         // Don't retry on certain errors
@@ -120,28 +144,28 @@ class ApiWrapper {
     };
   }
 
-  async get<T>(endpoint: string, options?: ApiRequestOptions): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { ...options, method: 'GET' });
+  async get<T>(endpoint: string, options?: ApiRequestOptions, userId?: string): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { ...options, method: 'GET' }, userId);
   }
 
-  async post<T>(endpoint: string, data?: any, options?: ApiRequestOptions): Promise<ApiResponse<T>> {
+  async post<T>(endpoint: string, data?: any, options?: ApiRequestOptions, userId?: string): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       ...options,
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
-    });
+    }, userId);
   }
 
-  async put<T>(endpoint: string, data?: any, options?: ApiRequestOptions): Promise<ApiResponse<T>> {
+  async put<T>(endpoint: string, data?: any, options?: ApiRequestOptions, userId?: string): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       ...options,
       method: 'PUT',
       body: data ? JSON.stringify(data) : undefined,
-    });
+    }, userId);
   }
 
-  async delete<T>(endpoint: string, options?: ApiRequestOptions): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { ...options, method: 'DELETE' });
+  async delete<T>(endpoint: string, options?: ApiRequestOptions, userId?: string): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { ...options, method: 'DELETE' }, userId);
   }
 }
 

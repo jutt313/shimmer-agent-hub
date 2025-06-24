@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/components/ui/use-toast";
 import { Bot, Send, Plus, Edit, Trash2, User, Crown } from "lucide-react";
+import ProblemCategorizer from "./ProblemCategorizer";
+import { analyzeProblem } from "@/utils/problemAnalyzer";
 
 interface ChatMessage {
   id: string;
@@ -17,6 +19,8 @@ interface ChatMessage {
     type: 'add' | 'edit' | 'delete';
     data?: any;
   }[];
+  showProblemCard?: boolean;
+  problemData?: any;
 }
 
 interface KnowledgeChatProps {
@@ -28,7 +32,7 @@ const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
     { 
       id: '1', 
       type: 'system', 
-      message: 'Hello Founder! Universal Memory AI is ready to assist you. I can read the knowledge store and help manage it with your permission.', 
+      message: 'Hello! I am your Universal Memory AI. I can help you solve problems and automatically organize solutions in our knowledge store. Just tell me about any issue you\'re facing!', 
       timestamp: new Date() 
     }
   ]);
@@ -53,52 +57,71 @@ const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const addMessage = (message: string, type: 'user' | 'ai' | 'system' = 'user', actionButtons?: any[]) => {
+  const addMessage = (message: string, type: 'user' | 'ai' | 'system' = 'user', actionButtons?: any[], showProblemCard = false, problemData?: any) => {
     const newMsg: ChatMessage = {
       id: Date.now().toString(),
       type,
       message,
       timestamp: new Date(),
-      actionButtons
+      actionButtons,
+      showProblemCard,
+      problemData
     };
     setMessages(prev => [...prev, newMsg]);
+    return newMsg.id;
   };
 
   const sendToAI = async (message: string) => {
     setIsLoading(true);
     try {
+      // Get relevant knowledge for context
+      const { data: knowledgeData, error: knowledgeError } = await supabase
+        .from('universal_knowledge_store')
+        .select('*')
+        .or(`title.ilike.%${message}%,summary.ilike.%${message}%,tags.cs.{${message.toLowerCase()}}`)
+        .limit(3);
+
+      const knowledgeContext = knowledgeData && knowledgeData.length > 0 
+        ? `\n\nRelevant Knowledge:\n${knowledgeData.map(k => `- ${k.title}: ${k.summary}`).join('\n')}`
+        : '';
+
       const { data, error } = await supabase.functions.invoke('knowledge-ai-chat', {
         body: { 
-          message: message,
+          message: message + knowledgeContext,
           category: selectedCategory || null,
-          userRole: 'founder'
+          userRole: 'founder',
+          context: 'problem_solving'
         }
       });
 
       if (error) throw error;
       
-      // Clean the response - remove special characters and ensure proper spacing
-      const cleanResponse = data.response
+      let aiResponse = data.response
         .replace(/[#$%&'*]/g, '')
         .replace(/\s+/g, ' ')
         .trim();
+
+      // Analyze if this is a problem that should be categorized
+      const problemAnalysis = analyzeProblem(message, aiResponse);
       
-      // Check if AI wants to perform actions
-      const actionButtons = [];
-      if (cleanResponse.toLowerCase().includes('add') && cleanResponse.toLowerCase().includes('knowledge')) {
-        actionButtons.push({ type: 'add', data: null });
+      let messageId;
+      if (problemAnalysis) {
+        // Add AI response with problem card
+        messageId = addMessage(
+          aiResponse, 
+          'ai', 
+          undefined, 
+          true, 
+          problemAnalysis
+        );
+      } else {
+        // Regular AI response
+        messageId = addMessage(aiResponse, 'ai');
       }
-      if (cleanResponse.toLowerCase().includes('edit') || cleanResponse.toLowerCase().includes('update')) {
-        actionButtons.push({ type: 'edit', data: null });
-      }
-      if (cleanResponse.toLowerCase().includes('delete') || cleanResponse.toLowerCase().includes('remove')) {
-        actionButtons.push({ type: 'delete', data: null });
-      }
-      
-      addMessage(cleanResponse, 'ai', actionButtons.length > 0 ? actionButtons : undefined);
+
     } catch (error) {
       console.error('AI Chat Error:', error);
-      addMessage("Sorry Founder, I encountered an issue. Please try again.", 'system');
+      addMessage("Sorry, I encountered an issue. Please try again.", 'system');
     } finally {
       setIsLoading(false);
     }
@@ -109,7 +132,7 @@ const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
       let fullMessage = newMessage;
       
       if (selectedCategory) {
-        fullMessage = `Context ${selectedCategory.replace('_', ' ')}: ${newMessage}`;
+        fullMessage = `Context: ${selectedCategory.replace('_', ' ')} - ${newMessage}`;
       }
       
       addMessage(fullMessage);
@@ -119,14 +142,25 @@ const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
     }
   };
 
-  const handleAction = async (actionType: string) => {
-    if (actionType === 'add') {
-      addMessage("I will help you add a new knowledge entry. Please tell me what you want to add and I will prepare it for you.", 'system');
-    } else if (actionType === 'edit') {
-      addMessage("I will help you edit existing knowledge. Please specify what you want to modify.", 'system');
-    } else if (actionType === 'delete') {
-      addMessage("I will help you delete knowledge entries. Please specify what you want to remove.", 'system');
-    }
+  const handleProblemSaved = (messageId: string) => {
+    setMessages(prev => prev.map(msg => 
+      msg.id === messageId 
+        ? { ...msg, showProblemCard: false }
+        : msg
+    ));
+    onKnowledgeUpdate();
+    toast({
+      title: "Knowledge Updated",
+      description: "Problem and solution have been added to the knowledge store.",
+    });
+  };
+
+  const handleProblemDismissed = (messageId: string) => {
+    setMessages(prev => prev.map(msg => 
+      msg.id === messageId 
+        ? { ...msg, showProblemCard: false }
+        : msg
+    ));
   };
 
   return (
@@ -136,53 +170,46 @@ const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
         <div className="flex items-center gap-2 mb-2">
           <Bot className="h-6 w-6 text-blue-600" />
           <Crown className="h-4 w-4 text-yellow-500" />
-          <h3 className="text-lg font-semibold text-gray-800">AI Assistant</h3>
+          <h3 className="text-lg font-semibold text-gray-800">Universal Memory AI</h3>
         </div>
-        <p className="text-sm text-gray-600">Your personal knowledge management AI</p>
+        <p className="text-sm text-gray-600">Your personal problem-solving and knowledge management AI</p>
       </div>
 
       {/* Messages */}
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
           {messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className="max-w-xs">
-                <div className={`px-4 py-3 rounded-2xl text-sm ${
-                  msg.type === 'user' 
-                    ? 'bg-blue-500 text-white' 
-                    : msg.type === 'ai'
-                    ? 'bg-gray-100 text-gray-800'
-                    : 'bg-green-50 text-green-800 border border-green-200'
-                }`}>
-                  {msg.type === 'user' && <User className="w-4 h-4 inline mr-2" />}
-                  {msg.type === 'ai' && <Bot className="w-4 h-4 inline mr-2 text-blue-600" />}
-                  <span>{msg.message}</span>
-                </div>
-                
-                {/* Action Buttons */}
-                {msg.actionButtons && msg.actionButtons.length > 0 && (
-                  <div className="flex gap-2 mt-2">
-                    {msg.actionButtons.map((action, index) => (
-                      <Button
-                        key={index}
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleAction(action.type)}
-                        className="text-xs"
-                      >
-                        {action.type === 'add' && <Plus className="w-3 h-3 mr-1" />}
-                        {action.type === 'edit' && <Edit className="w-3 h-3 mr-1" />}
-                        {action.type === 'delete' && <Trash2 className="w-3 h-3 mr-1" />}
-                        {action.type.charAt(0).toUpperCase() + action.type.slice(1)}
-                      </Button>
-                    ))}
+            <div key={msg.id}>
+              <div className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className="max-w-xs">
+                  <div className={`px-4 py-3 rounded-2xl text-sm ${
+                    msg.type === 'user' 
+                      ? 'bg-blue-500 text-white' 
+                      : msg.type === 'ai'
+                      ? 'bg-gray-100 text-gray-800'
+                      : 'bg-green-50 text-green-800 border border-green-200'
+                  }`}>
+                    {msg.type === 'user' && <User className="w-4 h-4 inline mr-2" />}
+                    {msg.type === 'ai' && <Bot className="w-4 h-4 inline mr-2 text-blue-600" />}
+                    <span>{msg.message}</span>
                   </div>
-                )}
-                
-                <p className="text-xs text-gray-500 mt-1">
-                  {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
+                  
+                  <p className="text-xs text-gray-500 mt-1">
+                    {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
               </div>
+
+              {/* Problem Categorizer Card */}
+              {msg.showProblemCard && msg.problemData && (
+                <div className="mt-3">
+                  <ProblemCategorizer
+                    problemData={msg.problemData}
+                    onSave={() => handleProblemSaved(msg.id)}
+                    onDismiss={() => handleProblemDismissed(msg.id)}
+                  />
+                </div>
+              )}
             </div>
           ))}
           
@@ -190,7 +217,7 @@ const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
             <div className="flex justify-start">
               <div className="bg-gray-100 text-gray-800 px-4 py-3 rounded-2xl">
                 <Bot className="w-4 h-4 inline mr-2 animate-pulse text-blue-600" />
-                <span className="text-sm">AI is thinking...</span>
+                <span className="text-sm">AI is analyzing your problem...</span>
               </div>
             </div>
           )}
@@ -203,7 +230,7 @@ const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
       <div className="p-4 border-t border-gray-200 space-y-3">
         <Select value={selectedCategory} onValueChange={setSelectedCategory}>
           <SelectTrigger className="text-sm">
-            <SelectValue placeholder="Select category for focused help" />
+            <SelectValue placeholder="Select category for focused help (optional)" />
           </SelectTrigger>
           <SelectContent className="bg-white border border-gray-200 rounded-xl shadow-lg z-50">
             {categories.map(cat => (
@@ -216,7 +243,7 @@ const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
         
         <div className="flex gap-2">
           <Input
-            placeholder="Ask your AI assistant..."
+            placeholder="Describe your problem or ask a question..."
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}

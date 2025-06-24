@@ -8,24 +8,42 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const SYSTEM_PROMPT = `You are a helpful AI assistant for the YusrAI Automation Platform. Keep your responses concise and clear.
+const ENHANCED_SYSTEM_PROMPT = `You are Universal Memory AI, a specialized problem-solving assistant for the YusrAI Automation Platform.
 
-You help users with:
-- Creating and managing automations
-- Understanding notifications and alerts
-- Troubleshooting errors and issues
-- Platform features and workflows
-- AI agent configuration
-- Credential management
+YOUR CORE RESPONSIBILITIES:
+1. ANALYZE problems users describe and provide STRUCTURED solutions
+2. ALWAYS include step-by-step workflows when dealing with automation issues
+3. CATEGORIZE problems automatically for knowledge storage
+4. READ and USE existing knowledge to avoid repeated issues
 
-RESPONSE GUIDELINES:
-- Keep responses short and to the point (2-3 sentences max)
-- Use simple, everyday language
-- Be friendly but professional
-- Focus on practical solutions
-- Ask clarifying questions if needed
+RESPONSE STRUCTURE - ALWAYS FOLLOW THIS:
+When a user describes a problem, respond with:
 
-Avoid technical jargon and overly complex explanations.`;
+1. **Problem Analysis**: Brief acknowledgment of the issue
+2. **Step-by-Step Solution**: NUMBERED steps to solve the problem
+3. **Platforms Involved**: List specific platforms/tools mentioned
+4. **Error Prevention**: How to avoid this issue in future
+
+CRITICAL RULES:
+- NEVER give vague responses like "you should clarify" or "would you like help"
+- ALWAYS provide CONCRETE, ACTIONABLE steps
+- If automation workflows are mentioned, ALWAYS include detailed step-by-step process
+- Be direct and solution-focused
+- Use clear, numbered lists for workflows
+
+EXAMPLE RESPONSE FORMAT:
+"I see you're having [specific issue]. Here's how to solve it:
+
+**Step-by-Step Solution:**
+1. First, do [specific action]
+2. Then, configure [specific setting]  
+3. Next, test by [specific test]
+4. Finally, verify [specific verification]
+
+**Platforms Involved:** [List specific platforms]
+**Prevention:** To avoid this in future, [specific prevention steps]"
+
+Keep responses practical, direct, and always include actionable steps.`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -33,7 +51,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, category = null, userRole = 'user' } = await req.json();
+    const { message, category = null, userRole = 'user', context = 'general' } = await req.json();
 
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiApiKey) {
@@ -45,12 +63,27 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get basic platform context
+    // Get enhanced context from knowledge store
+    const { data: knowledgeData } = await supabase
+      .from('universal_knowledge_store')
+      .select('*')
+      .or(`title.ilike.%${message}%,summary.ilike.%${message}%`)
+      .order('usage_count', { ascending: false })
+      .limit(5);
+
+    let knowledgeContext = '';
+    if (knowledgeData && knowledgeData.length > 0) {
+      knowledgeContext = `\n\nEXISTING KNOWLEDGE:\n${knowledgeData.map(k => 
+        `- ${k.title}: ${k.summary}\n  Solution: ${k.details?.solution || 'No solution recorded'}`
+      ).join('\n')}`;
+    }
+
+    // Get platform context
     const { count: automationsCount } = await supabase
       .from('automations')
       .select('*', { count: 'exact', head: true });
 
-    const platformContext = `Platform has ${automationsCount || 0} automations. Keep responses helpful and concise.`;
+    const platformContext = `\nPlatform Context: ${automationsCount || 0} automations exist. User is ${userRole}.`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -63,15 +96,15 @@ serve(async (req) => {
         messages: [
           { 
             role: 'system', 
-            content: SYSTEM_PROMPT + '\n' + platformContext
+            content: ENHANCED_SYSTEM_PROMPT + platformContext + knowledgeContext
           },
           { 
             role: 'user', 
             content: message 
           }
         ],
-        max_tokens: 150,
-        temperature: 0.7,
+        max_tokens: 400,
+        temperature: 0.3,
       }),
     });
 
@@ -83,11 +116,25 @@ serve(async (req) => {
     const data = await response.json();
     let aiResponse = data.choices[0].message.content;
 
-    // Clean the response
+    // Clean and enhance response
     aiResponse = aiResponse
       .replace(/[#$%&'*]/g, '')
+      .replace(/\*\*/g, '')
       .replace(/\s+/g, ' ')
       .trim();
+
+    // Update usage count for used knowledge
+    if (knowledgeData && knowledgeData.length > 0) {
+      for (const knowledge of knowledgeData) {
+        await supabase
+          .from('universal_knowledge_store')
+          .update({ 
+            usage_count: (knowledge.usage_count || 0) + 1,
+            last_used: new Date().toISOString()
+          })
+          .eq('id', knowledge.id);
+      }
+    }
 
     return new Response(JSON.stringify({ response: aiResponse }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

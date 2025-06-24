@@ -1,6 +1,15 @@
 import { AutomationBlueprint } from '@/types/automation';
 import { buildDynamicPlatformConfig, getDynamicMethodConfig, buildDynamicURL } from './dynamicPlatformConfig';
 import { supabase } from '@/integrations/supabase/client';
+import { ExpressionParser } from './expressionParser';
+import { 
+  RetryHandler, 
+  CircuitBreaker, 
+  globalErrorLogger, 
+  DEFAULT_RETRY_CONFIG, 
+  DEFAULT_CIRCUIT_BREAKER_CONFIG 
+} from './errorHandler';
+import { globalRateLimiter } from './rateLimiter';
 
 export interface ExecutionContext {
   variables: Record<string, any>;
@@ -23,6 +32,9 @@ export class AutomationExecutor {
   private blueprint: AutomationBlueprint;
   private platformsConfig: any[];
   private credentials: Record<string, Record<string, string>> = {};
+  private expressionParser: ExpressionParser;
+  private retryHandler: RetryHandler;
+  private circuitBreakers = new Map<string, CircuitBreaker>();
 
   constructor(
     blueprint: AutomationBlueprint,
@@ -41,11 +53,22 @@ export class AutomationExecutor {
       stepIndex: 0,
       logs: []
     };
+    
+    this.expressionParser = new ExpressionParser();
+    this.retryHandler = new RetryHandler(DEFAULT_RETRY_CONFIG);
+    
+    globalErrorLogger.log('INFO', 'AutomationExecutor initialized', {
+      automationId,
+      runId,
+      stepsCount: blueprint.steps.length
+    }, undefined, automationId, runId);
   }
 
   async execute(): Promise<{ success: boolean; result?: any; error?: string }> {
     try {
-      console.log('🚀 Starting real automation execution');
+      globalErrorLogger.log('INFO', '🚀 Starting real automation execution', {
+        description: this.blueprint.description
+      }, undefined, this.context.automationId, this.context.runId);
       
       // Load platform credentials
       await this.loadCredentials();
@@ -55,41 +78,51 @@ export class AutomationExecutor {
         this.context.stepIndex = i;
         const step = this.blueprint.steps[i];
         
-        console.log(`📍 Executing step ${i + 1}: ${step.name} (${step.type})`);
+        globalErrorLogger.log('INFO', `📍 Executing step ${i + 1}: ${step.name} (${step.type})`, {
+          stepId: step.id,
+          stepType: step.type
+        }, step.id, this.context.automationId, this.context.runId);
         
         try {
           await this.executeStep(step);
           await this.updateRunProgress();
         } catch (error: any) {
-          console.error(`❌ Step ${i + 1} failed:`, error);
+          globalErrorLogger.log('ERROR', `❌ Step ${i + 1} failed`, {
+            error: error.message,
+            stack: error.stack
+          }, step.id, this.context.automationId, this.context.runId);
           
           if (step.on_error === 'continue') {
             this.logStep(step.id, 'failed', `Step failed but continuing: ${error.message}`, error.message);
             continue;
           } else if (step.on_error === 'retry') {
-            // Simple retry logic - could be enhanced
             try {
-              console.log(`🔄 Retrying step ${i + 1}`);
+              globalErrorLogger.log('INFO', `🔄 Retrying step ${i + 1}`, {}, step.id, this.context.automationId, this.context.runId);
               await this.executeStep(step);
               await this.updateRunProgress();
             } catch (retryError: any) {
               this.logStep(step.id, 'failed', `Step failed after retry: ${retryError.message}`, retryError.message);
-              // After retry fails, stop execution unless explicitly told to continue
               throw retryError;
             }
           } else {
-            // Default: stop on error
             this.logStep(step.id, 'failed', `Step failed: ${error.message}`, error.message);
             throw error;
           }
         }
       }
       
-      console.log('✅ Automation execution completed successfully');
+      globalErrorLogger.log('INFO', '✅ Automation execution completed successfully', {
+        finalVariables: this.context.variables
+      }, undefined, this.context.automationId, this.context.runId);
+      
       return { success: true, result: this.context.variables };
       
     } catch (error: any) {
-      console.error('💥 Automation execution failed:', error);
+      globalErrorLogger.log('CRITICAL', '💥 Automation execution failed', {
+        error: error.message,
+        stack: error.stack
+      }, undefined, this.context.automationId, this.context.runId);
+      
       return { success: false, error: error.message };
     }
   }
@@ -102,21 +135,22 @@ export class AutomationExecutor {
       .eq('is_active', true);
 
     if (error) {
-      console.error('Failed to load credentials:', error);
+      globalErrorLogger.log('ERROR', 'Failed to load credentials', { error }, undefined, this.context.automationId, this.context.runId);
       return;
     }
 
-    // Organize credentials by platform
     credentials?.forEach((cred) => {
       try {
         const decryptedCreds = JSON.parse(cred.credentials);
         this.credentials[cred.platform_name.toLowerCase()] = decryptedCreds;
       } catch (e) {
-        console.error(`Failed to parse credentials for ${cred.platform_name}:`, e);
+        globalErrorLogger.log('ERROR', `Failed to parse credentials for ${cred.platform_name}`, { error: e }, undefined, this.context.automationId, this.context.runId);
       }
     });
 
-    console.log('🔑 Loaded credentials for platforms:', Object.keys(this.credentials));
+    globalErrorLogger.log('INFO', '🔑 Loaded credentials for platforms', {
+      platforms: Object.keys(this.credentials)
+    }, undefined, this.context.automationId, this.context.runId);
   }
 
   private async executeStep(step: any): Promise<void> {
@@ -153,60 +187,83 @@ export class AutomationExecutor {
     const method = action.method;
     const parameters = this.resolveVariables(action.parameters);
 
-    console.log(`🔧 Executing action: ${platformName}.${method}`, parameters);
+    globalErrorLogger.log('INFO', `🔧 Executing action: ${platformName}.${method}`, {
+      parameters
+    }, step.id, this.context.automationId, this.context.runId);
 
-    // Get platform credentials
+    // Check rate limit
+    const canProceed = await globalRateLimiter.checkRateLimit(platformName);
+    if (!canProceed) {
+      await globalRateLimiter.waitForRateLimit(platformName);
+    }
+
     const platformCreds = this.credentials[platformName];
     if (!platformCreds) {
       throw new Error(`No credentials found for platform: ${platformName}`);
     }
 
-    // Build platform configuration
+    // Get or create circuit breaker for this platform
+    if (!this.circuitBreakers.has(platformName)) {
+      this.circuitBreakers.set(platformName, new CircuitBreaker(DEFAULT_CIRCUIT_BREAKER_CONFIG));
+    }
+    const circuitBreaker = this.circuitBreakers.get(platformName)!;
+
     const config = buildDynamicPlatformConfig(platformName, this.platformsConfig, platformCreds);
-    
-    // Get method configuration
     const methodConfig = getDynamicMethodConfig(platformName, method, this.platformsConfig);
     
-    if (!methodConfig) {
-      // Fallback for platforms not in dynamic config
-      await this.executeFallbackAction(platformName, method, parameters, config);
-      return;
-    }
+    const operation = async () => {
+      if (!methodConfig) {
+        return await this.executeFallbackAction(platformName, method, parameters, config);
+      }
 
-    // Build the API URL
-    const url = buildDynamicURL(config.baseURL, methodConfig.endpoint, parameters, methodConfig.required_params);
-    
-    // Make the API call
-    const requestOptions: RequestInit = {
-      method: methodConfig.http_method.toUpperCase(),
-      headers: config.headers,
-      ...config,
+      const url = buildDynamicURL(config.baseURL, methodConfig.endpoint, parameters, methodConfig.required_params);
+      
+      const requestOptions: RequestInit = {
+        method: methodConfig.http_method.toUpperCase(),
+        headers: config.headers,
+        ...config,
+      };
+
+      if (['POST', 'PUT', 'PATCH'].includes(methodConfig.http_method.toUpperCase())) {
+        requestOptions.body = JSON.stringify(parameters);
+      }
+
+      const response = await fetch(url, requestOptions);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API call failed: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      return await response.json();
     };
 
-    // Add body for POST/PUT requests
-    if (['POST', 'PUT', 'PATCH'].includes(methodConfig.http_method.toUpperCase())) {
-      requestOptions.body = JSON.stringify(parameters);
-    }
+    try {
+      const result = await this.retryHandler.executeWithRetry(
+        operation,
+        `${platformName}.${method}`,
+        circuitBreaker
+      );
+      
+      if (action.output_variable) {
+        this.context.variables[action.output_variable] = result;
+      }
 
-    const response = await fetch(url, requestOptions);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API call failed: ${response.status} ${response.statusText} - ${errorText}`);
+      globalErrorLogger.log('INFO', `✅ Action completed successfully`, {
+        result
+      }, step.id, this.context.automationId, this.context.runId);
+    } catch (error: any) {
+      globalErrorLogger.log('ERROR', 'Action execution failed', {
+        platformName,
+        method,
+        error: error.message,
+        circuitBreakerState: circuitBreaker.getState()
+      }, step.id, this.context.automationId, this.context.runId);
+      throw error;
     }
-
-    const result = await response.json();
-    
-    // Store result in variables if specified
-    if (action.output_variable) {
-      this.context.variables[action.output_variable] = result;
-    }
-
-    console.log(`✅ Action completed successfully:`, result);
   }
 
   private async executeFallbackAction(platformName: string, method: string, parameters: any, config: any): Promise<void> {
-    // Simple fallback for common actions
     let url = config.baseURL;
     let httpMethod = 'POST';
 
@@ -233,26 +290,37 @@ export class AutomationExecutor {
     }
 
     const result = await response.json();
-    console.log(`✅ Fallback action completed:`, result);
+    globalErrorLogger.log('INFO', `✅ Fallback action completed`, { result }, undefined, this.context.automationId, this.context.runId);
   }
 
   private async executeCondition(step: any): Promise<void> {
     const { condition } = step;
     if (!condition) throw new Error('Condition configuration missing');
 
-    const expression = this.resolveVariables(condition.expression);
-    const result = this.evaluateExpression(expression);
+    try {
+      const result = this.expressionParser.evaluateExpression(condition.expression, this.context.variables);
 
-    console.log(`🔍 Condition evaluation: ${expression} = ${result}`);
+      globalErrorLogger.log('INFO', `🔍 Condition evaluation: ${condition.expression} = ${result}`, {
+        expression: condition.expression,
+        result,
+        variables: this.context.variables
+      }, step.id, this.context.automationId, this.context.runId);
 
-    if (result && condition.if_true) {
-      for (const subStep of condition.if_true) {
-        await this.executeStep(subStep);
+      if (result && condition.if_true) {
+        for (const subStep of condition.if_true) {
+          await this.executeStep(subStep);
+        }
+      } else if (!result && condition.if_false) {
+        for (const subStep of condition.if_false) {
+          await this.executeStep(subStep);
+        }
       }
-    } else if (!result && condition.if_false) {
-      for (const subStep of condition.if_false) {
-        await this.executeStep(subStep);
-      }
+    } catch (error: any) {
+      globalErrorLogger.log('ERROR', 'Condition evaluation failed', {
+        expression: condition.expression,
+        error: error.message
+      }, step.id, this.context.automationId, this.context.runId);
+      throw error;
     }
   }
 
@@ -265,14 +333,17 @@ export class AutomationExecutor {
       throw new Error('Loop array source is not an array');
     }
 
-    console.log(`🔄 Starting loop with ${arrayData.length} iterations`);
+    globalErrorLogger.log('INFO', `🔄 Starting loop with ${arrayData.length} iterations`, {
+      arrayLength: arrayData.length
+    }, step.id, this.context.automationId, this.context.runId);
 
     for (let i = 0; i < arrayData.length; i++) {
-      // Set loop variables
       this.context.variables['loop_item'] = arrayData[i];
       this.context.variables['loop_index'] = i;
 
-      console.log(`🔄 Loop iteration ${i + 1}/${arrayData.length}`);
+      globalErrorLogger.log('INFO', `🔄 Loop iteration ${i + 1}/${arrayData.length}`, {
+        currentItem: arrayData[i]
+      }, step.id, this.context.automationId, this.context.runId);
 
       for (const subStep of loop.steps) {
         await this.executeStep(subStep);
@@ -285,7 +356,9 @@ export class AutomationExecutor {
     if (!delay) throw new Error('Delay configuration missing');
 
     const seconds = delay.duration_seconds;
-    console.log(`⏱️ Delaying for ${seconds} seconds`);
+    globalErrorLogger.log('INFO', `⏱️ Delaying for ${seconds} seconds`, {
+      duration: seconds
+    }, step.id, this.context.automationId, this.context.runId);
 
     await new Promise(resolve => setTimeout(resolve, seconds * 1000));
   }
@@ -297,9 +370,11 @@ export class AutomationExecutor {
     const agentId = ai_agent_call.agent_id;
     const inputPrompt = this.resolveVariables(ai_agent_call.input_prompt);
 
-    console.log(`🤖 Calling AI agent: ${agentId}`);
+    globalErrorLogger.log('INFO', `🤖 Calling AI agent: ${agentId}`, {
+      agentId,
+      promptLength: inputPrompt.length
+    }, step.id, this.context.automationId, this.context.runId);
 
-    // Get AI agent configuration
     const { data: agent, error } = await supabase
       .from('ai_agents')
       .select('*')
@@ -310,15 +385,16 @@ export class AutomationExecutor {
       throw new Error(`AI agent not found: ${agentId}`);
     }
 
-    // Make AI API call based on agent configuration
     const aiResponse = await this.callAIProvider(agent, inputPrompt);
     
-    // Store the response in variables
     if (ai_agent_call.output_variable) {
       this.context.variables[ai_agent_call.output_variable] = aiResponse;
     }
 
-    console.log(`🤖 AI agent response stored in: ${ai_agent_call.output_variable}`);
+    globalErrorLogger.log('INFO', `🤖 AI agent response stored`, {
+      outputVariable: ai_agent_call.output_variable,
+      responseLength: aiResponse.length
+    }, step.id, this.context.automationId, this.context.runId);
   }
 
   private async callAIProvider(agent: any, prompt: string): Promise<any> {
@@ -360,7 +436,6 @@ export class AutomationExecutor {
 
   private resolveVariables(input: any): any {
     if (typeof input === 'string') {
-      // Replace variable placeholders like {{variable_name}}
       return input.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
         return this.context.variables[varName.trim()] || match;
       });
@@ -376,29 +451,6 @@ export class AutomationExecutor {
     return input;
   }
 
-  private evaluateExpression(expression: string): boolean {
-    // Simple expression evaluation - could be enhanced with a proper parser
-    try {
-      // Safety check: only allow basic comparisons
-      if (!/^[a-zA-Z0-9\s\.\[\]"'<>=!&|()]+$/.test(expression)) {
-        throw new Error('Invalid expression format');
-      }
-      
-      // Replace variable references with actual values
-      let evaluableExpression = expression;
-      for (const [varName, varValue] of Object.entries(this.context.variables)) {
-        const regex = new RegExp(`\\b${varName}\\b`, 'g');
-        evaluableExpression = evaluableExpression.replace(regex, JSON.stringify(varValue));
-      }
-      
-      // Use Function constructor for safe evaluation
-      return new Function(`return ${evaluableExpression}`)();
-    } catch (error) {
-      console.error('Expression evaluation failed:', error);
-      return false;
-    }
-  }
-
   private logStep(stepId: string, status: 'running' | 'completed' | 'failed', message: string, error?: string, output?: any): void {
     const logEntry = {
       step: stepId,
@@ -410,11 +462,17 @@ export class AutomationExecutor {
     };
     
     this.context.logs.push(logEntry);
-    console.log(`📝 Step log:`, logEntry);
+    
+    const logLevel = status === 'failed' ? 'ERROR' : 'INFO';
+    globalErrorLogger.log(logLevel, `📝 Step log: ${message}`, {
+      stepId,
+      status,
+      error,
+      output
+    }, stepId, this.context.automationId, this.context.runId);
   }
 
   private async updateRunProgress(): Promise<void> {
-    // Update the automation run with current progress
     const { error } = await supabase
       .from('automation_runs')
       .update({
@@ -429,7 +487,7 @@ export class AutomationExecutor {
       .eq('id', this.context.runId);
 
     if (error) {
-      console.error('Failed to update run progress:', error);
+      globalErrorLogger.log('ERROR', 'Failed to update run progress', { error }, undefined, this.context.automationId, this.context.runId);
     }
   }
 }

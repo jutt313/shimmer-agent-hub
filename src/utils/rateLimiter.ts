@@ -1,3 +1,6 @@
+
+import { globalErrorLogger } from '@/utils/errorLogger';
+
 // Rate limiting system for API calls
 export interface RateLimitConfig {
   maxRequests: number;

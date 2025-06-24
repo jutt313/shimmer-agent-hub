@@ -66,13 +66,19 @@ export class AutomationScheduler {
         throw new Error('Invalid cron expression');
       }
 
-      // Use Supabase RPC to handle scheduling in the database
-      const { error } = await supabase.rpc('schedule_automation', {
-        p_automation_id: automationId,
-        p_user_id: userId,
-        p_cron_expression: cronExpression,
-        p_next_run: nextRun.toISOString()
-      });
+      // For now, we'll use the automations table to store scheduling info
+      // In a real implementation, you'd want a dedicated scheduled_automations table
+      const { error } = await supabase
+        .from('automations')
+        .update({
+          platforms_config: {
+            scheduled: true,
+            cron_expression: cronExpression,
+            next_run: nextRun.toISOString()
+          }
+        })
+        .eq('id', automationId)
+        .eq('user_id', userId);
 
       if (error) throw error;
 
@@ -97,10 +103,15 @@ export class AutomationScheduler {
 
   async unscheduleAutomation(automationId: string, userId: string): Promise<boolean> {
     try {
-      const { error } = await supabase.rpc('unschedule_automation', {
-        p_automation_id: automationId,
-        p_user_id: userId
-      });
+      const { error } = await supabase
+        .from('automations')
+        .update({
+          platforms_config: {
+            scheduled: false
+          }
+        })
+        .eq('id', automationId)
+        .eq('user_id', userId);
 
       if (error) throw error;
 
@@ -122,13 +133,26 @@ export class AutomationScheduler {
 
   private async checkAndExecuteDueAutomations(): Promise<void> {
     try {
-      const { data: dueAutomations, error } = await supabase.rpc('get_due_automations');
+      // Query automations that have scheduling enabled
+      const { data: automations, error } = await supabase
+        .from('automations')
+        .select('*')
+        .not('platforms_config', 'is', null);
 
       if (error) throw error;
 
-      if (!dueAutomations || dueAutomations.length === 0) {
+      if (!automations || automations.length === 0) {
         return;
       }
+
+      // Filter for scheduled automations that are due
+      const dueAutomations = automations.filter(automation => {
+        const config = automation.platforms_config as any;
+        if (!config?.scheduled || !config?.next_run) return false;
+        
+        const nextRun = new Date(config.next_run);
+        return nextRun <= new Date();
+      });
 
       globalErrorLogger.log('INFO', `Found ${dueAutomations.length} due automations`);
 
@@ -142,17 +166,17 @@ export class AutomationScheduler {
     }
   }
 
-  private async executeDueAutomation(automation: ScheduledAutomation): Promise<void> {
+  private async executeDueAutomation(automation: any): Promise<void> {
     try {
       globalErrorLogger.log('INFO', 'Executing scheduled automation', {
-        automationId: automation.automation_id,
+        automationId: automation.id,
         userId: automation.user_id
       });
 
       // Execute the automation
       const { error } = await supabase.functions.invoke('execute-automation', {
         body: {
-          automation_id: automation.automation_id,
+          automation_id: automation.id,
           trigger_data: {
             trigger_type: 'scheduled',
             scheduled_time: new Date().toISOString()
@@ -165,21 +189,27 @@ export class AutomationScheduler {
       }
 
       // Update the next run time
-      const nextRun = this.calculateNextRun(automation.cron_expression);
+      const config = automation.platforms_config as any;
+      const nextRun = this.calculateNextRun(config.cron_expression);
       if (nextRun) {
-        await supabase.rpc('update_next_run', {
-          p_automation_id: automation.automation_id,
-          p_next_run: nextRun.toISOString()
-        });
+        await supabase
+          .from('automations')
+          .update({
+            platforms_config: {
+              ...config,
+              next_run: nextRun.toISOString()
+            }
+          })
+          .eq('id', automation.id);
       }
 
       globalErrorLogger.log('INFO', 'Scheduled automation executed successfully', {
-        automationId: automation.automation_id
+        automationId: automation.id
       });
 
     } catch (error: any) {
       globalErrorLogger.log('ERROR', 'Failed to execute scheduled automation', {
-        automationId: automation.automation_id,
+        automationId: automation.id,
         error: error.message
       });
     }
@@ -244,18 +274,23 @@ export class AutomationScheduler {
     }
   }
 
-  async getScheduledAutomations(userId: string): Promise<ScheduledAutomation[]> {
+  async getScheduledAutomations(userId: string): Promise<any[]> {
     try {
       const { data, error } = await supabase
-        .from('scheduled_automations')
+        .from('automations')
         .select('*')
         .eq('user_id', userId)
-        .eq('is_active', true)
-        .order('next_run', { ascending: true });
+        .not('platforms_config', 'is', null);
 
       if (error) throw error;
 
-      return data || [];
+      // Filter for scheduled automations
+      const scheduledAutomations = (data || []).filter(automation => {
+        const config = automation.platforms_config as any;
+        return config?.scheduled === true;
+      });
+
+      return scheduledAutomations;
     } catch (error: any) {
       globalErrorLogger.log('ERROR', 'Failed to get scheduled automations', {
         userId,

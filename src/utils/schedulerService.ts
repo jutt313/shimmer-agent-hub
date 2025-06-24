@@ -1,3 +1,4 @@
+import { supabase } from '@/integrations/supabase/client';
 
 // Automation scheduler service for cron-based triggers
 export interface ScheduleConfig {

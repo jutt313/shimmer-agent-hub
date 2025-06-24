@@ -1,3 +1,4 @@
+
 export interface StructuredResponse {
   summary?: string;
   steps?: string[];
@@ -99,7 +100,7 @@ export const parseStructuredResponse = (responseText: string): StructuredRespons
       }
     }
 
-    // Method 3: Enhanced text extraction as fallback
+    // Method 3: Enhanced text extraction as fallback - REMOVED HARDCODED PLATFORMS
     const extractedData = enhancedExtractDataFromText(responseText);
     if (extractedData && Object.keys(extractedData).length > 0) {
       console.log('✅ Extracted enhanced structured data from text patterns');
@@ -148,7 +149,7 @@ const validateStructuredData = (data: any): { isComplete: boolean; missing: stri
   };
 };
 
-// Enhanced data extraction with better patterns
+// Enhanced data extraction with ONLY AI-driven platform detection
 const enhancedExtractDataFromText = (text: string): StructuredResponse | null => {
   const data: StructuredResponse = {};
 
@@ -189,41 +190,10 @@ const enhancedExtractDataFromText = (text: string): StructuredResponse | null =>
     }
   }
 
-  // Enhanced platform extraction with API details
-  const platformKeywords = [
-    'Gmail', 'Google', 'Slack', 'Discord', 'Notion', 'Trello', 'Asana', 'Monday', 
-    'Jira', 'Confluence', 'Zendesk', 'Salesforce', 'HubSpot', 'Pipedrive',
-    'Stripe', 'PayPal', 'Twilio', 'SendGrid', 'Mailchimp', 'ConvertKit',
-    'OpenAI', 'Anthropic', 'Claude', 'ChatGPT', 'Zapier', 'Make', 'IFTTT',
-    'Shopify', 'WooCommerce', 'WordPress', 'Webflow', 'Airtable', 'ClickUp',
-    'Microsoft', 'Teams', 'Outlook', 'OneDrive', 'SharePoint', 'Azure',
-    'AWS', 'GCP', 'Dropbox', 'Box', 'GitHub', 'GitLab', 'Bitbucket'
-  ];
-  
-  const foundPlatforms = new Set<string>();
-  const lowerText = text.toLowerCase();
-  
-  platformKeywords.forEach(keyword => {
-    if (lowerText.includes(keyword.toLowerCase())) {
-      foundPlatforms.add(keyword);
-    }
-  });
+  // REMOVED: Enhanced platform extraction with hardcoded keywords
+  // Let AI provide platforms dynamically instead
 
-  if (foundPlatforms.size > 0) {
-    data.platforms = Array.from(foundPlatforms).map(platformName => ({
-      name: platformName,
-      credentials: [
-        {
-          field: "api_key",
-          placeholder: `Enter your ${platformName} API key`,
-          link: `https://${platformName.toLowerCase().replace(' ', '')}.com/developers`,
-          why_needed: `Required to connect and interact with ${platformName} services`
-        }
-      ]
-    }));
-  }
-
-  // Enhanced agent extraction
+  // Enhanced agent extraction - but NO hardcoded fallbacks
   const agentPatterns = [
     /(?:Agent|AI Agent|Assistant)[s]?\s*(?:recommended?|suggested?|needed?)[:\s]*([^.\n]+)/gi,
     /(?:I recommend|I suggest|You'll need).*?([A-Z][a-zA-Z]*(?:Agent|Manager|Analyzer|Handler|Processor))/gi
@@ -239,10 +209,7 @@ const enhancedExtractDataFromText = (text: string): StructuredResponse | null =>
     }
   });
 
-  // Fallback agent creation
-  if (agentNames.size === 0 && (data.summary || data.steps)) {
-    agentNames.add('AutomationManager');
-  }
+  // REMOVED: Fallback agent creation
 
   if (agentNames.size > 0) {
     data.agents = Array.from(agentNames).map(agentName => ({

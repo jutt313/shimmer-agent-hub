@@ -1,3 +1,4 @@
+
 import { AutomationBlueprint } from '@/types/automation';
 import { buildDynamicPlatformConfig, getDynamicMethodConfig, buildDynamicURL } from './dynamicPlatformConfig';
 import { supabase } from '@/integrations/supabase/client';

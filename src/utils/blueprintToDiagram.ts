@@ -1,3 +1,4 @@
+
 import { AutomationBlueprint } from "@/types/automation";
 import { Node, Edge, Position, MarkerType } from "@xyflow/react";
 
@@ -308,7 +309,7 @@ const processStep = (step: any, index: number, x: number, y: number, previousNod
   const edges: Edge[] = [];
   
   const nodeId = getId();
-  const nodeData = createNodeData(step, index); // Fixed: pass step instead of &
+  const nodeData = createNodeData(step, index);
   
   // Determine node type based on step type
   let nodeType = 'default';
@@ -440,7 +441,6 @@ const processBranch = (
         stroke: edgeColor,
       };
       result.edges[0].markerEnd = {
-        ...markerEnd,
         ...markerEnd,
         color: edgeColor,
       };

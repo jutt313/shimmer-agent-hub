@@ -107,14 +107,11 @@ const AutomationDetail = () => {
         };
       });
 
-      // Extract platforms from any AI message that has them (but only accumulate unique ones)
+      // Extract platforms from any AI message that has them
       const allPlatforms: any[] = [];
       formattedMessages.forEach(msg => {
         if (msg.isBot && msg.structuredData?.platforms) {
-          // Only add platforms if this isn't marked as an update response
-          if (!msg.structuredData.is_update) {
-            allPlatforms.push(...msg.structuredData.platforms);
-          }
+          allPlatforms.push(...msg.structuredData.platforms);
         }
       });
       
@@ -152,55 +149,6 @@ const AutomationDetail = () => {
     }
   };
 
-  const formatStructuredMessage = (structuredData: StructuredResponse): string => {
-    let formattedMessage = "";
-
-    // Summary
-    if (structuredData.summary) {
-      formattedMessage += `**Automation Summary**\n\n${structuredData.summary}\n\n`;
-    }
-
-    // Steps
-    if (structuredData.steps && structuredData.steps.length > 0) {
-      formattedMessage += `**Step-by-Step Workflow**\n\n`;
-      structuredData.steps.forEach((step, index) => {
-        formattedMessage += `**${index + 1}.** ${step}\n\n`;
-      });
-    }
-
-    // Platform information
-    if (structuredData.platforms && structuredData.platforms.length > 0) {
-      formattedMessage += `**Required Platform Credentials**\n\n`;
-      structuredData.platforms.forEach(platform => {
-        formattedMessage += `**${platform.name}**\n`;
-        platform.credentials.forEach(cred => {
-          formattedMessage += `• **${cred.field.replace(/_/g, ' ').toUpperCase()}**: ${cred.why_needed}\n`;
-        });
-        formattedMessage += `\n`;
-      });
-    }
-
-    // Agent information
-    if (structuredData.agents && structuredData.agents.length > 0) {
-      formattedMessage += `**Recommended AI Agents**\n\n`;
-      structuredData.agents.forEach(agent => {
-        formattedMessage += `**${agent.name}** - ${agent.role}\n`;
-        formattedMessage += `Goal: ${agent.goal}\n`;
-        formattedMessage += `Why needed: ${agent.why_needed}\n\n`;
-      });
-    }
-
-    // Clarification questions
-    if (structuredData.clarification_questions && structuredData.clarification_questions.length > 0) {
-      formattedMessage += `**I need some clarification:**\n\n`;
-      structuredData.clarification_questions.forEach((question, index) => {
-        formattedMessage += `**${index + 1}.** ${question}\n\n`;
-      });
-    }
-
-    return formattedMessage.trim();
-  };
-
   const handleSendMessage = async (messageText: string) => {
     if (!messageText.trim() || sendingMessage || !automation) return;
 
@@ -216,7 +164,7 @@ const AutomationDetail = () => {
     setSendingMessage(true);
 
     try {
-      console.log('🚀 Sending message to chat-ai function:', messageText.substring(0, 50));
+      console.log('🚀 Sending message with full conversation context:', messageText.substring(0, 50));
 
       // Save user message to database
       await supabase
@@ -227,11 +175,22 @@ const AutomationDetail = () => {
           message_content: messageText
         });
 
-      // Call the chat-ai function with simplified payload
+      // Prepare automation context for AI
+      const automationContext = {
+        id: automation.id,
+        title: automation.title,
+        description: automation.description,
+        status: automation.status,
+        automation_blueprint: automation.automation_blueprint
+      };
+
+      // Call the chat-ai function with FULL conversation context
       const { data, error } = await supabase.functions.invoke('chat-ai', {
         body: {
           message: messageText,
-          messages: messages.slice(-5) // Only send last 5 messages for context
+          messages: messages, // Send ALL messages, not just last 5
+          automationId: automation.id,
+          automationContext: automationContext
         }
       });
 
@@ -240,7 +199,7 @@ const AutomationDetail = () => {
         throw error;
       }
 
-      console.log('✅ Received response from chat-ai function');
+      console.log('✅ Received response from chat-ai function with full context');
 
       let aiResponse = data.response || "I'm sorry, I couldn't process your request.";
       
@@ -271,26 +230,47 @@ const AutomationDetail = () => {
         structuredData: structuredData
       };
 
-      console.log('📤 Adding AI message to chat');
+      console.log('📤 Adding AI message to chat with conversation context');
       setMessages(prev => [...prev, aiMessage]);
 
-      // Update platforms if available
-      if (structuredData?.platforms && Array.isArray(structuredData.platforms)) {
-        console.log('🔗 Updating platforms from response');
-        setCurrentPlatforms(prev => {
-          const newPlatforms = [...prev];
-          structuredData.platforms.forEach((platform: any) => {
-            if (!newPlatforms.find(p => p.name === platform.name)) {
-              newPlatforms.push(platform);
-            }
+      // Handle platform management with conversation context
+      if (structuredData) {
+        // Handle platform additions
+        if (structuredData.platforms && Array.isArray(structuredData.platforms)) {
+          console.log('🔗 Processing platform additions from contextualized response');
+          setCurrentPlatforms(prev => {
+            const newPlatforms = [...prev];
+            structuredData.platforms.forEach((platform: any) => {
+              if (!newPlatforms.find(p => p.name === platform.name)) {
+                newPlatforms.push(platform);
+              }
+            });
+            return newPlatforms;
           });
-          return newPlatforms;
-        });
+        }
+
+        // Handle platform removals (NEW FUNCTIONALITY)
+        if (structuredData.platforms_to_remove && Array.isArray(structuredData.platforms_to_remove)) {
+          console.log('🗑️ Processing platform removals from contextualized response');
+          setCurrentPlatforms(prev => 
+            prev.filter(platform => !structuredData.platforms_to_remove.includes(platform.name))
+          );
+          
+          toast({
+            title: "Platforms Updated",
+            description: `Removed platforms: ${structuredData.platforms_to_remove.join(', ')}`,
+          });
+        }
+
+        // Show conversation context acknowledgment
+        if (structuredData.conversation_updates) {
+          console.log('🧠 AI acknowledged conversation context:', structuredData.conversation_updates.context_acknowledged);
+        }
       }
 
-      // Update automation blueprint if available - but don't auto-show JSON
+      // Update automation blueprint if available
       if (structuredData?.automation_blueprint) {
-        console.log('🔧 Updating automation blueprint');
+        console.log('🔧 Updating automation blueprint with conversation context');
         const { error: updateError } = await supabase
           .from('automations')
           .update({ automation_blueprint: structuredData.automation_blueprint })
@@ -301,10 +281,9 @@ const AutomationDetail = () => {
             ...prev!,
             automation_blueprint: structuredData.automation_blueprint
           }));
-          // Don't auto-show blueprint as requested
           toast({
             title: "Blueprint Updated",
-            description: "Automation blueprint has been updated.",
+            description: "Automation blueprint has been updated with conversation context.",
           });
         }
       }
@@ -358,7 +337,7 @@ const AutomationDetail = () => {
         timestamp: new Date()
       }]);
 
-      handleSendMessage(`Please incorporate the newly configured AI Agent "${agentName}" (ID: ${agentId}) into this automation's blueprint and explain its role and impact on the workflow.`).then(() => {
+      handleSendMessage(`Please incorporate the newly configured AI Agent "${agentName}" (ID: ${agentId}) into this automation's blueprint and explain its role and impact on the workflow with full awareness of our conversation.`).then(() => {
         setNewMessage("");
       });
     }
@@ -508,7 +487,7 @@ const AutomationDetail = () => {
                   value={newMessage} 
                   onChange={e => setNewMessage(e.target.value)} 
                   onKeyPress={handleKeyPress} 
-                  placeholder={sendingMessage ? "YusrAI is building..." : "Ask about this automation..."} 
+                  placeholder={sendingMessage ? "YusrAI is thinking with full context..." : "Ask about this automation..."} 
                   disabled={sendingMessage}
                   className="rounded-3xl bg-white/80 backdrop-blur-sm border-0 px-6 py-4 text-lg focus:outline-none focus:ring-0 shadow-lg w-full" 
                   style={{

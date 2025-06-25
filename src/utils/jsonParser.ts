@@ -10,6 +10,7 @@ export interface StructuredResponse {
       why_needed: string;
     }>;
   }>;
+  platforms_to_remove?: string[];
   agents?: Array<{
     name: string;
     role: string;
@@ -21,10 +22,14 @@ export interface StructuredResponse {
   clarification_questions?: string[];
   automation_blueprint?: any;
   is_update?: boolean;
+  conversation_updates?: {
+    platform_changes?: string;
+    context_acknowledged?: string;
+  };
 }
 
 export const parseStructuredResponse = (responseText: string): StructuredResponse | null => {
-  console.log('🔍 Enhanced parsing - Length:', responseText.length);
+  console.log('🔍 Enhanced parsing with conversation context - Length:', responseText.length);
   
   try {
     // Method 1: Priority - JSON in code blocks with validation
@@ -32,12 +37,12 @@ export const parseStructuredResponse = (responseText: string): StructuredRespons
     if (jsonCodeBlockMatch) {
       try {
         const parsed = JSON.parse(jsonCodeBlockMatch[1]);
-        console.log('✅ Successfully parsed JSON from code block');
+        console.log('✅ Successfully parsed JSON from code block with conversation context');
         
         // Validate completeness
         const validation = validateStructuredData(parsed);
         if (validation.isComplete) {
-          console.log('✅ Complete structured data found');
+          console.log('✅ Complete structured data found with conversation awareness');
           parsed.is_update = isUpdateResponse(parsed, responseText);
           return validateAndFixStructuredData(parsed);
         } else {
@@ -71,7 +76,7 @@ export const parseStructuredResponse = (responseText: string): StructuredRespons
       if (jsonStr) {
         try {
           const parsed = JSON.parse(jsonStr);
-          console.log('✅ Successfully parsed complete JSON object');
+          console.log('✅ Successfully parsed complete JSON object with context');
           
           const validation = validateStructuredData(parsed);
           if (validation.isComplete) {
@@ -99,10 +104,10 @@ export const parseStructuredResponse = (responseText: string): StructuredRespons
       }
     }
 
-    // Method 3: Enhanced text extraction as fallback - REMOVED HARDCODED PLATFORMS
+    // Method 3: Enhanced text extraction as fallback with conversation awareness
     const extractedData = enhancedExtractDataFromText(responseText);
     if (extractedData && Object.keys(extractedData).length > 0) {
-      console.log('✅ Extracted enhanced structured data from text patterns');
+      console.log('✅ Extracted enhanced structured data from text patterns with context');
       extractedData.is_update = isUpdateResponse(extractedData, responseText);
       return validateAndFixStructuredData(extractedData);
     }
@@ -128,35 +133,22 @@ const validateStructuredData = (data: any): { isComplete: boolean; missing: stri
     missing.push('steps (minimum 3 required)');
   }
   
-  if (!data.platforms || !Array.isArray(data.platforms) || data.platforms.length === 0) {
-    missing.push('platforms');
-  } else {
-    data.platforms.forEach((platform: any, index: number) => {
-      if (!platform.credentials || platform.credentials.length === 0) {
-        missing.push(`platforms[${index}].credentials`);
-      }
-    });
-  }
-  
-  if (!data.agents || !Array.isArray(data.agents) || data.agents.length === 0) {
-    missing.push('agents');
-  }
-  
   return {
     isComplete: missing.length === 0,
     missing
   };
 };
 
-// Enhanced data extraction with ONLY AI-driven platform detection
+// Enhanced data extraction with conversation context awareness
 const enhancedExtractDataFromText = (text: string): StructuredResponse | null => {
   const data: StructuredResponse = {};
 
-  // Enhanced summary extraction
+  // Enhanced summary extraction with conversation context
   const summaryPatterns = [
     /(?:Summary|Automation Summary|This automation)[:\s]*([^.\n]+(?:\.[^.\n]+){0,2})/i,
     /^([^.\n]*(?:automation|workflow|system)[^.\n]*\.)/i,
-    /I['']ll help you create ([^.\n]+automation[^.\n]*\.)/i
+    /I['']ll help you create ([^.\n]+automation[^.\n]*\.)/i,
+    /(?:Based on our conversation|Following our discussion)[:\s]*([^.\n]+\.)/i
   ];
   
   for (const pattern of summaryPatterns) {
@@ -189,13 +181,11 @@ const enhancedExtractDataFromText = (text: string): StructuredResponse | null =>
     }
   }
 
-  // REMOVED: Enhanced platform extraction with hardcoded keywords
-  // Let AI provide platforms dynamically instead
-
-  // Enhanced agent extraction - but NO hardcoded fallbacks
+  // Enhanced agent extraction with conversation context awareness
   const agentPatterns = [
     /(?:Agent|AI Agent|Assistant)[s]?\s*(?:recommended?|suggested?|needed?)[:\s]*([^.\n]+)/gi,
-    /(?:I recommend|I suggest|You'll need).*?([A-Z][a-zA-Z]*(?:Agent|Manager|Analyzer|Handler|Processor))/gi
+    /(?:I recommend|I suggest|You'll need).*?([A-Z][a-zA-Z]*(?:Agent|Manager|Analyzer|Handler|Processor))/gi,
+    /(?:Based on our discussion|From our conversation).*?([A-Z][a-zA-Z]*(?:Agent|Manager))/gi
   ];
 
   const agentNames = new Set<string>();
@@ -208,8 +198,6 @@ const enhancedExtractDataFromText = (text: string): StructuredResponse | null =>
     }
   });
 
-  // REMOVED: Fallback agent creation
-
   if (agentNames.size > 0) {
     data.agents = Array.from(agentNames).map(agentName => ({
       name: agentName,
@@ -221,11 +209,26 @@ const enhancedExtractDataFromText = (text: string): StructuredResponse | null =>
     }));
   }
 
-  console.log('📊 Enhanced extracted data:', {
+  // Add conversation context awareness
+  const contextPatterns = [
+    /(?:Based on our conversation|Following our discussion|From our chat)/i,
+    /(?:As we discussed|From what we talked about)/i,
+    /(?:Context acknowledged|Conversation understood)/i
+  ];
+
+  const hasContextAwareness = contextPatterns.some(pattern => pattern.test(text));
+  if (hasContextAwareness) {
+    data.conversation_updates = {
+      context_acknowledged: "AI has acknowledged conversation history and context"
+    };
+  }
+
+  console.log('📊 Enhanced extracted data with conversation context:', {
     hasSummary: !!data.summary,
     stepsCount: data.steps?.length || 0,
     platformsCount: data.platforms?.length || 0,
-    agentsCount: data.agents?.length || 0
+    agentsCount: data.agents?.length || 0,
+    hasConversationContext: !!data.conversation_updates
   });
 
   return Object.keys(data).length > 0 ? data : null;
@@ -282,25 +285,29 @@ const enhanceWithExtractedData = (parsedData: any, responseText: string): Struct
   const extracted = enhancedExtractDataFromText(responseText);
   
   return {
-    summary: parsedData.summary || extracted?.summary || "Automation workflow created",
+    summary: parsedData.summary || extracted?.summary || "Automation workflow created with conversation context",
     steps: parsedData.steps || extracted?.steps || [],
     platforms: parsedData.platforms || extracted?.platforms || [],
+    platforms_to_remove: parsedData.platforms_to_remove || [],
     agents: parsedData.agents || extracted?.agents || [],
     clarification_questions: parsedData.clarification_questions || [],
     automation_blueprint: parsedData.automation_blueprint || null,
-    is_update: parsedData.is_update || false
+    is_update: parsedData.is_update || false,
+    conversation_updates: parsedData.conversation_updates || extracted?.conversation_updates || {}
   };
 };
 
 export const validateAndFixStructuredData = (data: any): StructuredResponse => {
   const validated: StructuredResponse = {
-    summary: data.summary || "Automation workflow created",
+    summary: data.summary || "Automation workflow created with conversation awareness",
     steps: data.steps || [],
     platforms: data.platforms || [],
+    platforms_to_remove: data.platforms_to_remove || [],
     agents: data.agents || [],
     clarification_questions: data.clarification_questions || [],
     automation_blueprint: data.automation_blueprint || null,
-    is_update: data.is_update || false
+    is_update: data.is_update || false,
+    conversation_updates: data.conversation_updates || {}
   };
 
   // Ensure platforms array has proper structure
@@ -328,35 +335,47 @@ export const validateAndFixStructuredData = (data: any): StructuredResponse => {
     }));
   }
 
-  console.log('✅ Validated structured data:', {
+  console.log('✅ Validated structured data with conversation context:', {
     hasSummary: !!validated.summary,
     stepsCount: validated.steps?.length || 0,
     platformsCount: validated.platforms?.length || 0,
+    platformsToRemoveCount: validated.platforms_to_remove?.length || 0,
     agentsCount: validated.agents?.length || 0,
-    hasBlueprint: !!validated.automation_blueprint
+    hasBlueprint: !!validated.automation_blueprint,
+    hasConversationUpdates: !!validated.conversation_updates
   });
 
   return validated;
 };
 
-// Helper function to detect if this is an update response vs new automation
+// Helper function to detect if this is an update response vs new automation with conversation context
 const isUpdateResponse = (parsed: any, responseText: string): boolean => {
   const updateKeywords = [
     'update', 'modify', 'change', 'adjust', 'edit', 'revise',
     'improved', 'enhanced', 'refined', 'optimized', 'fixed'
   ];
   
+  const conversationKeywords = [
+    'based on our conversation', 'from our discussion', 'as we talked about',
+    'following our chat', 'from what we discussed'
+  ];
+  
   const hasUpdateKeywords = updateKeywords.some(keyword => 
     responseText.toLowerCase().includes(keyword)
   );
 
-  // NEW LOGIC: If response contains comprehensive platform data or blueprint, it's NOT an update
+  const hasConversationContext = conversationKeywords.some(keyword =>
+    responseText.toLowerCase().includes(keyword)
+  );
+
+  // If response contains comprehensive platform data or blueprint, it's NOT an update
   const isComprehensiveResponse = !!parsed.automation_blueprint || 
                                  (parsed.platforms && Array.isArray(parsed.platforms) && parsed.platforms.length > 0) ||
                                  (parsed.agents && Array.isArray(parsed.agents) && parsed.agents.length > 0);
 
   // If it's a comprehensive response with actual data, and no explicit update keywords, it's NOT an update
-  if (isComprehensiveResponse && !hasUpdateKeywords) {
+  // However, if it has conversation context, it might be an update based on discussion
+  if (isComprehensiveResponse && !hasUpdateKeywords && !hasConversationContext) {
     return false;
   }
 
@@ -366,8 +385,8 @@ const isUpdateResponse = (parsed: any, responseText: string): boolean => {
 
   const hasQuestions = parsed.clarification_questions && parsed.clarification_questions.length > 0;
 
-  // Only return true if explicit update keywords OR minimal structure with questions
-  return hasUpdateKeywords || (hasMinimalStructure && hasQuestions);
+  // Return true if explicit update keywords OR minimal structure with questions OR conversation-based updates
+  return hasUpdateKeywords || (hasMinimalStructure && hasQuestions) || (hasConversationContext && hasUpdateKeywords);
 };
 
 const fixMalformedJson = (jsonStr: string): string | null => {
@@ -401,9 +420,9 @@ export const cleanDisplayText = (text: string): string => {
   cleanText = cleanText.replace(/\n\s*\n\s*\n/g, '\n\n');
   cleanText = cleanText.trim();
   
-  // If text is empty after cleaning, provide a default message
+  // If text is empty after cleaning, provide a default message with conversation awareness
   if (!cleanText) {
-    cleanText = "Here's your automation configuration:";
+    cleanText = "Here's your automation configuration based on our conversation:";
   }
   
   return cleanText;

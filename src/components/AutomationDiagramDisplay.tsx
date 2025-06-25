@@ -1,3 +1,4 @@
+
 import React, { useCallback, useMemo, useEffect, useState } from 'react';
 import {
   ReactFlow,
@@ -190,7 +191,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   // Show message if no blueprint
   if (!automationBlueprint) {
     return (
-      <div className="w-full h-[75vh] flex flex-col rounded-3xl overflow-hidden bg-white/90 backdrop-blur-md shadow-2xl border-0 relative">
+      <div className="w-full h-[65vh] flex flex-col rounded-3xl overflow-hidden bg-white/90 backdrop-blur-md shadow-2xl border-0 relative">
         <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-purple-100/40 to-blue-100/40 pointer-events-none"></div>
         
         <CardHeader className="pb-3 border-b border-purple-200/50 bg-gradient-to-r from-purple-50/80 to-blue-50/80 rounded-t-3xl relative z-10">
@@ -212,7 +213,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
 
   if (loading) {
     return (
-      <div className="w-full h-[75vh] flex flex-col rounded-3xl overflow-hidden bg-white/90 backdrop-blur-md shadow-2xl border-0 relative">
+      <div className="w-full h-[65vh] flex flex-col rounded-3xl overflow-hidden bg-white/90 backdrop-blur-md shadow-2xl border-0 relative">
         <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-purple-100/40 to-blue-100/40 pointer-events-none"></div>
         
         <CardHeader className="pb-3 border-b border-purple-200/50 bg-gradient-to-r from-purple-50/80 to-blue-50/80 rounded-t-3xl relative z-10">
@@ -232,7 +233,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   }
 
   return (
-    <div className="w-full h-[75vh] flex flex-col rounded-3xl overflow-hidden bg-white/90 backdrop-blur-md shadow-2xl border-0 relative">
+    <div className="w-full h-[65vh] flex flex-col rounded-3xl overflow-hidden bg-white/90 backdrop-blur-md shadow-2xl border-0 relative">
       <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-purple-100/40 to-blue-100/40 pointer-events-none"></div>
       
       <CardHeader className="pb-3 border-b border-purple-200/50 bg-gradient-to-r from-purple-50/80 to-blue-50/80 rounded-t-3xl relative z-10">

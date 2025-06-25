@@ -58,6 +58,7 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
       data: {
         label: step.name || `Step ${index + 1}`,
         icon: step.action?.integration || step.type,
+        platform: step.action?.integration, // Add platform for icon display
         action: step.action,
         condition: step.condition,
         loop: step.loop,

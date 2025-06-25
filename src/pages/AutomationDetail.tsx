@@ -379,8 +379,8 @@ const AutomationDetail = () => {
       <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-blue-300/20 to-purple-300/20 rounded-full blur-3xl animate-pulse"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-r from-purple-300/20 to-blue-300/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
       
-      {/* Compact Navigation Header */}
-      <div className="sticky top-4 z-20 flex justify-between items-center mx-6 py-2">
+      {/* Compact Navigation Header with proper spacing */}
+      <div className="sticky top-4 z-20 flex justify-between items-center mx-6 py-3 mb-4">
         {/* Left side - Back button and automation info */}
         <div className="flex items-center gap-3">
           <Button 
@@ -452,9 +452,9 @@ const AutomationDetail = () => {
         <div className="w-32"></div>
       </div>
       
-      <div className="flex-1 max-w-7xl mx-auto w-full px-6 relative">        
-        {/* Main Content Area with Slide Animation */}
-        <div className="py-2 relative">
+      <div className="flex-1 max-w-7xl mx-auto w-full px-6 relative pb-6">        
+        {/* Main Content Area with fixed height to prevent layout shifts */}
+        <div className="py-2 relative" style={{ minHeight: '70vh' }}>
           {/* Chat Card - slides left when dashboard OR diagram is shown */}
           <div className={`transition-transform duration-500 ease-in-out ${showDashboard || showDiagram ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'} ${showDashboard || showDiagram ? 'absolute' : 'relative'} w-full`}>
             <ChatCard 
@@ -467,8 +467,8 @@ const AutomationDetail = () => {
             />
           </div>
           
-          {/* Dashboard Card - slides from left */}
-          <div className={`transition-transform duration-500 ease-in-out ${showDashboard ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'} ${showDashboard ? 'relative' : 'absolute'}`}>
+          {/* Dashboard Card - slides from left with proper height */}
+          <div className={`transition-transform duration-500 ease-in-out ${showDashboard ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'} ${showDashboard ? 'relative' : 'absolute'} w-full`} style={{ minHeight: '70vh' }}>
             {showDashboard && (
               <AutomationDashboard
                 automationId={automation.id}
@@ -479,30 +479,32 @@ const AutomationDetail = () => {
             )}
           </div>
 
-          {/* Diagram Card - slides from RIGHT */}
-          <div className={`transition-transform duration-500 ease-in-out ${showDiagram ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} ${showDiagram ? 'relative' : 'absolute'} w-full`}>
+          {/* Diagram Card - slides from RIGHT with proper margins */}
+          <div className={`transition-transform duration-500 ease-in-out ${showDiagram ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} ${showDiagram ? 'relative' : 'absolute'} w-full`} style={{ minHeight: '70vh' }}>
             {showDiagram && (
-              <AutomationDiagramDisplay
-                automationBlueprint={automation?.automation_blueprint}
-                messages={messages}
-                onAgentAdd={handleAgentAdd}
-                onAgentDismiss={handleAgentDismiss}
-                dismissedAgents={dismissedAgents}
-              />
+              <div className="py-4">
+                <AutomationDiagramDisplay
+                  automationBlueprint={automation?.automation_blueprint}
+                  messages={messages}
+                  onAgentAdd={handleAgentAdd}
+                  onAgentDismiss={handleAgentDismiss}
+                  dismissedAgents={dismissedAgents}
+                />
+              </div>
             )}
           </div>
         </div>
         
-        {/* Platform Buttons - hide when showing diagram or dashboard, reduce spacing */}
+        {/* Platform Buttons - hide when showing diagram or dashboard, with minimal spacing */}
         {!showDashboard && !showDiagram && currentPlatforms && currentPlatforms.length > 0 && (
-          <div className="pb-2">
+          <div className="py-3">
             <PlatformButtons platforms={currentPlatforms} />
           </div>
         )}
         
-        {/* Input Section - hide when showing diagram or dashboard, reduce spacing */}
+        {/* Input Section - hide when showing diagram or dashboard, with minimal spacing */}
         {!showDashboard && !showDiagram && (
-          <div className="pb-6">
+          <div className="py-3">
             <div className="flex gap-4 items-end">
               <Button
                 onClick={() => setShowAIAgentForm(true)}

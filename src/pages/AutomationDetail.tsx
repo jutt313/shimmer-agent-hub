@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -6,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Send, ArrowLeft, Bot, BarChart3 } from "lucide-react";
+import { Send, ArrowLeft, Bot, BarChart3, Code2 } from "lucide-react";
 import ChatCard from "@/components/ChatCard";
 import AutomationDashboard from "@/components/AutomationDashboard";
 import AIAgentForm from "@/components/AIAgentForm";
 import PlatformButtons from "@/components/PlatformButtons";
 import BlueprintCard from "@/components/BlueprintCard";
+import AutomationDiagramDisplay from "@/components/AutomationDiagramDisplay";
 import { AutomationBlueprint } from "@/types/automation";
 import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
 
@@ -48,6 +48,7 @@ const AutomationDetail = () => {
   const [currentPlatforms, setCurrentPlatforms] = useState<any[]>([]);
   const [showBlueprint, setShowBlueprint] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showDiagram, setShowDiagram] = useState(false);
 
   useEffect(() => {
     if (!user || !id) {
@@ -411,11 +412,24 @@ const AutomationDetail = () => {
             Back
           </Button>
           <Button
-            onClick={() => setShowDashboard(!showDashboard)}
+            onClick={() => {
+              setShowDashboard(!showDashboard);
+              setShowDiagram(false); // Hide diagram when showing dashboard
+            }}
             className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
           >
             <BarChart3 className="w-5 h-5 mr-2" />
             {showDashboard ? 'Show Chat' : 'Dashboard'}
+          </Button>
+          <Button
+            onClick={() => {
+              setShowDiagram(!showDiagram);
+              setShowDashboard(false); // Hide dashboard when showing diagram
+            }}
+            className="rounded-3xl bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
+          >
+            <Code2 className="w-5 h-5 mr-2" />
+            {showDiagram ? 'Show Chat' : 'Diagram'}
           </Button>
           <div>
             <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -429,9 +443,10 @@ const AutomationDetail = () => {
       </div>
       
       <div className="max-w-7xl mx-auto h-full flex flex-col relative z-10 pt-20">        
-        {/* Main Content Area with Slide Animation - Reduced top padding */}
+        {/* Main Content Area with Slide Animation */}
         <div className="flex-1 flex items-start justify-center pt-1 pb-2 relative">
-          <div className={`transition-transform duration-500 ease-in-out ${showDashboard ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'} ${showDashboard ? 'absolute' : 'relative'} w-[calc(100vw-6rem)] max-w-none mx-12`}>
+          {/* Chat Card - slides left when dashboard OR diagram is shown */}
+          <div className={`transition-transform duration-500 ease-in-out ${showDashboard || showDiagram ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'} ${showDashboard || showDiagram ? 'absolute' : 'relative'} w-[calc(100vw-6rem)] max-w-none mx-12`}>
             <ChatCard 
               messages={messages} 
               onAgentAdd={handleAgentAdd}
@@ -442,7 +457,8 @@ const AutomationDetail = () => {
             />
           </div>
           
-          <div className={`transition-transform duration-500 ease-in-out ${showDashboard ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} ${showDashboard ? 'relative' : 'absolute'}`}>
+          {/* Dashboard Card - slides from left */}
+          <div className={`transition-transform duration-500 ease-in-out ${showDashboard ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'} ${showDashboard ? 'relative' : 'absolute'}`}>
             {showDashboard && (
               <AutomationDashboard
                 automationId={automation.id}
@@ -452,17 +468,26 @@ const AutomationDetail = () => {
               />
             )}
           </div>
+
+          {/* Diagram Card - slides from RIGHT (opposite of dashboard) */}
+          <div className={`transition-transform duration-500 ease-in-out ${showDiagram ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} ${showDiagram ? 'relative' : 'absolute'} w-[calc(100vw-6rem)] max-w-none mx-12`}>
+            {showDiagram && (
+              <AutomationDiagramDisplay
+                automationBlueprint={automation?.automation_blueprint}
+              />
+            )}
+          </div>
         </div>
         
-        {/* Platform Buttons - Reduced margin */}
-        {!showDashboard && currentPlatforms && currentPlatforms.length > 0 && (
+        {/* Platform Buttons - hide when showing diagram or dashboard */}
+        {!showDashboard && !showDiagram && currentPlatforms && currentPlatforms.length > 0 && (
           <div className="mb-2 mx-12">
             <PlatformButtons platforms={currentPlatforms} />
           </div>
         )}
         
-        {/* Input Section - Reduced padding and improved positioning */}
-        {!showDashboard && (
+        {/* Input Section - hide when showing diagram or dashboard */}
+        {!showDashboard && !showDiagram && (
           <div className="space-y-4 pb-4">
             <div className="flex gap-4 items-end px-[60px]">
               <Button

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -287,7 +288,7 @@ const AutomationDetail = () => {
         });
       }
 
-      // Update automation blueprint if available
+      // Update automation blueprint if available - but don't auto-show JSON
       if (structuredData?.automation_blueprint) {
         console.log('🔧 Updating automation blueprint');
         const { error: updateError } = await supabase
@@ -300,7 +301,7 @@ const AutomationDetail = () => {
             ...prev!,
             automation_blueprint: structuredData.automation_blueprint
           }));
-          setShowBlueprint(true);
+          // Don't auto-show blueprint as requested
           toast({
             title: "Blueprint Updated",
             description: "Automation blueprint has been updated.",
@@ -395,57 +396,59 @@ const AutomationDetail = () => {
   }
 
   return (
-    <div className="h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col relative overflow-hidden">
       {/* Background glow effects */}
       <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-blue-300/20 to-purple-300/20 rounded-full blur-3xl animate-pulse"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-r from-purple-300/20 to-blue-300/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
       
-      {/* Header */}
-      <div className="absolute top-6 left-6 right-6 z-20 flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <Button 
-            onClick={() => navigate("/automations")}
-            className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
-          >
-            <ArrowLeft className="w-5 h-5 mr-2" />
-            Back
-          </Button>
-          <Button
-            onClick={() => {
-              setShowDashboard(!showDashboard);
-              setShowDiagram(false); // Hide diagram when showing dashboard
-            }}
-            className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
-          >
-            <BarChart3 className="w-5 h-5 mr-2" />
-            {showDashboard ? 'Show Chat' : 'Dashboard'}
-          </Button>
-          <Button
-            onClick={() => {
-              setShowDiagram(!showDiagram);
-              setShowDashboard(false); // Hide dashboard when showing diagram
-            }}
-            className="rounded-3xl bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
-          >
-            <Code2 className="w-5 h-5 mr-2" />
-            {showDiagram ? 'Show Chat' : 'Diagram'}
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              {automation?.title}
-            </h1>
-            <p className="text-sm text-gray-600">
-              Status: <span className="capitalize">{automation?.status}</span>
-            </p>
+      {/* Fixed Header - Always visible */}
+      <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-6 py-4">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <Button 
+              onClick={() => navigate("/automations")}
+              className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
+            >
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              Back
+            </Button>
+            <Button
+              onClick={() => {
+                setShowDashboard(!showDashboard);
+                setShowDiagram(false);
+              }}
+              className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
+            >
+              <BarChart3 className="w-5 h-5 mr-2" />
+              {showDashboard ? 'Show Chat' : 'Dashboard'}
+            </Button>
+            <Button
+              onClick={() => {
+                setShowDiagram(!showDiagram);
+                setShowDashboard(false);
+              }}
+              className="rounded-3xl bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
+            >
+              <Code2 className="w-5 h-5 mr-2" />
+              {showDiagram ? 'Show Chat' : 'Diagram'}
+            </Button>
+            <div>
+              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                {automation?.title}
+              </h1>
+              <p className="text-sm text-gray-600">
+                Status: <span className="capitalize">{automation?.status}</span>
+              </p>
+            </div>
           </div>
         </div>
       </div>
       
-      <div className="max-w-7xl mx-auto h-full flex flex-col relative z-10 pt-20">        
+      <div className="flex-1 max-w-7xl mx-auto w-full px-6 relative">        
         {/* Main Content Area with Slide Animation */}
-        <div className="flex-1 flex items-start justify-center pt-1 pb-2 relative">
+        <div className="py-4 relative">
           {/* Chat Card - slides left when dashboard OR diagram is shown */}
-          <div className={`transition-transform duration-500 ease-in-out ${showDashboard || showDiagram ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'} ${showDashboard || showDiagram ? 'absolute' : 'relative'} w-[calc(100vw-6rem)] max-w-none mx-12`}>
+          <div className={`transition-transform duration-500 ease-in-out ${showDashboard || showDiagram ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'} ${showDashboard || showDiagram ? 'absolute' : 'relative'} w-full`}>
             <ChatCard 
               messages={messages} 
               onAgentAdd={handleAgentAdd}
@@ -469,7 +472,7 @@ const AutomationDetail = () => {
           </div>
 
           {/* Diagram Card - slides from RIGHT (opposite of dashboard) */}
-          <div className={`transition-transform duration-500 ease-in-out ${showDiagram ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} ${showDiagram ? 'relative' : 'absolute'} w-[calc(100vw-6rem)] max-w-none mx-12`}>
+          <div className={`transition-transform duration-500 ease-in-out ${showDiagram ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} ${showDiagram ? 'relative' : 'absolute'} w-full`}>
             {showDiagram && (
               <AutomationDiagramDisplay
                 automationBlueprint={automation?.automation_blueprint}
@@ -478,17 +481,17 @@ const AutomationDetail = () => {
           </div>
         </div>
         
-        {/* Platform Buttons - hide when showing diagram or dashboard */}
+        {/* Platform Buttons - hide when showing diagram or dashboard, reduce spacing */}
         {!showDashboard && !showDiagram && currentPlatforms && currentPlatforms.length > 0 && (
-          <div className="mb-2 mx-12">
+          <div className="pb-2">
             <PlatformButtons platforms={currentPlatforms} />
           </div>
         )}
         
-        {/* Input Section - hide when showing diagram or dashboard */}
+        {/* Input Section - hide when showing diagram or dashboard, reduce spacing */}
         {!showDashboard && !showDiagram && (
-          <div className="space-y-4 pb-4">
-            <div className="flex gap-4 items-end px-[60px]">
+          <div className="pb-6">
+            <div className="flex gap-4 items-end">
               <Button
                 onClick={() => setShowAIAgentForm(true)}
                 className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-6 py-4 shadow-lg hover:shadow-xl transition-all duration-300 border-0 flex-shrink-0"
@@ -529,7 +532,7 @@ const AutomationDetail = () => {
         )}
       </div>
 
-      {/* Blueprint Card - Right side slide-out panel */}
+      {/* Blueprint Card - Right side slide-out panel - Hidden by default as requested */}
       {showBlueprint && automation?.automation_blueprint && (
         <BlueprintCard
           blueprint={automation.automation_blueprint}

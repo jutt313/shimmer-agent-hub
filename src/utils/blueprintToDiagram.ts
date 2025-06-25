@@ -227,11 +227,10 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
   let currentX = config.startX;
   let currentY = config.startY;
 
-  // Create the Trigger node with dynamic content
+  // Create the Trigger node with dynamic content - fix trigger type handling
   const triggerNodeId = getId();
-  const triggerIcon = blueprint.trigger?.platform ? getPlatformIcon(blueprint.trigger.platform) : '▶️';
-  const triggerLabel = blueprint.trigger?.name || 
-                      `${triggerIcon} ${blueprint.trigger?.type || 'Trigger'}`;
+  const triggerIcon = '▶️'; // Use default trigger icon since trigger doesn't have platform property
+  const triggerLabel = `${triggerIcon} ${blueprint.trigger?.type || 'Trigger'}`;
   
   nodes.push({
     id: triggerNodeId,
@@ -239,7 +238,6 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
     data: { 
       label: triggerLabel,
       icon: triggerIcon,
-      platform: blueprint.trigger?.platform,
       stepType: 'trigger'
     },
     position: { x: currentX, y: currentY },
@@ -311,7 +309,7 @@ const processStep = (step: any, index: number, x: number, y: number, previousNod
   const edges: Edge[] = [];
   
   const nodeId = getId();
-  const nodeData = createNodeData(step, index);
+  const nodeData = createNodeData(step, index); // Fixed: pass step instead of &
   
   // Determine node type based on step type
   let nodeType = 'default';
@@ -435,12 +433,15 @@ const processBranch = (
     // Update the first edge in the branch with the label
     if (index === 0 && result.edges.length > 0) {
       result.edges[0].label = branchLabel;
+      const edgeStyle = result.edges[0].style || {};
+      const markerEnd = result.edges[0].markerEnd || {};
+      
       result.edges[0].style = {
-        ...result.edges[0].style,
+        ...edgeStyle,
         stroke: edgeColor,
       };
       result.edges[0].markerEnd = {
-        ...result.edges[0].markerEnd,
+        ...markerEnd,
         color: edgeColor,
       };
     }

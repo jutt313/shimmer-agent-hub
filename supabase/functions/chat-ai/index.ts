@@ -70,7 +70,7 @@ AGENT MANAGEMENT:
 
 MANDATORY JSON RESPONSE FORMAT:
 {
-  "summary": "Brief description that acknowledges conversation context",
+  "summary": "Brief description that acknowledges conversation context (MUST BE CONVERSATIONAL AND CLEAR)",
   "steps": ["Step 1", "Step 2", "Step 3"],
   "platforms": [
     {
@@ -92,7 +92,7 @@ MANDATORY JSON RESPONSE FORMAT:
         {
           "field": "api_key | access_token | bot_token | client_id | client_secret | username | password | webhook_secret | app_id | app_secret | database_id | form_id | channel_id (ABSOLUTELY CRITICAL: THIS MUST BE THE EXACT, CASE-SENSITIVE FIELD NAME REQUIRED BY THE PLATFORM'S API FOR THE SPECIFIC ACTION. DO NOT INVENT GENERIC NAMES. IF MULTIPLE FIELDS ARE REQUIRED, LIST THEM ALL. INCLUDE CONTEXTUAL IDS LIKE 'database_id' IF THE ACTION REQUIRES THEM.)",
           "placeholder": "Enter value for this field",
-          "why_needed": "Explanation of why this specific credential field is required for authentication or operation (MANDATORY AND THOROUGHLY EXPLAINED FOR EVERY FIELD)"
+          "why_needed": "Explanation of why this specific credential field is required for authentication or operation (MANDATORY AND THOROUGHLY EXPLAINED FOR EVERY FIELD IN CONCISE, PLAIN LANGUAGE)"
         }
       ]
     }
@@ -114,7 +114,7 @@ MANDATORY JSON RESPONSE FORMAT:
     "steps": [
       {
         "id": "step_1",
-        "name": "Step Name",
+        "name": "Step Name (USE CLEAR, HUMAN-READABLE NAMES. GROUP RELATED STEPS LOGICALLY.)",
         "type": "action",
         "action": {
           "integration": "platform_name",
@@ -141,12 +141,13 @@ CRITICAL RULES:
 3. ABSOLUTELY CRITICAL: For EVERY 'platform' you identify, you MUST provide its correct and **precise** 'api_config.auth_type' (e.g., 'oauth' for Google APIs, 'bearer_token' for Slack bot tokens, 'api_key' for specific API Key services, 'basic_auth' for username/password).
 4. ABSOLUTELY CRITICAL: Within the 'credentials' array for each platform, you MUST identify and list **EVERY SINGLE REQUIRED CREDENTIAL FIELD** by its **EXACT, PLATFORM-SPECIFIC NAME** (e.g., 'access_token', 'bot_token', 'client_id', 'client_secret', 'integration_token', 'api_key_id', 'api_secret_key', 'webhook_signing_secret', 'app_id', 'app_secret'). THIS INCLUDES ALL CONTEXTUAL, RESOURCE-SPECIFIC IDENTIFIERS (e.g., 'database_id', 'form_id', 'channel_id', 'sheet_id', 'board_id') THAT ARE REQUIRED FOR THE SPECIFIC AUTOMATION ACTIONS.
 5. ABSOLUTELY CRITICAL: For each platform, you MUST include a 'methods' object within 'api_config' that details the 'endpoint', 'http_method', 'required_params', and 'optional_params' for ALL API actions implied by the user's request (e.g., 'send_message' for Slack, 'create_page' for Notion, 'submit_response' for Google Forms).
-6. ABSOLUTELY CRITICAL: For EVERY single 'credential' field you list, you MUST provide a detailed, clear, and concise explanation in its 'why_needed' field, describing its purpose and necessity for the automation.
+6. ABSOLUTELY CRITICAL: For EVERY single 'credential' field you list, you MUST provide a detailed, clear, and concise explanation in its 'why_needed' field, describing its purpose and necessity for the automation. This explanation must be understandable to a non-technical user.
 7. DO NOT use generic terms like 'api_key' or 'token' if the platform has a more precise, standard name. **NO SIMPLIFICATION. NO GUESSING. NO OMISSIONS. If a platform requires multiple distinct credential fields (e.g., client_id AND client_secret), you MUST list them ALL.**
 8. If you identify a platform but cannot determine the EXACT credential fields or auth_type/method details/CONTEXTUAL ID from your knowledge, you MUST state "I need clarification on the exact authentication method/specific ID for [Platform Name]" in 'clarification_questions', AND still provide a placeholder for that field in the 'credentials' array or 'methods' object with a clear indication that it needs to be filled.
 9. Always consider full conversation context and apply relevant knowledge store insights to ensure the most complete and accurate response.
 10. PENALTY: Failure to provide precise and complete 'auth_type', 'credentials.field' names (including contextual IDs), 'api_config.methods', OR 'why_needed' explanations for ANY platform is considered a severe compliance violation and will result in response rejection and immediate retry with explicit correction demands. You MUST re-evaluate your understanding of the platform's API documentation if this occurs. YOU MUST NOT SIMPLIFY CREDENTIALS, CONTEXTUAL IDS, API DETAILS, OR THEIR EXPLANATIONS.
 11. Before finalizing the response, re-read the entire request, the conversation history, and your generated JSON to ensure absolute compliance with ALL critical rules, especially regarding credential accuracy, contextual ID inclusion, method detail completeness, AND 'why_needed' explanations. Recheck. Recheck. Recheck.
+12. POST-GENERATION GUIDANCE: After presenting the blueprint, offer clear, actionable next steps for the user (e.g., "Configure these credentials," "Test the automation," "View in diagram"). This enhances overall understandability and usability.
 `;
 
 serve(async (req) => {

@@ -1,4 +1,3 @@
-
 import React, { useCallback, useMemo, useEffect, useState } from 'react';
 import {
   ReactFlow,
@@ -280,7 +279,6 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           nodeTypes={nodeTypes}
           defaultEdgeOptions={defaultEdgeOptions}
           fitView
-          attributionPosition="hidden"
           className="rounded-b-3xl"
           style={{ backgroundColor: 'transparent' }}
           proOptions={{ hideAttribution: true }}

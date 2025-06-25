@@ -15,79 +15,188 @@ import {
   MessageSquare, Database, Code, Webhook, Calendar
 } from 'lucide-react';
 
-// Platform icon mapping
+// Platform icon mapping with enhanced coverage
 const getPlatformIcon = (platformName: string) => {
   const name = platformName.toLowerCase();
   
   // Email platforms
-  if (name.includes('gmail')) return { component: SiGmail, color: 'text-red-500' };
-  if (name.includes('outlook') || name.includes('microsoft')) return { component: FaMicrosoft, color: 'text-blue-600' };
-  if (name.includes('mail')) return { component: Mail, color: 'text-gray-600' };
+  if (name.includes('gmail')) return '📧';
+  if (name.includes('outlook') || name.includes('microsoft')) return '📨';
+  if (name.includes('mail')) return '✉️';
   
   // Communication platforms
-  if (name.includes('slack')) return { component: FaSlack, color: 'text-purple-500' };
-  if (name.includes('discord')) return { component: FaDiscord, color: 'text-indigo-500' };
-  if (name.includes('teams')) return { component: FaMicrosoft, color: 'text-blue-600' };
-  if (name.includes('zoom')) return { component: SiZoom, color: 'text-blue-500' };
+  if (name.includes('slack')) return '💬';
+  if (name.includes('discord')) return '🎮';
+  if (name.includes('teams')) return '👥';
+  if (name.includes('zoom')) return '📹';
   
   // Social platforms
-  if (name.includes('twitter')) return { component: FaTwitter, color: 'text-blue-400' };
-  if (name.includes('facebook')) return { component: FaFacebook, color: 'text-blue-600' };
-  if (name.includes('linkedin')) return { component: FaLinkedin, color: 'text-blue-700' };
-  if (name.includes('instagram')) return { component: FaInstagram, color: 'text-pink-500' };
-  if (name.includes('youtube')) return { component: FaYoutube, color: 'text-red-600' };
+  if (name.includes('twitter')) return '🐦';
+  if (name.includes('facebook')) return '📘';
+  if (name.includes('linkedin')) return '💼';
+  if (name.includes('instagram')) return '📷';
+  if (name.includes('youtube')) return '📺';
   
   // Productivity platforms
-  if (name.includes('notion')) return { component: SiNotion, color: 'text-gray-800' };
-  if (name.includes('airtable')) return { component: SiAirtable, color: 'text-yellow-500' };
-  if (name.includes('trello')) return { component: FaTrello, color: 'text-blue-500' };
-  if (name.includes('github')) return { component: FaGithub, color: 'text-gray-800' };
-  if (name.includes('google')) return { component: FaGoogle, color: 'text-red-500' };
+  if (name.includes('notion')) return '📝';
+  if (name.includes('airtable')) return '📊';
+  if (name.includes('trello')) return '📋';
+  if (name.includes('github')) return '🐙';
+  if (name.includes('google')) return '🌐';
   
   // AI platforms
-  if (name.includes('openai') || name.includes('gpt')) return { component: SiOpenai, color: 'text-green-600' };
-  if (name.includes('anthropic') || name.includes('claude')) return { component: SiAnthropic, color: 'text-orange-500' };
+  if (name.includes('openai') || name.includes('gpt')) return '🤖';
+  if (name.includes('anthropic') || name.includes('claude')) return '🧠';
   
   // CRM/Sales
-  if (name.includes('hubspot')) return { component: SiHubspot, color: 'text-orange-500' };
-  if (name.includes('salesforce')) return { component: SiSalesforce, color: 'text-blue-600' };
-  if (name.includes('shopify')) return { component: FaShopify, color: 'text-green-600' };
+  if (name.includes('hubspot')) return '🎯';
+  if (name.includes('salesforce')) return '☁️';
+  if (name.includes('shopify')) return '🛒';
   
   // Generic fallbacks
-  if (name.includes('webhook')) return { component: Webhook, color: 'text-purple-500' };
-  if (name.includes('api')) return { component: Code, color: 'text-gray-600' };
-  if (name.includes('database')) return { component: Database, color: 'text-blue-500' };
-  if (name.includes('calendar')) return { component: Calendar, color: 'text-green-500' };
+  if (name.includes('webhook')) return '🔗';
+  if (name.includes('api')) return '⚡';
+  if (name.includes('database')) return '💾';
+  if (name.includes('calendar')) return '📅';
   
   // Default
-  return { component: Zap, color: 'text-blue-500' };
+  return '⚙️';
 };
 
-// Step type icon mapping
-const getStepIcon = (stepType: string, step?: any) => {
+// Step type icon mapping with emojis for better visibility
+const getStepIcon = (stepType: string, step?: any): string => {
   switch (stepType) {
     case 'action':
       if (step?.action?.integration) {
         return getPlatformIcon(step.action.integration);
       }
-      return { component: Zap, color: 'text-blue-500' };
+      return '⚡';
     case 'condition':
-      return { component: GitBranch, color: 'text-orange-500' };
+      return '🔀';
     case 'loop':
-      return { component: Square, color: 'text-purple-500' };
+      return '🔄';
     case 'delay':
-      return { component: Clock, color: 'text-gray-500' };
+      return '⏰';
     case 'ai_agent_call':
-      return { component: Bot, color: 'text-green-500' };
+      return '🤖';
     default:
-      return { component: Play, color: 'text-gray-500' };
+      return '▶️';
   }
 };
 
 // Helper to generate unique IDs
 let idCounter = 0;
-const getId = () => `node_${idCounter++}`;
-const getEdgeId = (source: string, target: string, label?: string) => `edge_${source}-${target}-${label || ''}-${idCounter++}`;
+const getId = () => `node_${++idCounter}`;
+const getEdgeId = (source: string, target: string, label?: string) => `edge_${source}-${target}-${label || ''}-${++idCounter}`;
+
+// Color scheme for different node types
+const getNodeStyle = (stepType: string) => {
+  switch (stepType) {
+    case 'action':
+      return {
+        background: 'linear-gradient(135deg, #9333ea, #7c3aed)',
+        color: 'white',
+        border: '2px solid #7c3aed',
+        borderRadius: '12px',
+        fontWeight: 'bold',
+        minWidth: 200,
+        padding: '12px 16px'
+      };
+    case 'condition':
+      return {
+        background: 'linear-gradient(135deg, #f97316, #ea580c)',
+        color: 'white',
+        border: '2px solid #ea580c',
+        borderRadius: '12px',
+        fontWeight: 'bold',
+        minWidth: 200,
+        padding: '12px 16px'
+      };
+    case 'loop':
+      return {
+        background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+        color: 'white',
+        border: '2px solid #7c3aed',
+        borderRadius: '12px',
+        fontWeight: 'bold',
+        minWidth: 200,
+        padding: '12px 16px'
+      };
+    case 'delay':
+      return {
+        background: 'linear-gradient(135deg, #6b7280, #4b5563)',
+        color: 'white',
+        border: '2px solid #4b5563',
+        borderRadius: '12px',
+        fontWeight: 'bold',
+        minWidth: 200,
+        padding: '12px 16px'
+      };
+    case 'ai_agent_call':
+      return {
+        background: 'linear-gradient(135deg, #10b981, #059669)',
+        color: 'white',
+        border: '2px solid #059669',
+        borderRadius: '12px',
+        fontWeight: 'bold',
+        minWidth: 200,
+        padding: '12px 16px'
+      };
+    default:
+      return {
+        background: 'linear-gradient(135deg, #9333ea, #7c3aed)',
+        color: 'white',
+        border: '2px solid #7c3aed',
+        borderRadius: '12px',
+        fontWeight: 'bold',
+        minWidth: 200,
+        padding: '12px 16px'
+      };
+  }
+};
+
+// Enhanced node data with platform information
+const createNodeData = (step: any, index: number) => {
+  const icon = getStepIcon(step.type, step);
+  let label = step.name || `${step.type} ${index + 1}`;
+  
+  // Add platform info for action nodes
+  if (step.type === 'action' && step.action?.integration) {
+    const platformIcon = getPlatformIcon(step.action.integration);
+    label = `${platformIcon} ${step.action.integration}: ${step.action.method || 'Action'}`;
+  }
+  
+  // Add condition details for condition nodes
+  if (step.type === 'condition' && step.condition?.expression) {
+    label = `🔀 IF: ${step.condition.expression.substring(0, 30)}${step.condition.expression.length > 30 ? '...' : ''}`;
+  }
+  
+  // Add loop details for loop nodes
+  if (step.type === 'loop' && step.loop?.array_source) {
+    label = `🔄 Loop: ${step.loop.array_source}`;
+  }
+  
+  // Add delay details for delay nodes
+  if (step.type === 'delay' && step.delay?.duration_seconds) {
+    const duration = step.delay.duration_seconds;
+    const minutes = Math.floor(duration / 60);
+    const seconds = duration % 60;
+    const timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+    label = `⏰ Wait: ${timeStr}`;
+  }
+  
+  // Add AI agent details
+  if (step.type === 'ai_agent_call' && step.ai_agent_call?.agent_id) {
+    label = `🤖 AI Agent: ${step.ai_agent_call.agent_id}`;
+  }
+  
+  return {
+    label,
+    icon,
+    step,
+    platform: step.action?.integration || null
+  };
+};
 
 export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Node[]; edges: Edge[] } => {
   const nodes: Node[] = [];
@@ -95,6 +204,10 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
   let xOffset = 50;
   let yOffset = 100;
   const nodeSpacing = 300;
+  const verticalSpacing = 150;
+
+  // Reset counter for unique IDs
+  idCounter = 0;
 
   // Create the Trigger node
   const triggerNodeId = getId();
@@ -102,78 +215,42 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
     id: triggerNodeId,
     type: 'input',
     data: { 
-      label: `Trigger: ${blueprint.trigger.type}`,
+      label: `▶️ Trigger: ${blueprint.trigger.type}`,
       icon: '▶️'
     },
     position: { x: xOffset, y: yOffset },
     sourcePosition: Position.Right,
     style: {
-      background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+      background: 'linear-gradient(135deg, #a855f7, #9333ea)',
       color: 'white',
-      border: '2px solid #15803d',
+      border: '2px solid #9333ea',
       borderRadius: '12px',
-      fontWeight: 'bold'
+      fontWeight: 'bold',
+      minWidth: 200,
+      padding: '12px 16px'
     },
   });
 
   let previousNodeId = triggerNodeId;
   xOffset += nodeSpacing;
 
-  // Process main steps
+  // Process main steps with enhanced layout
   blueprint.steps.forEach((step, index) => {
     const nodeId = getId();
-    const label = step.name || `${step.type} ${index + 1}`;
-    const iconInfo = getStepIcon(step.type, step);
+    const nodeData = createNodeData(step, index);
+    const style = getNodeStyle(step.type);
     
-    let nodeColor = '#3b82f6'; // Default blue
-    let borderColor = '#2563eb';
-    
-    // Assign colors based on step type
-    switch (step.type) {
-      case 'action':
-        nodeColor = '#3b82f6';
-        borderColor = '#2563eb';
-        break;
-      case 'condition':
-        nodeColor = '#f97316';
-        borderColor = '#ea580c';
-        break;
-      case 'loop':
-        nodeColor = '#8b5cf6';
-        borderColor = '#7c3aed';
-        break;
-      case 'delay':
-        nodeColor = '#6b7280';
-        borderColor = '#4b5563';
-        break;
-      case 'ai_agent_call':
-        nodeColor = '#10b981';
-        borderColor = '#059669';
-        break;
-    }
-
     nodes.push({
       id: nodeId,
       type: 'default',
-      data: { 
-        label,
-        icon: getStepTypeEmoji(step.type),
-        step
-      },
+      data: nodeData,
       position: { x: xOffset, y: yOffset },
       targetPosition: Position.Left,
       sourcePosition: Position.Right,
-      style: {
-        background: `linear-gradient(135deg, ${nodeColor}, ${borderColor})`,
-        color: 'white',
-        border: `2px solid ${borderColor}`,
-        borderRadius: '12px',
-        fontWeight: 'bold',
-        minWidth: 200
-      },
+      style: style,
     });
 
-    // Connect to previous node with beautiful animated edge
+    // Connect to previous node with enhanced animated edge
     edges.push({
       id: getEdgeId(previousNodeId, nodeId),
       source: previousNodeId,
@@ -184,14 +261,62 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
         type: MarkerType.ArrowClosed,
         width: 20,
         height: 20,
-        color: '#4f46e5',
+        color: '#9333ea',
       },
       style: {
         strokeWidth: 3,
-        stroke: '#4f46e5',
+        stroke: '#9333ea',
         strokeDasharray: '5,5',
       },
     });
+
+    // Handle conditional branching for condition nodes
+    if (step.type === 'condition' && step.condition) {
+      let currentY = yOffset;
+      
+      // Process if_true branch
+      if (step.condition.if_true && step.condition.if_true.length > 0) {
+        currentY += verticalSpacing;
+        const trueBranchNodes = processConditionalBranch(
+          step.condition.if_true, 
+          nodeId, 
+          xOffset + nodeSpacing, 
+          currentY, 
+          'TRUE',
+          '#10b981'
+        );
+        nodes.push(...trueBranchNodes.nodes);
+        edges.push(...trueBranchNodes.edges);
+      }
+      
+      // Process if_false branch
+      if (step.condition.if_false && step.condition.if_false.length > 0) {
+        currentY += verticalSpacing * 2;
+        const falseBranchNodes = processConditionalBranch(
+          step.condition.if_false, 
+          nodeId, 
+          xOffset + nodeSpacing, 
+          currentY, 
+          'FALSE',
+          '#ef4444'
+        );
+        nodes.push(...falseBranchNodes.nodes);
+        edges.push(...falseBranchNodes.edges);
+      }
+    }
+
+    // Handle loop structures
+    if (step.type === 'loop' && step.loop?.steps && step.loop.steps.length > 0) {
+      const loopNodes = processLoopBranch(
+        step.loop.steps,
+        nodeId,
+        xOffset + nodeSpacing,
+        yOffset + verticalSpacing,
+        '#8b5cf6'
+      );
+      nodes.push(...loopNodes.nodes);
+      edges.push(...loopNodes.edges);
+    }
 
     previousNodeId = nodeId;
     xOffset += nodeSpacing;
@@ -203,7 +328,7 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
     id: endNodeId,
     type: 'output',
     data: { 
-      label: 'Complete',
+      label: '🏁 Complete',
       icon: '🏁'
     },
     position: { x: xOffset, y: yOffset },
@@ -213,7 +338,9 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
       color: 'white',
       border: '2px solid #b91c1c',
       borderRadius: '12px',
-      fontWeight: 'bold'
+      fontWeight: 'bold',
+      minWidth: 200,
+      padding: '12px 16px'
     },
   });
 
@@ -227,11 +354,11 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
       type: MarkerType.ArrowClosed,
       width: 20,
       height: 20,
-      color: '#4f46e5',
+      color: '#9333ea',
     },
     style: {
       strokeWidth: 3,
-      stroke: '#4f46e5',
+      stroke: '#9333ea',
       strokeDasharray: '5,5',
     },
   });
@@ -239,20 +366,115 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
   return { nodes, edges };
 };
 
-// Helper function to get emoji for step types
-const getStepTypeEmoji = (stepType: string): string => {
-  switch (stepType) {
-    case 'action':
-      return '⚡';
-    case 'condition':
-      return '🔀';
-    case 'loop':
-      return '🔄';
-    case 'delay':
-      return '⏰';
-    case 'ai_agent_call':
-      return '🤖';
-    default:
-      return '📋';
-  }
+// Helper function to process conditional branches
+const processConditionalBranch = (
+  steps: any[], 
+  parentNodeId: string, 
+  startX: number, 
+  startY: number, 
+  branchLabel: string,
+  edgeColor: string
+): { nodes: Node[]; edges: Edge[] } => {
+  const branchNodes: Node[] = [];
+  const branchEdges: Edge[] = [];
+  let currentX = startX;
+  let previousNodeId = parentNodeId;
+
+  steps.forEach((step, index) => {
+    const nodeId = getId();
+    const nodeData = createNodeData(step, index);
+    const style = getNodeStyle(step.type);
+    
+    branchNodes.push({
+      id: nodeId,
+      type: 'default',
+      data: nodeData,
+      position: { x: currentX, y: startY },
+      targetPosition: Position.Left,
+      sourcePosition: Position.Right,
+      style: style,
+    });
+
+    // Connect to previous node
+    branchEdges.push({
+      id: getEdgeId(previousNodeId, nodeId),
+      source: previousNodeId,
+      target: nodeId,
+      type: 'smoothstep',
+      animated: true,
+      label: index === 0 ? branchLabel : undefined,
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 20,
+        height: 20,
+        color: edgeColor,
+      },
+      style: {
+        strokeWidth: 3,
+        stroke: edgeColor,
+        strokeDasharray: '5,5',
+      },
+    });
+
+    previousNodeId = nodeId;
+    currentX += 300;
+  });
+
+  return { nodes: branchNodes, edges: branchEdges };
+};
+
+// Helper function to process loop branches
+const processLoopBranch = (
+  steps: any[], 
+  parentNodeId: string, 
+  startX: number, 
+  startY: number, 
+  edgeColor: string
+): { nodes: Node[]; edges: Edge[] } => {
+  const loopNodes: Node[] = [];
+  const loopEdges: Edge[] = [];
+  let currentX = startX;
+  let previousNodeId = parentNodeId;
+
+  steps.forEach((step, index) => {
+    const nodeId = getId();
+    const nodeData = createNodeData(step, index);
+    const style = getNodeStyle(step.type);
+    
+    loopNodes.push({
+      id: nodeId,
+      type: 'default',
+      data: nodeData,
+      position: { x: currentX, y: startY },
+      targetPosition: Position.Left,
+      sourcePosition: Position.Right,
+      style: style,
+    });
+
+    // Connect to previous node
+    loopEdges.push({
+      id: getEdgeId(previousNodeId, nodeId),
+      source: previousNodeId,
+      target: nodeId,
+      type: 'smoothstep',
+      animated: true,
+      label: index === 0 ? 'LOOP' : undefined,
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 20,
+        height: 20,
+        color: edgeColor,
+      },
+      style: {
+        strokeWidth: 3,
+        stroke: edgeColor,
+        strokeDasharray: '5,5',
+      },
+    });
+
+    previousNodeId = nodeId;
+    currentX += 300;
+  });
+
+  return { nodes: loopNodes, edges: loopEdges };
 };

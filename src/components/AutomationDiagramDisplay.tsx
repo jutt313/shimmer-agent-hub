@@ -1,3 +1,4 @@
+
 import React, { useCallback, useMemo } from 'react';
 import {
   ReactFlow,
@@ -8,6 +9,7 @@ import {
   useEdgesState,
   addEdge,
   MarkerType,
+  BackgroundVariant,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -16,7 +18,7 @@ import { CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 // Simple custom node component for Phase 1
 const CustomDefaultNode = ({ data }: any) => (
-  <div className="px-4 py-3 shadow-lg rounded-xl bg-white border-2 border-blue-200 hover:border-blue-300 transition-all duration-200">
+  <div className="px-4 py-3 shadow-lg rounded-xl bg-white border-2 border-purple-200 hover:border-purple-300 transition-all duration-200">
     <div className="flex items-center space-x-2">
       {data.icon && <span className="text-lg">{data.icon}</span>}
       <div className="text-sm font-semibold text-gray-800">{data.label}</div>
@@ -59,11 +61,11 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({ aut
       type: MarkerType.ArrowClosed,
       width: 20,
       height: 20,
-      color: '#4f46e5',
+      color: '#9333ea',
     },
     style: {
       strokeWidth: 3,
-      stroke: '#4f46e5',
+      stroke: '#9333ea',
       strokeDasharray: '5,5', // Dot-dot style
     },
   }), []);
@@ -71,11 +73,11 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({ aut
   // Show message if no blueprint
   if (!automationBlueprint) {
     return (
-      <div className="w-full h-full flex flex-col rounded-3xl overflow-hidden bg-white/70 backdrop-blur-md shadow-2xl border-0 relative">
-        <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-green-100/30 to-blue-100/30 pointer-events-none"></div>
+      <div className="w-[calc(100vw-6rem)] max-w-none h-full flex flex-col rounded-3xl overflow-hidden bg-white/70 backdrop-blur-md shadow-2xl border-0 relative">
+        <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-purple-100/30 to-blue-100/30 pointer-events-none"></div>
         
-        <CardHeader className="pb-3 border-b border-green-200/50 bg-gradient-to-r from-green-50/50 to-blue-50/50 rounded-t-3xl relative z-10">
-          <CardTitle className="text-xl font-semibold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+        <CardHeader className="pb-3 border-b border-purple-200/50 bg-gradient-to-r from-purple-50/50 to-blue-50/50 rounded-t-3xl relative z-10">
+          <CardTitle className="text-xl font-semibold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
             Workflow Diagram
           </CardTitle>
         </CardHeader>
@@ -92,11 +94,11 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({ aut
   }
 
   return (
-    <div className="w-full h-full flex flex-col rounded-3xl overflow-hidden bg-white/70 backdrop-blur-md shadow-2xl border-0 relative">
-      <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-green-100/30 to-blue-100/30 pointer-events-none"></div>
+    <div className="w-[calc(100vw-6rem)] max-w-none h-full flex flex-col rounded-3xl overflow-hidden bg-white/70 backdrop-blur-md shadow-2xl border-0 relative">
+      <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-purple-100/30 to-blue-100/30 pointer-events-none"></div>
       
-      <CardHeader className="pb-3 border-b border-green-200/50 bg-gradient-to-r from-green-50/50 to-blue-50/50 rounded-t-3xl relative z-10">
-        <CardTitle className="text-xl font-semibold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+      <CardHeader className="pb-3 border-b border-purple-200/50 bg-gradient-to-r from-purple-50/50 to-blue-50/50 rounded-t-3xl relative z-10">
+        <CardTitle className="text-xl font-semibold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
           Workflow Diagram
         </CardTitle>
       </CardHeader>
@@ -116,19 +118,20 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({ aut
         >
           <MiniMap 
             nodeColor={(n) => {
-              if (n.type === 'input') return '#22c55e';
+              if (n.type === 'input') return '#a855f7';
               if (n.type === 'output') return '#ef4444';
               if (n.type === 'conditionNode') return '#f97316';
-              if (n.type === 'aiAgentNode') return '#8b5cf6';
-              return '#3b82f6';
+              if (n.type === 'aiAgentNode') return '#10b981';
+              return '#9333ea';
             }}
-            className="!bg-white/80 !border-2 !border-green-200 !rounded-lg"
+            className="!bg-white/80 !border-2 !border-purple-200 !rounded-lg"
           />
-          <Controls className="!bg-white/80 !border-2 !border-green-200 !rounded-lg" />
+          <Controls className="!bg-white/80 !border-2 !border-purple-200 !rounded-lg" />
           <Background 
+            variant={BackgroundVariant.Dots}
             gap={20} 
             size={2} 
-            color="#94a3b8"
+            color="#c084fc"
             className="opacity-30"
           />
         </ReactFlow>

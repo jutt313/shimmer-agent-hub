@@ -379,8 +379,8 @@ const AutomationDetail = () => {
       <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-blue-300/20 to-purple-300/20 rounded-full blur-3xl animate-pulse"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-r from-purple-300/20 to-blue-300/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
       
-      {/* Compact Navigation Header with proper spacing */}
-      <div className="sticky top-4 z-20 flex justify-between items-center mx-6 py-3 mb-4">
+      {/* Navigation Header with better spacing */}
+      <div className="sticky top-0 z-20 flex justify-between items-center mx-6 py-4 mb-6">
         {/* Left side - Back button and automation info */}
         <div className="flex items-center gap-3">
           <Button 
@@ -452,37 +452,41 @@ const AutomationDetail = () => {
         <div className="w-32"></div>
       </div>
       
-      <div className="flex-1 max-w-7xl mx-auto w-full px-6 relative pb-6">        
-        {/* Main Content Area with fixed height to prevent layout shifts */}
-        <div className="py-2 relative" style={{ minHeight: '70vh' }}>
-          {/* Chat Card - slides left when dashboard OR diagram is shown */}
+      <div className="flex-1 max-w-7xl mx-auto w-full px-6 relative">        
+        {/* Main Content Area with proper height management */}
+        <div className="relative">
+          {/* Chat Card - with proper height */}
           <div className={`transition-transform duration-500 ease-in-out ${showDashboard || showDiagram ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'} ${showDashboard || showDiagram ? 'absolute' : 'relative'} w-full`}>
-            <ChatCard 
-              messages={messages} 
-              onAgentAdd={handleAgentAdd}
-              dismissedAgents={dismissedAgents}
-              onAgentDismiss={handleAgentDismiss}
-              automationId={automation.id}
-              isLoading={sendingMessage}
-            />
+            <div style={{ height: '65vh' }}>
+              <ChatCard 
+                messages={messages} 
+                onAgentAdd={handleAgentAdd}
+                dismissedAgents={dismissedAgents}
+                onAgentDismiss={handleAgentDismiss}
+                automationId={automation.id}
+                isLoading={sendingMessage}
+              />
+            </div>
           </div>
           
-          {/* Dashboard Card - slides from left with proper height */}
-          <div className={`transition-transform duration-500 ease-in-out ${showDashboard ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'} ${showDashboard ? 'relative' : 'absolute'} w-full`} style={{ minHeight: '70vh' }}>
+          {/* Dashboard Card - with full height */}
+          <div className={`transition-transform duration-500 ease-in-out ${showDashboard ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'} ${showDashboard ? 'relative' : 'absolute'} w-full`}>
             {showDashboard && (
-              <AutomationDashboard
-                automationId={automation.id}
-                automationTitle={automation.title}
-                automationBlueprint={automation.automation_blueprint}
-                onClose={() => setShowDashboard(false)}
-              />
+              <div style={{ height: '65vh' }}>
+                <AutomationDashboard
+                  automationId={automation.id}
+                  automationTitle={automation.title}
+                  automationBlueprint={automation.automation_blueprint}
+                  onClose={() => setShowDashboard(false)}
+                />
+              </div>
             )}
           </div>
 
-          {/* Diagram Card - slides from RIGHT with proper margins */}
-          <div className={`transition-transform duration-500 ease-in-out ${showDiagram ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} ${showDiagram ? 'relative' : 'absolute'} w-full`} style={{ minHeight: '70vh' }}>
+          {/* Diagram Card - with proper spacing */}
+          <div className={`transition-transform duration-500 ease-in-out ${showDiagram ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} ${showDiagram ? 'relative' : 'absolute'} w-full`}>
             {showDiagram && (
-              <div className="py-4">
+              <div style={{ height: '65vh' }}>
                 <AutomationDiagramDisplay
                   automationBlueprint={automation?.automation_blueprint}
                   messages={messages}
@@ -495,16 +499,16 @@ const AutomationDetail = () => {
           </div>
         </div>
         
-        {/* Platform Buttons - hide when showing diagram or dashboard, with minimal spacing */}
+        {/* Platform Buttons - with proper spacing */}
         {!showDashboard && !showDiagram && currentPlatforms && currentPlatforms.length > 0 && (
-          <div className="py-3">
+          <div className="mt-4 mb-4">
             <PlatformButtons platforms={currentPlatforms} />
           </div>
         )}
         
-        {/* Input Section - hide when showing diagram or dashboard, with minimal spacing */}
+        {/* Input Section - with proper spacing */}
         {!showDashboard && !showDiagram && (
-          <div className="py-3">
+          <div className="mt-4 mb-6">
             <div className="flex gap-4 items-end">
               <Button
                 onClick={() => setShowAIAgentForm(true)}
@@ -546,7 +550,7 @@ const AutomationDetail = () => {
         )}
       </div>
 
-      {/* Blueprint Card - Right side slide-out panel - Hidden by default as requested */}
+      {/* Blueprint Card - Right side slide-out panel */}
       {showBlueprint && automation?.automation_blueprint && (
         <BlueprintCard
           blueprint={automation.automation_blueprint}
@@ -554,7 +558,7 @@ const AutomationDetail = () => {
         />
       )}
 
-      {/* AI Agent Form Modal with auto-fill capability */}
+      {/* AI Agent Form Modal */}
       {showAIAgentForm && automation && (
         <AIAgentForm
           automationId={automation.id}

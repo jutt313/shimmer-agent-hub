@@ -170,14 +170,14 @@ const ChatCard = ({
 
   return (
     <div 
-      className="w-full max-w-7xl h-[68vh] bg-white/95 backdrop-blur-md rounded-3xl p-6 shadow-2xl border-0 relative mx-auto"
+      className="w-full h-full bg-white/95 backdrop-blur-md rounded-3xl p-6 shadow-2xl border-0 relative mx-auto flex flex-col"
       style={{
         boxShadow: '0 0 60px rgba(92, 142, 246, 0.15), 0 0 120px rgba(154, 94, 255, 0.08)'
       }}
     >
       <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/20 to-purple-100/20 pointer-events-none"></div>
       
-      <ScrollArea className="h-full relative z-10" ref={scrollAreaRef}>
+      <ScrollArea className="flex-1 relative z-10" ref={scrollAreaRef}>
         <div className="space-y-6 pr-4">
           {messages.map(message => {
             let structuredData = message.structuredData;

@@ -16,9 +16,11 @@ class ErrorLogger {
   private sessionId: string;
   private maxLogs = 1000; // Keep last 1000 logs in memory
   private isProduction = import.meta.env.PROD;
+  private monitoringServiceUrl: string;
 
   constructor() {
     this.sessionId = this.generateSessionId();
+    this.monitoringServiceUrl = import.meta.env.VITE_MONITORING_SERVICE_URL || '';
     this.setupGlobalErrorHandlers();
     this.setupAppErrorListener();
   }
@@ -100,24 +102,55 @@ class ErrorLogger {
     }
 
     // Send critical errors to monitoring service in production
-    if (this.isProduction && level === 'CRITICAL') {
+    if (this.isProduction && (level === 'CRITICAL' || level === 'ERROR')) {
       this.sendToMonitoringService(logEntry);
     }
   }
 
   private async sendToMonitoringService(logEntry: LogEntry): Promise<void> {
     try {
-      // In production, integrate with monitoring service like Sentry
-      console.error('🚨 CRITICAL ERROR - Would send to monitoring service:', logEntry);
-      
-      // Example implementation for future integration:
-      // await fetch('/api/monitoring/error', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(logEntry)
-      // });
+      // Production error monitoring integration
+      if (this.monitoringServiceUrl) {
+        await fetch(this.monitoringServiceUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            timestamp: logEntry.timestamp,
+            level: logEntry.level,
+            message: logEntry.message,
+            context: logEntry.context,
+            userId: logEntry.userId,
+            sessionId: logEntry.sessionId,
+            userAgent: logEntry.userAgent,
+            url: logEntry.url,
+            stackTrace: logEntry.stackTrace,
+            environment: this.isProduction ? 'production' : 'development'
+          })
+        });
+      } else {
+        // Fallback: Use Supabase Edge Function for error tracking
+        await this.sendToSupabaseErrorTracking(logEntry);
+      }
     } catch (error) {
       console.error('Failed to send error to monitoring service:', error);
+      // Don't throw here to avoid infinite loops
+    }
+  }
+
+  private async sendToSupabaseErrorTracking(logEntry: LogEntry): Promise<void> {
+    try {
+      // Send to Supabase edge function for error tracking
+      await fetch('/api/track-error', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(logEntry)
+      });
+    } catch (error) {
+      console.error('Failed to send error to Supabase tracking:', error);
     }
   }
 

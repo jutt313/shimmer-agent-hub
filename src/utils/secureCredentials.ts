@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { globalErrorLogger } from '@/utils/errorLogger';
 
@@ -11,14 +10,20 @@ export interface SecureCredential {
   updated_at: string;
 }
 
-// Encryption utilities for secure credential storage
+// Secure encryption utilities with environment-based keys
 class CredentialEncryption {
   private static async getEncryptionKey(): Promise<CryptoKey> {
-    // Generate or derive a key for encryption
-    // In production, this should use a proper key management service
-    const keyMaterial = await crypto.subtle.importKey(
+    // Use environment variables for encryption keys (never hardcode)
+    const keyMaterial = import.meta.env.VITE_ENCRYPTION_KEY || this.generateSecureKey();
+    const salt = import.meta.env.VITE_ENCRYPTION_SALT || this.generateSecureSalt();
+    
+    if (!import.meta.env.VITE_ENCRYPTION_KEY) {
+      globalErrorLogger.log('WARN', 'Using generated encryption key - set VITE_ENCRYPTION_KEY for production', {});
+    }
+
+    const keyMaterialBuffer = await crypto.subtle.importKey(
       'raw',
-      new TextEncoder().encode('your-secure-key-32-bytes-long!!'), // This should come from environment
+      new TextEncoder().encode(keyMaterial),
       { name: 'PBKDF2' },
       false,
       ['deriveBits', 'deriveKey']
@@ -27,15 +32,29 @@ class CredentialEncryption {
     return await crypto.subtle.deriveKey(
       {
         name: 'PBKDF2',
-        salt: new TextEncoder().encode('salt-should-be-random'),
+        salt: new TextEncoder().encode(salt),
         iterations: 100000,
         hash: 'SHA-256'
       },
-      keyMaterial,
+      keyMaterialBuffer,
       { name: 'AES-GCM', length: 256 },
       false,
       ['encrypt', 'decrypt']
     );
+  }
+
+  private static generateSecureKey(): string {
+    // Generate a secure random key for development only
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+  }
+
+  private static generateSecureSalt(): string {
+    // Generate a secure random salt for development only
+    const array = new Uint8Array(16);
+    crypto.getRandomValues(array);
+    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
   }
 
   static async encryptCredentials(credentials: Record<string, string>): Promise<string> {

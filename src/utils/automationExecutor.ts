@@ -1,8 +1,7 @@
-
 import { AutomationBlueprint } from '@/types/automation';
 import { buildDynamicPlatformConfig, getDynamicMethodConfig, buildDynamicURL } from './dynamicPlatformConfig';
 import { supabase } from '@/integrations/supabase/client';
-import { ExpressionParser } from './expressionParser';
+import { SecureExpressionParser } from './secureExpressionParser';
 import { 
   RetryHandler, 
   CircuitBreaker, 
@@ -33,7 +32,7 @@ export class AutomationExecutor {
   private blueprint: AutomationBlueprint;
   private platformsConfig: any[];
   private credentials: Record<string, Record<string, string>> = {};
-  private expressionParser: ExpressionParser;
+  private expressionParser: SecureExpressionParser;
   private retryHandler: RetryHandler;
   private circuitBreakers = new Map<string, CircuitBreaker>();
 
@@ -55,10 +54,10 @@ export class AutomationExecutor {
       logs: []
     };
     
-    this.expressionParser = new ExpressionParser();
+    this.expressionParser = new SecureExpressionParser();
     this.retryHandler = new RetryHandler(DEFAULT_RETRY_CONFIG);
     
-    globalErrorLogger.log('INFO', 'AutomationExecutor initialized', {
+    globalErrorLogger.log('INFO', 'AutomationExecutor initialized with secure parser', {
       automationId,
       runId,
       stepsCount: blueprint.steps.length
@@ -301,10 +300,11 @@ export class AutomationExecutor {
     try {
       const result = this.expressionParser.evaluateExpression(condition.expression, this.context.variables);
 
-      globalErrorLogger.log('INFO', `🔍 Condition evaluation: ${condition.expression} = ${result}`, {
+      globalErrorLogger.log('INFO', `🔍 Secure condition evaluation: ${condition.expression} = ${result}`, {
         expression: condition.expression,
         result,
-        variables: this.context.variables
+        variables: this.context.variables,
+        secureEvaluation: true
       }, step.id, this.context.automationId, this.context.runId);
 
       if (result && condition.if_true) {
@@ -317,9 +317,10 @@ export class AutomationExecutor {
         }
       }
     } catch (error: any) {
-      globalErrorLogger.log('ERROR', 'Condition evaluation failed', {
+      globalErrorLogger.log('ERROR', 'Secure condition evaluation failed', {
         expression: condition.expression,
-        error: error.message
+        error: error.message,
+        securityNote: 'Using secure AST-based evaluation'
       }, step.id, this.context.automationId, this.context.runId);
       throw error;
     }

@@ -27,22 +27,13 @@ export class EnvironmentValidator {
     const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
     const mode = import.meta.env.MODE;
 
-    // Fallback to hardcoded values if environment variables are not set
-    // This ensures backward compatibility during migration
-    const finalUrl = supabaseUrl || "https://zorwtyijosgdcckljmqd.supabase.co";
-    const finalKey = supabaseAnonKey || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvcnd0eWlqb3NnZGNja2xqbXFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxMTA4NDksImV4cCI6MjA2NTY4Njg0OX0.R-HltFpAhGNf_U2WEAYurf9LQ1xLgdQyP7C4ez6zRP4";
-
-    // Log warnings if using fallback values
-    if (!supabaseUrl) {
-      console.warn('VITE_SUPABASE_URL not found in environment, using fallback');
-    }
-    if (!supabaseAnonKey) {
-      console.warn('VITE_SUPABASE_ANON_KEY not found in environment, using fallback');
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('Missing required environment variables: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set');
     }
 
     return {
-      supabaseUrl: finalUrl,
-      supabaseAnonKey: finalKey,
+      supabaseUrl,
+      supabaseAnonKey,
       isDevelopment: mode === 'development',
       isProduction: mode === 'production'
     };

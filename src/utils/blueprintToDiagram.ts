@@ -1,4 +1,3 @@
-
 import { AutomationBlueprint } from "@/types/automation";
 import { Node, Edge, Position, MarkerType } from "@xyflow/react";
 
@@ -432,15 +431,16 @@ const processBranch = (
     
     // Update the first edge in the branch with the label
     if (index === 0 && result.edges.length > 0) {
-      result.edges[0].label = branchLabel;
-      const edgeStyle = result.edges[0].style || {};
-      const markerEnd = result.edges[0].markerEnd || {};
+      const firstEdge = result.edges[0];
+      firstEdge.label = branchLabel;
+      const edgeStyle = firstEdge.style || {};
+      const markerEnd = firstEdge.markerEnd || { type: MarkerType.ArrowClosed, width: 20, height: 20 };
       
-      result.edges[0].style = {
+      firstEdge.style = {
         ...edgeStyle,
         stroke: edgeColor,
       };
-      result.edges[0].markerEnd = {
+      firstEdge.markerEnd = {
         ...markerEnd,
         color: edgeColor,
       };

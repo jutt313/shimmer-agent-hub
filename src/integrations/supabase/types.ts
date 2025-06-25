@@ -132,6 +132,44 @@ export type Database = {
           },
         ]
       }
+      automation_diagrams: {
+        Row: {
+          automation_id: string
+          created_at: string
+          diagram_data: Json
+          id: string
+          layout_version: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          automation_id: string
+          created_at?: string
+          diagram_data?: Json
+          id?: string
+          layout_version?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          automation_id?: string
+          created_at?: string
+          diagram_data?: Json
+          id?: string
+          layout_version?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_diagrams_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_runs: {
         Row: {
           automation_id: string

@@ -1,73 +1,113 @@
 
 import { AutomationBlueprint } from "@/types/automation";
 import { Node, Edge, Position, MarkerType } from "@xyflow/react";
-import { 
-  FaGoogle, FaSlack, FaMicrosoft, FaGithub, FaTrello, FaDropbox, 
-  FaTwitter, FaFacebook, FaLinkedin, FaInstagram, FaYoutube,
-  FaDiscord, FaSpotify, FaAmazon, FaApple, FaShopify
-} from 'react-icons/fa';
-import { 
-  SiGmail, SiNotion, SiAirtable, SiZapier, SiHubspot, SiSalesforce,
-  SiZoom, SiOpenai, SiAnthropic
-} from 'react-icons/si';
-import { 
-  Mail, Zap, GitBranch, Clock, Bot, Play, Square, 
-  MessageSquare, Database, Code, Webhook, Calendar
-} from 'lucide-react';
 
-// Platform icon mapping with enhanced coverage
-const getPlatformIcon = (platformName: string) => {
+// Dynamic platform icon mapping - fully based on automation blueprint data
+const getPlatformIcon = (platformName: string, actionType?: string): string => {
+  if (!platformName) return '⚡';
+  
   const name = platformName.toLowerCase();
   
   // Email platforms
-  if (name.includes('gmail')) return '📧';
-  if (name.includes('outlook') || name.includes('microsoft')) return '📨';
-  if (name.includes('mail')) return '✉️';
+  if (name.includes('gmail') || name.includes('google mail')) return '📧';
+  if (name.includes('outlook') || name.includes('microsoft mail')) return '📨';
+  if (name.includes('sendgrid')) return '📮';
+  if (name.includes('mailchimp')) return '📬';
+  if (name.includes('mail') || actionType?.includes('email')) return '✉️';
   
   // Communication platforms
   if (name.includes('slack')) return '💬';
   if (name.includes('discord')) return '🎮';
-  if (name.includes('teams')) return '👥';
+  if (name.includes('teams') || name.includes('microsoft teams')) return '👥';
   if (name.includes('zoom')) return '📹';
+  if (name.includes('telegram')) return '📱';
+  if (name.includes('whatsapp')) return '📲';
   
   // Social platforms
-  if (name.includes('twitter')) return '🐦';
+  if (name.includes('twitter') || name.includes('x.com')) return '🐦';
   if (name.includes('facebook')) return '📘';
   if (name.includes('linkedin')) return '💼';
   if (name.includes('instagram')) return '📷';
   if (name.includes('youtube')) return '📺';
+  if (name.includes('tiktok')) return '🎵';
   
   // Productivity platforms
   if (name.includes('notion')) return '📝';
   if (name.includes('airtable')) return '📊';
   if (name.includes('trello')) return '📋';
+  if (name.includes('asana')) return '📌';
+  if (name.includes('monday')) return '📅';
+  if (name.includes('clickup')) return '✅';
+  
+  // Development platforms
   if (name.includes('github')) return '🐙';
+  if (name.includes('gitlab')) return '🦊';
+  if (name.includes('bitbucket')) return '🪣';
+  if (name.includes('jira')) return '🎯';
+  
+  // Google services
+  if (name.includes('google drive')) return '💾';
+  if (name.includes('google sheets')) return '📈';
+  if (name.includes('google docs')) return '📄';
+  if (name.includes('google calendar')) return '📅';
   if (name.includes('google')) return '🌐';
   
   // AI platforms
-  if (name.includes('openai') || name.includes('gpt')) return '🤖';
+  if (name.includes('openai') || name.includes('gpt') || name.includes('chatgpt')) return '🤖';
   if (name.includes('anthropic') || name.includes('claude')) return '🧠';
+  if (name.includes('gemini') || name.includes('bard')) return '✨';
+  if (name.includes('hugging') || name.includes('transformers')) return '🤗';
   
-  // CRM/Sales
+  // CRM/Sales platforms
   if (name.includes('hubspot')) return '🎯';
   if (name.includes('salesforce')) return '☁️';
+  if (name.includes('pipedrive')) return '🚀';
+  if (name.includes('zoho')) return '📊';
+  
+  // E-commerce platforms
   if (name.includes('shopify')) return '🛒';
+  if (name.includes('woocommerce')) return '🏪';
+  if (name.includes('stripe')) return '💳';
+  if (name.includes('paypal')) return '💰';
+  
+  // File storage
+  if (name.includes('dropbox')) return '📦';
+  if (name.includes('onedrive')) return '☁️';
+  if (name.includes('box')) return '📁';
+  
+  // Generic action-based icons
+  if (actionType) {
+    const action = actionType.toLowerCase();
+    if (action.includes('send') || action.includes('post')) return '📤';
+    if (action.includes('get') || action.includes('fetch') || action.includes('read')) return '📥';
+    if (action.includes('create') || action.includes('add')) return '➕';
+    if (action.includes('update') || action.includes('edit')) return '✏️';
+    if (action.includes('delete') || action.includes('remove')) return '🗑️';
+    if (action.includes('search') || action.includes('find')) return '🔍';
+    if (action.includes('upload')) return '📤';
+    if (action.includes('download')) return '📥';
+  }
   
   // Generic fallbacks
-  if (name.includes('webhook')) return '🔗';
-  if (name.includes('api')) return '⚡';
-  if (name.includes('database')) return '💾';
+  if (name.includes('webhook') || name.includes('api')) return '🔗';
+  if (name.includes('database') || name.includes('sql')) return '💾';
   if (name.includes('calendar')) return '📅';
+  if (name.includes('file')) return '📄';
+  if (name.includes('image')) return '🖼️';
+  if (name.includes('video')) return '🎥';
+  if (name.includes('audio')) return '🎵';
   
-  // Default
+  // Default platform icon
   return '⚙️';
 };
 
-// Step type icon mapping with emojis for better visibility
+// Dynamic step type icon mapping
 const getStepIcon = (stepType: string, step?: any): string => {
   switch (stepType) {
     case 'action':
-      if (step?.action?.integration) {
+      if (step?.action?.integration && step?.action?.method) {
+        return getPlatformIcon(step.action.integration, step.action.method);
+      } else if (step?.action?.integration) {
         return getPlatformIcon(step.action.integration);
       }
       return '⚡';
@@ -89,136 +129,120 @@ let idCounter = 0;
 const getId = () => `node_${++idCounter}`;
 const getEdgeId = (source: string, target: string, label?: string) => `edge_${source}-${target}-${label || ''}-${++idCounter}`;
 
-// Color scheme for different node types
-const getNodeStyle = (stepType: string) => {
-  switch (stepType) {
-    case 'action':
-      return {
-        background: 'linear-gradient(135deg, #9333ea, #7c3aed)',
-        color: 'white',
-        border: '2px solid #7c3aed',
-        borderRadius: '12px',
-        fontWeight: 'bold',
-        minWidth: 200,
-        padding: '12px 16px'
-      };
-    case 'condition':
-      return {
-        background: 'linear-gradient(135deg, #f97316, #ea580c)',
-        color: 'white',
-        border: '2px solid #ea580c',
-        borderRadius: '12px',
-        fontWeight: 'bold',
-        minWidth: 200,
-        padding: '12px 16px'
-      };
-    case 'loop':
-      return {
-        background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
-        color: 'white',
-        border: '2px solid #7c3aed',
-        borderRadius: '12px',
-        fontWeight: 'bold',
-        minWidth: 200,
-        padding: '12px 16px'
-      };
-    case 'delay':
-      return {
-        background: 'linear-gradient(135deg, #6b7280, #4b5563)',
-        color: 'white',
-        border: '2px solid #4b5563',
-        borderRadius: '12px',
-        fontWeight: 'bold',
-        minWidth: 200,
-        padding: '12px 16px'
-      };
-    case 'ai_agent_call':
-      return {
-        background: 'linear-gradient(135deg, #10b981, #059669)',
-        color: 'white',
-        border: '2px solid #059669',
-        borderRadius: '12px',
-        fontWeight: 'bold',
-        minWidth: 200,
-        padding: '12px 16px'
-      };
-    default:
-      return {
-        background: 'linear-gradient(135deg, #9333ea, #7c3aed)',
-        color: 'white',
-        border: '2px solid #7c3aed',
-        borderRadius: '12px',
-        fontWeight: 'bold',
-        minWidth: 200,
-        padding: '12px 16px'
-      };
-  }
-};
-
-// Enhanced node data with platform information
+// Enhanced node data creation with full dynamic content
 const createNodeData = (step: any, index: number) => {
   const icon = getStepIcon(step.type, step);
-  let label = step.name || `${step.type} ${index + 1}`;
+  let label = step.name || `Step ${index + 1}`;
+  let platform = null;
   
-  // Add platform info for action nodes
-  if (step.type === 'action' && step.action?.integration) {
-    const platformIcon = getPlatformIcon(step.action.integration);
-    label = `${platformIcon} ${step.action.integration}: ${step.action.method || 'Action'}`;
-  }
-  
-  // Add condition details for condition nodes
-  if (step.type === 'condition' && step.condition?.expression) {
-    label = `🔀 IF: ${step.condition.expression.substring(0, 30)}${step.condition.expression.length > 30 ? '...' : ''}`;
-  }
-  
-  // Add loop details for loop nodes
-  if (step.type === 'loop' && step.loop?.array_source) {
-    label = `🔄 Loop: ${step.loop.array_source}`;
-  }
-  
-  // Add delay details for delay nodes
-  if (step.type === 'delay' && step.delay?.duration_seconds) {
-    const duration = step.delay.duration_seconds;
-    const minutes = Math.floor(duration / 60);
-    const seconds = duration % 60;
-    const timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-    label = `⏰ Wait: ${timeStr}`;
-  }
-  
-  // Add AI agent details
-  if (step.type === 'ai_agent_call' && step.ai_agent_call?.agent_id) {
-    label = `🤖 AI Agent: ${step.ai_agent_call.agent_id}`;
+  // Dynamic label and platform extraction from blueprint
+  switch (step.type) {
+    case 'action':
+      if (step.action?.integration) {
+        platform = step.action.integration;
+        const method = step.action.method || 'Action';
+        const description = step.action.description || '';
+        label = description ? `${method}: ${description}` : `${platform}: ${method}`;
+      }
+      break;
+      
+    case 'condition':
+      if (step.condition?.expression) {
+        const expr = step.condition.expression;
+        label = `IF: ${expr.length > 25 ? `${expr.substring(0, 25)}...` : expr}`;
+      } else if (step.condition?.field && step.condition?.operator && step.condition?.value) {
+        label = `IF: ${step.condition.field} ${step.condition.operator} ${step.condition.value}`;
+      }
+      break;
+      
+    case 'loop':
+      if (step.loop?.array_source) {
+        label = `Loop: ${step.loop.array_source}`;
+      } else if (step.loop?.condition) {
+        label = `Loop: ${step.loop.condition}`;
+      } else if (step.loop?.count) {
+        label = `Loop: ${step.loop.count} times`;
+      }
+      break;
+      
+    case 'delay':
+      if (step.delay?.duration_seconds) {
+        const duration = step.delay.duration_seconds;
+        if (duration >= 3600) {
+          const hours = Math.floor(duration / 3600);
+          const minutes = Math.floor((duration % 3600) / 60);
+          label = `Wait: ${hours}h ${minutes}m`;
+        } else if (duration >= 60) {
+          const minutes = Math.floor(duration / 60);
+          const seconds = duration % 60;
+          label = `Wait: ${minutes}m ${seconds}s`;
+        } else {
+          label = `Wait: ${duration}s`;
+        }
+      } else if (step.delay?.duration) {
+        label = `Wait: ${step.delay.duration}`;
+      }
+      break;
+      
+    case 'ai_agent_call':
+      if (step.ai_agent_call?.agent_name) {
+        label = `AI: ${step.ai_agent_call.agent_name}`;
+      } else if (step.ai_agent_call?.agent_id) {
+        label = `AI Agent: ${step.ai_agent_call.agent_id}`;
+      } else if (step.ai_agent_call?.prompt) {
+        const prompt = step.ai_agent_call.prompt;
+        label = `AI: ${prompt.length > 20 ? `${prompt.substring(0, 20)}...` : prompt}`;
+      }
+      break;
   }
   
   return {
     label,
     icon,
+    platform,
     step,
-    platform: step.action?.integration || null
+    stepType: step.type
   };
 };
 
+// Enhanced layout algorithm with better spacing and branching
 export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Node[]; edges: Edge[] } => {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
-  let xOffset = 50;
-  let yOffset = 100;
-  const nodeSpacing = 300;
-  const verticalSpacing = 150;
-
-  // Reset counter for unique IDs
+  
+  // Reset counter
   idCounter = 0;
+  
+  // Layout configuration
+  const config = {
+    nodeWidth: 220,
+    nodeHeight: 80,
+    horizontalSpacing: 280,
+    verticalSpacing: 120,
+    branchSpacing: 150,
+    startX: 100,
+    startY: 100
+  };
+  
+  let currentX = config.startX;
+  let currentY = config.startY;
 
-  // Create the Trigger node
+  // Create the Trigger node with dynamic content
   const triggerNodeId = getId();
+  const triggerIcon = blueprint.trigger?.platform ? getPlatformIcon(blueprint.trigger.platform) : '▶️';
+  const triggerLabel = blueprint.trigger?.name || 
+                      `${triggerIcon} ${blueprint.trigger?.type || 'Trigger'}`;
+  
   nodes.push({
     id: triggerNodeId,
     type: 'input',
     data: { 
-      label: `▶️ Trigger: ${blueprint.trigger.type}`,
-      icon: '▶️'
+      label: triggerLabel,
+      icon: triggerIcon,
+      platform: blueprint.trigger?.platform,
+      stepType: 'trigger'
     },
-    position: { x: xOffset, y: yOffset },
+    position: { x: currentX, y: currentY },
     sourcePosition: Position.Right,
     style: {
       background: 'linear-gradient(135deg, #a855f7, #9333ea)',
@@ -226,101 +250,28 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
       border: '2px solid #9333ea',
       borderRadius: '12px',
       fontWeight: 'bold',
-      minWidth: 200,
+      minWidth: config.nodeWidth,
+      minHeight: config.nodeHeight,
       padding: '12px 16px'
     },
   });
 
   let previousNodeId = triggerNodeId;
-  xOffset += nodeSpacing;
+  currentX += config.horizontalSpacing;
 
-  // Process main steps with enhanced layout
-  blueprint.steps.forEach((step, index) => {
-    const nodeId = getId();
-    const nodeData = createNodeData(step, index);
-    const style = getNodeStyle(step.type);
-    
-    nodes.push({
-      id: nodeId,
-      type: 'default',
-      data: nodeData,
-      position: { x: xOffset, y: yOffset },
-      targetPosition: Position.Left,
-      sourcePosition: Position.Right,
-      style: style,
-    });
-
-    // Connect to previous node with enhanced animated edge
-    edges.push({
-      id: getEdgeId(previousNodeId, nodeId),
-      source: previousNodeId,
-      target: nodeId,
-      type: 'smoothstep',
-      animated: true,
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        width: 20,
-        height: 20,
-        color: '#9333ea',
-      },
-      style: {
-        strokeWidth: 3,
-        stroke: '#9333ea',
-        strokeDasharray: '5,5',
-      },
-    });
-
-    // Handle conditional branching for condition nodes
-    if (step.type === 'condition' && step.condition) {
-      let currentY = yOffset;
+  // Process main steps with enhanced recursive handling
+  if (blueprint.steps && Array.isArray(blueprint.steps)) {
+    blueprint.steps.forEach((step, index) => {
+      const result = processStep(step, index, currentX, currentY, previousNodeId, config);
+      nodes.push(...result.nodes);
+      edges.push(...result.edges);
       
-      // Process if_true branch
-      if (step.condition.if_true && step.condition.if_true.length > 0) {
-        currentY += verticalSpacing;
-        const trueBranchNodes = processConditionalBranch(
-          step.condition.if_true, 
-          nodeId, 
-          xOffset + nodeSpacing, 
-          currentY, 
-          'TRUE',
-          '#10b981'
-        );
-        nodes.push(...trueBranchNodes.nodes);
-        edges.push(...trueBranchNodes.edges);
+      if (result.lastNode) {
+        previousNodeId = result.lastNode.id;
+        currentX = result.lastNode.position.x + config.horizontalSpacing;
       }
-      
-      // Process if_false branch
-      if (step.condition.if_false && step.condition.if_false.length > 0) {
-        currentY += verticalSpacing * 2;
-        const falseBranchNodes = processConditionalBranch(
-          step.condition.if_false, 
-          nodeId, 
-          xOffset + nodeSpacing, 
-          currentY, 
-          'FALSE',
-          '#ef4444'
-        );
-        nodes.push(...falseBranchNodes.nodes);
-        edges.push(...falseBranchNodes.edges);
-      }
-    }
-
-    // Handle loop structures
-    if (step.type === 'loop' && step.loop?.steps && step.loop.steps.length > 0) {
-      const loopNodes = processLoopBranch(
-        step.loop.steps,
-        nodeId,
-        xOffset + nodeSpacing,
-        yOffset + verticalSpacing,
-        '#8b5cf6'
-      );
-      nodes.push(...loopNodes.nodes);
-      edges.push(...loopNodes.edges);
-    }
-
-    previousNodeId = nodeId;
-    xOffset += nodeSpacing;
-  });
+    });
+  }
 
   // Create End node
   const endNodeId = getId();
@@ -329,9 +280,10 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
     type: 'output',
     data: { 
       label: '🏁 Complete',
-      icon: '🏁'
+      icon: '🏁',
+      stepType: 'end'
     },
-    position: { x: xOffset, y: yOffset },
+    position: { x: currentX, y: currentY },
     targetPosition: Position.Left,
     style: {
       background: 'linear-gradient(135deg, #ef4444, #dc2626)',
@@ -339,142 +291,187 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
       border: '2px solid #b91c1c',
       borderRadius: '12px',
       fontWeight: 'bold',
-      minWidth: 200,
+      minWidth: config.nodeWidth,
+      minHeight: config.nodeHeight,
       padding: '12px 16px'
     },
   });
 
-  edges.push({
-    id: getEdgeId(previousNodeId, endNodeId),
-    source: previousNodeId,
-    target: endNodeId,
-    type: 'smoothstep',
-    animated: true,
-    markerEnd: {
-      type: MarkerType.ArrowClosed,
-      width: 20,
-      height: 20,
-      color: '#9333ea',
-    },
-    style: {
-      strokeWidth: 3,
-      stroke: '#9333ea',
-      strokeDasharray: '5,5',
-    },
-  });
+  // Connect last node to end node
+  if (previousNodeId) {
+    edges.push(createEdge(previousNodeId, endNodeId));
+  }
 
   return { nodes, edges };
 };
 
-// Helper function to process conditional branches
-const processConditionalBranch = (
+// Enhanced step processing with recursive branching
+const processStep = (step: any, index: number, x: number, y: number, previousNodeId: string, config: any) => {
+  const nodes: Node[] = [];
+  const edges: Edge[] = [];
+  
+  const nodeId = getId();
+  const nodeData = createNodeData(&, index);
+  
+  // Determine node type based on step type
+  let nodeType = 'default';
+  switch (step.type) {
+    case 'action':
+      nodeType = 'actionNode';
+      break;
+    case 'condition':
+      nodeType = 'conditionNode';
+      break;
+    case 'loop':
+      nodeType = 'loopNode';
+      break;
+    case 'delay':
+      nodeType = 'delayNode';
+      break;
+    case 'ai_agent_call':
+      nodeType = 'aiAgentNode';
+      break;
+  }
+  
+  const node = {
+    id: nodeId,
+    type: nodeType,
+    data: nodeData,
+    position: { x, y },
+    targetPosition: Position.Left,
+    sourcePosition: Position.Right,
+  };
+  
+  nodes.push(node);
+  
+  // Connect to previous node
+  if (previousNodeId) {
+    edges.push(createEdge(previousNodeId, nodeId));
+  }
+  
+  let lastNode = node;
+  let maxX = x;
+  
+  // Handle complex branching for conditions
+  if (step.type === 'condition' && step.condition) {
+    let branchY = y;
+    
+    // Process if_true branch
+    if (step.condition.if_true && Array.isArray(step.condition.if_true) && step.condition.if_true.length > 0) {
+      branchY += config.branchSpacing;
+      const trueBranch = processBranch(
+        step.condition.if_true, 
+        nodeId, 
+        x + config.horizontalSpacing, 
+        branchY, 
+        'TRUE',
+        '#10b981',
+        config
+      );
+      nodes.push(...trueBranch.nodes);
+      edges.push(...trueBranch.edges);
+      maxX = Math.max(maxX, trueBranch.maxX);
+    }
+    
+    // Process if_false branch
+    if (step.condition.if_false && Array.isArray(step.condition.if_false) && step.condition.if_false.length > 0) {
+      branchY += config.branchSpacing;
+      const falseBranch = processBranch(
+        step.condition.if_false, 
+        nodeId, 
+        x + config.horizontalSpacing, 
+        branchY, 
+        'FALSE',
+        '#ef4444',
+        config
+      );
+      nodes.push(...falseBranch.nodes);
+      edges.push(...falseBranch.edges);
+      maxX = Math.max(maxX, falseBranch.maxX);
+    }
+  }
+  
+  // Handle loop branching
+  if (step.type === 'loop' && step.loop?.steps && Array.isArray(step.loop.steps) && step.loop.steps.length > 0) {
+    const loopBranch = processBranch(
+      step.loop.steps,
+      nodeId,
+      x + config.horizontalSpacing,
+      y + config.branchSpacing,
+      'LOOP',
+      '#8b5cf6',
+      config
+    );
+    nodes.push(...loopBranch.nodes);
+    edges.push(...loopBranch.edges);
+    maxX = Math.max(maxX, loopBranch.maxX);
+  }
+  
+  return { nodes, edges, lastNode, maxX };
+};
+
+// Enhanced branch processing with better organization
+const processBranch = (
   steps: any[], 
   parentNodeId: string, 
   startX: number, 
   startY: number, 
   branchLabel: string,
-  edgeColor: string
-): { nodes: Node[]; edges: Edge[] } => {
-  const branchNodes: Node[] = [];
-  const branchEdges: Edge[] = [];
+  edgeColor: string,
+  config: any
+) => {
+  const nodes: Node[] = [];
+  const edges: Edge[] = [];
   let currentX = startX;
+  let currentY = startY;
   let previousNodeId = parentNodeId;
+  let maxX = startX;
 
   steps.forEach((step, index) => {
-    const nodeId = getId();
-    const nodeData = createNodeData(step, index);
-    const style = getNodeStyle(step.type);
+    const result = processStep(step, index, currentX, currentY, previousNodeId, config);
+    nodes.push(...result.nodes);
+    edges.push(...result.edges);
     
-    branchNodes.push({
-      id: nodeId,
-      type: 'default',
-      data: nodeData,
-      position: { x: currentX, y: startY },
-      targetPosition: Position.Left,
-      sourcePosition: Position.Right,
-      style: style,
-    });
-
-    // Connect to previous node
-    branchEdges.push({
-      id: getEdgeId(previousNodeId, nodeId),
-      source: previousNodeId,
-      target: nodeId,
-      type: 'smoothstep',
-      animated: true,
-      label: index === 0 ? branchLabel : undefined,
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        width: 20,
-        height: 20,
-        color: edgeColor,
-      },
-      style: {
-        strokeWidth: 3,
+    // Update the first edge in the branch with the label
+    if (index === 0 && result.edges.length > 0) {
+      result.edges[0].label = branchLabel;
+      result.edges[0].style = {
+        ...result.edges[0].style,
         stroke: edgeColor,
-        strokeDasharray: '5,5',
-      },
-    });
-
-    previousNodeId = nodeId;
-    currentX += 300;
+      };
+      result.edges[0].markerEnd = {
+        ...result.edges[0].markerEnd,
+        color: edgeColor,
+      };
+    }
+    
+    if (result.lastNode) {
+      previousNodeId = result.lastNode.id;
+      currentX = result.lastNode.position.x + config.horizontalSpacing;
+      maxX = Math.max(maxX, currentX);
+    }
   });
 
-  return { nodes: branchNodes, edges: branchEdges };
+  return { nodes, edges, maxX };
 };
 
-// Helper function to process loop branches
-const processLoopBranch = (
-  steps: any[], 
-  parentNodeId: string, 
-  startX: number, 
-  startY: number, 
-  edgeColor: string
-): { nodes: Node[]; edges: Edge[] } => {
-  const loopNodes: Node[] = [];
-  const loopEdges: Edge[] = [];
-  let currentX = startX;
-  let previousNodeId = parentNodeId;
-
-  steps.forEach((step, index) => {
-    const nodeId = getId();
-    const nodeData = createNodeData(step, index);
-    const style = getNodeStyle(step.type);
-    
-    loopNodes.push({
-      id: nodeId,
-      type: 'default',
-      data: nodeData,
-      position: { x: currentX, y: startY },
-      targetPosition: Position.Left,
-      sourcePosition: Position.Right,
-      style: style,
-    });
-
-    // Connect to previous node
-    loopEdges.push({
-      id: getEdgeId(previousNodeId, nodeId),
-      source: previousNodeId,
-      target: nodeId,
-      type: 'smoothstep',
-      animated: true,
-      label: index === 0 ? 'LOOP' : undefined,
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        width: 20,
-        height: 20,
-        color: edgeColor,
-      },
-      style: {
-        strokeWidth: 3,
-        stroke: edgeColor,
-        strokeDasharray: '5,5',
-      },
-    });
-
-    previousNodeId = nodeId;
-    currentX += 300;
-  });
-
-  return { nodes: loopNodes, edges: loopEdges };
-};
+// Enhanced edge creation with better styling
+const createEdge = (source: string, target: string, label?: string, color: string = '#9333ea') => ({
+  id: getEdgeId(source, target, label),
+  source,
+  target,
+  type: 'smoothstep',
+  animated: true,
+  label,
+  markerEnd: {
+    type: MarkerType.ArrowClosed,
+    width: 20,
+    height: 20,
+    color,
+  },
+  style: {
+    strokeWidth: 3,
+    stroke: color,
+    strokeDasharray: '8,4',
+  },
+});

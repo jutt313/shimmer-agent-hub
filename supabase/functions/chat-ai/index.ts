@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
@@ -9,6 +8,9 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 };
 
+// ENHANCED_SYSTEM_PROMPT: This is the core instruction set for the AI.
+// It dictates the AI's persona, its access to conversation memory and knowledge,
+// and most critically, the EXACT JSON response format and strict rules for credential handling.
 const ENHANCED_SYSTEM_PROMPT = `You are YusrAI, an advanced automation assistant with full conversation memory and knowledge integration. You MUST respond with VALID JSON only.
 
 CONVERSATION CONTEXT AWARENESS:
@@ -38,18 +40,22 @@ AGENT MANAGEMENT:
 - If agents were dismissed, don't recommend them again unless specifically asked
 - Include agent recommendations in "agents" array with full details
 
-MANDATORY JSON FORMAT:
+MANDATORY JSON RESPONSE FORMAT:
 {
   "summary": "Brief description that acknowledges conversation context",
   "steps": ["Step 1", "Step 2", "Step 3"],
   "platforms": [
     {
       "name": "Platform Name",
+      "api_config": {
+        "auth_type": "bearer_token|api_key|oauth|basic_auth (ABSOLUTELY CRITICAL: THIS MUST BE THE EXACT AND CORRECT AUTHENTICATION PROTOCOL FOR THE PLATFORM. NO EXCEPTIONS. GENERIC GUESSES ARE UNACCEPTABLE.)",
+        "base_url": "https://api.example.com/v1"
+      },
       "credentials": [
         {
-          "field": "api_key",
-          "placeholder": "Enter API key",
-          "why_needed": "Required for authentication"
+          "field": "api_key | access_token | bot_token | client_id | client_secret | username | password | webhook_secret | app_id | app_secret (ABSOLUTELY CRITICAL: THIS MUST BE THE EXACT, CASE-SENSITIVE FIELD NAME REQUIRED BY THE PLATFORM'S API. DO NOT INVENT GENERIC NAMES. IF MULTIPLE FIELDS ARE REQUIRED, LIST THEM ALL.)",
+          "placeholder": "Enter value for this field",
+          "why_needed": "Explanation of why this specific credential field is required for authentication"
         }
       ]
     }
@@ -87,15 +93,27 @@ MANDATORY JSON FORMAT:
     "context_acknowledged": "Summary of what was understood from conversation history",
     "knowledge_applied": "How knowledge store information was applied",
     "response_saved": "Confirmation that this response will be saved for future context"
-  }
+  },
+  "is_update": false, // Set to true if this is an update to a previous response, e.g., clarification
+  "recheck_status": "none|rechecking_credentials|rechecking_blueprint|rechecking_all" // Indicates if the AI is rechecking based on previous errors
 }
 
-CRITICAL: Respond ONLY with valid JSON. No extra text. Consider full conversation context and apply knowledge store insights.`;
+CRITICAL RULES:
+1. Respond ONLY with valid JSON. No extra text, no markdown code blocks outside the JSON itself.
+2. Your primary objective is to generate an EXECUTABLE automation_blueprint. This means ALL platform and credential details MUST BE 100% ACCURATE AND COMPLETE.
+3. ABSOLUTELY CRITICAL: For EVERY 'platform' you identify, you MUST provide its correct and **precise** 'api_config.auth_type' (e.g., 'oauth' for Google APIs, 'bearer_token' for Slack bot tokens, 'api_key' for specific API Key services, 'basic_auth' for username/password).
+4. ABSOLUTELY CRITICAL: Within the 'credentials' array for each platform, you MUST identify and list **EVERY SINGLE REQUIRED CREDENTIAL FIELD** by its **EXACT, PLATFORM-SPECIFIC NAME** (e.g., 'access_token', 'bot_token', 'client_id', 'client_secret', 'integration_token', 'api_key_id', 'api_secret_key', 'webhook_signing_secret', 'app_id', 'app_secret').
+5. DO NOT use generic terms like 'api_key' or 'token' if the platform has a more precise, standard name. **NO SIMPLIFICATION. NO GUESSING. NO OMISSIONS. If a platform requires multiple distinct credential fields (e.g., client_id AND client_secret), you MUST list them ALL.**
+6. If the user's request implies a platform, but you cannot determine the EXACT credential fields or auth_type, you MUST state "I need clarification on the exact authentication method for [Platform Name]" in 'clarification_questions' and provide a more general placeholder, but still attempt to list commonly expected fields.
+7. Always consider full conversation context and apply relevant knowledge store insights.
+8. PENALTY: Failure to provide precise and complete 'auth_type' and 'credentials.field' names for ANY platform is considered a severe compliance violation and will result in response rejection and immediate retry with explicit correction demands. You MUST re-evaluate your understanding of the platform's API documentation if this occurs. YOU MUST NOT SIMPLIFY CREDENTIALS.
+9. Before finalizing the response, re-read the entire request, the conversation history, and your generated JSON to ensure absolute compliance with ALL critical rules, especially regarding credential accuracy and completeness. Recheck. Recheck. Recheck.
+`;
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { 
+    return new Response('ok', {
       headers: corsHeaders,
       status: 200
     });
@@ -103,7 +121,7 @@ serve(async (req) => {
 
   try {
     const { message, messages = [], automationId, automationContext } = await req.json();
-    
+
     console.log('🔄 Processing chat request with full context:', message?.substring(0, 50));
     console.log('📚 Conversation history length:', messages.length);
     console.log('🔧 Automation context:', automationContext?.title);
@@ -117,11 +135,11 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     let knowledgeContext = "";
-    
+
     if (supabaseUrl && supabaseKey) {
       try {
         const supabase = createClient(supabaseUrl, supabaseKey);
-        
+
         // Enhanced knowledge store query with automation-specific context
         const searchTerms = [
           message.substring(0, 100),
@@ -138,7 +156,7 @@ serve(async (req) => {
           .limit(5);
 
         if (!knowledgeError && knowledgeData && knowledgeData.length > 0) {
-          knowledgeContext = `\n\nRELEVANT KNOWLEDGE STORE CONTEXT:\n${knowledgeData.map(k => 
+          knowledgeContext = `\n\nRELEVANT KNOWLEDGE STORE CONTEXT:\n${knowledgeData.map(k =>
             `- ${k.title} (${k.category}): ${k.summary}\n  Details: ${k.details?.substring(0, 200) || 'No additional details'}`
           ).join('\n\n')}`;
           console.log('📖 Enhanced knowledge store context retrieved:', knowledgeData.length, 'entries');
@@ -152,7 +170,7 @@ serve(async (req) => {
     const conversationHistory = messages.map((msg: any, index: number) => {
       const role = msg.isBot ? 'assistant' : 'user';
       let content = msg.text;
-      
+
       // For assistant messages, include structured data context
       if (msg.isBot && msg.structuredData) {
         const structuredInfo = {
@@ -163,7 +181,7 @@ serve(async (req) => {
         };
         content = `${msg.text}\n\n[CONTEXT: ${JSON.stringify(structuredInfo)}]`;
       }
-      
+
       return { role, content };
     });
 
@@ -174,7 +192,7 @@ serve(async (req) => {
         .filter((msg: any) => msg.isBot && msg.structuredData?.platforms)
         .flatMap((msg: any) => msg.structuredData.platforms.map((p: any) => p.name))
         .filter((name: string, index: number, arr: string[]) => arr.indexOf(name) === index);
-      
+
       const previousAgents = messages
         .filter((msg: any) => msg.isBot && msg.structuredData?.agents)
         .flatMap((msg: any) => msg.structuredData.agents.map((a: any) => a.name))
@@ -189,7 +207,7 @@ serve(async (req) => {
 - Previously Recommended Agents: [${previousAgents.join(', ')}]
 - Conversation Length: ${messages.length} messages`;
     }
-    
+
     if (knowledgeContext) {
       contextualSystemPrompt += knowledgeContext;
     }
@@ -204,10 +222,10 @@ serve(async (req) => {
     console.log('📡 Making OpenAI request with enhanced context:', requestMessages.length, 'messages...');
 
     const requestBody = {
-      model: 'gpt-4o-mini',
+      model: 'gpt-4o-mini', // Consider larger models if 4o-mini still struggles with complexity after prompt tuning
       messages: requestMessages,
       max_tokens: 4000,
-      temperature: 0.1,
+      temperature: 0.1, // Keep temperature low for deterministic JSON output
     };
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -222,7 +240,7 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('❌ OpenAI API error:', response.status, errorText);
-      throw new Error(`OpenAI API error: ${response.status}`);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`); // Include more error context
     }
 
     const data = await response.json();
@@ -234,57 +252,60 @@ serve(async (req) => {
     try {
       // Remove any markdown formatting and clean response
       aiResponse = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      
+
       // Try to parse to validate
       const parsed = JSON.parse(aiResponse);
-      
+
       // Add response saving confirmation
       if (parsed.conversation_updates) {
         parsed.conversation_updates.response_saved = "This response has been processed and will be saved for future conversation context";
         parsed.conversation_updates.knowledge_applied = knowledgeContext ? "Applied relevant patterns from knowledge store" : "No specific knowledge store patterns applied";
       }
-      
+
       console.log('✅ Enhanced JSON validation successful with full context awareness');
-      
+
       return new Response(JSON.stringify({ response: JSON.stringify(parsed) }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
       });
     } catch (parseError) {
-      console.error('❌ JSON parse error:', parseError);
-      
+      console.error('❌ JSON parse error with OpenAI response:', parseError);
+      console.error('Raw AI response causing parse error:', aiResponse); // Log the problematic AI response
+
       // Enhanced fallback response with conversation awareness
+      // This fallback is crucial for robustness if AI fails to produce valid JSON repeatedly.
       const fallbackResponse = {
-        "summary": "I understand our full conversation history and I'm ready to help with your automation. Let me provide context-aware next steps.",
+        "summary": "I'm having trouble generating a perfect structured response right now, but I fully understand our conversation history and the context of your automation. I will re-attempt to provide a precise response with accurate credential details. Please ask your question again.",
         "steps": [
-          "Analyze our complete conversation history",
-          "Apply relevant knowledge store patterns", 
-          "Review previously configured platforms and agents",
-          "Provide contextually appropriate recommendations",
-          "Save this interaction for future reference"
+          "Re-evaluating the authentication methods for all mentioned platforms.",
+          "Ensuring all required credential fields are listed with exact names.",
+          "Applying all critical rules for precise JSON formatting.",
+          "Preparing to generate an executable automation blueprint."
         ],
-        "platforms": [],
+        "platforms": [], // Clear platforms in fallback to avoid incorrect data
         "platforms_to_remove": [],
         "agents": [],
         "clarification_questions": [
-          "Based on our complete conversation, what specific aspect would you like me to focus on next?",
-          "Should I update any of the previously configured platforms or agents?"
+          "Could you please reiterate the platforms you wish to integrate or the specific action you want to automate?",
+          "If you have details on a platform's authentication, please share it to help me avoid errors."
         ],
         "automation_blueprint": {
           "version": "1.0.0",
-          "description": "Context-aware automation workflow with full conversation memory",
+          "description": "Fallback state - AI is re-evaluating for precision",
           "trigger": {"type": "manual", "details": {}},
           "steps": [],
           "variables": {}
         },
         "conversation_updates": {
-          "platform_changes": "Ready to process platform updates with full conversation context",
-          "context_acknowledged": "Full conversation history processed and understood",
-          "knowledge_applied": knowledgeContext ? "Knowledge store patterns available for application" : "Knowledge store queried but no specific patterns found",
-          "response_saved": "This response will be saved and used for future conversation context"
-        }
+          "platform_changes": "Re-assessing platform requirements for extreme precision.",
+          "context_acknowledged": "Full conversation history processed and understood. Focusing on previous errors.",
+          "knowledge_applied": knowledgeContext ? "Knowledge store patterns available for application and re-checking." : "Knowledge store queried but no specific patterns found.",
+          "response_saved": "This fallback response will be saved and inform future context for enhanced precision."
+        },
+        "is_update": true, // Indicate this is an internal update/re-evaluation
+        "recheck_status": "rechecking_all" // Signal to frontend that AI is explicitly rechecking
       };
-      
+
       return new Response(JSON.stringify({ response: JSON.stringify(fallbackResponse) }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
@@ -292,36 +313,39 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('💥 Enhanced chat function error:', error);
-    
-    // Enhanced error response with conversation awareness
+    console.error('💥 General chat function error:', error);
+
+    // Enhanced error response for any uncaught exceptions during function execution.
+    // This helps in debugging and provides a more user-friendly message.
     const errorResponse = {
-      "summary": "I'm experiencing technical difficulties but I maintain our full conversation context. Please try again.",
-      "steps": ["Retry your request", "Check connection", "Contact support if issue persists"],
+      "summary": "I'm experiencing a severe technical issue and cannot process your request at this moment. My internal systems are trying to re-establish connection and precision.",
+      "steps": ["Please wait a moment and try your request again.", "If the problem persists, please contact support with details of your query."],
       "platforms": [],
       "platforms_to_remove": [],
       "agents": [],
-      "clarification_questions": ["Could you please rephrase your request? I'll respond with full conversation awareness and knowledge store integration."],
+      "clarification_questions": ["I apologize for the inconvenience. Could you please try again in a few moments? All conversation context is preserved."],
       "automation_blueprint": {
         "version": "1.0.0",
-        "description": "Error state - full conversation context and knowledge store integration maintained",
+        "description": "Critical error state - full conversation context and knowledge store integration maintained",
         "trigger": {"type": "manual", "details": {}},
         "steps": [],
         "variables": {}
       },
       "conversation_updates": {
-        "platform_changes": "Error occurred but conversation context is fully maintained",
-        "context_acknowledged": "Full conversation history is preserved and accessible",
-        "knowledge_applied": "Knowledge store integration maintained despite error",
-        "response_saved": "Error state will be logged for troubleshooting while maintaining conversation context"
-      }
+        "platform_changes": "System error occurred, but conversation context is fully maintained.",
+        "context_acknowledged": "Full conversation history is preserved and accessible.",
+        "knowledge_applied": "Knowledge store integration maintained despite error.",
+        "response_saved": "Error state will be logged for troubleshooting while maintaining conversation context."
+      },
+      "is_update": true, // Indicate this is an internal update/error
+      "recheck_status": "rechecking_all" // Signal to frontend that AI is explicitly rechecking due to critical error
     };
 
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       response: JSON.stringify(errorResponse),
-      error: error.message 
+      error: error.message
     }), {
-      status: 200,
+      status: 500, // Changed status to 500 for critical errors
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

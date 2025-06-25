@@ -1,16 +1,17 @@
 
 import { IconType } from 'react-icons';
 import { 
-  SiGmail, SiMicrosoft, SiSlack, SiDiscord, SiZoom, SiTelegram, SiWhatsapp,
-  SiTwitter, SiFacebook, SiLinkedin, SiInstagram, SiYoutube, SiTiktok,
+  SiGmail, SiSlack, SiDiscord, SiZoom, SiTelegram, SiWhatsapp,
+  SiX, SiFacebook, SiLinkedin, SiInstagram, SiYoutube, SiTiktok,
   SiNotion, SiAirtable, SiTrello, SiAsana, SiClickup, SiGithub, SiGitlab,
   SiBitbucket, SiJira, SiGoogledrive, SiGooglesheets, SiGoogledocs,
   SiGooglecalendar, SiGoogle, SiOpenai, SiHuggingface, SiHubspot,
-  SiSalesforce, SiShopify, SiStripe, SiPaypal, SiDropbox, SiMicrosoftonedrive
+  SiSalesforce, SiShopify, SiStripe, SiPaypal, SiDropbox
 } from 'react-icons/si';
 import { 
   FaRobot, FaCloud, FaStore, FaBox, FaFolder, FaFile, FaImage, 
-  FaVideo, FaMusic, FaCalendar, FaDatabase, FaLink, FaCog
+  FaVideo, FaMusic, FaCalendar, FaDatabase, FaLink, FaCog, FaMicrosoft,
+  FaEnvelope
 } from 'react-icons/fa';
 
 export interface PlatformIconConfig {
@@ -29,7 +30,7 @@ export const getPlatformIconConfig = (platformName: string, actionType?: string)
   if (name.includes('gmail') || name.includes('google mail')) 
     return { icon: SiGmail, color: '#ea4335', bgColor: '#fef2f2' };
   if (name.includes('outlook') || name.includes('microsoft mail')) 
-    return { icon: SiMicrosoft, color: '#0078d4', bgColor: '#eff6ff' };
+    return { icon: FaMicrosoft, color: '#0078d4', bgColor: '#eff6ff' };
   
   // Communication platforms
   if (name.includes('slack')) 
@@ -45,7 +46,7 @@ export const getPlatformIconConfig = (platformName: string, actionType?: string)
   
   // Social platforms
   if (name.includes('twitter') || name.includes('x.com')) 
-    return { icon: SiTwitter, color: '#1da1f2', bgColor: '#eff6ff' };
+    return { icon: SiX, color: '#000000', bgColor: '#f9fafb' };
   if (name.includes('facebook')) 
     return { icon: SiFacebook, color: '#1877f2', bgColor: '#eff6ff' };
   if (name.includes('linkedin')) 
@@ -115,7 +116,7 @@ export const getPlatformIconConfig = (platformName: string, actionType?: string)
   if (name.includes('dropbox')) 
     return { icon: SiDropbox, color: '#0061ff', bgColor: '#eff6ff' };
   if (name.includes('onedrive')) 
-    return { icon: SiMicrosoftonedrive, color: '#0078d4', bgColor: '#eff6ff' };
+    return { icon: FaCloud, color: '#0078d4', bgColor: '#eff6ff' };
   
   // Generic fallbacks based on action type
   if (actionType) {
@@ -136,6 +137,8 @@ export const getPlatformIconConfig = (platformName: string, actionType?: string)
       return { icon: FaDatabase, color: '#059669', bgColor: '#f0fdf4' };
     if (action.includes('webhook') || action.includes('api')) 
       return { icon: FaLink, color: '#9333ea', bgColor: '#f3e8ff' };
+    if (action.includes('email') || action.includes('mail')) 
+      return { icon: FaEnvelope, color: '#6366f1', bgColor: '#eef2ff' };
   }
   
   // Generic platform icons

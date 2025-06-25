@@ -34,6 +34,11 @@ KNOWLEDGE STORE INTEGRATION:
 - Reference best practices for the specific automation type
 - Apply learned patterns to current automation context
 
+AUTOMATION LOGIC & IDENTIFIER DISCOVERY (End-to-End Reasoning):
+- For every action, consider its full context: WHERE is data coming from? WHERE is it going? WHAT specific resource (e.g., a Notion database, a Slack channel, a Google Form) is being targeted?
+- Based on the action's target, proactively identify and list ANY required resource-specific IDs or names (e.g., 'notion_database_id', 'slack_channel_id', 'google_form_id'). These are CRITICAL, functional identifiers, not just authentication credentials.
+- Ensure the 'automation_blueprint.steps' accurately reflect this end-to-end flow, using specific IDs/variables where applicable.
+
 AGENT MANAGEMENT:
 - Track previously recommended agents across conversation
 - Only recommend new agents if they serve different purposes
@@ -49,13 +54,22 @@ MANDATORY JSON RESPONSE FORMAT:
       "name": "Platform Name",
       "api_config": {
         "auth_type": "bearer_token|api_key|oauth|basic_auth (ABSOLUTELY CRITICAL: THIS MUST BE THE EXACT AND CORRECT AUTHENTICATION PROTOCOL FOR THE PLATFORM. NO EXCEPTIONS. GENERIC GUESSES ARE UNACCEPTABLE.)",
-        "base_url": "https://api.example.com/v1"
+        "base_url": "https://api.example.com/v1",
+        "methods": { // CRITICAL: MUST BE PRESENT AND DETAILED FOR EACH RELEVANT API CALL
+          "action_method_name": {
+            "endpoint": "/path/to/endpoint",
+            "http_method": "POST|GET|PUT|DELETE",
+            "required_params": ["param1", "param2" /* INCLUDE ALL NECESSARY FUNCTIONAL IDS HERE, E.G., 'channel_id', 'database_id', 'formId' */],
+            "optional_params": ["param3"],
+            "example_request": {"key": "value"}
+          }
+        }
       },
       "credentials": [
         {
-          "field": "api_key | access_token | bot_token | client_id | client_secret | username | password | webhook_secret | app_id | app_secret (ABSOLUTELY CRITICAL: THIS MUST BE THE EXACT, CASE-SENSITIVE FIELD NAME REQUIRED BY THE PLATFORM'S API. DO NOT INVENT GENERIC NAMES. IF MULTIPLE FIELDS ARE REQUIRED, LIST THEM ALL.)",
+          "field": "api_key | access_token | bot_token | client_id | client_secret | username | password | webhook_secret | app_id | app_secret | database_id | form_id | channel_id (ABSOLUTELY CRITICAL: THIS MUST BE THE EXACT, CASE-SENSITIVE FIELD NAME REQUIRED BY THE PLATFORM'S API FOR THE SPECIFIC ACTION. DO NOT INVENT GENERIC NAMES. IF MULTIPLE FIELDS ARE REQUIRED, LIST THEM ALL. INCLUDE CONTEXTUAL IDS LIKE 'database_id' IF THE ACTION REQUIRES THEM.)",
           "placeholder": "Enter value for this field",
-          "why_needed": "Explanation of why this specific credential field is required for authentication"
+          "why_needed": "Explanation of why this specific credential field is required for authentication or operation"
         }
       ]
     }
@@ -102,12 +116,13 @@ CRITICAL RULES:
 1. Respond ONLY with valid JSON. No extra text, no markdown code blocks outside the JSON itself.
 2. Your primary objective is to generate an EXECUTABLE automation_blueprint. This means ALL platform and credential details MUST BE 100% ACCURATE AND COMPLETE.
 3. ABSOLUTELY CRITICAL: For EVERY 'platform' you identify, you MUST provide its correct and **precise** 'api_config.auth_type' (e.g., 'oauth' for Google APIs, 'bearer_token' for Slack bot tokens, 'api_key' for specific API Key services, 'basic_auth' for username/password).
-4. ABSOLUTELY CRITICAL: Within the 'credentials' array for each platform, you MUST identify and list **EVERY SINGLE REQUIRED CREDENTIAL FIELD** by its **EXACT, PLATFORM-SPECIFIC NAME** (e.g., 'access_token', 'bot_token', 'client_id', 'client_secret', 'integration_token', 'api_key_id', 'api_secret_key', 'webhook_signing_secret', 'app_id', 'app_secret').
-5. DO NOT use generic terms like 'api_key' or 'token' if the platform has a more precise, standard name. **NO SIMPLIFICATION. NO GUESSING. NO OMISSIONS. If a platform requires multiple distinct credential fields (e.g., client_id AND client_secret), you MUST list them ALL.**
-6. If the user's request implies a platform, but you cannot determine the EXACT credential fields or auth_type, you MUST state "I need clarification on the exact authentication method for [Platform Name]" in 'clarification_questions' and provide a more general placeholder, but still attempt to list commonly expected fields.
-7. Always consider full conversation context and apply relevant knowledge store insights.
-8. PENALTY: Failure to provide precise and complete 'auth_type' and 'credentials.field' names for ANY platform is considered a severe compliance violation and will result in response rejection and immediate retry with explicit correction demands. You MUST re-evaluate your understanding of the platform's API documentation if this occurs. YOU MUST NOT SIMPLIFY CREDENTIALS.
-9. Before finalizing the response, re-read the entire request, the conversation history, and your generated JSON to ensure absolute compliance with ALL critical rules, especially regarding credential accuracy and completeness. Recheck. Recheck. Recheck.
+4. ABSOLUTELY CRITICAL: Within the 'credentials' array for each platform, you MUST identify and list **EVERY SINGLE REQUIRED CREDENTIAL FIELD** by its **EXACT, PLATFORM-SPECIFIC NAME** (e.g., 'access_token', 'bot_token', 'client_id', 'client_secret', 'integration_token', 'api_key_id', 'api_secret_key', 'webhook_signing_secret', 'app_id', 'app_secret'). THIS INCLUDES ALL CONTEXTUAL, RESOURCE-SPECIFIC IDENTIFIERS (e.g., 'database_id', 'form_id', 'channel_id', 'sheet_id', 'board_id') THAT ARE REQUIRED FOR THE SPECIFIC AUTOMATION ACTIONS.
+5. ABSOLUTELY CRITICAL: For each platform, you MUST include a 'methods' object within 'api_config' that details the 'endpoint', 'http_method', 'required_params', and 'optional_params' for ALL API actions implied by the user's request (e.g., 'send_message' for Slack, 'create_page' for Notion, 'submit_response' for Google Forms).
+6. DO NOT use generic terms like 'api_key' or 'token' if the platform has a more precise, standard name. **NO SIMPLIFICATION. NO GUESSING. NO OMISSIONS. If a platform requires multiple distinct credential fields (e.g., client_id AND client_secret), you MUST list them ALL.**
+7. If you identify a platform but cannot determine the EXACT credential fields or auth_type/method details/CONTEXTUAL ID from your knowledge, you MUST state "I need clarification on the exact authentication method/specific ID for [Platform Name]" in 'clarification_questions', AND still provide a placeholder for that field in the 'credentials' array or 'methods' object with a clear indication that it needs to be filled.
+8. Always consider full conversation context and apply relevant knowledge store insights to ensure the most complete and accurate response.
+9. PENALTY: Failure to provide precise and complete 'auth_type', 'credentials.field' names (including contextual IDs), and 'api_config.methods' for ANY platform is considered a severe compliance violation and will result in response rejection and immediate retry with explicit correction demands. You MUST re-evaluate your understanding of the platform's API documentation if this occurs. YOU MUST NOT SIMPLIFY CREDENTIALS, CONTEXTUAL IDS, OR API DETAILS.
+10. Before finalizing the response, re-read the entire request, the conversation history, and your generated JSON to ensure absolute compliance with ALL critical rules, especially regarding credential accuracy, contextual ID inclusion, and method detail completeness. Recheck. Recheck. Recheck.
 `;
 
 serve(async (req) => {
@@ -135,10 +150,48 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     let knowledgeContext = "";
+    const relevantPlatformConfigs = []; // To store fetched platform API details
 
     if (supabaseUrl && supabaseKey) {
       try {
         const supabase = createClient(supabaseUrl, supabaseKey);
+
+        // Extract potential platform names from the current message and conversation history
+        const allText = message + ' ' + messages.map((msg: any) => msg.text).join(' ');
+        const platformKeywords = ['google forms', 'notion', 'openai', 'slack', 'gmail', 'google drive', 'trello', 'shopify', 'stripe', 'github', 'discord', 'microsoft teams', 'telegram', 'outlook', 'sendgrid', 'mailchimp', 'dropbox', 'onedrive', 'salesforce', 'hubspot', 'pipedrive', 'zoho', 'woocommerce', 'twitter', 'facebook', 'linkedin', 'instagram', 'youtube', 'tiktok', 'asana', 'jira', 'monday.com', 'google analytics', 'google search console', 'mixpanel', 'amplitude', 'google sheets', 'microsoft excel', 'airtable', 'zoom', 'twilio', 'calendly', 'gitlab', 'bitbucket', 'jenkins', 'convertkit', 'activecampaign', 'constant contact', 'buffer', 'quickbooks', 'xero', 'freshbooks', 'wave', 'zendesk', 'freshdesk', 'intercom', 'help scout', 'mongodb', 'firebase', 'supabase', 'typeform', 'jotform', 'wufoo', 'openweathermap', 'google maps', 'mapbox', 'zapier', 'ifttt', 'microsoft power automate', 'docusign', 'adobe', 'canva', 'figma', 'sketch'];
+        
+        const identifiedPlatforms = new Set<string>();
+        platformKeywords.forEach(keyword => {
+            if (allText.toLowerCase().includes(keyword)) {
+                identifiedPlatforms.add(keyword);
+            }
+        });
+
+        if (identifiedPlatforms.size > 0) {
+            console.log('🔍 Identified potential platforms for knowledge lookup:', Array.from(identifiedPlatforms));
+            // Fetch detailed API configurations for identified platforms from universal_knowledge_store
+            const { data: platformDetails, error: platformDetailsError } = await supabase
+                .from('universal_knowledge_store')
+                .select('title, summary, details, category')
+                .eq('category', 'platform_knowledge')
+                .in('title', Array.from(identifiedPlatforms).map(p => p.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') + ' API Integration Details')) // Standardize title for lookup
+                .limit(identifiedPlatforms.size);
+
+            if (!platformDetailsError && platformDetails && platformDetails.length > 0) {
+                platformDetails.forEach(p => {
+                    if (p.details) {
+                        relevantPlatformConfigs.push(p.details); // Store the full 'details' object which contains api_config etc.
+                    }
+                });
+                knowledgeContext += `\n\nDETAILED PLATFORM KNOWLEDGE STORE CONTEXT:\n${platformDetails.map(k =>
+                    `- ${k.title} (${k.category}): ${JSON.stringify(k.details, null, 2)}`
+                ).join('\n\n')}`;
+                console.log('📖 Enhanced detailed platform knowledge store context retrieved:', platformDetails.length, 'entries');
+            } else {
+                console.log('⚠️ No detailed platform knowledge found for identified platforms or query failed:', platformDetailsError);
+            }
+        }
+
 
         // Enhanced knowledge store query with automation-specific context
         const searchTerms = [
@@ -156,10 +209,10 @@ serve(async (req) => {
           .limit(5);
 
         if (!knowledgeError && knowledgeData && knowledgeData.length > 0) {
-          knowledgeContext = `\n\nRELEVANT KNOWLEDGE STORE CONTEXT:\n${knowledgeData.map(k =>
-            `- ${k.title} (${k.category}): ${k.summary}\n  Details: ${k.details?.substring(0, 200) || 'No additional details'}`
+          knowledgeContext += `\n\nRELEVANT GENERAL KNOWLEDGE STORE CONTEXT:\n${knowledgeData.map(k =>
+            `- ${k.title} (${k.category}): ${k.summary}\n  Details: ${k.details?.substring(0, 200) || JSON.stringify(k.details || {}).substring(0,200) || 'No additional details'}`
           ).join('\n\n')}`;
-          console.log('📖 Enhanced knowledge store context retrieved:', knowledgeData.length, 'entries');
+          console.log('📖 Enhanced general knowledge store context retrieved:', knowledgeData.length, 'entries');
         }
       } catch (knowledgeErr) {
         console.log('⚠️ Knowledge store access failed:', knowledgeErr);
@@ -211,6 +264,15 @@ serve(async (req) => {
     if (knowledgeContext) {
       contextualSystemPrompt += knowledgeContext;
     }
+    
+    // Add dynamically fetched platform configurations to the prompt
+    if (relevantPlatformConfigs.length > 0) {
+        contextualSystemPrompt += `\n\nEXACT PLATFORM API SPECIFICATIONS FROM KNOWLEDGE STORE:
+${relevantPlatformConfigs.map(config => JSON.stringify(config, null, 2)).join('\n\n')}
+`;
+        console.log('📚 Injected exact platform API specs into system prompt.');
+    }
+
 
     // Build messages array with full conversation context
     const requestMessages = [

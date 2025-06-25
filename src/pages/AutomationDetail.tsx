@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -380,52 +379,82 @@ const AutomationDetail = () => {
       <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-blue-300/20 to-purple-300/20 rounded-full blur-3xl animate-pulse"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-r from-purple-300/20 to-blue-300/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
       
-      {/* Fixed Header - Always visible */}
-      <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-6 py-4">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <Button 
-              onClick={() => navigate("/automations")}
-              className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
-            >
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              Back
-            </Button>
-            <Button
-              onClick={() => {
-                setShowDashboard(!showDashboard);
-                setShowDiagram(false);
-              }}
-              className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
-            >
-              <BarChart3 className="w-5 h-5 mr-2" />
-              {showDashboard ? 'Show Chat' : 'Dashboard'}
-            </Button>
-            <Button
-              onClick={() => {
-                setShowDiagram(!showDiagram);
-                setShowDashboard(false);
-              }}
-              className="rounded-3xl bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
-            >
-              <Code2 className="w-5 h-5 mr-2" />
-              {showDiagram ? 'Show Chat' : 'Diagram'}
-            </Button>
-            <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                {automation?.title}
-              </h1>
-              <p className="text-sm text-gray-600">
-                Status: <span className="capitalize">{automation?.status}</span>
-              </p>
-            </div>
+      {/* Compact Navigation Header */}
+      <div className="sticky top-4 z-20 flex justify-between items-center mx-6 py-2">
+        {/* Left side - Back button and automation info */}
+        <div className="flex items-center gap-3">
+          <Button 
+            onClick={() => navigate("/automations")}
+            size="sm"
+            className="rounded-full bg-white/90 hover:bg-white text-gray-700 border border-gray-200/50 shadow-lg backdrop-blur-sm"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div className="text-left">
+            <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              {automation?.title}
+            </h1>
+            {automation?.description && (
+              <p className="text-xs text-gray-600 max-w-md truncate">{automation.description}</p>
+            )}
           </div>
         </div>
+
+        {/* Center - Main Navigation */}
+        <div className="flex items-center bg-white/90 backdrop-blur-sm rounded-full shadow-lg border border-gray-200/50 p-1">
+          <Button
+            onClick={() => {
+              setShowDashboard(!showDashboard);
+              setShowDiagram(false);
+            }}
+            size="sm"
+            className={`rounded-full px-4 py-2 transition-all duration-300 ${
+              showDashboard 
+                ? 'bg-gradient-to-r from-purple-500 to-blue-600 text-white shadow-md' 
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+          </Button>
+          
+          <Button
+            onClick={() => {
+              setShowDashboard(false);
+              setShowDiagram(false);
+            }}
+            size="sm"
+            className={`rounded-full px-4 py-2 mx-1 transition-all duration-300 ${
+              !showDashboard && !showDiagram 
+                ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md' 
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <Bot className="w-4 h-4" />
+          </Button>
+          
+          <Button
+            onClick={() => {
+              setShowDiagram(!showDiagram);
+              setShowDashboard(false);
+            }}
+            size="sm"
+            className={`rounded-full px-4 py-2 transition-all duration-300 ${
+              showDiagram 
+                ? 'bg-gradient-to-r from-purple-500 to-blue-600 text-white shadow-md' 
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <Code2 className="w-4 h-4" />
+          </Button>
+        </div>
+
+        {/* Right side - spacer for balance */}
+        <div className="w-32"></div>
       </div>
       
       <div className="flex-1 max-w-7xl mx-auto w-full px-6 relative">        
         {/* Main Content Area with Slide Animation */}
-        <div className="py-4 relative">
+        <div className="py-2 relative">
           {/* Chat Card - slides left when dashboard OR diagram is shown */}
           <div className={`transition-transform duration-500 ease-in-out ${showDashboard || showDiagram ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'} ${showDashboard || showDiagram ? 'absolute' : 'relative'} w-full`}>
             <ChatCard 
@@ -450,11 +479,15 @@ const AutomationDetail = () => {
             )}
           </div>
 
-          {/* Diagram Card - slides from RIGHT (opposite of dashboard) */}
+          {/* Diagram Card - slides from RIGHT */}
           <div className={`transition-transform duration-500 ease-in-out ${showDiagram ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} ${showDiagram ? 'relative' : 'absolute'} w-full`}>
             {showDiagram && (
               <AutomationDiagramDisplay
                 automationBlueprint={automation?.automation_blueprint}
+                messages={messages}
+                onAgentAdd={handleAgentAdd}
+                onAgentDismiss={handleAgentDismiss}
+                dismissedAgents={dismissedAgents}
               />
             )}
           </div>

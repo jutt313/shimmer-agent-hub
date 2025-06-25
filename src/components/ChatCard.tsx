@@ -59,7 +59,7 @@ const ChatCard = ({
     if (structuredData.summary) {
       content.push(
         <div key="summary" className="mb-4">
-          <p className="text-gray-800 leading-relaxed">{structuredData.summary}</p>
+          <p className="text-white leading-relaxed">{structuredData.summary}</p>
         </div>
       );
     }
@@ -68,8 +68,8 @@ const ChatCard = ({
     if (structuredData.steps && structuredData.steps.length > 0) {
       content.push(
         <div key="steps" className="mb-4">
-          <p className="font-medium text-gray-800 mb-2">Steps:</p>
-          <ol className="list-decimal list-inside space-y-1 text-gray-700 ml-4">
+          <p className="font-medium text-white mb-2">Steps:</p>
+          <ol className="list-decimal list-inside space-y-1 text-blue-100 ml-4">
             {structuredData.steps.map((step, index) => (
               <li key={index} className="leading-relaxed">{step}</li>
             ))}
@@ -82,11 +82,11 @@ const ChatCard = ({
     if (structuredData.platforms && structuredData.platforms.length > 0) {
       content.push(
         <div key="platforms" className="mb-4">
-          <p className="font-medium text-gray-800 mb-2">Required Platform Credentials:</p>
-          <div className="text-gray-700 ml-4 space-y-2">
+          <p className="font-medium text-white mb-2">Required Platform Credentials:</p>
+          <div className="text-blue-100 ml-4 space-y-2">
             {structuredData.platforms.map((platform, index) => (
               <div key={index}>
-                <p className="font-medium">{platform.name}</p>
+                <p className="font-medium text-white">{platform.name}</p>
                 {platform.credentials && platform.credentials.length > 0 && (
                   <ul className="list-disc list-inside ml-4 space-y-1">
                     {platform.credentials.map((cred, credIndex) => (
@@ -107,8 +107,8 @@ const ChatCard = ({
     if (structuredData.clarification_questions && structuredData.clarification_questions.length > 0) {
       content.push(
         <div key="clarification" className="mb-4">
-          <p className="font-medium text-gray-800 mb-2">I need some clarification:</p>
-          <ol className="list-decimal list-inside space-y-1 text-gray-700 ml-4">
+          <p className="font-medium text-white mb-2">I need some clarification:</p>
+          <ol className="list-decimal list-inside space-y-1 text-blue-100 ml-4">
             {structuredData.clarification_questions.map((question, index) => (
               <li key={index} className="leading-relaxed">{question}</li>
             ))}
@@ -121,23 +121,23 @@ const ChatCard = ({
     if (structuredData.agents && structuredData.agents.length > 0) {
       content.push(
         <div key="agents" className="mb-4">
-          <p className="font-medium text-gray-800 mb-3">Recommended AI Agents:</p>
+          <p className="font-medium text-white mb-3">Recommended AI Agents:</p>
           <div className="space-y-3">
             {structuredData.agents.map((agent, index) => {
               if (dismissedAgents.has(agent.name)) return null;
               
               return (
-                <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <div key={index} className="border border-blue-300/30 rounded-lg p-4 bg-blue-400/20 backdrop-blur-sm">
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-gray-800">{agent.name}</h4>
-                      <p className="text-sm text-gray-600">{agent.role}</p>
+                      <h4 className="font-semibold text-white">{agent.name}</h4>
+                      <p className="text-sm text-blue-100">{agent.role}</p>
                     </div>
                     <div className="flex gap-2 ml-4">
                       <Button
                         size="sm"
                         onClick={() => onAgentAdd?.(agent)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 text-xs"
+                        className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-3 py-1 text-xs border-0"
                       >
                         <Plus className="w-3 h-3 mr-1" />
                         Add Agent
@@ -146,16 +146,16 @@ const ChatCard = ({
                         size="sm"
                         variant="outline"
                         onClick={() => onAgentDismiss?.(agent.name)}
-                        className="border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-1 text-xs"
+                        className="border-blue-300/50 text-blue-100 hover:bg-blue-400/20 px-3 py-1 text-xs"
                       >
                         <X className="w-3 h-3 mr-1" />
                         Dismiss
                       </Button>
                     </div>
                   </div>
-                  <div className="space-y-2 text-sm text-gray-700">
-                    <p><strong>Goal:</strong> {agent.goal}</p>
-                    <p><strong>Why needed:</strong> {agent.why_needed}</p>
+                  <div className="space-y-2 text-sm text-blue-100">
+                    <p><strong className="text-white">Goal:</strong> {agent.goal}</p>
+                    <p><strong className="text-white">Why needed:</strong> {agent.why_needed}</p>
                   </div>
                 </div>
               );
@@ -189,12 +189,14 @@ const ChatCard = ({
               <div key={message.id} className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}>
                 <div className={`max-w-5xl px-6 py-4 rounded-2xl ${
                   message.isBot 
-                    ? 'bg-white text-gray-800 border border-gray-200 shadow-sm' 
+                    ? 'bg-gradient-to-r from-blue-500/90 to-purple-600/90 text-white border-0 shadow-lg backdrop-blur-sm' 
                     : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
                   } transition-all duration-300 overflow-hidden`} 
-                  style={!message.isBot ? {
+                  style={message.isBot ? {
+                    boxShadow: '0 0 25px rgba(59, 130, 246, 0.3)'
+                  } : {
                     boxShadow: '0 0 25px rgba(92, 142, 246, 0.25)'
-                  } : {}}
+                  }}
                 >
                   {/* Render structured content for bot messages */}
                   {message.isBot && structuredData ? (
@@ -208,7 +210,7 @@ const ChatCard = ({
                     </div>
                   )}
                   
-                  <p className={`text-xs mt-3 ${message.isBot ? 'text-gray-500' : 'text-blue-100'}`}>
+                  <p className={`text-xs mt-3 ${message.isBot ? 'text-blue-100' : 'text-blue-100'}`}>
                     {message.timestamp.toLocaleTimeString([], {
                       hour: '2-digit',
                       minute: '2-digit'
@@ -222,14 +224,14 @@ const ChatCard = ({
           {/* Loading indicator */}
           {isLoading && (
             <div className="flex justify-start">
-              <div className="max-w-5xl px-6 py-4 rounded-2xl bg-white text-gray-800 border border-gray-200 shadow-sm">
+              <div className="max-w-5xl px-6 py-4 rounded-2xl bg-gradient-to-r from-blue-500/90 to-purple-600/90 text-white border-0 shadow-lg backdrop-blur-sm">
                 <div className="flex items-center space-x-3">
-                  <Bot className="w-5 h-5 animate-pulse text-blue-500" />
+                  <Bot className="w-5 h-5 animate-pulse text-blue-200" />
                   <span className="font-medium">YusrAI is creating your automation...</span>
                   <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="w-2 h-2 bg-blue-200 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-purple-200 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                    <div className="w-2 h-2 bg-blue-200 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   </div>
                 </div>
               </div>

@@ -15,9 +15,12 @@ import '@xyflow/react/dist/style.css';
 
 import { blueprintToDiagram } from "@/utils/blueprintToDiagram";
 import { CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
+import { Plus, X } from 'lucide-react';
+import { parseStructuredResponse } from '@/utils/jsonParser';
 
 // Import custom node components
 import ActionNode from './diagram/ActionNode';
@@ -28,12 +31,47 @@ import AIAgentNode from './diagram/AIAgentNode';
 
 interface AutomationDiagramDisplayProps {
   automationBlueprint: any;
+  messages?: any[];
+  onAgentAdd?: (agent: any) => void;
+  onAgentDismiss?: (agentName: string) => void;
+  dismissedAgents?: Set<string>;
 }
 
-const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({ automationBlueprint }) => {
+const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({ 
+  automationBlueprint, 
+  messages = [],
+  onAgentAdd,
+  onAgentDismiss,
+  dismissedAgents = new Set()
+}) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [recommendedAgents, setRecommendedAgents] = useState<any[]>([]);
+
+  // Extract recommended agents from messages
+  useEffect(() => {
+    const agents: any[] = [];
+    messages.forEach(message => {
+      if (message.isBot) {
+        let structuredData = message.structuredData;
+        if (!structuredData) {
+          structuredData = parseStructuredResponse(message.text);
+        }
+        if (structuredData?.agents) {
+          agents.push(...structuredData.agents);
+        }
+      }
+    });
+    
+    // Remove duplicates and dismissed agents
+    const uniqueAgents = agents.filter((agent, index, self) => 
+      index === self.findIndex(a => a.name === agent.name) && 
+      !dismissedAgents.has(agent.name)
+    );
+    
+    setRecommendedAgents(uniqueAgents);
+  }, [messages, dismissedAgents]);
 
   // Transform blueprint to diagram format
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
@@ -199,9 +237,37 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({ aut
       <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-purple-100/40 to-blue-100/40 pointer-events-none"></div>
       
       <CardHeader className="pb-3 border-b border-purple-200/50 bg-gradient-to-r from-purple-50/80 to-blue-50/80 rounded-t-3xl relative z-10">
-        <CardTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-          Workflow Diagram
-        </CardTitle>
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+            Workflow Diagram
+          </CardTitle>
+          
+          {/* Recommended Agents */}
+          {recommendedAgents.length > 0 && (
+            <div className="flex gap-2">
+              {recommendedAgents.map((agent, index) => (
+                <div key={index} className="flex items-center gap-2 bg-blue-100/50 border border-blue-200/50 rounded-lg px-3 py-1">
+                  <span className="text-sm font-medium text-blue-700">{agent.name}</span>
+                  <Button
+                    size="sm"
+                    onClick={() => onAgentAdd?.(agent)}
+                    className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-2 py-1 text-xs h-6"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onAgentDismiss?.(agent.name)}
+                    className="border-blue-300/50 text-blue-600 hover:bg-blue-100/50 px-2 py-1 text-xs h-6"
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </CardHeader>
       
       <CardContent className="flex-1 p-0 relative z-10" style={{ height: 'calc(100% - 5rem)' }}>
@@ -214,9 +280,10 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({ aut
           nodeTypes={nodeTypes}
           defaultEdgeOptions={defaultEdgeOptions}
           fitView
-          attributionPosition="bottom-right"
+          attributionPosition="hidden"
           className="rounded-b-3xl"
           style={{ backgroundColor: 'transparent' }}
+          proOptions={{ hideAttribution: true }}
         >
           <MiniMap 
             nodeColor={(n) => {

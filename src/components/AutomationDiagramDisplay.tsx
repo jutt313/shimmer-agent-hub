@@ -238,10 +238,10 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({ aut
           />
           <Background 
             variant={BackgroundVariant.Dots}
-            gap={30} 
-            size={2} 
-            color="#c084fc"
-            className="opacity-30"
+            gap={20} 
+            size={1.5} 
+            color="#9333ea"
+            className="opacity-50"
           />
         </ReactFlow>
       </CardContent>

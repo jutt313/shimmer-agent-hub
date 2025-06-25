@@ -215,6 +215,8 @@ const AutomationDetail = () => {
     setSendingMessage(true);
 
     try {
+      console.log('🚀 Sending message to chat-ai function:', messageText.substring(0, 50));
+
       // Save user message to database
       await supabase
         .from('automation_chats')
@@ -224,102 +226,99 @@ const AutomationDetail = () => {
           message_content: messageText
         });
 
-      // Get AI response with automation context
-      const payload = {
-        message: messageText,
-        messages: messages.slice(-10),
-        automation: automation
-      };
-
+      // Call the chat-ai function with simplified payload
       const { data, error } = await supabase.functions.invoke('chat-ai', {
-        body: payload
+        body: {
+          message: messageText,
+          messages: messages.slice(-5) // Only send last 5 messages for context
+        }
       });
 
-      if (error) throw error;
-
-      console.log('🤖 RAW AI RESPONSE RECEIVED');
-      console.log('📊 Response length:', data.response.length);
-
-      // Parse structured response using new parser
-      const structuredData = parseStructuredResponse(data.response);      
-      let displayText = cleanDisplayText(data.response);
-      
-      // If we have structured data, format it nicely and store it
-      if (structuredData) {
-        console.log('✅ STRUCTURED DATA FOUND');
-        console.log('🔄 Is update response:', structuredData.is_update);
-        
-        // Only update platforms if this is NOT an update response and has new platforms
-        if (!structuredData.is_update && structuredData.platforms && Array.isArray(structuredData.platforms)) {
-          console.log('🔗 Adding new platforms:', structuredData.platforms.length);
-          setCurrentPlatforms(prev => {
-            const newPlatforms = [...prev];
-            structuredData.platforms!.forEach((platform: any) => {
-              if (!newPlatforms.find(p => p.name === platform.name)) {
-                newPlatforms.push(platform);
-              }
-            });
-            return newPlatforms;
-          });
-        }
-
-        // Only update automation_blueprint if provided by AI and it's a meaningful change
-        if (structuredData.automation_blueprint && !structuredData.is_update) {
-          console.log('🔧 Updating automation blueprint in DB');
-          const { error: updateBlueprintError } = await supabase
-            .from('automations')
-            .update({ automation_blueprint: structuredData.automation_blueprint })
-            .eq('id', automation.id);
-
-          if (updateBlueprintError) {
-            console.error('Error updating automation blueprint:', updateBlueprintError);
-            toast({
-              title: "Error",
-              description: "Failed to save automation blueprint.",
-              variant: "destructive",
-            });
-          } else {
-            setAutomation(prev => ({
-              ...prev!,
-              automation_blueprint: structuredData.automation_blueprint
-            }));
-            setShowBlueprint(true);
-            toast({
-              title: "Blueprint Updated",
-              description: "Automation blueprint has been updated.",
-            });
-          }
-        } else if (structuredData.automation_blueprint && structuredData.is_update) {
-          console.log('📝 Skipping blueprint update - this is an update/clarification response');
-        }
-      } else {
-        console.log('⚠️ No structured data found, using cleaned response');
+      if (error) {
+        console.error('❌ Supabase function error:', error);
+        throw error;
       }
+
+      console.log('✅ Received response from chat-ai function');
+
+      let aiResponse = data.response || "I'm sorry, I couldn't process your request.";
       
+      // Parse structured response
+      let structuredData = null;
+      try {
+        // Try to parse as JSON first
+        if (aiResponse.startsWith('{') && aiResponse.endsWith('}')) {
+          structuredData = JSON.parse(aiResponse);
+          console.log('✅ Parsed structured data successfully');
+        } else {
+          // Try to extract JSON from the response
+          const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            structuredData = JSON.parse(jsonMatch[0]);
+            console.log('✅ Extracted and parsed JSON from response');
+          }
+        }
+      } catch (parseError) {
+        console.log('⚠️ Could not parse structured data:', parseError);
+      }
+
       const aiMessage = {
         id: Date.now() + 1,
-        text: data.response, // Use original response to preserve JSON structure
+        text: aiResponse,
         isBot: true,
         timestamp: new Date(),
         structuredData: structuredData
       };
 
-      console.log('📤 ADDING AI MESSAGE TO CHAT');
-      console.log('🔧 Has structuredData:', !!aiMessage.structuredData);
-
+      console.log('📤 Adding AI message to chat');
       setMessages(prev => [...prev, aiMessage]);
 
-      // Save AI response to database (save the original response to preserve structure)
+      // Update platforms if available
+      if (structuredData?.platforms && Array.isArray(structuredData.platforms)) {
+        console.log('🔗 Updating platforms from response');
+        setCurrentPlatforms(prev => {
+          const newPlatforms = [...prev];
+          structuredData.platforms.forEach((platform: any) => {
+            if (!newPlatforms.find(p => p.name === platform.name)) {
+              newPlatforms.push(platform);
+            }
+          });
+          return newPlatforms;
+        });
+      }
+
+      // Update automation blueprint if available
+      if (structuredData?.automation_blueprint) {
+        console.log('🔧 Updating automation blueprint');
+        const { error: updateError } = await supabase
+          .from('automations')
+          .update({ automation_blueprint: structuredData.automation_blueprint })
+          .eq('id', automation.id);
+
+        if (!updateError) {
+          setAutomation(prev => ({
+            ...prev!,
+            automation_blueprint: structuredData.automation_blueprint
+          }));
+          setShowBlueprint(true);
+          toast({
+            title: "Blueprint Updated",
+            description: "Automation blueprint has been updated.",
+          });
+        }
+      }
+
+      // Save AI response to database
       await supabase
         .from('automation_chats')
         .insert({
           automation_id: automation.id,
           sender: 'ai',
-          message_content: data.response // Save original response with JSON intact
+          message_content: aiResponse
         });
 
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('💥 Error sending message:', error);
       toast({
         title: "Error",
         description: "Failed to send message. Please try again.",

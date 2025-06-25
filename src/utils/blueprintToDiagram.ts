@@ -311,7 +311,7 @@ const processStep = (step: any, index: number, x: number, y: number, previousNod
   const edges: Edge[] = [];
   
   const nodeId = getId();
-  const nodeData = createNodeData(&, index);
+  const nodeData = createNodeData(step, index);
   
   // Determine node type based on step type
   let nodeType = 'default';

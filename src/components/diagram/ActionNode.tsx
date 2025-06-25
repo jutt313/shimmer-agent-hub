@@ -1,12 +1,14 @@
 
 import React from 'react';
 import { Handle, Position } from '@xyflow/react';
+import { getPlatformIconConfig } from '@/utils/platformIcons';
 
 interface ActionNodeData {
   label: string;
   icon: string;
   platform?: string;
   action?: any;
+  stepType?: string;
 }
 
 interface ActionNodeProps {
@@ -15,8 +17,19 @@ interface ActionNodeProps {
 }
 
 const ActionNode: React.FC<ActionNodeProps> = ({ data, selected }) => {
+  const iconConfig = getPlatformIconConfig(data.platform || '', data.action?.method);
+  const IconComponent = iconConfig.icon;
+
   return (
-    <div className={`px-4 py-3 shadow-lg rounded-xl bg-gradient-to-r from-purple-500 to-blue-600 text-white border-2 transition-all duration-200 min-w-[200px] ${selected ? 'border-purple-300' : 'border-purple-200'}`}>
+    <div 
+      className={`px-4 py-3 shadow-lg rounded-xl text-white border-2 transition-all duration-200 min-w-[220px] max-w-[280px] ${
+        selected ? 'border-purple-300 shadow-purple-200' : 'border-purple-200'
+      }`}
+      style={{
+        background: `linear-gradient(135deg, ${iconConfig.color}15, ${iconConfig.color}25)`,
+        borderColor: selected ? iconConfig.color : `${iconConfig.color}50`
+      }}
+    >
       <Handle
         type="target"
         position={Position.Left}
@@ -24,11 +37,23 @@ const ActionNode: React.FC<ActionNodeProps> = ({ data, selected }) => {
       />
       
       <div className="flex items-center space-x-3">
-        <span className="text-xl flex-shrink-0">{data.icon}</span>
+        <div 
+          className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center"
+          style={{ backgroundColor: iconConfig.bgColor }}
+        >
+          <IconComponent 
+            className="w-5 h-5" 
+            style={{ color: iconConfig.color }} 
+          />
+        </div>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold truncate">{data.label}</div>
+          <div className="text-sm font-semibold truncate text-gray-800">
+            {data.label}
+          </div>
           {data.platform && (
-            <div className="text-xs opacity-90 truncate">{data.platform}</div>
+            <div className="text-xs opacity-70 truncate text-gray-600">
+              {data.platform}
+            </div>
           )}
         </div>
       </div>

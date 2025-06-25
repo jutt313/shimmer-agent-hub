@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Handle, Position } from '@xyflow/react';
+import { FaQuestionCircle } from 'react-icons/fa';
 
 interface ConditionNodeData {
   label: string;
@@ -15,7 +16,12 @@ interface ConditionNodeProps {
 
 const ConditionNode: React.FC<ConditionNodeProps> = ({ data, selected }) => {
   return (
-    <div className={`px-4 py-3 shadow-lg rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white border-2 transition-all duration-200 min-w-[200px] ${selected ? 'border-orange-300' : 'border-orange-200'}`}>
+    <div className={`px-4 py-3 shadow-lg rounded-xl text-white border-2 transition-all duration-200 min-w-[220px] max-w-[280px] ${
+      selected ? 'border-orange-300 shadow-orange-200' : 'border-orange-200'
+    }`}
+    style={{
+      background: 'linear-gradient(135deg, #f97316, #ea580c)',
+    }}>
       <Handle
         type="target"
         position={Position.Left}
@@ -23,7 +29,9 @@ const ConditionNode: React.FC<ConditionNodeProps> = ({ data, selected }) => {
       />
       
       <div className="flex items-center space-x-3">
-        <span className="text-xl flex-shrink-0">{data.icon}</span>
+        <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
+          <FaQuestionCircle className="w-5 h-5 text-orange-600" />
+        </div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold truncate">{data.label}</div>
         </div>
@@ -33,7 +41,7 @@ const ConditionNode: React.FC<ConditionNodeProps> = ({ data, selected }) => {
         type="source"
         position={Position.Right}
         id="true"
-        className="w-3 h-3 !bg-white !border-2 !border-green-400"
+        className="w-3 h-3 !bg-green-400 !border-2 !border-green-600"
         style={{ top: '30%' }}
       />
       
@@ -41,7 +49,7 @@ const ConditionNode: React.FC<ConditionNodeProps> = ({ data, selected }) => {
         type="source"
         position={Position.Right}
         id="false"
-        className="w-3 h-3 !bg-white !border-2 !border-red-400"
+        className="w-3 h-3 !bg-red-400 !border-2 !border-red-600"
         style={{ top: '70%' }}
       />
     </div>

@@ -433,16 +433,18 @@ const processBranch = (
     if (index === 0 && result.edges.length > 0) {
       const firstEdge = result.edges[0];
       firstEdge.label = branchLabel;
-      const edgeStyle = firstEdge.style || {};
-      const markerEnd = firstEdge.markerEnd || { type: MarkerType.ArrowClosed, width: 20, height: 20 };
+      
+      // Ensure proper markerEnd structure
+      firstEdge.markerEnd = {
+        type: MarkerType.ArrowClosed,
+        width: 20,
+        height: 20,
+        color: edgeColor,
+      };
       
       firstEdge.style = {
-        ...edgeStyle,
+        ...(firstEdge.style || {}),
         stroke: edgeColor,
-      };
-      firstEdge.markerEnd = {
-        ...markerEnd,
-        color: edgeColor,
       };
     }
     

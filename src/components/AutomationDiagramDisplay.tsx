@@ -74,7 +74,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({ aut
     },
   }), []);
 
-  // Save diagram layout to database
+  // Auto-save functionality
   const saveDiagramLayout = useCallback(async (updatedNodes: any[], updatedEdges: any[]) => {
     if (!user || !automationBlueprint) return;
 
@@ -103,7 +103,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({ aut
     }
   }, [user, automationBlueprint]);
 
-  // Load saved diagram layout from database
+  // Load saved diagram layout
   useEffect(() => {
     const loadDiagramLayout = async () => {
       if (!user || !automationBlueprint) return;
@@ -144,7 +144,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({ aut
     if (nodes.length > 0 || edges.length > 0) {
       const timeoutId = setTimeout(() => {
         saveDiagramLayout(nodes, edges);
-      }, 2000); // Auto-save after 2 seconds of inactivity
+      }, 2000);
 
       return () => clearTimeout(timeoutId);
     }
@@ -153,20 +153,20 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({ aut
   // Show message if no blueprint
   if (!automationBlueprint) {
     return (
-      <div className="w-[calc(100vw-6rem)] max-w-none h-full flex flex-col rounded-3xl overflow-hidden bg-white/70 backdrop-blur-md shadow-2xl border-0 relative">
-        <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-purple-100/30 to-blue-100/30 pointer-events-none"></div>
+      <div className="w-full h-[75vh] flex flex-col rounded-3xl overflow-hidden bg-white/90 backdrop-blur-md shadow-2xl border-0 relative">
+        <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-purple-100/40 to-blue-100/40 pointer-events-none"></div>
         
-        <CardHeader className="pb-3 border-b border-purple-200/50 bg-gradient-to-r from-purple-50/50 to-blue-50/50 rounded-t-3xl relative z-10">
-          <CardTitle className="text-xl font-semibold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+        <CardHeader className="pb-3 border-b border-purple-200/50 bg-gradient-to-r from-purple-50/80 to-blue-50/80 rounded-t-3xl relative z-10">
+          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
             Workflow Diagram
           </CardTitle>
         </CardHeader>
         
         <CardContent className="flex-1 flex items-center justify-center relative z-10">
           <div className="text-center">
-            <div className="text-6xl mb-4">🎯</div>
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">No Automation Blueprint Yet</h3>
-            <p className="text-gray-500">Create your automation through chat first, then view the visual diagram here!</p>
+            <div className="text-8xl mb-6">🎯</div>
+            <h3 className="text-xl font-bold text-gray-700 mb-3">No Automation Blueprint Yet</h3>
+            <p className="text-gray-600">Create your automation through chat first, then view the visual diagram here!</p>
           </div>
         </CardContent>
       </div>
@@ -175,19 +175,19 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({ aut
 
   if (loading) {
     return (
-      <div className="w-[calc(100vw-6rem)] max-w-none h-full flex flex-col rounded-3xl overflow-hidden bg-white/70 backdrop-blur-md shadow-2xl border-0 relative">
-        <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-purple-100/30 to-blue-100/30 pointer-events-none"></div>
+      <div className="w-full h-[75vh] flex flex-col rounded-3xl overflow-hidden bg-white/90 backdrop-blur-md shadow-2xl border-0 relative">
+        <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-purple-100/40 to-blue-100/40 pointer-events-none"></div>
         
-        <CardHeader className="pb-3 border-b border-purple-200/50 bg-gradient-to-r from-purple-50/50 to-blue-50/50 rounded-t-3xl relative z-10">
-          <CardTitle className="text-xl font-semibold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+        <CardHeader className="pb-3 border-b border-purple-200/50 bg-gradient-to-r from-purple-50/80 to-blue-50/80 rounded-t-3xl relative z-10">
+          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
             Workflow Diagram
           </CardTitle>
         </CardHeader>
         
         <CardContent className="flex-1 flex items-center justify-center relative z-10">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading diagram...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+            <p className="text-gray-700 font-medium">Loading diagram...</p>
           </div>
         </CardContent>
       </div>
@@ -195,11 +195,11 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({ aut
   }
 
   return (
-    <div className="w-[calc(100vw-6rem)] max-w-none h-full flex flex-col rounded-3xl overflow-hidden bg-white/70 backdrop-blur-md shadow-2xl border-0 relative">
-      <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-purple-100/30 to-blue-100/30 pointer-events-none"></div>
+    <div className="w-full h-[75vh] flex flex-col rounded-3xl overflow-hidden bg-white/90 backdrop-blur-md shadow-2xl border-0 relative">
+      <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-purple-100/40 to-blue-100/40 pointer-events-none"></div>
       
-      <CardHeader className="pb-3 border-b border-purple-200/50 bg-gradient-to-r from-purple-50/50 to-blue-50/50 rounded-t-3xl relative z-10">
-        <CardTitle className="text-xl font-semibold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+      <CardHeader className="pb-3 border-b border-purple-200/50 bg-gradient-to-r from-purple-50/80 to-blue-50/80 rounded-t-3xl relative z-10">
+        <CardTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
           Workflow Diagram
         </CardTitle>
       </CardHeader>
@@ -228,15 +228,20 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({ aut
               if (n.type === 'delayNode') return '#6b7280';
               return '#9333ea';
             }}
-            className="!bg-white/80 !border-2 !border-purple-200 !rounded-lg"
+            className="!bg-white/90 !border-2 !border-purple-200 !rounded-lg !shadow-lg"
           />
-          <Controls className="!bg-white/80 !border-2 !border-purple-200 !rounded-lg" />
+          <Controls 
+            className="!bg-white/90 !border-2 !border-purple-200 !rounded-lg !shadow-lg" 
+            showZoom={true}
+            showFitView={true}
+            showInteractive={true}
+          />
           <Background 
             variant={BackgroundVariant.Dots}
-            gap={25} 
-            size={3} 
+            gap={30} 
+            size={2} 
             color="#c084fc"
-            className="opacity-40"
+            className="opacity-30"
           />
         </ReactFlow>
       </CardContent>

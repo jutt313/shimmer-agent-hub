@@ -1,4 +1,3 @@
-
 import { AutomationBlueprint } from "@/types/automation";
 import { Node, Edge, Position, MarkerType } from "@xyflow/react";
 
@@ -441,6 +440,7 @@ const processBranch = (
         stroke: edgeColor,
       };
       result.edges[0].markerEnd = {
+        ...markerEnd,
         ...markerEnd,
         color: edgeColor,
       };

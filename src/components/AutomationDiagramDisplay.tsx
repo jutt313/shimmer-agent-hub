@@ -1,4 +1,3 @@
-
 import React, { useCallback, useMemo } from 'react';
 import {
   ReactFlow,
@@ -127,7 +126,6 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({ aut
           />
           <Controls className="!bg-white/80 !border-2 !border-green-200 !rounded-lg" />
           <Background 
-            variant="dots" 
             gap={20} 
             size={2} 
             color="#94a3b8"

@@ -8,7 +8,7 @@ import {
 } from 'react-icons/fa';
 import { 
   SiGmail, SiNotion, SiAirtable, SiZapier, SiHubspot, SiSalesforce,
-  SiZoom, SiMicrosoftteams, SiOpenai, SiAnthropic
+  SiZoom, SiOpenai, SiAnthropic
 } from 'react-icons/si';
 import { 
   Mail, Zap, GitBranch, Clock, Bot, Play, Square, 
@@ -27,7 +27,7 @@ const getPlatformIcon = (platformName: string) => {
   // Communication platforms
   if (name.includes('slack')) return { component: FaSlack, color: 'text-purple-500' };
   if (name.includes('discord')) return { component: FaDiscord, color: 'text-indigo-500' };
-  if (name.includes('teams')) return { component: SiMicrosoftteams, color: 'text-blue-600' };
+  if (name.includes('teams')) return { component: FaMicrosoft, color: 'text-blue-600' };
   if (name.includes('zoom')) return { component: SiZoom, color: 'text-blue-500' };
   
   // Social platforms

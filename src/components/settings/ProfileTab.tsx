@@ -1,12 +1,11 @@
 
 import { useState, useEffect } from 'react';
-import { User, Settings, Camera, CreditCard } from 'lucide-react';
+import { User, Settings, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -25,7 +24,6 @@ const ProfileTab = () => {
   const { toast } = useToast();
   const [profile, setProfile] = useState({
     full_name: '',
-    avatar_url: ''
   });
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>({
     automation_created: true,
@@ -35,7 +33,19 @@ const ProfileTab = () => {
     automation_error: true,
     automation_stopped: true
   });
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [showPasswords, setShowPasswords] = useState({
+    current: false,
+    new: false,
+    confirm: false
+  });
   const [loading, setLoading] = useState(true);
+  const [updatingProfile, setUpdatingProfile] = useState(false);
+  const [updatingPassword, setUpdatingPassword] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -55,7 +65,6 @@ const ProfileTab = () => {
       if (data) {
         setProfile({
           full_name: data.full_name || '',
-          avatar_url: data.avatar_url || ''
         });
       }
     } catch (error) {
@@ -92,13 +101,13 @@ const ProfileTab = () => {
   };
 
   const updateProfile = async () => {
+    setUpdatingProfile(true);
     try {
       const { error } = await supabase
         .from('profiles')
         .upsert({
           id: user?.id,
           full_name: profile.full_name,
-          avatar_url: profile.avatar_url
         });
 
       if (error) throw error;
@@ -114,6 +123,57 @@ const ProfileTab = () => {
         description: "Failed to update profile",
         variant: "destructive",
       });
+    } finally {
+      setUpdatingProfile(false);
+    }
+  };
+
+  const updatePassword = async () => {
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "New passwords don't match",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      toast({
+        title: "Error",
+        description: "New password must be at least 6 characters long",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUpdatingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: passwordData.newPassword
+      });
+
+      if (error) throw error;
+      
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+      
+      toast({
+        title: "Success",
+        description: "Password updated successfully",
+      });
+    } catch (error: any) {
+      console.error('Error updating password:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update password",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingPassword(false);
     }
   };
 
@@ -130,8 +190,20 @@ const ProfileTab = () => {
         });
 
       if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "Notification preferences updated",
+      });
     } catch (error) {
       console.error('Error updating preferences:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update notification preferences",
+        variant: "destructive",
+      });
+      // Revert the change
+      setNotificationPreferences(notificationPreferences);
     }
   };
 
@@ -158,16 +230,8 @@ const ProfileTab = () => {
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-              {profile.avatar_url ? (
-                <img src={profile.avatar_url} alt="Profile" className="w-full h-full rounded-full object-cover" />
-              ) : (
-                <User className="w-8 h-8 text-white" />
-              )}
+              <User className="w-8 h-8 text-white" />
             </div>
-            <Button variant="outline" size="sm" className="rounded-xl">
-              <Camera className="w-4 h-4 mr-2" />
-              Change Photo
-            </Button>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -191,39 +255,96 @@ const ProfileTab = () => {
             </div>
           </div>
 
-          <Button onClick={updateProfile} className="rounded-xl bg-blue-600 hover:bg-blue-700">
-            Update Profile
+          <Button 
+            onClick={updateProfile} 
+            disabled={updatingProfile}
+            className="rounded-xl bg-blue-600 hover:bg-blue-700"
+          >
+            {updatingProfile ? 'Updating...' : 'Update Profile'}
           </Button>
         </CardContent>
       </Card>
 
-      {/* Subscription Plan */}
+      {/* Change Password */}
       <Card className="bg-white/80 backdrop-blur-sm border border-blue-100 shadow-sm rounded-xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <CreditCard className="w-5 h-5 text-purple-600" />
-            Subscription Plan
+            <Settings className="w-5 h-5 text-purple-600" />
+            Change Password
           </CardTitle>
-          <CardDescription>Current plan and usage information</CardDescription>
+          <CardDescription>Update your account password</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-semibold">Free Plan</h4>
-              <p className="text-sm text-gray-600">Basic automation features</p>
+          <div className="space-y-4">
+            <div className="relative">
+              <Label htmlFor="newPassword">New Password</Label>
+              <div className="relative">
+                <Input
+                  id="newPassword"
+                  type={showPasswords.new ? "text" : "password"}
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                  className="rounded-xl pr-10"
+                  placeholder="Enter new password"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
+                >
+                  {showPasswords.new ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
             </div>
-            <Badge variant="secondary">Current Plan</Badge>
+            
+            <div className="relative">
+              <Label htmlFor="confirmPassword">Confirm New Password</Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showPasswords.confirm ? "text" : "password"}
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                  className="rounded-xl pr-10"
+                  placeholder="Confirm new password"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
+                >
+                  {showPasswords.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
           </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-3 bg-blue-50 rounded-xl">
-              <p className="text-sm text-gray-600">Automations Used</p>
-              <p className="text-2xl font-bold text-blue-600">5 / 10</p>
-            </div>
-            <div className="p-3 bg-purple-50 rounded-xl">
-              <p className="text-sm text-gray-600">Monthly Runs</p>
-              <p className="text-2xl font-bold text-purple-600">150 / 1000</p>
-            </div>
+
+          <Button 
+            onClick={updatePassword} 
+            disabled={updatingPassword || !passwordData.newPassword || !passwordData.confirmPassword}
+            className="rounded-xl bg-purple-600 hover:bg-purple-700"
+          >
+            {updatingPassword ? 'Updating...' : 'Update Password'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Subscription Plan - Not Available */}
+      <Card className="bg-white/80 backdrop-blur-sm border border-blue-100 shadow-sm rounded-xl">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="w-5 h-5 text-purple-600" />
+            Subscription Plan
+          </CardTitle>
+          <CardDescription>Subscription management is not available yet</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 text-center">
+            <p className="text-gray-600">Subscription plans are not available yet. This feature is coming soon.</p>
           </div>
         </CardContent>
       </Card>

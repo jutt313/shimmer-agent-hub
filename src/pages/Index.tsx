@@ -4,6 +4,7 @@ import { Send, Bot } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ChatCard from "@/components/ChatCard";
 import AIAgentForm from "@/components/AIAgentForm";
+import SettingsDropdown from "@/components/SettingsDropdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -156,15 +157,18 @@ const Index = () => {
         )}
         
         {user ? (
-          <Button 
-            onClick={() => navigate("/automations")}
-            className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0" 
-            style={{
-              boxShadow: '0 0 30px rgba(92, 142, 246, 0.3)'
-            }}
-          >
-            Automations
-          </Button>
+          <div className="flex gap-4">
+            <SettingsDropdown />
+            <Button 
+              onClick={() => navigate("/automations")}
+              className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0" 
+              style={{
+                boxShadow: '0 0 30px rgba(92, 142, 246, 0.3)'
+              }}
+            >
+              Automations
+            </Button>
+          </div>
         ) : (
           <Button 
             onClick={() => navigate("/auth")}

@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Shield, Trash2, AlertTriangle, Download, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,27 +18,108 @@ import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
+interface DataSummary {
+  automations: number;
+  chatMessages: number;
+  aiAgents: number;
+  totalDataMB: string;
+}
+
 const PrivacyTab = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [dataSummary, setDataSummary] = useState<DataSummary>({
+    automations: 0,
+    chatMessages: 0,
+    aiAgents: 0,
+    totalDataMB: '0.0'
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDataSummary();
+  }, [user]);
+
+  const fetchDataSummary = async () => {
+    try {
+      // Get automations count
+      const { data: automations, error: automationsError } = await supabase
+        .from('automations')
+        .select('id', { count: 'exact' })
+        .eq('user_id', user?.id);
+
+      if (automationsError) throw automationsError;
+
+      // Get automation IDs for chat messages
+      const automationIds = automations?.map(a => a.id) || [];
+      
+      // Get chat messages count
+      let chatCount = 0;
+      if (automationIds.length > 0) {
+        const { count, error: chatError } = await supabase
+          .from('automation_chats')
+          .select('*', { count: 'exact', head: true })
+          .in('automation_id', automationIds);
+
+        if (chatError) throw chatError;
+        chatCount = count || 0;
+      }
+
+      // Get AI agents count
+      let agentsCount = 0;
+      if (automationIds.length > 0) {
+        const { count, error: agentsError } = await supabase
+          .from('ai_agents')
+          .select('*', { count: 'exact', head: true })
+          .in('automation_id', automationIds);
+
+        if (agentsError) throw agentsError;
+        agentsCount = count || 0;
+      }
+
+      // Calculate estimated data size (rough estimate)
+      const estimatedSizeKB = (automations?.length || 0) * 2 + chatCount * 0.5 + agentsCount * 1;
+      const estimatedSizeMB = (estimatedSizeKB / 1024).toFixed(1);
+
+      setDataSummary({
+        automations: automations?.length || 0,
+        chatMessages: chatCount,
+        aiAgents: agentsCount,
+        totalDataMB: estimatedSizeMB
+      });
+    } catch (error) {
+      console.error('Error fetching data summary:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load data summary",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleExportData = async () => {
     try {
       // Fetch all user data
-      const [automations, chats, agents, credentials] = await Promise.all([
+      const [automationsResult, chatsResult, agentsResult, credentialsResult] = await Promise.all([
         supabase.from('automations').select('*').eq('user_id', user?.id),
-        supabase.from('automation_chats').select('*').eq('automation_id', user?.id),
-        supabase.from('ai_agents').select('*'),
+        supabase.from('automation_chats').select('*').in('automation_id', 
+          (await supabase.from('automations').select('id').eq('user_id', user?.id)).data?.map(a => a.id) || []
+        ),
+        supabase.from('ai_agents').select('*').in('automation_id',
+          (await supabase.from('automations').select('id').eq('user_id', user?.id)).data?.map(a => a.id) || []
+        ),
         supabase.from('platform_credentials').select('platform_name, credential_type, is_active').eq('user_id', user?.id)
       ]);
 
       const userData = {
         profile: { email: user?.email },
-        automations: automations.data,
-        chats: chats.data,
-        agents: agents.data,
-        credentials: credentials.data,
+        automations: automationsResult.data || [],
+        chats: chatsResult.data || [],
+        agents: agentsResult.data || [],
+        credentials: credentialsResult.data || [],
         exportDate: new Date().toISOString()
       };
 
@@ -69,14 +150,24 @@ const PrivacyTab = () => {
   const handleDeleteChats = async () => {
     setIsDeleting(true);
     try {
-      const { error } = await supabase
-        .from('automation_chats')
-        .delete()
-        .in('automation_id', 
-          (await supabase.from('automations').select('id').eq('user_id', user?.id)).data?.map(a => a.id) || []
-        );
+      // Get automation IDs first
+      const { data: automations } = await supabase
+        .from('automations')
+        .select('id')
+        .eq('user_id', user?.id);
 
-      if (error) throw error;
+      const automationIds = automations?.map(a => a.id) || [];
+
+      if (automationIds.length > 0) {
+        const { error } = await supabase
+          .from('automation_chats')
+          .delete()
+          .in('automation_id', automationIds);
+
+        if (error) throw error;
+      }
+
+      await fetchDataSummary(); // Refresh data
 
       toast({
         title: "Success",
@@ -97,12 +188,49 @@ const PrivacyTab = () => {
   const handleDeleteAutomations = async () => {
     setIsDeleting(true);
     try {
-      const { error } = await supabase
+      // Delete in correct order due to foreign key constraints
+      const { data: automations } = await supabase
         .from('automations')
-        .delete()
+        .select('id')
         .eq('user_id', user?.id);
 
-      if (error) throw error;
+      const automationIds = automations?.map(a => a.id) || [];
+
+      if (automationIds.length > 0) {
+        // Delete chats first
+        await supabase
+          .from('automation_chats')
+          .delete()
+          .in('automation_id', automationIds);
+
+        // Delete agents
+        await supabase
+          .from('ai_agents')
+          .delete()
+          .in('automation_id', automationIds);
+
+        // Delete automation runs
+        await supabase
+          .from('automation_runs')
+          .delete()
+          .in('automation_id', automationIds);
+
+        // Delete automation diagrams
+        await supabase
+          .from('automation_diagrams')
+          .delete()
+          .in('automation_id', automationIds);
+
+        // Finally delete automations
+        const { error } = await supabase
+          .from('automations')
+          .delete()
+          .eq('user_id', user?.id);
+
+        if (error) throw error;
+      }
+
+      await fetchDataSummary(); // Refresh data
 
       toast({
         title: "Success",
@@ -123,17 +251,35 @@ const PrivacyTab = () => {
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
     try {
-      // Delete all user data
+      // Get automation IDs first
+      const { data: automations } = await supabase
+        .from('automations')
+        .select('id')
+        .eq('user_id', user?.id);
+
+      const automationIds = automations?.map(a => a.id) || [];
+
+      // Delete all user data in correct order
+      if (automationIds.length > 0) {
+        await Promise.all([
+          supabase.from('automation_chats').delete().in('automation_id', automationIds),
+          supabase.from('ai_agents').delete().in('automation_id', automationIds),
+          supabase.from('automation_runs').delete().in('automation_id', automationIds),
+          supabase.from('automation_diagrams').delete().in('automation_id', automationIds),
+        ]);
+
+        await supabase.from('automations').delete().eq('user_id', user?.id);
+      }
+
       await Promise.all([
-        supabase.from('automations').delete().eq('user_id', user?.id),
         supabase.from('platform_credentials').delete().eq('user_id', user?.id),
-        supabase.from('notifications').delete().eq('user_id', user?.id)
+        supabase.from('notifications').delete().eq('user_id', user?.id),
+        supabase.from('user_preferences').delete().eq('user_id', user?.id),
+        supabase.from('profiles').delete().eq('id', user?.id)
       ]);
 
-      // Delete the user account
-      const { error } = await supabase.auth.admin.deleteUser(user?.id || '');
-      
-      if (error) throw error;
+      // Sign out the user
+      await supabase.auth.signOut();
 
       toast({
         title: "Account Deleted",
@@ -150,6 +296,15 @@ const PrivacyTab = () => {
       setIsDeleting(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="p-6 text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+        <p className="mt-2 text-gray-600">Loading privacy settings...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -327,31 +482,31 @@ const PrivacyTab = () => {
         </CardContent>
       </Card>
 
-      {/* Data Usage Summary */}
+      {/* Real Data Usage Summary */}
       <Card className="bg-white/70 backdrop-blur-sm border border-blue-200/50 shadow-lg rounded-2xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-blue-700">
             <Shield className="w-5 h-5" />
             Data Usage Summary
           </CardTitle>
-          <CardDescription>Overview of your current data usage</CardDescription>
+          <CardDescription>Overview of your current data usage (live data)</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="p-3 bg-white rounded-xl shadow-sm border border-blue-100 text-center">
-              <div className="text-2xl font-bold text-blue-600">5</div>
+              <div className="text-2xl font-bold text-blue-600">{dataSummary.automations}</div>
               <div className="text-sm text-gray-600">Automations</div>
             </div>
             <div className="p-3 bg-white rounded-xl shadow-sm border border-blue-100 text-center">
-              <div className="text-2xl font-bold text-purple-600">247</div>
+              <div className="text-2xl font-bold text-purple-600">{dataSummary.chatMessages}</div>
               <div className="text-sm text-gray-600">Chat Messages</div>
             </div>
             <div className="p-3 bg-white rounded-xl shadow-sm border border-blue-100 text-center">
-              <div className="text-2xl font-bold text-green-600">8</div>
+              <div className="text-2xl font-bold text-green-600">{dataSummary.aiAgents}</div>
               <div className="text-sm text-gray-600">AI Agents</div>
             </div>
             <div className="p-3 bg-white rounded-xl shadow-sm border border-blue-100 text-center">
-              <div className="text-2xl font-bold text-orange-600">2.1 MB</div>
+              <div className="text-2xl font-bold text-orange-600">{dataSummary.totalDataMB} MB</div>
               <div className="text-sm text-gray-600">Total Data</div>
             </div>
           </div>

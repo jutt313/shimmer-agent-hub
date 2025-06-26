@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { FaQuestionCircle } from 'react-icons/fa';
+import { GitBranch } from 'lucide-react';
 
 interface ConditionNodeData {
   label: string;
@@ -30,10 +30,15 @@ const ConditionNode: React.FC<ConditionNodeProps> = ({ data, selected }) => {
       
       <div className="flex items-center space-x-3">
         <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
-          <FaQuestionCircle className="w-5 h-5 text-orange-600" />
+          <GitBranch className="w-5 h-5 text-orange-600" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold truncate">{data.label}</div>
+          {data.condition?.expression && (
+            <div className="text-xs opacity-70 truncate">
+              {data.condition.expression}
+            </div>
+          )}
         </div>
       </div>
       

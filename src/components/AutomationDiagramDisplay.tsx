@@ -37,6 +37,19 @@ interface AutomationDiagramDisplayProps {
   dismissedAgents?: Set<string>;
 }
 
+// Generate a proper UUID v4
+const generateUUID = (): string => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for older browsers
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({ 
   automationBlueprint, 
   messages = [],
@@ -48,6 +61,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [recommendedAgents, setRecommendedAgents] = useState<any[]>([]);
+  const [diagramId, setDiagramId] = useState<string | null>(null);
 
   // Extract recommended agents from messages
   useEffect(() => {
@@ -73,11 +87,28 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     setRecommendedAgents(uniqueAgents);
   }, [messages, dismissedAgents]);
 
-  // Transform blueprint to diagram format
+  // Transform blueprint to diagram format with error handling
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
     if (!automationBlueprint) return { nodes: [], edges: [] };
-    return blueprintToDiagram(automationBlueprint);
-  }, [automationBlueprint]);
+    
+    try {
+      console.log('🔄 Converting blueprint to diagram:', automationBlueprint);
+      const result = blueprintToDiagram(automationBlueprint);
+      console.log('✅ Diagram conversion successful:', { 
+        nodesCount: result.nodes.length, 
+        edgesCount: result.edges.length 
+      });
+      return result;
+    } catch (error) {
+      console.error('❌ Error converting blueprint to diagram:', error);
+      toast({
+        title: "Diagram Error",
+        description: "Failed to generate diagram from blueprint",
+        variant: "destructive",
+      });
+      return { nodes: [], edges: [] };
+    }
+  }, [automationBlueprint, toast]);
 
   // ReactFlow hooks for managing nodes and edges state
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -112,11 +143,29 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     },
   }), []);
 
-  // Auto-save functionality
+  // Auto-save functionality with proper UUID handling
   const saveDiagramLayout = useCallback(async (updatedNodes: any[], updatedEdges: any[]) => {
-    if (!user || !automationBlueprint) return;
+    if (!user || !automationBlueprint) {
+      console.log('⚠️ Cannot save diagram: missing user or blueprint');
+      return;
+    }
 
     try {
+      // Ensure we have a proper automation ID
+      let automationId = automationBlueprint.id;
+      if (!automationId || typeof automationId !== 'string') {
+        console.warn('⚠️ Invalid automation ID, generating new one');
+        automationId = generateUUID();
+      }
+
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(automationId)) {
+        console.error('❌ Invalid UUID format for automation_id:', automationId);
+        automationId = generateUUID();
+        console.log('✅ Generated new UUID:', automationId);
+      }
+
       const diagramData = {
         nodes: updatedNodes,
         edges: updatedEdges,
@@ -124,51 +173,98 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         savedAt: new Date().toISOString()
       };
 
-      const { error } = await supabase
+      console.log('💾 Saving diagram layout:', { 
+        automationId, 
+        userId: user.id, 
+        nodesCount: updatedNodes.length,
+        edgesCount: updatedEdges.length 
+      });
+
+      const { data, error } = await supabase
         .from('automation_diagrams')
         .upsert({
-          automation_id: automationBlueprint.id || 'temp',
+          automation_id: automationId,
           user_id: user.id,
           diagram_data: diagramData,
           layout_version: '1.0'
+        }, {
+          onConflict: 'automation_id,user_id'
         });
 
       if (error) {
-        console.error('Error saving diagram:', error);
+        console.error('❌ Error saving diagram:', error);
+        toast({
+          title: "Save Error",
+          description: `Failed to save diagram: ${error.message}`,
+          variant: "destructive",
+        });
+      } else {
+        console.log('✅ Diagram saved successfully');
+        if (data && data[0]) {
+          setDiagramId(data[0].id);
+        }
       }
     } catch (error) {
-      console.error('Error saving diagram layout:', error);
+      console.error('❌ Error saving diagram layout:', error);
+      toast({
+        title: "Save Error",
+        description: "Unexpected error while saving diagram",
+        variant: "destructive",
+      });
     }
-  }, [user, automationBlueprint]);
+  }, [user, automationBlueprint, toast]);
 
-  // Load saved diagram layout
+  // Load saved diagram layout with proper error handling
   useEffect(() => {
     const loadDiagramLayout = async () => {
       if (!user || !automationBlueprint) return;
 
       try {
         setLoading(true);
+        
+        let automationId = automationBlueprint.id;
+        if (!automationId || typeof automationId !== 'string') {
+          console.warn('⚠️ No valid automation ID for loading diagram');
+          return;
+        }
+
+        // Validate UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(automationId)) {
+          console.warn('⚠️ Invalid UUID format, skipping load:', automationId);
+          return;
+        }
+
+        console.log('🔄 Loading diagram layout:', { automationId, userId: user.id });
+
         const { data, error } = await supabase
           .from('automation_diagrams')
-          .select('diagram_data')
-          .eq('automation_id', automationBlueprint.id || 'temp')
+          .select('id, diagram_data')
+          .eq('automation_id', automationId)
           .eq('user_id', user.id)
           .maybeSingle();
 
         if (error) {
-          console.error('Error loading diagram:', error);
+          console.error('❌ Error loading diagram:', error);
           return;
         }
 
         if (data && data.diagram_data) {
           const savedDiagram = data.diagram_data as any;
           if (savedDiagram.nodes && savedDiagram.edges) {
+            console.log('✅ Loaded saved diagram:', { 
+              nodesCount: savedDiagram.nodes.length,
+              edgesCount: savedDiagram.edges.length 
+            });
             setNodes(savedDiagram.nodes);
             setEdges(savedDiagram.edges);
+            setDiagramId(data.id);
           }
+        } else {
+          console.log('ℹ️ No saved diagram found, using generated layout');
         }
       } catch (error) {
-        console.error('Error loading diagram layout:', error);
+        console.error('❌ Error loading diagram layout:', error);
       } finally {
         setLoading(false);
       }
@@ -177,12 +273,12 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     loadDiagramLayout();
   }, [user, automationBlueprint, setNodes, setEdges]);
 
-  // Auto-save when nodes or edges change
+  // Auto-save when nodes or edges change (debounced)
   useEffect(() => {
     if (nodes.length > 0 || edges.length > 0) {
       const timeoutId = setTimeout(() => {
         saveDiagramLayout(nodes, edges);
-      }, 2000);
+      }, 2000); // 2 second debounce
 
       return () => clearTimeout(timeoutId);
     }

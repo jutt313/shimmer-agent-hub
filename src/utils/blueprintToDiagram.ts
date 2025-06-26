@@ -1,5 +1,5 @@
 
-import { Node, Edge, XYPosition, Position } from '@xyflow/react';
+import { Node, Edge, Position } from '@xyflow/react';
 
 // Define the structure of a blueprint step, including nested steps for conditions and loops
 interface BlueprintStep {
@@ -39,6 +39,19 @@ interface AutomationBlueprint {
   steps: BlueprintStep[];
   variables?: any;
 }
+
+// Generate a proper UUID v4
+const generateUUID = (): string => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for older browsers
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
 
 // Helper function to determine the custom node type based on the blueprint step's type
 const getNodeType = (step: BlueprintStep): string => {
@@ -82,8 +95,11 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
   const processedNodes = new Map<string, Node>();
   
   if (!blueprint || !blueprint.steps || blueprint.steps.length === 0) {
+    console.warn('⚠️ Empty or invalid blueprint provided');
     return { nodes: [], edges: [] };
   }
+
+  console.log('🔄 Processing blueprint with', blueprint.steps.length, 'steps');
 
   // Layout constants - LEFT TO RIGHT FLOW
   const startX = 100;
@@ -96,9 +112,19 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
   let currentColumnX = startX;
   let nodeIdCounter = 0;
 
-  // Helper function to add edges with proper styling
+  // Helper function to add edges with proper styling and validation
   const addDiagramEdge = (sourceId: string, targetId: string, edgeType: 'default' | 'true' | 'false' | 'branch' = 'default', label?: string) => {
-    const edgeId = `${sourceId}-${targetId}-${edgeType}-${Date.now()}`;
+    // Validate that both source and target nodes exist
+    if (!processedNodes.has(sourceId)) {
+      console.error('❌ Cannot create edge: source node not found:', sourceId);
+      return;
+    }
+    if (!processedNodes.has(targetId)) {
+      console.error('❌ Cannot create edge: target node not found:', targetId);
+      return;
+    }
+
+    const edgeId = `${sourceId}-${targetId}-${edgeType}-${Date.now()}-${Math.random()}`;
     
     let color = '#9333ea';
     let sourceHandle: string | undefined = undefined;
@@ -117,7 +143,7 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
       animated = true;
     }
 
-    edges.push({
+    const newEdge: Edge = {
       id: edgeId,
       source: sourceId,
       target: targetId,
@@ -129,11 +155,20 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
       labelBgStyle: { fill: 'white', color: '#333' },
       labelStyle: { fontSize: '10px', fill: '#555' },
       style: { stroke: color, strokeWidth: 2 }
-    });
+    };
+
+    edges.push(newEdge);
+    console.log('✅ Added edge:', { sourceId, targetId, edgeType, edgeId });
   };
 
-  // Function to create a node
+  // Function to create a node with proper validation
   const createNode = (step: BlueprintStep, x: number, y: number): Node => {
+    // Ensure step has a valid ID
+    if (!step.id) {
+      step.id = `step_${generateUUID()}`;
+      console.warn('⚠️ Generated ID for step without ID:', step.id);
+    }
+
     const node: Node = {
       id: step.id,
       type: getNodeType(step),
@@ -154,6 +189,7 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
     
     nodes.push(node);
     processedNodes.set(step.id, node);
+    console.log('✅ Created node:', { id: step.id, type: getNodeType(step), position: { x, y } });
     return node;
   };
 
@@ -169,8 +205,15 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
     let lastNodeId: string | null = null;
     let usedYPositions: number[] = [];
 
+    console.log('🔄 Processing', steps.length, 'steps at position', { startX, centerY });
+
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
+      
+      // Ensure step has an ID
+      if (!step.id) {
+        step.id = `step_${generateUUID()}`;
+      }
       
       // Check if node already exists (for convergence)
       if (processedNodes.has(step.id)) {
@@ -179,6 +222,7 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
           addDiagramEdge(parentId, step.id, edgeType);
         }
         lastNodeId = step.id;
+        console.log('✅ Reusing existing node:', step.id);
         continue;
       }
 
@@ -196,7 +240,6 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
       if (step.type === 'condition' && step.condition) {
         // CONDITION NODE - CREATE BRANCHES
         const branchStartX = currentX + horizontalSpacing;
-        let branchY = centerY;
         const branches: Array<{ steps: BlueprintStep[], type: 'true' | 'false', label?: string }> = [];
         
         // Add true branch
@@ -209,43 +252,45 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
           branches.push({ steps: step.condition.if_false, type: 'false' });
         }
 
+        console.log('🔀 Processing condition with', branches.length, 'branches');
+
         // Calculate branch positions
         const totalBranches = branches.length;
-        const branchSpacing = verticalSpacing;
-        let branchStartY = centerY - ((totalBranches - 1) * branchSpacing / 2);
+        if (totalBranches > 0) {
+          const branchSpacing = verticalSpacing;
+          let branchStartY = centerY - ((totalBranches - 1) * branchSpacing / 2);
 
-        let maxBranchX = branchStartX;
-        let allBranchEndNodes: string[] = [];
+          let maxBranchX = branchStartX;
+          let allBranchEndNodes: string[] = [];
 
-        // Process each branch
-        branches.forEach((branch, index) => {
-          const branchY = branchStartY + (index * branchSpacing);
-          const { lastNodeId: branchLastNode, nextX: branchNextX } = processStepsFlow(
-            branch.steps,
-            branchStartX,
-            branchY,
-            step.id,
-            branch.type
-          );
-          
-          if (branchLastNode) {
-            allBranchEndNodes.push(branchLastNode);
-          }
-          maxBranchX = Math.max(maxBranchX, branchNextX);
-        });
+          // Process each branch
+          branches.forEach((branch, index) => {
+            const branchY = branchStartY + (index * branchSpacing);
+            console.log('🌿 Processing', branch.type, 'branch at Y:', branchY);
+            
+            const { lastNodeId: branchLastNode, nextX: branchNextX } = processStepsFlow(
+              branch.steps,
+              branchStartX,
+              branchY,
+              step.id,
+              branch.type
+            );
+            
+            if (branchLastNode) {
+              allBranchEndNodes.push(branchLastNode);
+            }
+            maxBranchX = Math.max(maxBranchX, branchNextX);
+          });
 
-        // Update current X to continue after branches
-        currentX = maxBranchX;
-        
-        // If there are more steps after this condition, create convergence
-        if (i < steps.length - 1) {
-          const nextStep = steps[i + 1];
-          // The next step will naturally converge the branches
+          // Update current X to continue after branches
+          currentX = maxBranchX;
         }
 
       } else if (step.type === 'loop' && step.loop) {
         // LOOP NODE - PROCESS INTERNAL STEPS
         const loopContentX = currentX + horizontalSpacing;
+        console.log('🔄 Processing loop with', step.loop.steps.length, 'internal steps');
+        
         const { lastNodeId: loopLastNode, nextX: loopNextX } = processStepsFlow(
           step.loop.steps,
           loopContentX,
@@ -260,22 +305,20 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
         currentX += horizontalSpacing;
       }
 
-      // Check if this step sends to multiple platforms (parallel execution)
+      // Handle parallel execution for multiple platforms
       if (step.action && step.action.integration) {
-        // If next steps are all actions with different platforms, they might be parallel
+        // Look for consecutive actions that might be parallel
         let parallelActions: BlueprintStep[] = [];
         let j = i + 1;
         
-        // Look ahead for consecutive action steps that might be parallel
-        while (j < steps.length && steps[j].type === 'action' && steps[j].action?.integration !== step.action.integration) {
+        while (j < steps.length && steps[j].type === 'action' && j - i < 5) { // Limit to 5 parallel actions
           parallelActions.push(steps[j]);
           j++;
         }
         
-        // If we found parallel actions, create branches
         if (parallelActions.length > 0) {
+          console.log('⚡ Processing', parallelActions.length, 'parallel actions');
           const parallelStartX = currentX;
-          let parallelY = centerY;
           const parallelSpacing = verticalSpacing * 0.8;
           const parallelStartY = centerY - ((parallelActions.length - 1) * parallelSpacing / 2);
           
@@ -283,6 +326,10 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
           
           // Create parallel action nodes
           parallelActions.forEach((parallelStep, index) => {
+            if (!parallelStep.id) {
+              parallelStep.id = `step_${generateUUID()}`;
+            }
+            
             const parallelNodeY = parallelStartY + (index * parallelSpacing);
             const parallelNode = createNode(parallelStep, parallelStartX, parallelNodeY);
             addDiagramEdge(step.id, parallelStep.id, 'branch');
@@ -297,6 +344,7 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
       }
     }
 
+    console.log('✅ Finished processing steps, last node:', lastNodeId, 'next X:', currentX);
     return { lastNodeId, nextX: currentX, usedYPositions };
   };
 
@@ -333,6 +381,12 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
   };
 
   adjustNodePositions();
+
+  console.log('🎯 Blueprint conversion complete:', { 
+    totalNodes: nodes.length, 
+    totalEdges: edges.length,
+    processedSteps: blueprint.steps.length
+  });
 
   return { nodes, edges };
 };

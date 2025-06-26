@@ -85,6 +85,73 @@ const ChatCard = ({
     }
   };
 
+  // BULLETPROOF credential validation function
+  const validateCredential = (cred: any): boolean => {
+    try {
+      return (
+        cred && 
+        typeof cred === 'object' && 
+        cred.field && 
+        typeof cred.field === 'string' &&
+        cred.field.trim().length > 0
+      );
+    } catch (error) {
+      console.error('Error validating credential:', error);
+      return false;
+    }
+  };
+
+  // BULLETPROOF platform validation function
+  const validatePlatform = (platform: any): boolean => {
+    try {
+      return (
+        platform && 
+        typeof platform === 'object' && 
+        platform.name && 
+        typeof platform.name === 'string' &&
+        platform.name.trim().length > 0
+      );
+    } catch (error) {
+      console.error('Error validating platform:', error);
+      return false;
+    }
+  };
+
+  // ULTRA-SAFE credential field processing
+  const safeProcessCredentialField = (field: any): string => {
+    try {
+      if (!field || typeof field !== 'string') {
+        console.warn('Invalid credential field, using fallback:', field);
+        return 'CREDENTIAL';
+      }
+      
+      const trimmedField = field.trim();
+      if (trimmedField.length === 0) {
+        return 'CREDENTIAL';
+      }
+      
+      return trimmedField.replace(/_/g, ' ').toUpperCase();
+    } catch (error) {
+      console.error('Error processing credential field:', error);
+      return 'CREDENTIAL';
+    }
+  };
+
+  // ULTRA-SAFE why_needed processing
+  const safeProcessWhyNeeded = (whyNeeded: any): string => {
+    try {
+      if (!whyNeeded || typeof whyNeeded !== 'string') {
+        return 'Required for platform integration';
+      }
+      
+      const trimmed = whyNeeded.trim();
+      return trimmed.length > 0 ? trimmed : 'Required for platform integration';
+    } catch (error) {
+      console.error('Error processing why_needed:', error);
+      return 'Required for platform integration';
+    }
+  };
+
   const renderStructuredContent = (structuredData: StructuredResponse) => {
     const content = [];
 
@@ -115,54 +182,80 @@ const ChatCard = ({
         );
       }
 
-      // Platforms - BULLETPROOF RENDERING WITH NULL CHECKS
+      // Platforms - COMPLETELY BULLETPROOF RENDERING
       if (Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
-        content.push(
-          <div key="platforms" className="mb-4">
-            <p className="font-medium text-gray-800 mb-2">Required Platform Credentials:</p>
-            <div className="text-gray-700 ml-4 space-y-2">
-              {structuredData.platforms.map((platform, index) => {
-                // CRITICAL FIX: Safe platform validation
-                if (!platform || typeof platform !== 'object') {
-                  return null;
-                }
+        try {
+          // Filter and validate platforms first
+          const validPlatforms = structuredData.platforms.filter(validatePlatform);
+          
+          if (validPlatforms.length > 0) {
+            content.push(
+              <div key="platforms" className="mb-4">
+                <p className="font-medium text-gray-800 mb-2">Required Platform Credentials:</p>
+                <div className="text-gray-700 ml-4 space-y-2">
+                  {validPlatforms.map((platform, index) => {
+                    try {
+                      const platformName = platform.name || 'Unknown Platform';
+                      
+                      return (
+                        <div key={`platform-${index}`}>
+                          <p className="font-medium text-gray-800">{platformName}</p>
+                          {Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
+                            <ul className="list-disc list-inside ml-4 space-y-1">
+                              {platform.credentials.map((cred, credIndex) => {
+                                try {
+                                  // CRITICAL: Validate credential before processing
+                                  if (!validateCredential(cred)) {
+                                    console.warn('Invalid credential skipped:', cred);
+                                    return null;
+                                  }
 
-                const platformName = platform.name || 'Unknown Platform';
-                
-                return (
-                  <div key={index}>
-                    <p className="font-medium text-gray-800">{platformName}</p>
-                    {Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
-                      <ul className="list-disc list-inside ml-4 space-y-1">
-                        {platform.credentials.map((cred, credIndex) => {
-                          // CRITICAL FIX: Safe credential validation
-                          if (!cred || typeof cred !== 'object') {
-                            return null;
-                          }
+                                  // BULLETPROOF field handling with multiple fallbacks
+                                  const fieldName = safeProcessCredentialField(cred.field);
+                                  const whyNeeded = safeProcessWhyNeeded(cred.why_needed);
 
-                          // BULLETPROOF field handling - this was causing the crashes
-                          const fieldName = cred.field && typeof cred.field === 'string' 
-                            ? cred.field.replace(/_/g, ' ').toUpperCase()
-                            : 'CREDENTIAL';
-                          
-                          const whyNeeded = cred.why_needed && typeof cred.why_needed === 'string'
-                            ? cred.why_needed
-                            : 'Required for platform integration';
-
-                          return (
-                            <li key={credIndex} className="text-sm">
-                              <strong>{fieldName}</strong>: {whyNeeded}
-                            </li>
-                          );
-                        }).filter(Boolean)}
-                      </ul>
-                    )}
-                  </div>
-                );
-              }).filter(Boolean)}
+                                  return (
+                                    <li key={`cred-${credIndex}`} className="text-sm">
+                                      <strong>{fieldName}</strong>: {whyNeeded}
+                                    </li>
+                                  );
+                                } catch (credError) {
+                                  console.error('Error rendering credential:', credError);
+                                  handleError(credError, `Credential rendering for ${platform.name}`);
+                                  return (
+                                    <li key={`cred-error-${credIndex}`} className="text-sm text-red-600">
+                                      Error displaying credential
+                                    </li>
+                                  );
+                                }
+                              }).filter(Boolean)}
+                            </ul>
+                          )}
+                        </div>
+                      );
+                    } catch (platformError) {
+                      console.error('Error rendering platform:', platformError);
+                      handleError(platformError, `Platform rendering: ${platform?.name || 'unknown'}`);
+                      return (
+                        <div key={`platform-error-${index}`} className="text-red-600 text-sm">
+                          Error displaying platform information
+                        </div>
+                      );
+                    }
+                  })}
+                </div>
+              </div>
+            );
+          }
+        } catch (platformsError) {
+          console.error('Error rendering platforms section:', platformsError);
+          handleError(platformsError, 'Platforms section rendering');
+          content.push(
+            <div key="platforms-error" className="mb-4 p-4 bg-red-50 rounded-lg">
+              <p className="text-red-600 text-sm">Error displaying platform credentials. Please try again.</p>
             </div>
-          </div>
-        );
+          );
+        }
       }
 
       // Clarification Questions - Safe rendering
@@ -239,8 +332,9 @@ const ChatCard = ({
 
       return content;
     } catch (error: any) {
+      console.error('Critical error in renderStructuredContent:', error);
       handleError(error, 'Structured content rendering');
-      return [<div key="error" className="text-red-600 p-4">Error rendering structured content</div>];
+      return [<div key="error" className="text-red-600 p-4 bg-red-50 rounded-lg">Error rendering content. Please refresh and try again.</div>];
     }
   };
 

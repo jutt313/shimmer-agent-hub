@@ -30,6 +30,96 @@ const PlatformCredentialForm = ({ platform, onClose }: PlatformCredentialFormPro
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // BULLETPROOF platform validation
+  const validatePlatformData = (platformData: any): boolean => {
+    try {
+      return (
+        platformData &&
+        typeof platformData === 'object' &&
+        typeof platformData.name === 'string' &&
+        platformData.name.trim().length > 0 &&
+        Array.isArray(platformData.credentials) &&
+        platformData.credentials.length > 0
+      );
+    } catch (error) {
+      console.error('Error validating platform data:', error);
+      return false;
+    }
+  };
+
+  // BULLETPROOF credential validation
+  const validateCredentialData = (cred: any): boolean => {
+    try {
+      return (
+        cred &&
+        typeof cred === 'object' &&
+        typeof cred.field === 'string' &&
+        cred.field.trim().length > 0
+      );
+    } catch (error) {
+      console.error('Error validating credential data:', error);
+      return false;
+    }
+  };
+
+  // Early validation - if platform data is invalid, show error
+  if (!validatePlatformData(platform)) {
+    return (
+      <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-white/80 backdrop-blur-md rounded-3xl p-8 w-full max-w-md shadow-2xl border-0 relative">
+          <Button
+            onClick={onClose}
+            variant="ghost"
+            size="sm"
+            className="absolute top-4 right-4 rounded-full hover:bg-gray-100/50"
+          >
+            <X className="w-5 h-5" />
+          </Button>
+          
+          <div className="text-center">
+            <h2 className="text-xl font-bold text-red-600 mb-4">Invalid Platform Data</h2>
+            <p className="text-gray-600 mb-6">
+              The platform configuration is incomplete or corrupted. Please try generating the automation again.
+            </p>
+            <Button onClick={onClose} className="w-full rounded-xl">
+              Close
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Filter valid credentials
+  const validCredentials = platform.credentials.filter(validateCredentialData);
+  
+  if (validCredentials.length === 0) {
+    return (
+      <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-white/80 backdrop-blur-md rounded-3xl p-8 w-full max-w-md shadow-2xl border-0 relative">
+          <Button
+            onClick={onClose}
+            variant="ghost"
+            size="sm"
+            className="absolute top-4 right-4 rounded-full hover:bg-gray-100/50"
+          >
+            <X className="w-5 h-5" />
+          </Button>
+          
+          <div className="text-center">
+            <h2 className="text-xl font-bold text-yellow-600 mb-4">No Valid Credentials</h2>
+            <p className="text-gray-600 mb-6">
+              No valid credential fields found for {platform.name}. Please try generating the automation again.
+            </p>
+            <Button onClick={onClose} className="w-full rounded-xl">
+              Close
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const handleInputChange = (field: string, value: string) => {
     setCredentials(prev => ({ ...prev, [field]: value }));
   };
@@ -169,6 +259,50 @@ const PlatformCredentialForm = ({ platform, onClose }: PlatformCredentialFormPro
     return passwordFields.some(pf => field.toLowerCase().includes(pf));
   };
 
+  // Safe field processing
+  const safeProcessField = (field: string): string => {
+    try {
+      if (!field || typeof field !== 'string') return 'credential';
+      return field.replace(/_/g, ' ').toLowerCase();
+    } catch (error) {
+      console.error('Error processing field:', error);
+      return 'credential';
+    }
+  };
+
+  // Safe placeholder processing
+  const safeProcessPlaceholder = (placeholder: any): string => {
+    try {
+      if (!placeholder || typeof placeholder !== 'string') return 'Enter value...';
+      return placeholder;
+    } catch (error) {
+      console.error('Error processing placeholder:', error);
+      return 'Enter value...';
+    }
+  };
+
+  // Safe link processing
+  const safeProcessLink = (link: any): string => {
+    try {
+      if (!link || typeof link !== 'string') return '#';
+      return link;
+    } catch (error) {
+      console.error('Error processing link:', error);
+      return '#';
+    }
+  };
+
+  // Safe why_needed processing
+  const safeProcessWhyNeeded = (whyNeeded: any): string => {
+    try {
+      if (!whyNeeded || typeof whyNeeded !== 'string') return 'Required for platform integration';
+      return whyNeeded;
+    } catch (error) {
+      console.error('Error processing why_needed:', error);
+      return 'Required for platform integration';
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div 
@@ -195,11 +329,11 @@ const PlatformCredentialForm = ({ platform, onClose }: PlatformCredentialFormPro
         </p>
 
         <div className="space-y-6">
-          {platform.credentials.map((cred, index) => (
+          {validCredentials.map((cred, index) => (
             <div key={index}>
               <div className="flex items-center gap-2 mb-2">
                 <Label htmlFor={cred.field} className="text-gray-700 font-medium capitalize">
-                  {cred.field.replace(/_/g, ' ')}
+                  {safeProcessField(cred.field)}
                 </Label>
                 <TooltipProvider>
                   <Tooltip>
@@ -209,15 +343,15 @@ const PlatformCredentialForm = ({ platform, onClose }: PlatformCredentialFormPro
                     <TooltipContent>
                       <div className="max-w-xs">
                         <p className="font-medium mb-1">Why needed:</p>
-                        <p className="text-sm mb-3">{cred.why_needed}</p>
+                        <p className="text-sm mb-3">{safeProcessWhyNeeded(cred.why_needed)}</p>
                         <p className="font-medium mb-1">Get it here:</p>
                         <a 
-                          href={cred.link} 
+                          href={safeProcessLink(cred.link)} 
                           target="_blank" 
                           rel="noopener noreferrer" 
                           className="text-blue-600 hover:underline text-sm break-all"
                         >
-                          {cred.link}
+                          {safeProcessLink(cred.link)}
                         </a>
                       </div>
                     </TooltipContent>
@@ -231,7 +365,7 @@ const PlatformCredentialForm = ({ platform, onClose }: PlatformCredentialFormPro
                   type={isPasswordField(cred.field) && !showPassword[cred.field] ? "password" : "text"}
                   value={credentials[cred.field] || ""}
                   onChange={(e) => handleInputChange(cred.field, e.target.value)}
-                  placeholder={cred.placeholder}
+                  placeholder={safeProcessPlaceholder(cred.placeholder)}
                   className="rounded-xl border-0 bg-white/60 shadow-md focus:shadow-lg transition-shadow pr-10"
                   style={{ boxShadow: '0 0 15px rgba(147, 51, 234, 0.1)' }}
                 />

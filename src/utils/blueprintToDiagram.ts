@@ -1,4 +1,5 @@
-import { Node, Edge, XYPosition, Position } from '@xyflow/react'; // Added Position import
+import { Node, Edge, XYPosition, Position, internalsSymbol } from '@xyflow/react';
+import ELK from 'elkjs/lib/elk.js'; // Import ELK for graph layout
 
 // Define a new type to include 'id' along with XYPosition for recursive function returns
 interface ProcessedNodePosition extends XYPosition {
@@ -19,10 +20,14 @@ interface BlueprintStep {
     expression: string;
     if_true: BlueprintStep[];
     if_false?: BlueprintStep[];
+    // Added optional property for a unique ID for the condition itself if needed, though step.id usually suffices
+    condition_id?: string; 
   };
   loop?: {
     array_source: string;
     steps: BlueprintStep[];
+    // Added optional property for a unique ID for the loop itself
+    loop_id?: string;
   };
   delay?: {
     duration_seconds: number;
@@ -44,6 +49,26 @@ interface AutomationBlueprint {
   variables?: any;
 }
 
+// Initialize ELK.js for layout calculation
+const elk = new ELK();
+
+// ELK layout algorithm options for a hierarchical, directed graph
+// These options are crucial for how the diagram will be structured and spaced
+const elkLayoutOptions = {
+  'elk.algorithm': 'layered', // Use layered algorithm for hierarchical graphs
+  'elk.direction': 'RIGHT', // Flow from left to right
+  'elk.spacing.nodeNode': '70', // Spacing between nodes
+  'elk.layered.spacing.nodeNodeBetweenLayers': '100', // Spacing between nodes in different layers
+  'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF', // Better for minimizing bends
+  'elk.padding': '[top=50,left=50,bottom=50,right=50]', // Padding around the entire graph
+  'elk.layered.mergeEdges': 'true', // Merge multiple edges between same nodes
+  'elk.edgeRouting': 'SPLINES', // Smooth edges
+  'org.eclipse.elk.portAlignment.default': 'CENTER', // Align ports centrally
+  'org.eclipse.elk.layered.mergeEdges': 'true',
+  'org.eclipse.elk.layered.unnecessaryBends': 'true', // Reduce unnecessary bends
+  'org.eclipse.elk.layered.layering.strategy': 'LONGEST_PATH', // Optimize layering
+};
+
 // Helper function to determine the custom node type based on the blueprint step's type
 const getNodeType = (step: BlueprintStep): string => {
   switch (step.type) {
@@ -53,7 +78,7 @@ const getNodeType = (step: BlueprintStep): string => {
       return 'loopNode';
     case 'delay':
       return 'delayNode';
-    case 'ai_agent_call': // Changed from 'agent' to 'ai_agent_call' as per automation.ts
+    case 'ai_agent_call':
       return 'aiAgentNode';
     case 'action':
     default:
@@ -61,111 +86,124 @@ const getNodeType = (step: BlueprintStep): string => {
   }
 };
 
-// Main function to convert an automation blueprint into nodes and edges for React Flow
-export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Node[], edges: Edge[] } => {
-  const nodes: Node[] = [];
-  const edges: Edge[] = [];
-  const processedStepIds = new Set<string>(); // To prevent duplicate processing of steps
+// Recursive function to build the ELK graph structure from the automation blueprint
+// This function meticulously translates each blueprint step and its nested logic
+// into nodes and edges that ELK.js can understand and layout.
+const buildElkGraph = (steps: BlueprintStep[], parentElkNode: any, currentX: number, currentY: number, processedMap: Map<string, any>, globalNodes: Node[], globalEdges: Edge[], initialYOffset: number): { elkNodes: any[], elkEdges: any[], finalY: number } => {
+  let elkNodes: any[] = [];
+  let elkEdges: any[] = [];
+  let maxYReached = currentY;
+  let currentLayerX = currentX;
 
-  if (!blueprint || !blueprint.steps || blueprint.steps.length === 0) {
-    return { nodes: [], edges: [] };
-  }
+  steps.forEach((step, index) => {
+    // Determine the node type for React Flow
+    const reactFlowNodeType = getNodeType(step);
+    // Approximate node dimensions for ELK.js (React Flow nodes are often fixed size)
+    const nodeWidth = 220;
+    const nodeHeight = 80;
 
-  // Initial X and Y positions
-  let currentX = 150;
-  let currentY = 100;
-  const nodeWidth = 220; // Approximate width of a node for layout calculations
-  const nodeHeight = 80; // Approximate height of a node
-  const xOffset = nodeWidth + 80; // Horizontal spacing between nodes
-  const yOffset = nodeHeight + 50; // Vertical spacing for branches
-
-  // Recursively processes steps and generates nodes/edges
-  // Changed return type to ProcessedNodePosition
-  const processStep = (step: BlueprintStep, x: number, y: number, parentId: string | null, edgeType: 'default' | 'true' | 'false' = 'default'): ProcessedNodePosition => {
-    // If step already processed (e.g., part of multiple paths converging), skip re-adding node but still draw edge
-    if (processedStepIds.has(step.id)) {
-      // Find existing node to connect to
-      const existingNode = nodes.find(n => n.id === step.id);
-      if (existingNode && parentId) {
-        let edgeId = `${parentId}-${step.id}`;
-        let edgeLabel: string | undefined = undefined;
-        let edgeColor = '#9333ea'; // Default edge color
-
-        if (edgeType === 'true') {
-          edgeId = `${parentId}-true-${step.id}`;
-          edgeLabel = 'If True';
-          edgeColor = '#10b981'; // Green for true branch
-        } else if (edgeType === 'false') {
-          edgeId = `${parentId}-false-${step.id}`;
-          edgeLabel = 'If False';
-          edgeColor = '#ef4444'; // Red for false branch
+    // Check if this step has already been processed to avoid duplicates
+    // This is crucial for handling convergence in branching paths
+    if (processedMap.has(step.id)) {
+        // If node already exists, we just need to draw an edge to it
+        const existingElkNode = processedMap.get(step.id);
+        if (parentElkNode) {
+            // Create an edge from the parent to the existing node
+            elkEdges.push({
+                id: `e${parentElkNode.id}-${step.id}-converge`,
+                source: parentElkNode.id,
+                target: existingElkNode.id,
+                properties: { 'org.eclipse.elk.edgeRouting': 'SPLINES' }
+            });
+            // Also add to global React Flow edges if not already there
+            if (!globalEdges.some(e => e.id === `e${parentElkNode.id}-${step.id}-converge`)) {
+                globalEdges.push({
+                    id: `e${parentElkNode.id}-${step.id}-converge`,
+                    source: parentElkNode.id,
+                    target: step.id,
+                    animated: true,
+                    style: { stroke: '#9333ea', strokeWidth: 2 }
+                });
+            }
         }
-
-        // Add edge only if it doesn't already exist
-        if (!edges.some(e => e.id === edgeId)) {
-          edges.push({
-            id: edgeId,
-            source: parentId,
-            target: step.id,
-            sourceHandle: edgeType !== 'default' ? edgeType : undefined, // Attach to specific handle for conditions
-            animated: true,
-            label: edgeLabel,
-            labelBgPadding: [4, 8],
-            labelBgBorderRadius: 4,
-            labelBgStyle: { fill: 'white', color: '#333' },
-            labelStyle: { fontSize: '10px', fill: '#555' },
-            style: { stroke: edgeColor, strokeWidth: 2 }
-          });
-        }
-      }
-      // Ensure existingNode.position is valid before accessing, and return ProcessedNodePosition
-      return { id: step.id, x: existingNode?.position.x || x, y: existingNode?.position.y || y };
+        return; // Skip further processing for this step as its node is already defined
     }
 
-    processedStepIds.add(step.id); // Mark as processed
-
-    const nodeType = getNodeType(step);
-    const newNode: Node = {
+    // Add node to ELK graph
+    const elkNode = {
       id: step.id,
-      type: nodeType,
-      position: { x, y },
-      data: {
-        label: step.name || `Step ${step.id}`,
-        icon: step.action?.integration || step.type,
-        platform: step.action?.integration,
-        action: step.action,
-        condition: step.condition,
-        loop: step.loop,
-        delay: step.delay,
-        agent: step.ai_agent_call // Use ai_agent_call for agent data
-      },
-      // Ensure specific handles are available for condition nodes
-      sourcePosition: nodeType === 'conditionNode' ? undefined : Position.Right, // Fixed: Use Position.Right
-      targetPosition: Position.Left, // Fixed: Use Position.Left
+      width: nodeWidth,
+      height: nodeHeight,
+      // ELK.js will compute x, y, this is just a placeholder
+      x: 0, 
+      y: 0,
     };
-    nodes.push(newNode);
+    elkNodes.push(elkNode);
+    processedMap.set(step.id, elkNode);
 
-    // Create edge from parent if exists
-    if (parentId) {
-      let edgeId = `${parentId}-${step.id}`;
+    // Create a corresponding React Flow node
+    const reactFlowNode: Node = {
+        id: step.id,
+        type: reactFlowNodeType,
+        position: { x: elkNode.x, y: elkNode.y }, // Will be updated after layout
+        data: {
+            label: step.name || `Step ${step.id}`,
+            icon: step.action?.integration || step.type,
+            platform: step.action?.integration,
+            action: step.action,
+            condition: step.condition,
+            loop: step.loop,
+            delay: step.delay,
+            agent: step.ai_agent_call,
+            // Add an explanation for the node's purpose based on its type or context
+            explanation: `This step ${step.type === 'action' ? 'performs an action' : step.type === 'condition' ? 'evaluates a condition' : step.type === 'loop' ? 'iterates over data' : step.type === 'ai_agent_call' ? 'invokes an AI agent' : 'introduces a delay'}.`
+        },
+        sourcePosition: reactFlowNodeType === 'conditionNode' ? undefined : Position.Right,
+        targetPosition: Position.Left,
+    };
+    globalNodes.push(reactFlowNode);
+
+
+    // If there's a parent, create an edge
+    if (parentElkNode) {
+      let edgeId = `e${parentElkNode.id}-${step.id}`;
       let edgeLabel: string | undefined = undefined;
-      let edgeColor = '#9333ea'; // Default edge color
+      let edgeColor = '#9333ea'; // Default edge color for sequential flow
 
-      if (edgeType === 'true') {
-        edgeId = `${parentId}-true-${step.id}`;
-        edgeLabel = 'If True';
-        edgeColor = '#10b981'; // Green for true branch
-      } else if (edgeType === 'false') {
-        edgeId = `${parentId}-false-${step.id}`;
-        edgeLabel = 'If False';
-        edgeColor = '#ef4444'; // Red for false branch
+      // Handle specific source handles for conditions (true/false)
+      let sourceHandle: string | undefined = undefined;
+      if (parentElkNode.type === 'conditionNode') { // Assuming parentElkNode also holds its React Flow type
+        if (index === 0 && parentElkNode.branchType === 'true') { // Using a custom property to track branch type
+            sourceHandle = 'true';
+            edgeId = `${parentElkNode.id}-true-${step.id}`;
+            edgeLabel = 'If True';
+            edgeColor = '#10b981'; // Green for true branch
+        } else if (index === 0 && parentElkNode.branchType === 'false') { // Assuming branchType is passed
+            sourceHandle = 'false';
+            edgeId = `${parentElkNode.id}-false-${step.id}`;
+            edgeLabel = 'If False';
+            edgeColor = '#ef4444'; // Red for false branch
+        }
+      } else if (parentElkNode.type === 'aiAgentNode' && steps.length > 1) { // If an agent has multiple conceptual outputs
+         // This is a complex scenario, for now, we'll just have it branch from its default handle
+         // A more advanced blueprint could define explicit output handles for agents
+         sourceHandle = 'right'; // Agents usually have a single right handle unless blueprint defines more
       }
+      
 
-      edges.push({
+      elkEdges.push({
         id: edgeId,
-        source: parentId,
+        source: parentElkNode.id,
         target: step.id,
-        sourceHandle: edgeType !== 'default' ? edgeType : undefined, // Attach to specific handle for conditions
+        properties: { 'org.eclipse.elk.edgeRouting': 'SPLINES' }
+      });
+
+      // Add to global React Flow edges
+      globalEdges.push({
+        id: edgeId,
+        source: parentEllNode.id, // Corrected typo
+        target: step.id,
+        sourceHandle: sourceHandle,
         animated: true,
         label: edgeLabel,
         labelBgPadding: [4, 8],
@@ -176,148 +214,150 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
       });
     }
 
-    let maxYInBranch = y; // Track maximum Y coordinate reached in this branch for layout
-
-    // Handle nested steps for conditions and loops
+    // Handle nested steps recursively
     if (step.type === 'condition' && step.condition) {
-      const conditionSteps = [];
+      let subElkNodes: any[] = [];
+      let subElkEdges: any[] = [];
+      let subMaxY = maxYReached;
+
+      // Process 'if_true' branch
       if (step.condition.if_true && step.condition.if_true.length > 0) {
-        conditionSteps.push({ steps: step.condition.if_true, type: 'true' });
+        const { elkNodes: trueNodes, elkEdges: trueEdges, finalY: trueFinalY } = buildElkGraph(
+          step.condition.if_true,
+          { ...elkNode, type: 'conditionNode', branchType: 'true' }, // Pass type and branch info
+          currentLayerX + nodeWidth + 100, // Start next layer after condition
+          maxYReached + (initialYOffset / 2), // Adjust Y for true branch
+          processedMap, globalNodes, globalEdges, initialYOffset
+        );
+        subElkNodes.push(...trueNodes);
+        subElkEdges.push(...trueEdges);
+        subMaxY = Math.max(subMaxY, trueFinalY);
       }
+
+      // Process 'if_false' branch
       if (step.condition.if_false && step.condition.if_false.length > 0) {
-        conditionSteps.push({ steps: step.condition.if_false, type: 'false' });
+        const { elkNodes: falseNodes, elkEdges: falseEdges, finalY: falseFinalY } = buildElkGraph(
+          step.condition.if_false,
+          { ...elkNode, type: 'conditionNode', branchType: 'false' }, // Pass type and branch info
+          currentLayerX + nodeWidth + 100, // Start next layer after condition
+          subMaxY + initialYOffset, // Position false branch below true branch's max Y
+          processedMap, globalNodes, globalEdges, initialYOffset
+        );
+        subElkNodes.push(...falseNodes);
+        subElkEdges.push(...falseEdges);
+        subMaxY = Math.max(subMaxY, falseFinalY);
       }
-
-      if (conditionSteps.length > 0) {
-        const branchStartY = y - (yOffset * (conditionSteps.length - 1)) / 2; // Center branches vertically
-        let currentBranchY = branchStartY;
-
-        conditionSteps.forEach((branch, i) => {
-          let branchNodeX = x + xOffset;
-          let branchNodeY = currentBranchY;
-          let lastBranchNodePos: ProcessedNodePosition = { id: '', x: branchNodeX, y: branchNodeY }; // Fixed type
-
-          branch.steps.forEach((subStep, subIndex) => {
-            lastBranchNodePos = processStep(subStep, branchNodeX, branchNodeY, subIndex === 0 ? step.id : lastBranchNodePos.id, branch.type);
-            branchNodeX += xOffset;
-            branchNodeY = lastBranchNodePos.y; // Keep Y consistent within a sub-path
-          });
-          currentBranchY += yOffset;
-          maxYInBranch = Math.max(maxYInBranch, lastBranchNodePos.y); // Update overall max Y
-        });
-      }
+      
+      // Add sub-nodes and edges to the current ELK node's children for layout
+      elkNode.children = subElkNodes;
+      elkNode.edges = subElkEdges;
+      maxYReached = subMaxY;
 
     } else if (step.type === 'loop' && step.loop) {
-      // For loops, lay out children sequentially after the loop node
-      let loopNodeX = x + xOffset;
-      let loopNodeY = y;
-      let lastLoopNodePos: ProcessedNodePosition = { id: '', x: loopNodeX, y: loopNodeY }; // Fixed type
+        // For loops, the steps inside are children of the loop node in ELK
+        let subElkNodes: any[] = [];
+        let subElkEdges: any[] = [];
+        const { elkNodes: loopNodes, elkEdges: loopEdges, finalY: loopFinalY } = buildElkGraph(
+            step.loop.steps,
+            { ...elkNode, type: 'loopNode' }, // Pass type info
+            currentLayerX + nodeWidth + 100, // Start nested steps after loop node
+            maxYReached + (initialYOffset / 2),
+            processedMap, globalNodes, globalEdges, initialYOffset
+        );
+        subElkNodes.push(...loopNodes);
+        subElkEdges.push(...loopEdges);
+        maxYReached = Math.max(maxYReached, loopFinalY);
 
-      if (step.loop.steps && step.loop.steps.length > 0) {
-        step.loop.steps.forEach((subStep, subIndex) => {
-          lastLoopNodePos = processStep(subStep, loopNodeX, loopNodeY, subIndex === 0 ? step.id : lastLoopNodePos.id);
-          loopNodeX += xOffset;
-          loopNodeY = lastLoopNodePos.y;
-        });
-        maxYInBranch = Math.max(maxYInBranch, lastLoopNodePos.y);
-      }
+        elkNode.children = subElkNodes;
+        elkNode.edges = subElkEdges;
     }
     
-    // For AI Agent calls that might imply multiple subsequent actions,
-    // we assume these are defined as separate steps in the main blueprint after the agent.
-    // The main processing loop (below) handles sequential steps.
-    // If you need explicit branching from an agent within the diagram, the blueprint
-    // needs to reflect that branching explicitly (e.g., like a condition with 'if_true'/'if_false' for agent outcomes).
+    currentLayerX += nodeWidth + 100; // Advance X for sequential steps
+    maxYReached = Math.max(maxYReached, elkNode.y + nodeHeight); // Update max Y
 
-    return { id: step.id, x: x, y: y }; // Return position of the current node
+    return { id: step.id, x: elkNode.x, y: elkNode.y }; // Return initial position (will be updated by ELK)
+  });
+
+  return { elkNodes, elkEdges, finalY: maxYReached };
+};
+
+
+// Main function to convert an automation blueprint into nodes and edges for React Flow
+export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Node[], edges: Edge[] } => {
+  const reactFlowNodes: Node[] = [];
+  const reactFlowEdges: Edge[] = [];
+  const processedMap = new Map<string, any>(); // Map to track processed nodes for ELK graph building
+
+  if (!blueprint || !blueprint.steps || blueprint.steps.length === 0) {
+    return { nodes: [], edges: [] };
+  }
+
+  // Build the ELK graph structure from the blueprint
+  const { elkNodes: topLevelElkNodes, elkEdges: topLevelElkEdges } = buildElkGraph(
+    blueprint.steps,
+    null, // No parent for top-level steps
+    0, 0, // Initial X, Y for the entire graph
+    processedMap, reactFlowNodes, reactFlowEdges, 80 // Initial Y offset for layout
+  );
+
+  // Define the root ELK graph object
+  const elkGraph = {
+    id: 'root',
+    children: topLevelElkNodes,
+    edges: topLevelElkEdges,
   };
 
-  // Process top-level steps
-  let lastX = currentX;
-  let lastY = currentY;
+  console.log('ELK Graph before layout:', JSON.stringify(elkGraph, null, 2));
 
-  blueprint.steps.forEach(step => {
-    // If this step is part of a conditional/loop branch already handled by recursion, skip it here.
-    // This simple check might not be perfect for complex graph structures,
-    // but prevents duplicates for basic sequential processing.
-    if (!processedStepIds.has(step.id)) {
-        // Updated processStep call to correctly use the returned object structure
-        const nodePosition = processStep(step, lastX, lastY, null); 
-        lastX += xOffset; // Move next node horizontally
-        // For sequential steps, if a branch caused a large Y displacement, align subsequent steps below it.
-        lastY = Math.max(lastY, nodePosition.y); 
-    }
-  });
+  // Run the ELK layout algorithm
+  return elk.layout(elkGraph)
+    .then(layoutGraph => {
+      console.log('ELK Layout Result:', JSON.stringify(layoutGraph, null, 2));
 
-  // A very basic attempt at auto-layout for readability.
-  // For truly complex diagrams, a proper graph layout algorithm (e.g., using elkjs) would be needed.
-  // This iteration will try to align nodes more logically.
-  const layoutNodes: Node[] = [];
-  const nodeMap = new Map<string, Node>();
-  nodes.forEach(node => nodeMap.set(node.id, node));
+      // Create a map from ELK node ID to its React Flow node object for easy updates
+      const reactFlowNodesMap = new Map<string, Node>();
+      reactFlowNodes.forEach(node => reactFlowNodesMap.set(node.id, node));
 
-  // Simple topological sort / layered layout:
-  // Iterate through levels (based on X position)
-  const xLevels = new Map<number, Node[]>();
-  nodes.forEach(node => {
-      const xCoord = node.position.x;
-      if (!xLevels.has(xCoord)) {
-          xLevels.set(xCoord, []);
-      }
-      xLevels.get(xCoord)?.push(node);
-  });
-
-  const sortedXCoords = Array.from(xLevels.keys()).sort((a, b) => a - b);
-  let currentLayerY = 100;
-  let maxPrevLayerHeight = 0; // Track the height of the tallest node in the previous layer
-
-  sortedXCoords.forEach(xCoord => {
-      const layerNodes = xLevels.get(xCoord) || [];
+      // Update positions for React Flow nodes based on ELK's layout result
+      layoutGraph.children?.forEach(elkNode => {
+        const reactFlowNode = reactFlowNodesMap.get(elkNode.id);
+        if (reactFlowNode) {
+          reactFlowNode.position = { x: elkNode.x || 0, y: elkNode.y || 0 };
+          // If the node is a group/parent in ELK (e.g., condition/loop with children),
+          // its size might be determined by ELK to contain children.
+          // React Flow nodes typically manage their own size based on content.
+          // This ensures the top-level nodes are updated.
+        }
+      });
       
-      // Calculate max height for current layer
-      let currentLayerMaxNodeHeight = 0;
-      layerNodes.forEach(node => {
-        // Approximate height
-        currentLayerMaxNodeHeight = Math.max(currentLayerMaxNodeHeight, nodeHeight); 
+      // Update edge paths for React Flow based on ELK's layout result
+      layoutGraph.edges?.forEach(elkEdge => {
+        const reactFlowEdge = reactFlowEdges.find(e => e.id === elkEdge.id);
+        if (reactFlowEdge && elkEdge.sections && elkEdge.sections.length > 0) {
+          // Map ELK points to React Flow points
+          reactFlowEdge.data = { elk: elkEdge }; // Store ELK data for debugging/reference
+          // ELK edge points might need to be translated to React Flow's `points`
+          // property for custom edge rendering, if default smooth step edges aren't enough.
+          // For now, React Flow's default edge rendering often uses source/target positions.
+          // If custom edge drawing is needed later, this is where `points` would be set.
+          // reactFlowEdge.points = elkEdge.sections[0].bendPoints || []; // Example for custom edges
+        }
       });
 
-      // Simple Y positioning within a layer: spread out vertically
-      const totalVerticalSpaceNeeded = layerNodes.length * yOffset;
-      let startYForLayer = currentLayerY;
+      // For multiple outputs from a single step (e.g., AI agent, which is not a 'condition' type)
+      // This part of layout is complex without explicit blueprint support for output handles.
+      // Current ELK configuration and recursive processing handles general hierarchical layout.
+      // If an AI Agent can have *named, distinct output paths* that diverge, the blueprint
+      // itself would need to define this, perhaps similar to a 'condition' but with 'output_branches' array.
+      // The current diagram will lay out sequential steps after an agent linearly.
+      // If a step's output feeds into multiple *independent* next steps, the ELK layout will
+      // attempt to draw diverging lines, but they might merge if they converge later.
 
-      // Adjust Y position if branches from previous layers extend downwards
-      if (layerNodes.some(node => node.type === 'conditionNode' || node.type === 'loopNode')) {
-          startYForLayer += 0; // No adjustment, branches will extend
-      }
-      
-      // Sort nodes in this layer by their original Y position to maintain relative order
-      layerNodes.sort((a, b) => a.position.y - b.position.y);
-
-      layerNodes.forEach((node, i) => {
-          // If node is part of a branching flow, its Y might be dictated by the branch
-          // Otherwise, lay it out in the current vertical flow
-          if (!node.data.ySetByBranch) { // A custom flag could be used if Y is strictly set by branching logic
-            node.position = { x: node.position.x, y: startYForLayer + (i * yOffset) };
-          }
-          layoutNodes.push(node);
-      });
-
-      // Update Y for next layer, considering the maximum height needed for this layer
-      currentLayerY = startYForLayer + totalVerticalSpaceNeeded + yOffset;
-  });
-
-  // Final pass for edges to ensure source/target handles are correctly set for conditional nodes
-  edges.forEach(edge => {
-    const sourceNode = nodeMap.get(edge.source);
-    if (sourceNode && sourceNode.type === 'conditionNode') {
-      // Ensure sourceHandle is 'true' or 'false'
-      if (!edge.sourceHandle) {
-         // This is a fallback, ideally set during processStep
-         edge.sourceHandle = edges.find(e => e.source === edge.source && e.target === edge.target && e.sourceHandle === 'true')?.sourceHandle || 'false';
-      }
-    }
-  });
-
-
-  return { nodes: layoutNodes, edges };
+      return { nodes: Array.from(reactFlowNodesMap.values()), edges: reactFlowEdges };
+    })
+    .catch(error => {
+      console.error('ELK layout failed:', error);
+      // Fallback: return nodes and edges without layout, or throw error
+      return { nodes: reactFlowNodes, edges: reactFlowEdges };
+    });
 };

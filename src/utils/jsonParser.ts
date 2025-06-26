@@ -1,5 +1,5 @@
 
-// Enhanced JSON parser with comprehensive error handling and null checks
+// Ultra-robust JSON parser with bulletproof error handling
 
 export interface StructuredResponse {
   summary?: string;
@@ -24,50 +24,47 @@ export interface StructuredResponse {
 }
 
 export const parseStructuredResponse = (text: string | undefined | null): StructuredResponse | null => {
-  // Handle null, undefined, or non-string inputs
-  if (!text || typeof text !== 'string') {
-    console.log('⚠️ Invalid input for JSON parsing:', typeof text);
+  // Ultra-safe input validation
+  if (!text || typeof text !== 'string' || text.trim() === '') {
+    console.log('⚠️ parseStructuredResponse: Invalid or empty input');
     return null;
   }
 
   console.log('🔍 Enhanced parsing with conversation context - Length:', text.length);
 
   try {
-    // Clean the text first - handle potential undefined values with robust checking
     let cleanText = text.trim();
     
-    // Safely remove any potential undefined or null values that might have been stringified
-    if (cleanText && typeof cleanText === 'string') {
-      cleanText = cleanText.replace(/\bundefined\b|null/g, '""');
-    }
+    // Remove potential undefined/null stringified values
+    cleanText = cleanText.replace(/\bundefined\b|null/g, '""');
     
-    // Try to extract JSON from markdown code blocks
+    // Try JSON code block extraction first
     const jsonBlockMatch = cleanText.match(/```json\s*([\s\S]*?)\s*```/);
     if (jsonBlockMatch && jsonBlockMatch[1]) {
       try {
         const parsed = JSON.parse(jsonBlockMatch[1].trim());
         console.log('✅ Successfully parsed JSON from code block');
-        return parsed;
+        return validateStructuredResponse(parsed);
       } catch (blockError) {
-        console.log('⚠️ Failed to parse JSON from code block, trying other methods');
+        console.log('⚠️ Failed to parse JSON from code block');
       }
     }
 
-    // Try to extract JSON from the entire text
+    // Try parsing entire text as JSON
     try {
       const parsed = JSON.parse(cleanText);
       console.log('✅ Successfully parsed entire text as JSON');
-      return parsed;
+      return validateStructuredResponse(parsed);
     } catch (fullError) {
       console.log('⚠️ Failed to parse entire text as JSON');
     }
 
-    // Try to find JSON object patterns in the text
+    // Pattern-based extraction with safety checks
     const jsonPatterns = [
-      /\{[\s\S]*"summary"[\s\S]*\}/,
-      /\{[\s\S]*"steps"[\s\S]*\}/,
-      /\{[\s\S]*"platforms"[\s\S]*\}/,
-      /\{[\s\S]*"automation_blueprint"[\s\S]*\}/
+      /\{[\s\S]*?"summary"[\s\S]*?\}/,
+      /\{[\s\S]*?"steps"[\s\S]*?\}/,
+      /\{[\s\S]*?"platforms"[\s\S]*?\}/,
+      /\{[\s\S]*?"automation_blueprint"[\s\S]*?\}/
     ];
 
     for (const pattern of jsonPatterns) {
@@ -76,20 +73,20 @@ export const parseStructuredResponse = (text: string | undefined | null): Struct
         try {
           const parsed = JSON.parse(match[0]);
           console.log('✅ Successfully parsed JSON using pattern matching');
-          return parsed;
+          return validateStructuredResponse(parsed);
         } catch (patternError) {
           console.log('⚠️ Pattern match failed, trying next pattern');
         }
       }
     }
 
-    // If all JSON parsing fails, try to extract individual components
+    // Field extraction as last resort
     const extractedData: StructuredResponse = {
-      summary: extractField(cleanText, 'summary'),
-      steps: extractArrayField(cleanText, 'steps'),
-      platforms: extractArrayField(cleanText, 'platforms'),
-      agents: extractArrayField(cleanText, 'agents'),
-      automation_blueprint: extractField(cleanText, 'automation_blueprint')
+      summary: safeExtractField(cleanText, 'summary'),
+      steps: safeExtractArrayField(cleanText, 'steps'),
+      platforms: safeExtractArrayField(cleanText, 'platforms'),
+      agents: safeExtractArrayField(cleanText, 'agents'),
+      automation_blueprint: safeExtractField(cleanText, 'automation_blueprint')
     };
 
     const hasValidData = extractedData.summary || 
@@ -110,9 +107,53 @@ export const parseStructuredResponse = (text: string | undefined | null): Struct
   }
 };
 
-// Helper function to safely extract fields with comprehensive null checks
-const extractField = (text: string, fieldName: string) => {
-  if (!text || typeof text !== 'string' || !fieldName || typeof fieldName !== 'string') {
+// Validate and sanitize structured response
+const validateStructuredResponse = (data: any): StructuredResponse | null => {
+  if (!data || typeof data !== 'object') {
+    return null;
+  }
+
+  try {
+    const validated: StructuredResponse = {};
+
+    if (data.summary && typeof data.summary === 'string') {
+      validated.summary = data.summary;
+    }
+
+    if (Array.isArray(data.steps)) {
+      validated.steps = data.steps.filter(step => typeof step === 'string');
+    }
+
+    if (Array.isArray(data.platforms)) {
+      validated.platforms = data.platforms.filter(platform => 
+        platform && typeof platform === 'object' && platform.name
+      );
+    }
+
+    if (Array.isArray(data.agents)) {
+      validated.agents = data.agents.filter(agent => 
+        agent && typeof agent === 'object' && agent.name && agent.role
+      );
+    }
+
+    if (Array.isArray(data.clarification_questions)) {
+      validated.clarification_questions = data.clarification_questions.filter(q => typeof q === 'string');
+    }
+
+    if (data.automation_blueprint) {
+      validated.automation_blueprint = data.automation_blueprint;
+    }
+
+    return validated;
+  } catch (error) {
+    console.error('Error validating structured response:', error);
+    return null;
+  }
+};
+
+// Ultra-safe field extraction
+const safeExtractField = (text: string, fieldName: string): string | null => {
+  if (!text || typeof text !== 'string' || !fieldName) {
     return null;
   }
   
@@ -126,9 +167,9 @@ const extractField = (text: string, fieldName: string) => {
   }
 };
 
-// Helper function to safely extract array fields with comprehensive null checks
-const extractArrayField = (text: string, fieldName: string) => {
-  if (!text || typeof text !== 'string' || !fieldName || typeof fieldName !== 'string') {
+// Ultra-safe array field extraction
+const safeExtractArrayField = (text: string, fieldName: string): any[] => {
+  if (!text || typeof text !== 'string' || !fieldName) {
     return [];
   }
   
@@ -136,15 +177,12 @@ const extractArrayField = (text: string, fieldName: string) => {
     const pattern = new RegExp(`"${fieldName}"\\s*:\\s*\\[([^\\]]*)\\]`, 'i');
     const match = text.match(pattern);
     if (match && match[1]) {
-      // Try to parse the array content
       try {
         return JSON.parse(`[${match[1]}]`);
       } catch (arrayError) {
-        // If JSON parsing fails, split by commas and clean up
         return match[1].split(',').map((item: string) => {
-          if (!item || typeof item !== 'string') return '';
           return item.trim().replace(/"/g, '');
-        }).filter((item: string) => item && item.length > 0);
+        }).filter((item: string) => item.length > 0);
       }
     }
     return [];
@@ -154,77 +192,43 @@ const extractArrayField = (text: string, fieldName: string) => {
   }
 };
 
-// SUPER FIXED: Clean display text function with ultra-robust null/undefined handling and guaranteed string return
+// BULLETPROOF cleanDisplayText function
 export const cleanDisplayText = (text: string | undefined | null): string => {
   try {
-    // CRITICAL: Always return a string, never undefined/null
-    if (!text || typeof text !== 'string') {
-      console.warn('cleanDisplayText: Invalid input, returning empty string:', typeof text);
+    // CRITICAL: Always guarantee a string return
+    if (text === null || text === undefined) {
+      console.warn('cleanDisplayText: null/undefined input, returning empty string');
       return '';
     }
 
+    if (typeof text !== 'string') {
+      console.warn('cleanDisplayText: non-string input, converting:', typeof text);
+      return String(text);
+    }
+
+    // Process the text safely
     let cleanText = text;
     
-    // Only proceed if we still have a valid string
-    if (typeof cleanText === 'string') {
-      // Remove JSON code blocks
-      cleanText = cleanText.replace(/```json[\s\S]*?```/g, '');
-      
-      // Remove standalone JSON objects
-      cleanText = cleanText.replace(/^\s*\{[\s\S]*?\}\s*$/gm, '');
-      
-      // Clean up extra whitespace
-      cleanText = cleanText.replace(/\n\s*\n/g, '\n').trim();
-    }
+    // Remove JSON code blocks
+    cleanText = cleanText.replace(/```json[\s\S]*?```/g, '');
     
-    // FINAL SAFETY: Guarantee we return a string
-    if (typeof cleanText !== 'string') {
-      console.error('cleanDisplayText: Processing failed, returning original or fallback');
-      return typeof text === 'string' ? text : '';
-    }
+    // Remove standalone JSON objects  
+    cleanText = cleanText.replace(/^\s*\{[\s\S]*?\}\s*$/gm, '');
     
-    return cleanText;
+    // Clean up extra whitespace
+    cleanText = cleanText.replace(/\n\s*\n/g, '\n').trim();
+    
+    // FINAL GUARANTEE: Return a string
+    return typeof cleanText === 'string' ? cleanText : '';
+    
   } catch (error) {
     console.error('cleanDisplayText: Critical error, returning safe fallback:', error);
-    // Final fallback - always return a string
-    return typeof text === 'string' ? text : '';
+    // Ultimate fallback - convert input to string safely
+    try {
+      return String(text || '');
+    } catch (finalError) {
+      console.error('cleanDisplayText: Even fallback failed:', finalError);
+      return '';
+    }
   }
-};
-
-// Enhanced data extraction with conversation context and improved error handling
-export const extractStructuredData = (text: string | undefined | null) => {
-  // Handle null/undefined input with detailed logging
-  if (!text || typeof text !== 'string') {
-    console.log('⚠️ Invalid text provided for extraction:', typeof text);
-    return {
-      hasSummary: false,
-      stepsCount: 0,
-      platformsCount: 0,
-      agentsCount: 0,
-      hasConversationContext: false
-    };
-  }
-
-  console.log('🔍 Enhanced parsing with conversation context - Length:', text.length);
-  
-  let structuredData: StructuredResponse | null = null;
-  
-  try {
-    structuredData = parseStructuredResponse(text);
-  } catch (parseError) {
-    console.error('⚠️ Parse error in extractStructuredData:', parseError);
-    structuredData = null;
-  }
-  
-  const extracted = {
-    hasSummary: Boolean(structuredData?.summary),
-    stepsCount: Array.isArray(structuredData?.steps) ? structuredData.steps.length : 0,
-    platformsCount: Array.isArray(structuredData?.platforms) ? structuredData.platforms.length : 0,
-    agentsCount: Array.isArray(structuredData?.agents) ? structuredData.agents.length : 0,
-    hasConversationContext: Boolean(structuredData?.conversation_updates)
-  };
-
-  console.log('📊 Enhanced extracted data with conversation context:', extracted);
-  
-  return extracted;
 };

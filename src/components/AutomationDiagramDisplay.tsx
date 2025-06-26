@@ -1,4 +1,3 @@
-
 import React, { useCallback, useMemo, useEffect, useState } from 'react';
 import {
   ReactFlow,
@@ -189,7 +188,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           layout_version: '1.0'
         }, {
           onConflict: 'automation_id,user_id'
-        });
+        })
+        .select('id');
 
       if (error) {
         console.error('❌ Error saving diagram:', error);
@@ -201,7 +201,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       } else {
         console.log('✅ Diagram saved successfully');
         // Fix the TypeScript error by properly handling the data response
-        if (data && Array.isArray(data) && data.length > 0 && data[0]?.id) {
+        if (data && data.length > 0 && data[0]?.id) {
           setDiagramId(data[0].id);
         }
       }

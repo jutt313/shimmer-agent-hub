@@ -1,6 +1,11 @@
+import { Node, Edge, XYPosition, Position } from '@xyflow/react'; // Removed ELK and internalsSymbol imports
 
-import { Node, Edge, Position } from '@xyflow/react';
+// Define a new type to include 'id' along with XYPosition for recursive function returns
+interface ProcessedNodePosition extends XYPosition {
+  id: string;
+}
 
+// Define the structure of a blueprint step, including nested steps for conditions and loops
 interface BlueprintStep {
   id: string;
   name: string;
@@ -14,12 +19,10 @@ interface BlueprintStep {
     expression: string;
     if_true: BlueprintStep[];
     if_false?: BlueprintStep[];
-    condition_id?: string;
   };
   loop?: {
     array_source: string;
     steps: BlueprintStep[];
-    loop_id?: string;
   };
   delay?: {
     duration_seconds: number;
@@ -32,6 +35,7 @@ interface BlueprintStep {
   on_error?: 'continue' | 'stop' | 'retry';
 }
 
+// Define the overall structure of the automation blueprint
 interface AutomationBlueprint {
   version: string;
   description?: string;
@@ -40,6 +44,7 @@ interface AutomationBlueprint {
   variables?: any;
 }
 
+// Helper function to determine the custom node type based on the blueprint step's type
 const getNodeType = (step: BlueprintStep): string => {
   switch (step.type) {
     case 'condition':
@@ -56,166 +61,56 @@ const getNodeType = (step: BlueprintStep): string => {
   }
 };
 
+// Main function to convert an automation blueprint into nodes and edges for React Flow
 export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Node[], edges: Edge[] } => {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
+  // Use a Map to keep track of processed step IDs and their React Flow Node objects
+  // This helps when drawing edges to already-placed nodes (e.g., convergence)
   const processedNodes = new Map<string, Node>();
+  // Tracks the maximum Y-coordinate used at a specific X-coordinate level
+  // Used to prevent vertical overlaps in horizontal layout
+  const columnMaxY = new Map<number, number>(); 
 
   if (!blueprint || !blueprint.steps || blueprint.steps.length === 0) {
     return { nodes: [], edges: [] };
   }
 
-  // Layout constants - optimized for better visual flow
+  // Layout constants - optimized for better visual flow and readability
   const startX = 100;
   const startY = 100;
-  const xSpacing = 300; // More space between columns
-  const ySpacing = 120; // Space between rows
-  const branchSeparation = 200; // Space between true/false branches
+  const xSpacing = 300; // Horizontal space between node centers
+  const ySpacing = 120; // Vertical space between nodes/branches (center to center)
+  const nodeHeight = 80; // Approximate visual height of a node for overlap calculation
 
-  const processSteps = (
-    steps: BlueprintStep[],
-    currentX: number,
-    currentY: number,
-    parentId: string | null,
-    edgeType: 'default' | 'true' | 'false' = 'default'
-  ): { maxX: number; maxY: number; lastNodeId: string | null } => {
-    let maxX = currentX;
-    let maxY = currentY;
-    let lastNodeId: string | null = null;
-    let yOffset = 0;
-
-    steps.forEach((step, index) => {
-      // Check if node already exists (convergence point)
-      if (processedNodes.has(step.id)) {
-        const existingNode = processedNodes.get(step.id)!;
-        if (parentId) {
-          addEdge(parentId, step.id, edgeType);
-        }
-        lastNodeId = step.id;
-        maxX = Math.max(maxX, existingNode.position.x);
-        maxY = Math.max(maxY, existingNode.position.y);
-        return;
-      }
-
-      const nodeY = currentY + yOffset;
-      
-      // Create the node
-      const newNode: Node = {
-        id: step.id,
-        type: getNodeType(step),
-        position: { x: currentX, y: nodeY },
-        data: {
-          label: step.name || `Step ${step.id}`,
-          platform: step.action?.integration,
-          action: step.action,
-          condition: step.condition,
-          loop: step.loop,
-          delay: step.delay,
-          agent: step.ai_agent_call,
-          explanation: getStepExplanation(step)
-        },
-        sourcePosition: step.type === 'condition' ? undefined : Position.Right,
-        targetPosition: Position.Left,
-      };
-
-      nodes.push(newNode);
-      processedNodes.set(step.id, newNode);
-      lastNodeId = step.id;
-
-      // Add edge from parent
-      if (parentId) {
-        addEdge(parentId, step.id, edgeType);
-      }
-
-      maxX = Math.max(maxX, currentX);
-      maxY = Math.max(maxY, nodeY);
-
-      // Handle nested structures
-      if (step.type === 'condition' && step.condition) {
-        const branchX = currentX + xSpacing;
-        let trueBranchY = nodeY - branchSeparation / 2;
-        let falseBranchY = nodeY + branchSeparation / 2;
-
-        // Ensure branches don't overlap with existing nodes
-        trueBranchY = Math.max(trueBranchY, maxY - branchSeparation);
-        falseBranchY = Math.max(falseBranchY, maxY);
-
-        let branchMaxX = branchX;
-        let branchMaxY = Math.max(trueBranchY, falseBranchY);
-
-        // Process true branch
-        if (step.condition.if_true && step.condition.if_true.length > 0) {
-          const trueResult = processSteps(
-            step.condition.if_true,
-            branchX,
-            trueBranchY,
-            step.id,
-            'true'
-          );
-          branchMaxX = Math.max(branchMaxX, trueResult.maxX);
-          branchMaxY = Math.max(branchMaxY, trueResult.maxY);
-        }
-
-        // Process false branch
-        if (step.condition.if_false && step.condition.if_false.length > 0) {
-          const falseResult = processSteps(
-            step.condition.if_false,
-            branchX,
-            falseBranchY,
-            step.id,
-            'false'
-          );
-          branchMaxX = Math.max(branchMaxX, falseResult.maxX);
-          branchMaxY = Math.max(branchMaxY, falseResult.maxY);
-        }
-
-        maxX = Math.max(maxX, branchMaxX);
-        maxY = Math.max(maxY, branchMaxY);
-        yOffset = branchMaxY - currentY + ySpacing;
-
-      } else if (step.type === 'loop' && step.loop) {
-        const loopX = currentX + xSpacing;
-        const loopResult = processSteps(
-          step.loop.steps,
-          loopX,
-          nodeY,
-          step.id,
-          'default'
-        );
-        maxX = Math.max(maxX, loopResult.maxX);
-        maxY = Math.max(maxY, loopResult.maxY);
-        yOffset += ySpacing;
-      } else {
-        // Regular sequential step
-        yOffset += ySpacing;
-      }
-    });
-
-    return { maxX, maxY, lastNodeId };
-  };
-
-  const addEdge = (sourceId: string, targetId: string, type: 'default' | 'true' | 'false') => {
-    let label: string | undefined;
-    let color = '#9333ea';
-    let sourceHandle: string | undefined;
+  // Helper function to add edges to the React Flow graph
+  const addDiagramEdge = (sourceId: string, targetId: string, type: 'default' | 'true' | 'false', edgeList: Edge[]) => {
+    let label: string | undefined = undefined;
+    let color = '#9333ea'; // Default stroke color
+    let sourceHandle: string | undefined = Position.Right; // Default source handle
 
     if (type === 'true') {
       label = 'If True';
-      color = '#10b981';
-      sourceHandle = 'true';
+      color = '#10b981'; // Green for true
+      sourceHandle = 'true'; // Custom handle for ConditionNode
     } else if (type === 'false') {
       label = 'If False';
-      color = '#ef4444';
-      sourceHandle = 'false';
+      color = '#ef4444'; // Red for false
+      sourceHandle = 'false'; // Custom handle for ConditionNode
     }
 
     const edgeId = `${sourceId}-${type}-${targetId}`;
     
-    edges.push({
+    // Check if edge already exists to prevent duplicates, especially with convergence
+    if (edgeList.some(e => e.id === edgeId)) {
+        return;
+    }
+
+    edgeList.push({
       id: edgeId,
       source: sourceId,
       target: targetId,
-      sourceHandle,
+      sourceHandle: sourceHandle,
       animated: true,
       label,
       labelBgPadding: [4, 8],
@@ -226,6 +121,7 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
     });
   };
 
+  // Helper to get step explanation for node data
   const getStepExplanation = (step: BlueprintStep): string => {
     switch (step.type) {
       case 'action':
@@ -243,8 +139,138 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
     }
   };
 
-  // Process all steps starting from the beginning
-  processSteps(blueprint.steps, startX, startY, null);
+  // Recursive function to process steps and determine their positions and connections.
+  // This function is the core of the manual layout algorithm.
+  const processSteps = (
+    steps: BlueprintStep[],
+    currentColumnX: number, // The X-coordinate for the current 'column' or layer of nodes
+    currentYCursor: number, // The Y-coordinate to start placing the first node in this flow segment
+    parentNodeId: string | null, // The ID of the node that leads to these steps (for edge drawing)
+    incomingEdgeType: 'default' | 'true' | 'false' = 'default' // Type of edge coming from the parent
+  ): { nextColumnX: number; maxBranchY: number; lastNodeId: string | null } => {
+    let maxXReachedInSegment = currentColumnX; // Tracks the furthest X coordinate reached by nodes in this segment
+    let maxYReachedByFlow = currentYCursor; // Tracks the lowest Y coordinate reached by nodes in this segment (including branches)
+    let lastProcessedNodeId: string | null = null;
+    let localYCursor = currentYCursor; // Y cursor for placing sequential nodes within the current column
+
+    steps.forEach((step, index) => {
+      // If node already exists (convergence point), just connect an edge to it
+      if (processedNodes.has(step.id)) {
+        const existingNode = processedNodes.get(step.id)!;
+        if (parentNodeId) {
+          addDiagramEdge(parentNodeId, step.id, incomingEdgeType, edges);
+        }
+        // Update max X/Y based on this existing node's position as it's part of the flow
+        maxXReachedInSegment = Math.max(maxXReachedInSegment, existingNode.position.x);
+        maxYReachedByFlow = Math.max(maxYReachedByFlow, existingNode.position.y + nodeHeight);
+        lastProcessedNodeId = step.id;
+        return; // Skip adding node again
+      }
+
+      // Determine the Y position for the current node, preventing overlaps within the same X-column
+      const nodeY = Math.max(localYCursor, columnMaxY.get(currentColumnX) || startY);
+      columnMaxY.set(currentColumnX, nodeY + nodeHeight + ySpacing / 2); // Update max Y for this column
+
+      const newNode: Node = {
+        id: step.id,
+        type: getNodeType(step),
+        position: { x: currentColumnX, y: nodeY },
+        data: {
+          label: step.name || `Step ${step.id}`,
+          platform: step.action?.integration,
+          action: step.action,
+          condition: step.condition,
+          loop: step.loop,
+          delay: step.delay,
+          agent: step.ai_agent_call,
+          explanation: getStepExplanation(step)
+        },
+        sourcePosition: getNodeType(step) === 'conditionNode' ? undefined : Position.Right,
+        targetPosition: Position.Left,
+      };
+      nodes.push(newNode);
+      processedNodes.set(step.id, newNode); // Add node to the map of processed nodes
+      lastProcessedNodeId = step.id;
+
+      // Add edge from parent to current node
+      if (parentNodeId) {
+        addDiagramEdge(parentNodeId, step.id, incomingEdgeType, edges);
+      }
+
+      let subFlowMaxY = nodeY; // Max Y reached by nested flows originating from this node
+
+      // Handle nested steps (conditions and loops)
+      if (step.type === 'condition' && step.condition) {
+        const branchStartX = currentColumnX + xSpacing;
+        let trueBranchCurrentY = nodeY - (ySpacing * 0.75); // Start true branch slightly above current node's Y
+        let falseBranchCurrentY = nodeY + (ySpacing * 0.75); // Start false branch slightly below current node's Y
+
+        let branchMaxX = branchStartX;
+        
+        // Process 'if_true' branch
+        if (step.condition.if_true && step.condition.if_true.length > 0) {
+          const { nextColumnX: trueNextX, maxBranchY: trueMaxY } = processSteps(
+            step.condition.if_true, branchStartX, trueBranchCurrentY, step.id, 'true'
+          );
+          branchMaxX = Math.max(branchMaxX, trueNextX);
+          subFlowMaxY = Math.max(subFlowMaxY, trueMaxY);
+        }
+
+        // Process 'if_false' branch
+        if (step.condition.if_false && step.condition.if_false.length > 0) {
+          const { nextColumnX: falseNextX, maxBranchY: falseMaxY } = processSteps(
+            step.condition.if_false, branchStartX, falseBranchCurrentY, step.id, 'false'
+          );
+          branchMaxX = Math.max(branchMaxX, falseNextX);
+          subFlowMaxY = Math.max(subFlowMaxY, falseMaxY);
+        }
+
+        // After processing branches, the current Y cursor for subsequent nodes
+        // needs to account for the total vertical space consumed by branches.
+        // The next sequential node should ideally start at the max Y of all branches + spacing
+        localYCursor = subFlowMaxY + ySpacing; 
+        maxXReachedInSegment = Math.max(maxXReachedInSegment, branchMaxX); // Update max X considering branches
+      } else if (step.type === 'loop' && step.loop) {
+        // For loops, its children are laid out sequentially starting to its right
+        const loopContentStartX = currentColumnX + xSpacing;
+        const { nextColumnX: loopNextX, maxBranchY: loopMaxY } = processSteps(
+          step.loop.steps, loopContentStartX, nodeY, step.id, 'default'
+        );
+        maxXReachedInSegment = Math.max(maxXReachedInSegment, loopNextX);
+        subFlowMaxY = Math.max(subFlowMaxY, loopMaxY);
+        localYCursor = subFlowMaxY + ySpacing; // Advance Y cursor after loop content
+      } else {
+        // For simple actions, agents, delays: just advance the Y cursor for the next sibling step
+        localYCursor = nodeY + ySpacing;
+      }
+      
+      maxXReachedInSegment = Math.max(maxXInCurrentFlow, currentColumnX + xSpacing); // Further most X reached by this step's column
+      maxYReachedByFlow = Math.max(maxYReachedByFlow, subFlowMaxY); // Max Y including any nested branches
+
+    });
+
+    return { nextColumnX: maxXReachedInSegment, maxBranchY: maxYReachedByFlow, lastNodeId: lastProcessedNodeId };
+  };
+
+  // Start processing the top-level blueprint steps
+  const { nextColumnX, maxBranchY } = processSteps(blueprint.steps, startX, startY, null);
+
+  // Final layout adjustment: Re-center diagram if it's too far left/top
+  // This can be done by finding min X/Y and shifting all nodes.
+  let minX = Infinity;
+  let minY = Infinity;
+  nodes.forEach(node => {
+      minX = Math.min(minX, node.position.x);
+      minY = Math.min(minY, node.position.y);
+  });
+
+  const offsetX = (minX < 50) ? (50 - minX) : 0; // Ensure some left margin
+  const offsetY = (minY < 50) ? (50 - minY) : 0; // Ensure some top margin
+
+  nodes.forEach(node => {
+      node.position.x += offsetX;
+      node.position.y += offsetY;
+  });
 
   return { nodes, edges };
 };

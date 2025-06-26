@@ -17,7 +17,7 @@ interface ConditionNodeProps {
 const ConditionNode: React.FC<ConditionNodeProps> = ({ data, selected }) => {
   return (
     <div className={`px-4 py-3 shadow-lg rounded-xl text-white border-2 transition-all duration-200 min-w-[220px] max-w-[280px] ${
-      selected ? 'border-orange-300 shadow-orange-200' : 'border-orange-200'
+      selected ? 'border-orange-400 shadow-lg' : 'border-orange-200'
     }`}
     style={{
       background: 'linear-gradient(135deg, #f97316, #ea580c)',
@@ -35,27 +35,29 @@ const ConditionNode: React.FC<ConditionNodeProps> = ({ data, selected }) => {
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold truncate">{data.label}</div>
           {data.condition?.expression && (
-            <div className="text-xs opacity-70 truncate">
+            <div className="text-xs opacity-80 truncate">
               {data.condition.expression}
             </div>
           )}
         </div>
       </div>
       
+      {/* True branch handle */}
       <Handle
         type="source"
         position={Position.Right}
         id="true"
         className="w-3 h-3 !bg-green-400 !border-2 !border-green-600"
-        style={{ top: '30%' }}
+        style={{ top: '25%' }}
       />
       
+      {/* False branch handle */}
       <Handle
         type="source"
         position={Position.Right}
         id="false"
         className="w-3 h-3 !bg-red-400 !border-2 !border-red-600"
-        style={{ top: '70%' }}
+        style={{ top: '75%' }}
       />
     </div>
   );

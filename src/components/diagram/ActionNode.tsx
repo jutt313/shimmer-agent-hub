@@ -24,11 +24,11 @@ const ActionNode: React.FC<ActionNodeProps> = ({ data, selected }) => {
   return (
     <div 
       className={`px-4 py-3 shadow-lg rounded-xl border-2 transition-all duration-200 min-w-[220px] max-w-[280px] ${
-        selected ? 'border-purple-300 shadow-purple-200' : 'border-purple-200'
+        selected ? 'border-purple-400 shadow-lg' : 'border-gray-200'
       }`}
       style={{
-        background: `linear-gradient(135deg, ${iconConfig.bgColor}, ${iconConfig.color}15)`,
-        borderColor: selected ? iconConfig.color : `${iconConfig.color}50`
+        background: iconConfig.bgColor,
+        borderColor: selected ? iconConfig.color : '#e5e7eb'
       }}
     >
       <Handle
@@ -40,7 +40,7 @@ const ActionNode: React.FC<ActionNodeProps> = ({ data, selected }) => {
       <div className="flex items-center space-x-3">
         <div 
           className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center"
-          style={{ backgroundColor: iconConfig.bgColor }}
+          style={{ backgroundColor: `${iconConfig.color}20` }}
         >
           {IconComponent && (
             <IconComponent 
@@ -54,7 +54,7 @@ const ActionNode: React.FC<ActionNodeProps> = ({ data, selected }) => {
             {data.label}
           </div>
           {data.platform && (
-            <div className="text-xs opacity-70 truncate text-gray-600">
+            <div className="text-xs text-gray-600 truncate">
               {data.platform}
             </div>
           )}

@@ -1,6 +1,29 @@
 
 // Enhanced JSON parser with comprehensive error handling and null checks
-export const parseStructuredResponse = (text: string | undefined | null) => {
+
+export interface StructuredResponse {
+  summary?: string;
+  steps?: string[];
+  platforms?: Array<{
+    name: string;
+    credentials?: Array<{
+      field: string;
+      why_needed: string;
+    }>;
+  }>;
+  agents?: Array<{
+    name: string;
+    role: string;
+    goal: string;
+    why_needed: string;
+  }>;
+  clarification_questions?: string[];
+  automation_blueprint?: any;
+  platforms_to_remove?: string[];
+  conversation_updates?: any;
+}
+
+export const parseStructuredResponse = (text: string | undefined | null): StructuredResponse | null => {
   // Handle null, undefined, or non-string inputs
   if (!text || typeof text !== 'string') {
     console.log('⚠️ Invalid input for JSON parsing:', typeof text);
@@ -59,7 +82,7 @@ export const parseStructuredResponse = (text: string | undefined | null) => {
     }
 
     // If all JSON parsing fails, try to extract individual components
-    const extractedData = {
+    const extractedData: StructuredResponse = {
       summary: extractField(cleanText, 'summary'),
       steps: extractArrayField(cleanText, 'steps'),
       platforms: extractArrayField(cleanText, 'platforms'),
@@ -122,6 +145,29 @@ const extractArrayField = (text: string, fieldName: string) => {
   } catch (error) {
     console.error(`Error extracting array field ${fieldName}:`, error);
     return [];
+  }
+};
+
+// Clean display text function to remove JSON formatting and make it readable
+export const cleanDisplayText = (text: string | undefined | null): string => {
+  if (!text || typeof text !== 'string') {
+    return '';
+  }
+
+  try {
+    // Remove JSON code blocks
+    let cleanText = text.replace(/```json[\s\S]*?```/g, '');
+    
+    // Remove standalone JSON objects
+    cleanText = cleanText.replace(/^\s*\{[\s\S]*?\}\s*$/gm, '');
+    
+    // Clean up extra whitespace
+    cleanText = cleanText.replace(/\n\s*\n/g, '\n').trim();
+    
+    return cleanText;
+  } catch (error) {
+    console.error('Error cleaning display text:', error);
+    return text;
   }
 };
 

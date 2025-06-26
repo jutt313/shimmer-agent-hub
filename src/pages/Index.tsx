@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Send, Bot } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ChatCard from "@/components/ChatCard";
@@ -41,7 +41,7 @@ const Index = () => {
     errorSeverity: 'medium'
   });
 
-  const handleSendMessage = async () => {
+  const handleSendMessage = useCallback(async () => {
     if (!message.trim() || isLoading) {
       return;
     }
@@ -140,15 +140,15 @@ const Index = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [message, isLoading, messages, currentAgentConfig, executeChatRequest, handleError]);
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !isLoading) {
       handleSendMessage();
     }
-  };
+  }, [handleSendMessage, isLoading]);
 
-  const handleAgentConfigSaved = (agentName: string, agentId?: string, llmProvider?: string, model?: string, config?: any, apiKey?: string) => {
+  const handleAgentConfigSaved = useCallback((agentName: string, agentId?: string, llmProvider?: string, model?: string, config?: any, apiKey?: string) => {
     // Enhanced null safety for agent configuration
     const safeAgentConfig = {
       name: agentName && typeof agentName === 'string' ? agentName : 'AI Agent',
@@ -164,7 +164,23 @@ const Index = () => {
       title: "AI Agent Configured",
       description: `AI Agent "${safeAgentConfig.name}" is now active for this chat session.`,
     });
-  };
+  }, [toast]);
+
+  // Memoize the agent status display to prevent re-renders
+  const agentStatusDisplay = useMemo(() => {
+    if (!currentAgentConfig) return null;
+    
+    return (
+      <div className="bg-white/90 backdrop-blur-md rounded-2xl px-4 py-2 shadow-lg border border-blue-200">
+        <div className="text-sm text-blue-600 font-medium">
+          Active Agent: {currentAgentConfig.name || 'AI Agent'}
+        </div>
+        <div className="text-xs text-gray-500">
+          {currentAgentConfig.llmProvider || 'OpenAI'} - {currentAgentConfig.model || 'gpt-4o-mini'}
+        </div>
+      </div>
+    );
+  }, [currentAgentConfig]);
 
   return (
     <div className="h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6 relative overflow-hidden">
@@ -175,16 +191,7 @@ const Index = () => {
       {/* Header with navigation */}
       <div className="absolute top-6 right-6 z-20 flex gap-4">
         {/* Agent Status Display */}
-        {currentAgentConfig && (
-          <div className="bg-white/90 backdrop-blur-md rounded-2xl px-4 py-2 shadow-lg border border-blue-200">
-            <div className="text-sm text-blue-600 font-medium">
-              Active Agent: {currentAgentConfig.name || 'AI Agent'}
-            </div>
-            <div className="text-xs text-gray-500">
-              {currentAgentConfig.llmProvider || 'OpenAI'} - {currentAgentConfig.model || 'gpt-4o-mini'}
-            </div>
-          </div>
-        )}
+        {agentStatusDisplay}
         
         {user ? (
           <div className="flex gap-4">

@@ -1,4 +1,3 @@
-
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Bot, Plus, X } from "lucide-react";
@@ -188,7 +187,7 @@ const ChatCard = ({
         );
       }
 
-      // Platforms - COMPLETELY BULLETPROOF RENDERING
+      // Enhanced Platforms rendering with comprehensive credential display
       if (Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
         try {
           const validPlatforms = structuredData.platforms.filter(validatePlatform);
@@ -197,25 +196,24 @@ const ChatCard = ({
             content.push(
               <div key="platforms" className="mb-4">
                 <p className="font-medium text-gray-800 mb-2">Required Platform Credentials:</p>
-                <div className="text-gray-700 ml-4 space-y-2">
+                <div className="text-gray-700 ml-4 space-y-3">
                   {validPlatforms.map((platform, index) => {
                     try {
                       const platformName = platform.name || 'Unknown Platform';
                       
                       return (
-                        <div key={`platform-${index}`}>
-                          <p className="font-medium text-gray-800">{platformName}</p>
+                        <div key={`platform-${index}`} className="bg-blue-50/30 p-3 rounded-lg border border-blue-200/50">
+                          <p className="font-medium text-gray-800 mb-2">{platformName}</p>
                           {Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
-                            <ul className="list-disc list-inside ml-4 space-y-1">
+                            <div className="space-y-2">
                               {platform.credentials.map((cred, credIndex) => {
                                 try {
-                                  // Enhanced credential validation
                                   if (!validateCredential(cred)) {
                                     console.warn('Invalid credential skipped:', cred);
                                     return (
-                                      <li key={`cred-fallback-${credIndex}`} className="text-sm text-yellow-600">
-                                        Credential configuration incomplete
-                                      </li>
+                                      <div key={`cred-fallback-${credIndex}`} className="text-sm text-yellow-600 bg-yellow-50 p-2 rounded">
+                                        Credential configuration incomplete - please regenerate automation
+                                      </div>
                                     );
                                   }
 
@@ -223,21 +221,33 @@ const ChatCard = ({
                                   const whyNeeded = safeProcessWhyNeeded(cred.why_needed);
 
                                   return (
-                                    <li key={`cred-${credIndex}`} className="text-sm">
-                                      <strong>{fieldName}</strong>: {whyNeeded}
-                                    </li>
+                                    <div key={`cred-${credIndex}`} className="bg-white p-3 rounded border border-gray-200">
+                                      <div className="flex items-start justify-between mb-2">
+                                        <strong className="text-purple-700 font-semibold">{fieldName}</strong>
+                                        <a 
+                                          href={cred.link} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer" 
+                                          className="text-blue-600 hover:text-blue-800 text-xs underline"
+                                        >
+                                          Get Credential
+                                        </a>
+                                      </div>
+                                      <p className="text-sm text-gray-600">{whyNeeded}</p>
+                                      <p className="text-xs text-gray-500 mt-1">Format: {cred.placeholder}</p>
+                                    </div>
                                   );
                                 } catch (credError) {
                                   console.error('Error rendering credential:', credError);
                                   handleError(credError, `Credential rendering for ${platform.name}`);
                                   return (
-                                    <li key={`cred-error-${credIndex}`} className="text-sm text-red-600">
-                                      Error displaying credential
-                                    </li>
+                                    <div key={`cred-error-${credIndex}`} className="text-sm text-red-600 bg-red-50 p-2 rounded">
+                                      Error displaying credential - please regenerate automation
+                                    </div>
                                   );
                                 }
                               }).filter(Boolean)}
-                            </ul>
+                            </div>
                           )}
                         </div>
                       );
@@ -245,8 +255,8 @@ const ChatCard = ({
                       console.error('Error rendering platform:', platformError);
                       handleError(platformError, `Platform rendering: ${platform?.name || 'unknown'}`);
                       return (
-                        <div key={`platform-error-${index}`} className="text-red-600 text-sm">
-                          Error displaying platform information
+                        <div key={`platform-error-${index}`} className="text-red-600 text-sm bg-red-50 p-2 rounded">
+                          Error displaying platform information - please regenerate automation
                         </div>
                       );
                     }
@@ -260,7 +270,7 @@ const ChatCard = ({
           handleError(platformsError, 'Platforms section rendering');
           content.push(
             <div key="platforms-error" className="mb-4 p-4 bg-red-50 rounded-lg">
-              <p className="text-red-600 text-sm">Error displaying platform credentials. Please try again.</p>
+              <p className="text-red-600 text-sm">Error displaying platform credentials. Please regenerate the automation.</p>
             </div>
           );
         }
@@ -283,12 +293,12 @@ const ChatCard = ({
         );
       }
 
-      // AI Agents - Safe rendering with agent validation
+      // Enhanced AI Agents with comprehensive rules and memory display
       if (Array.isArray(structuredData.agents) && structuredData.agents.length > 0) {
         content.push(
           <div key="agents" className="mb-4">
             <p className="font-medium text-gray-800 mb-3">Recommended AI Agents:</p>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {structuredData.agents.map((agent, index) => {
                 if (!agent || typeof agent !== 'object' || typeof agent.name !== 'string') {
                   return null;
@@ -299,17 +309,17 @@ const ChatCard = ({
                 }
                 
                 return (
-                  <div key={index} className="border border-blue-200/50 rounded-lg p-4 bg-blue-50/30 backdrop-blur-sm">
-                    <div className="flex justify-between items-start mb-3">
+                  <div key={index} className="border border-blue-200/50 rounded-xl p-5 bg-gradient-to-br from-blue-50/40 to-purple-50/40 backdrop-blur-sm">
+                    <div className="flex justify-between items-start mb-4">
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-gray-800">{agent.name}</h4>
-                        <p className="text-sm text-gray-600">{agent.role || 'AI Agent'}</p>
+                        <h4 className="font-bold text-gray-800 text-lg">{agent.name}</h4>
+                        <p className="text-sm text-blue-600 font-medium">{agent.role || 'AI Agent'}</p>
                       </div>
                       <div className="flex gap-2 ml-4">
                         <Button
                           size="sm"
                           onClick={() => onAgentAdd?.(agent)}
-                          className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-3 py-1 text-xs border-0"
+                          className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-4 py-2 text-xs border-0 rounded-lg shadow-md"
                         >
                           <Plus className="w-3 h-3 mr-1" />
                           Add Agent
@@ -318,16 +328,34 @@ const ChatCard = ({
                           size="sm"
                           variant="outline"
                           onClick={() => onAgentDismiss?.(agent.name)}
-                          className="border-gray-300 text-gray-600 hover:bg-gray-100 px-3 py-1 text-xs"
+                          className="border-gray-300 text-gray-600 hover:bg-gray-100 px-3 py-2 text-xs rounded-lg"
                         >
                           <X className="w-3 h-3 mr-1" />
                           Dismiss
                         </Button>
                       </div>
                     </div>
-                    <div className="space-y-2 text-sm text-gray-700">
-                      <p><strong className="text-gray-800">Goal:</strong> {agent.goal || 'Not specified'}</p>
-                      <p><strong className="text-gray-800">Why needed:</strong> {agent.why_needed || 'Not specified'}</p>
+                    
+                    <div className="space-y-3 text-sm">
+                      <div className="bg-white/60 p-3 rounded-lg border border-gray-200/50">
+                        <p><strong className="text-gray-800">Goal:</strong> <span className="text-gray-700">{agent.goal || 'Not specified'}</span></p>
+                      </div>
+                      
+                      {agent.rules && (
+                        <div className="bg-white/60 p-3 rounded-lg border border-gray-200/50">
+                          <p><strong className="text-gray-800">Operating Rules:</strong> <span className="text-gray-700">{agent.rules}</span></p>
+                        </div>
+                      )}
+                      
+                      {agent.memory && (
+                        <div className="bg-white/60 p-3 rounded-lg border border-gray-200/50">
+                          <p><strong className="text-gray-800">Memory Context:</strong> <span className="text-gray-700">{agent.memory}</span></p>
+                        </div>
+                      )}
+                      
+                      <div className="bg-white/60 p-3 rounded-lg border border-gray-200/50">
+                        <p><strong className="text-gray-800">Why needed:</strong> <span className="text-gray-700">{agent.why_needed || 'Not specified'}</span></p>
+                      </div>
                     </div>
                   </div>
                 );
@@ -341,7 +369,7 @@ const ChatCard = ({
     } catch (error: any) {
       console.error('Critical error in renderStructuredContent:', error);
       handleError(error, 'Structured content rendering');
-      return [<div key="error" className="text-red-600 p-4 bg-red-50 rounded-lg">Error rendering content. Please refresh and try again.</div>];
+      return [<div key="error" className="text-red-600 p-4 bg-red-50 rounded-lg">Error rendering content. Please refresh and regenerate the automation.</div>];
     }
   };
 

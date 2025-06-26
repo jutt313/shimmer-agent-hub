@@ -45,8 +45,19 @@ const Index = () => {
     setIsLoading(true);
 
     try {
-      // Enhanced payload with bulletproof null protection
-      const payload = { 
+      // Enhanced payload with proper typing
+      const payload: {
+        message: string;
+        messages: Array<{
+          id: number;
+          text: string;
+          isBot: boolean;
+          timestamp: Date;
+        }>;
+        agentConfig?: any;
+        llmProvider?: string;
+        model?: string;
+      } = { 
         message: currentMessage,
         messages: Array.isArray(messages) ? messages.slice(-10) : []
       };

@@ -1,3 +1,4 @@
+// src/utils/jsonParser.ts
 
 // Ultra-robust JSON parser with bulletproof error handling
 
@@ -90,8 +91,8 @@ export const parseStructuredResponse = (text: string | undefined | null): Struct
     };
 
     const hasValidData = extractedData.summary || 
-                        (extractedData.steps && extractedData.steps.length > 0) ||
-                        (extractedData.platforms && extractedData.platforms.length > 0);
+                         (extractedData.steps && extractedData.steps.length > 0) ||
+                         (extractedData.platforms && extractedData.platforms.length > 0);
 
     if (hasValidData) {
       console.log('✅ Successfully extracted structured data using field extraction');
@@ -195,40 +196,56 @@ const safeExtractArrayField = (text: string, fieldName: string): any[] => {
 // BULLETPROOF cleanDisplayText function
 export const cleanDisplayText = (text: string | undefined | null): string => {
   try {
-    // CRITICAL: Always guarantee a string return
+    // CRITICAL: Always guarantee a string return at the earliest point
     if (text === null || text === undefined) {
-      console.warn('cleanDisplayText: null/undefined input, returning empty string');
+      console.warn('cleanDisplayText: Input is null/undefined, returning empty string.');
       return '';
     }
 
     if (typeof text !== 'string') {
-      console.warn('cleanDisplayText: non-string input, converting:', typeof text);
-      return String(text);
+      console.warn('cleanDisplayText: Input is not a string, converting to string. Type:', typeof text, 'Value:', text);
+      return String(text); // Convert non-string primitives/objects to string
     }
 
     // Process the text safely
-    let cleanText = text;
+    let cleanText: string = text; // Explicitly type as string here
     
-    // Remove JSON code blocks
-    cleanText = cleanText.replace(/```json[\s\S]*?```/g, '');
+    // Use an inner try-catch for individual string operations in case they fail unexpectedly
+    try {
+        cleanText = cleanText.replace(/```json[\s\S]*?```/g, '');
+    } catch (e) {
+        console.error('cleanDisplayText: Error removing JSON code blocks:', e);
+    }
     
-    // Remove standalone JSON objects  
-    cleanText = cleanText.replace(/^\s*\{[\s\S]*?\}\s*$/gm, '');
+    try {
+        cleanText = cleanText.replace(/^\s*\{[\s\S]*?\}\s*$/gm, '');
+    } catch (e) {
+        console.error('cleanDisplayText: Error removing standalone JSON objects:', e);
+    }
     
-    // Clean up extra whitespace
-    cleanText = cleanText.replace(/\n\s*\n/g, '\n').trim();
+    try {
+        cleanText = cleanText.replace(/\n\s*\n/g, '\n'); // Replaced .trim() with separate .trim() to ensure string consistency
+    } catch (e) {
+        console.error('cleanDisplayText: Error removing extra newlines:', e);
+    }
+
+    try {
+        cleanText = cleanText.trim();
+    } catch (e) {
+        console.error('cleanDisplayText: Error trimming whitespace:', e);
+    }
     
-    // FINAL GUARANTEE: Return a string
-    return typeof cleanText === 'string' ? cleanText : '';
+    // FINAL GUARANTEE: Return a primitive string explicitly
+    return typeof cleanText === 'string' ? cleanText : String(cleanText || '');
     
-  } catch (error) {
-    console.error('cleanDisplayText: Critical error, returning safe fallback:', error);
-    // Ultimate fallback - convert input to string safely
+  } catch (error: any) {
+    console.error('cleanDisplayText: TOP-LEVEL CATCH - Critical error, returning safe fallback.', error, 'Original input:', text);
+    // Ultimate fallback if anything goes wrong, ensure a string is returned
     try {
       return String(text || '');
     } catch (finalError) {
-      console.error('cleanDisplayText: Even fallback failed:', finalError);
-      return '';
+      console.error('cleanDisplayText: Fallback conversion also failed:', finalError);
+      return ''; // Absolute last resort
     }
   }
 };

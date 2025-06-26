@@ -1,3 +1,4 @@
+
 // src/utils/jsonParser.ts
 
 // Ultra-robust JSON parser with bulletproof error handling
@@ -193,7 +194,7 @@ const safeExtractArrayField = (text: string, fieldName: string): any[] => {
   }
 };
 
-// BULLETPROOF cleanDisplayText function
+// BULLETPROOF cleanDisplayText function - FIXED VERSION
 export const cleanDisplayText = (text: string | undefined | null): string => {
   try {
     // CRITICAL: Always guarantee a string return at the earliest point
@@ -207,32 +208,56 @@ export const cleanDisplayText = (text: string | undefined | null): string => {
       return String(text); // Convert non-string primitives/objects to string
     }
 
-    // Process the text safely
+    // Process the text safely with multiple safeguards
     let cleanText: string = text; // Explicitly type as string here
     
-    // Use an inner try-catch for individual string operations in case they fail unexpectedly
+    // CRITICAL FIX: Ensure cleanText is always a string before each operation
     try {
+      if (typeof cleanText === 'string') {
         cleanText = cleanText.replace(/```json[\s\S]*?```/g, '');
+      } else {
+        console.error('cleanDisplayText: cleanText is not a string before JSON removal, resetting:', typeof cleanText);
+        cleanText = String(text || '');
+      }
     } catch (e) {
-        console.error('cleanDisplayText: Error removing JSON code blocks:', e);
+      console.error('cleanDisplayText: Error removing JSON code blocks:', e);
+      cleanText = String(text || '');
     }
     
     try {
+      if (typeof cleanText === 'string') {
         cleanText = cleanText.replace(/^\s*\{[\s\S]*?\}\s*$/gm, '');
+      } else {
+        console.error('cleanDisplayText: cleanText is not a string before JSON object removal, resetting:', typeof cleanText);
+        cleanText = String(text || '');
+      }
     } catch (e) {
-        console.error('cleanDisplayText: Error removing standalone JSON objects:', e);
+      console.error('cleanDisplayText: Error removing standalone JSON objects:', e);
+      cleanText = String(text || '');
     }
     
     try {
-        cleanText = cleanText.replace(/\n\s*\n/g, '\n'); // Replaced .trim() with separate .trim() to ensure string consistency
+      if (typeof cleanText === 'string') {
+        cleanText = cleanText.replace(/\n\s*\n/g, '\n');
+      } else {
+        console.error('cleanDisplayText: cleanText is not a string before newline removal, resetting:', typeof cleanText);
+        cleanText = String(text || '');
+      }
     } catch (e) {
-        console.error('cleanDisplayText: Error removing extra newlines:', e);
+      console.error('cleanDisplayText: Error removing extra newlines:', e);
+      cleanText = String(text || '');
     }
 
     try {
+      if (typeof cleanText === 'string') {
         cleanText = cleanText.trim();
+      } else {
+        console.error('cleanDisplayText: cleanText is not a string before trimming, resetting:', typeof cleanText);
+        cleanText = String(text || '');
+      }
     } catch (e) {
-        console.error('cleanDisplayText: Error trimming whitespace:', e);
+      console.error('cleanDisplayText: Error trimming whitespace:', e);
+      cleanText = String(text || '');
     }
     
     // FINAL GUARANTEE: Return a primitive string explicitly

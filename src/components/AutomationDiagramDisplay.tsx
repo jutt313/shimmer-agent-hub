@@ -200,7 +200,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         });
       } else {
         console.log('✅ Diagram saved successfully');
-        if (data && data[0]) {
+        // Fix the TypeScript error by properly handling the data response
+        if (data && Array.isArray(data) && data.length > 0 && data[0]?.id) {
           setDiagramId(data[0].id);
         }
       }

@@ -1,4 +1,5 @@
 
+
 // Enhanced JSON parser with comprehensive error handling and null checks
 
 export interface StructuredResponse {
@@ -33,11 +34,13 @@ export const parseStructuredResponse = (text: string | undefined | null): Struct
   console.log('🔍 Enhanced parsing with conversation context - Length:', text.length);
 
   try {
-    // Clean the text first - handle potential undefined values
+    // Clean the text first - handle potential undefined values with robust checking
     let cleanText = text.trim();
     
-    // Remove any potential undefined or null values that might have been stringified
-    cleanText = cleanText.replace(/undefined|null/g, '""');
+    // Safely remove any potential undefined or null values that might have been stringified
+    if (cleanText && typeof cleanText === 'string') {
+      cleanText = cleanText.replace(/\bundefined\b|null/g, '""');
+    }
     
     // Try to extract JSON from markdown code blocks
     const jsonBlockMatch = cleanText.match(/```json\s*([\s\S]*?)\s*```/);
@@ -108,9 +111,11 @@ export const parseStructuredResponse = (text: string | undefined | null): Struct
   }
 };
 
-// Helper function to safely extract fields with null checks
+// Helper function to safely extract fields with comprehensive null checks
 const extractField = (text: string, fieldName: string) => {
-  if (!text || !fieldName) return null;
+  if (!text || typeof text !== 'string' || !fieldName || typeof fieldName !== 'string') {
+    return null;
+  }
   
   try {
     const pattern = new RegExp(`"${fieldName}"\\s*:\\s*"([^"]*)"`, 'i');
@@ -122,9 +127,11 @@ const extractField = (text: string, fieldName: string) => {
   }
 };
 
-// Helper function to safely extract array fields with null checks
+// Helper function to safely extract array fields with comprehensive null checks
 const extractArrayField = (text: string, fieldName: string) => {
-  if (!text || !fieldName) return [];
+  if (!text || typeof text !== 'string' || !fieldName || typeof fieldName !== 'string') {
+    return [];
+  }
   
   try {
     const pattern = new RegExp(`"${fieldName}"\\s*:\\s*\\[([^\\]]*)\\]`, 'i');
@@ -136,9 +143,9 @@ const extractArrayField = (text: string, fieldName: string) => {
       } catch (arrayError) {
         // If JSON parsing fails, split by commas and clean up
         return match[1].split(',').map((item: string) => {
-          if (!item) return '';
+          if (!item || typeof item !== 'string') return '';
           return item.trim().replace(/"/g, '');
-        }).filter((item: string) => item.length > 0);
+        }).filter((item: string) => item && item.length > 0);
       }
     }
     return [];
@@ -148,34 +155,45 @@ const extractArrayField = (text: string, fieldName: string) => {
   }
 };
 
-// Clean display text function to remove JSON formatting and make it readable
+// FIXED: Clean display text function with robust null/undefined handling
 export const cleanDisplayText = (text: string | undefined | null): string => {
+  // Early return for null/undefined to prevent .replace() errors
   if (!text || typeof text !== 'string') {
     return '';
   }
 
   try {
-    // Remove JSON code blocks
-    let cleanText = text.replace(/```json[\s\S]*?```/g, '');
+    // Safely handle text processing with additional checks
+    let cleanText = text;
     
-    // Remove standalone JSON objects
-    cleanText = cleanText.replace(/^\s*\{[\s\S]*?\}\s*$/gm, '');
+    // Remove JSON code blocks only if text is valid
+    if (cleanText && typeof cleanText === 'string') {
+      cleanText = cleanText.replace(/```json[\s\S]*?```/g, '');
+    }
     
-    // Clean up extra whitespace
-    cleanText = cleanText.replace(/\n\s*\n/g, '\n').trim();
+    // Remove standalone JSON objects only if text is still valid
+    if (cleanText && typeof cleanText === 'string') {
+      cleanText = cleanText.replace(/^\s*\{[\s\S]*?\}\s*$/gm, '');
+    }
     
-    return cleanText;
+    // Clean up extra whitespace only if text is still valid
+    if (cleanText && typeof cleanText === 'string') {
+      cleanText = cleanText.replace(/\n\s*\n/g, '\n').trim();
+    }
+    
+    return cleanText || '';
   } catch (error) {
     console.error('Error cleaning display text:', error);
-    return text;
+    // Return the original text as fallback instead of throwing
+    return typeof text === 'string' ? text : '';
   }
 };
 
-// Enhanced data extraction with conversation context
+// Enhanced data extraction with conversation context and improved error handling
 export const extractStructuredData = (text: string | undefined | null) => {
-  // Handle null/undefined input
+  // Handle null/undefined input with detailed logging
   if (!text || typeof text !== 'string') {
-    console.log('⚠️ Invalid text provided for extraction');
+    console.log('⚠️ Invalid text provided for extraction:', typeof text);
     return {
       hasSummary: false,
       stepsCount: 0,
@@ -187,7 +205,14 @@ export const extractStructuredData = (text: string | undefined | null) => {
 
   console.log('🔍 Enhanced parsing with conversation context - Length:', text.length);
   
-  const structuredData = parseStructuredResponse(text);
+  let structuredData: StructuredResponse | null = null;
+  
+  try {
+    structuredData = parseStructuredResponse(text);
+  } catch (parseError) {
+    console.error('⚠️ Parse error in extractStructuredData:', parseError);
+    structuredData = null;
+  }
   
   const extracted = {
     hasSummary: Boolean(structuredData?.summary),

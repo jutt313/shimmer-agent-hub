@@ -37,17 +37,31 @@ interface AutomationDiagramDisplayProps {
   dismissedAgents?: Set<string>;
 }
 
-// Generate a proper UUID v4
+// FIXED: Generate a proper UUID v4 with error handling
 const generateUUID = (): string => {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
+  try {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    // Fallback for older browsers with validation
+    const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+    
+    // Validate UUID format before returning
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(uuid)) {
+      return uuid;
+    } else {
+      throw new Error('Generated UUID failed validation');
+    }
+  } catch (error) {
+    console.error('UUID generation error:', error);
+    // Ultimate fallback - timestamp-based UUID
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-4xxx-yxxx-${Math.random().toString(36).substr(2, 12)}`;
   }
-  // Fallback for older browsers
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
 };
 
 const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({ 
@@ -63,7 +77,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   const [recommendedAgents, setRecommendedAgents] = useState<any[]>([]);
   const [diagramId, setDiagramId] = useState<string | null>(null);
 
-  // Extract recommended agents from messages with proper null checks
+  // FIXED: Extract recommended agents from messages with comprehensive null checks
   useEffect(() => {
     const agents: any[] = [];
     
@@ -73,21 +87,30 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     }
 
     messages.forEach(message => {
-      if (message && message.isBot) {
+      if (!message || typeof message !== 'object') return;
+      
+      if (message.isBot) {
         let structuredData = message.structuredData;
-        if (!structuredData && message.text) {
-          structuredData = parseStructuredResponse(message.text);
+        if (!structuredData && message.text && typeof message.text === 'string') {
+          try {
+            structuredData = parseStructuredResponse(message.text);
+          } catch (parseError) {
+            console.error('Error parsing message structured data:', parseError);
+            structuredData = null;
+          }
         }
         if (structuredData?.agents && Array.isArray(structuredData.agents)) {
-          agents.push(...structuredData.agents);
+          agents.push(...structuredData.agents.filter(agent => agent && typeof agent === 'object'));
         }
       }
     });
     
-    // Remove duplicates and dismissed agents
+    // Remove duplicates and dismissed agents with robust filtering
     const uniqueAgents = agents.filter((agent, index, self) => 
       agent && 
+      typeof agent === 'object' &&
       agent.name &&
+      typeof agent.name === 'string' &&
       index === self.findIndex(a => a && a.name === agent.name) && 
       !dismissedAgents.has(agent.name)
     );
@@ -95,7 +118,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     setRecommendedAgents(uniqueAgents);
   }, [messages, dismissedAgents]);
 
-  // Transform blueprint to diagram format with error handling
+  // Transform blueprint to diagram format with enhanced error handling
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
     if (!automationBlueprint) return { nodes: [], edges: [] };
     
@@ -151,7 +174,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     },
   }), []);
 
-  // Auto-save functionality with proper UUID handling and enhanced error checking
+  // FIXED: Auto-save functionality with comprehensive error handling and UUID validation
   const saveDiagramLayout = useCallback(async (updatedNodes: any[], updatedEdges: any[]) => {
     if (!user || !automationBlueprint) {
       console.log('⚠️ Cannot save diagram: missing user or blueprint');
@@ -159,14 +182,15 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     }
 
     try {
-      // Ensure we have a proper automation ID
+      // FIXED: Ensure we have a proper automation ID with robust validation
       let automationId = automationBlueprint.id;
+      
       if (!automationId || typeof automationId !== 'string') {
         console.warn('⚠️ Invalid automation ID, generating new one');
         automationId = generateUUID();
       }
 
-      // Validate UUID format
+      // Validate UUID format with enhanced checking
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       if (!uuidRegex.test(automationId)) {
         console.error('❌ Invalid UUID format for automation_id:', automationId);
@@ -175,8 +199,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       }
 
       const diagramData = {
-        nodes: updatedNodes || [],
-        edges: updatedEdges || [],
+        nodes: Array.isArray(updatedNodes) ? updatedNodes : [],
+        edges: Array.isArray(updatedEdges) ? updatedEdges : [],
         viewport: { x: 0, y: 0, zoom: 1 },
         savedAt: new Date().toISOString()
       };
@@ -184,8 +208,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       console.log('💾 Saving diagram layout:', { 
         automationId, 
         userId: user.id, 
-        nodesCount: updatedNodes?.length || 0,
-        edgesCount: updatedEdges?.length || 0
+        nodesCount: diagramData.nodes.length,
+        edgesCount: diagramData.edges.length
       });
 
       const { data, error } = await supabase
@@ -209,7 +233,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         });
       } else {
         console.log('✅ Diagram saved successfully');
-        // Safely handle the data response with proper null checks
+        // FIXED: Safely handle the data response with comprehensive null checks
         if (data && Array.isArray(data) && data.length > 0 && data[0]?.id) {
           setDiagramId(data[0].id);
         }
@@ -224,7 +248,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     }
   }, [user, automationBlueprint, toast]);
 
-  // Load saved diagram layout with proper error handling
+  // Load saved diagram layout with enhanced error handling
   useEffect(() => {
     const loadDiagramLayout = async () => {
       if (!user || !automationBlueprint) return;

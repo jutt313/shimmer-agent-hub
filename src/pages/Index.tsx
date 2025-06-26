@@ -40,7 +40,7 @@ const Index = () => {
       setIsLoading(true);
 
       try {
-        // Prepare payload with proper typing and null checks
+        // FIXED: Prepare payload with comprehensive null/undefined protection
         const payload: {
           message: string;
           messages: any[];
@@ -49,12 +49,12 @@ const Index = () => {
           model?: string;
           apiKey?: string;
         } = { 
-          message: message || "", // Ensure message is never undefined
-          messages: messages.slice(-10) || [] // Send last 10 messages for context
+          message: message?.trim() || "", // Ensure message is never undefined/null
+          messages: Array.isArray(messages) ? messages.slice(-10) : [] // Send last 10 messages for context
         };
 
         // Add agent configuration if available (but don't send API key to the backend)
-        if (currentAgentConfig) {
+        if (currentAgentConfig && typeof currentAgentConfig === 'object') {
           payload.agentConfig = currentAgentConfig.config || {};
           payload.llmProvider = currentAgentConfig.llmProvider || 'OpenAI';
           payload.model = currentAgentConfig.model || 'gpt-4o-mini';
@@ -71,8 +71,18 @@ const Index = () => {
           throw error;
         }
 
-        // Safely handle the response with null checks
-        const responseText = data?.response || "Sorry, I didn't receive a proper response. Please try again.";
+        // FIXED: Safely handle the response with comprehensive null checks and error recovery
+        let responseText = "Sorry, I didn't receive a proper response. Please try again.";
+        
+        if (data && typeof data === 'object') {
+          if (typeof data.response === 'string' && data.response.trim()) {
+            responseText = data.response;
+          } else if (typeof data.message === 'string' && data.message.trim()) {
+            responseText = data.message;
+          } else if (typeof data.text === 'string' && data.text.trim()) {
+            responseText = data.text;
+          }
+        }
         
         const botResponse = {
           id: Date.now() + 1,
@@ -111,12 +121,13 @@ const Index = () => {
   };
 
   const handleAgentConfigSaved = (agentName: string, agentId?: string, llmProvider?: string, model?: string, config?: any, apiKey?: string) => {
+    // FIXED: Robust null/undefined handling for agent configuration
     setCurrentAgentConfig({
-      name: agentName || 'Unnamed Agent',
-      llmProvider: llmProvider || 'OpenAI',
-      model: model || 'gpt-4o-mini',
-      config: config || {},
-      apiKey: apiKey || '' // Store locally but don't send to backend
+      name: agentName && typeof agentName === 'string' ? agentName : 'Unnamed Agent',
+      llmProvider: llmProvider && typeof llmProvider === 'string' ? llmProvider : 'OpenAI',
+      model: model && typeof model === 'string' ? model : 'gpt-4o-mini',
+      config: config && typeof config === 'object' ? config : {},
+      apiKey: apiKey && typeof apiKey === 'string' ? apiKey : '' // Store locally but don't send to backend
     });
     toast({
       title: "AI Agent Configured",

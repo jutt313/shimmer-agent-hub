@@ -40,7 +40,7 @@ const Index = () => {
       setIsLoading(true);
 
       try {
-        // Prepare payload with proper typing
+        // Prepare payload with proper typing and null checks
         const payload: {
           message: string;
           messages: any[];
@@ -49,15 +49,15 @@ const Index = () => {
           model?: string;
           apiKey?: string;
         } = { 
-          message: message,
-          messages: messages.slice(-10) // Send last 10 messages for context
+          message: message || "", // Ensure message is never undefined
+          messages: messages.slice(-10) || [] // Send last 10 messages for context
         };
 
         // Add agent configuration if available (but don't send API key to the backend)
         if (currentAgentConfig) {
-          payload.agentConfig = currentAgentConfig.config;
-          payload.llmProvider = currentAgentConfig.llmProvider;
-          payload.model = currentAgentConfig.model;
+          payload.agentConfig = currentAgentConfig.config || {};
+          payload.llmProvider = currentAgentConfig.llmProvider || 'OpenAI';
+          payload.model = currentAgentConfig.model || 'gpt-4o-mini';
           // Don't send the API key to the backend - it should use the one from Supabase secrets
         }
 
@@ -71,9 +71,12 @@ const Index = () => {
           throw error;
         }
 
+        // Safely handle the response with null checks
+        const responseText = data?.response || "Sorry, I didn't receive a proper response. Please try again.";
+        
         const botResponse = {
           id: Date.now() + 1,
-          text: data.response,
+          text: responseText,
           isBot: true,
           timestamp: new Date()
         };
@@ -109,7 +112,7 @@ const Index = () => {
 
   const handleAgentConfigSaved = (agentName: string, agentId?: string, llmProvider?: string, model?: string, config?: any, apiKey?: string) => {
     setCurrentAgentConfig({
-      name: agentName,
+      name: agentName || 'Unnamed Agent',
       llmProvider: llmProvider || 'OpenAI',
       model: model || 'gpt-4o-mini',
       config: config || {},
@@ -117,7 +120,7 @@ const Index = () => {
     });
     toast({
       title: "AI Agent Configured",
-      description: `AI Agent "${agentName}" is now active for this chat session.`,
+      description: `AI Agent "${agentName || 'Unnamed Agent'}" is now active for this chat session.`,
     });
   };
 
@@ -133,10 +136,10 @@ const Index = () => {
         {currentAgentConfig && (
           <div className="bg-white/90 backdrop-blur-md rounded-2xl px-4 py-2 shadow-lg border border-blue-200">
             <div className="text-sm text-blue-600 font-medium">
-              Active Agent: {currentAgentConfig.name}
+              Active Agent: {currentAgentConfig.name || 'Unnamed Agent'}
             </div>
             <div className="text-xs text-gray-500">
-              {currentAgentConfig.llmProvider} - {currentAgentConfig.model}
+              {currentAgentConfig.llmProvider || 'OpenAI'} - {currentAgentConfig.model || 'gpt-4o-mini'}
             </div>
           </div>
         )}
@@ -191,7 +194,7 @@ const Index = () => {
             <div className="flex-1 relative">
               <Input 
                 value={message} 
-                onChange={e => setMessage(e.target.value)} 
+                onChange={e => setMessage(e.target.value || "")} 
                 onKeyPress={handleKeyPress} 
                 placeholder={isLoading ? "YusrAI is thinking..." : "Type your message here..."} 
                 disabled={isLoading}

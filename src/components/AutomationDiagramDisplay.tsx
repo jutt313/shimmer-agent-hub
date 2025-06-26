@@ -1,3 +1,4 @@
+
 import React, { useCallback, useMemo, useEffect, useState } from 'react';
 import {
   ReactFlow,
@@ -62,16 +63,22 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   const [recommendedAgents, setRecommendedAgents] = useState<any[]>([]);
   const [diagramId, setDiagramId] = useState<string | null>(null);
 
-  // Extract recommended agents from messages
+  // Extract recommended agents from messages with proper null checks
   useEffect(() => {
     const agents: any[] = [];
+    
+    if (!messages || !Array.isArray(messages)) {
+      setRecommendedAgents([]);
+      return;
+    }
+
     messages.forEach(message => {
-      if (message.isBot) {
+      if (message && message.isBot) {
         let structuredData = message.structuredData;
-        if (!structuredData) {
+        if (!structuredData && message.text) {
           structuredData = parseStructuredResponse(message.text);
         }
-        if (structuredData?.agents) {
+        if (structuredData?.agents && Array.isArray(structuredData.agents)) {
           agents.push(...structuredData.agents);
         }
       }
@@ -79,7 +86,9 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     
     // Remove duplicates and dismissed agents
     const uniqueAgents = agents.filter((agent, index, self) => 
-      index === self.findIndex(a => a.name === agent.name) && 
+      agent && 
+      agent.name &&
+      index === self.findIndex(a => a && a.name === agent.name) && 
       !dismissedAgents.has(agent.name)
     );
     
@@ -142,7 +151,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     },
   }), []);
 
-  // Auto-save functionality with proper UUID handling
+  // Auto-save functionality with proper UUID handling and enhanced error checking
   const saveDiagramLayout = useCallback(async (updatedNodes: any[], updatedEdges: any[]) => {
     if (!user || !automationBlueprint) {
       console.log('⚠️ Cannot save diagram: missing user or blueprint');
@@ -166,8 +175,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       }
 
       const diagramData = {
-        nodes: updatedNodes,
-        edges: updatedEdges,
+        nodes: updatedNodes || [],
+        edges: updatedEdges || [],
         viewport: { x: 0, y: 0, zoom: 1 },
         savedAt: new Date().toISOString()
       };
@@ -175,8 +184,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       console.log('💾 Saving diagram layout:', { 
         automationId, 
         userId: user.id, 
-        nodesCount: updatedNodes.length,
-        edgesCount: updatedEdges.length 
+        nodesCount: updatedNodes?.length || 0,
+        edgesCount: updatedEdges?.length || 0
       });
 
       const { data, error } = await supabase
@@ -195,13 +204,13 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         console.error('❌ Error saving diagram:', error);
         toast({
           title: "Save Error",
-          description: `Failed to save diagram: ${error.message}`,
+          description: `Failed to save diagram: ${error.message || 'Unknown error'}`,
           variant: "destructive",
         });
       } else {
         console.log('✅ Diagram saved successfully');
-        // Fix the TypeScript error by properly handling the data response
-        if (data && data.length > 0 && data[0]?.id) {
+        // Safely handle the data response with proper null checks
+        if (data && Array.isArray(data) && data.length > 0 && data[0]?.id) {
           setDiagramId(data[0].id);
         }
       }
@@ -344,7 +353,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             <div className="flex gap-2">
               {recommendedAgents.map((agent, index) => (
                 <div key={index} className="flex items-center gap-2 bg-blue-100/50 border border-blue-200/50 rounded-lg px-3 py-1">
-                  <span className="text-sm font-medium text-blue-700">{agent.name}</span>
+                  <span className="text-sm font-medium text-blue-700">{agent.name || 'Unnamed Agent'}</span>
                   <Button
                     size="sm"
                     onClick={() => onAgentAdd?.(agent)}
@@ -355,7 +364,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => onAgentDismiss?.(agent.name)}
+                    onClick={() => onAgentDismiss?.(agent.name || 'Unnamed Agent')}
                     className="border-blue-300/50 text-blue-600 hover:bg-blue-100/50 px-2 py-1 text-xs h-6"
                   >
                     <X className="w-3 h-3" />

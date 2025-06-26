@@ -1,3 +1,4 @@
+
 // src/components/ChatCard.tsx
 
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -5,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Bot, Plus, X } from "lucide-react";
 import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
 import { useEffect, useRef } from "react";
+import { useErrorRecovery } from "@/hooks/useErrorRecovery";
+import { useChatOptimization } from "@/hooks/useChatOptimization";
 
 interface Message {
   id: number;
@@ -33,62 +36,44 @@ const ChatCard = ({
 }: ChatCardProps) => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { handleError } = useErrorRecovery();
+  const { optimizeMessages } = useChatOptimization();
 
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // Renamed and made more robust for rendering message text into HTML
+  // Optimize messages for performance
+  const optimizedMessages = optimizeMessages(messages);
+
+  // Enhanced safe text formatting with error recovery
   const safeFormatMessageText = (inputText: string | undefined | null): React.ReactNode[] => {
-    console.log('safeFormatMessageText: InputText value:', inputText, 'Type:', typeof inputText);
-
-    // ULTIMATE SAFETY: Initial check for null/undefined/non-string input
-    if (typeof inputText !== 'string' || inputText === null || inputText === undefined) {
-      console.warn('safeFormatMessageText: Invalid inputText type received, returning fallback span. Type:', typeof inputText, 'Value:', inputText);
-      return [<span key="fallback-input-error">Message content unavailable.</span>];
-    }
-
-    let cleanHtmlString: string = '';
     try {
-      // Step 1: Clean the text using the bulletproof cleanDisplayText
-      cleanHtmlString = cleanDisplayText(inputText);
-      console.log('safeFormatMessageText: After cleanDisplayText. Value:', cleanHtmlString, 'Type:', typeof cleanHtmlString);
-
-      // CRITICAL: Final check that cleanDisplayText indeed returned a string
-      if (typeof cleanHtmlString !== 'string') {
-        console.error('safeFormatMessageText: CRITICAL - cleanDisplayText returned non-string! Forcing to string.', cleanHtmlString);
-        cleanHtmlString = String(cleanHtmlString || ''); // Force to string as last resort
+      if (typeof inputText !== 'string' || inputText === null || inputText === undefined) {
+        console.warn('safeFormatMessageText: Invalid input, using fallback');
+        return [<span key="fallback-input-error">Message content unavailable.</span>];
       }
+
+      const cleanHtmlString = cleanDisplayText(inputText);
       
-      // Step 2: Perform markdown-like replacements safely
-      // Ensure cleanHtmlString is a string here before .replace()
-      if (typeof cleanHtmlString === 'string') {
-        cleanHtmlString = cleanHtmlString.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-      } else {
-        console.error('safeFormatMessageText: cleanHtmlString unexpectedly non-string before markdown replace. Value:', cleanHtmlString);
-        cleanHtmlString = ''; // Reset to empty string if type is wrong
+      if (typeof cleanHtmlString !== 'string') {
+        console.error('safeFormatMessageText: cleanDisplayText returned non-string');
+        return [<span key="processing-error">Error displaying message content.</span>];
       }
 
-      // Step 3: Split into lines and map to ReactNode array
-      const lines = cleanHtmlString.split('\n');
-      return lines.map((line, index) => {
-        // Ensure each line is also a string before injecting into HTML
-        const safeLine = typeof line === 'string' ? line : String(line || '');
-        
-        return (
-          <span key={`line-${index}`}>
-            {/* Using dangerouslySetInnerHTML as per original intent */}
-            <span dangerouslySetInnerHTML={{ __html: safeLine }} />
-            {/* Add <br /> between lines, excluding the last one */}
-            {index < lines.length - 1 && <br />}
-          </span>
-        );
-      });
+      const processedText = cleanHtmlString.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      const lines = processedText.split('\n');
+      
+      return lines.map((line, index) => (
+        <span key={`line-${index}`}>
+          <span dangerouslySetInnerHTML={{ __html: String(line || '') }} />
+          {index < lines.length - 1 && <br />}
+        </span>
+      ));
 
     } catch (error: any) {
-      console.error('safeFormatMessageText: Top-level error caught during text formatting. Error:', error, 'Input:', inputText, 'Current cleanHtmlString:', cleanHtmlString);
-      // Fallback in case any operation within this function throws an error
+      handleError(error, 'Text formatting in ChatCard');
       return [<span key="processing-error">Error displaying message content.</span>];
     }
   };
@@ -96,117 +81,122 @@ const ChatCard = ({
   const renderStructuredContent = (structuredData: StructuredResponse) => {
     const content = [];
 
-    // Summary - Clean simple text
-    if (structuredData.summary) {
-      content.push(
-        <div key="summary" className="mb-4">
-          <p className="text-gray-800 leading-relaxed">{structuredData.summary}</p>
-        </div>
-      );
-    }
-
-    // Steps - Simple numbered list
-    if (structuredData.steps && structuredData.steps.length > 0) {
-      content.push(
-        <div key="steps" className="mb-4">
-          <p className="font-medium text-gray-800 mb-2">Steps:</p>
-          <ol className="list-decimal list-inside space-y-1 text-gray-700 ml-4">
-            {structuredData.steps.map((step, index) => (
-              <li key={index} className="leading-relaxed">{step}</li>
-            ))}
-          </ol>
-        </div>
-      );
-    }
-
-    // Platforms - Simple text list
-    if (structuredData.platforms && structuredData.platforms.length > 0) {
-      content.push(
-        <div key="platforms" className="mb-4">
-          <p className="font-medium text-gray-800 mb-2">Required Platform Credentials:</p>
-          <div className="text-gray-700 ml-4 space-y-2">
-            {structuredData.platforms.map((platform, index) => (
-              <div key={index}>
-                <p className="font-medium text-gray-800">{platform.name}</p>
-                {platform.credentials && platform.credentials.length > 0 && (
-                  <ul className="list-disc list-inside ml-4 space-y-1">
-                    {platform.credentials.map((cred, credIndex) => (
-                      <li key={credIndex} className="text-sm">
-                        <strong>{cred.field.replace(/_/g, ' ').toUpperCase()}</strong>: {cred.why_needed}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
+    try {
+      // Summary
+      if (structuredData.summary) {
+        content.push(
+          <div key="summary" className="mb-4">
+            <p className="text-gray-800 leading-relaxed">{structuredData.summary}</p>
           </div>
-        </div>
-      );
-    }
+        );
+      }
 
-    // Clarification Questions - Simple list
-    if (structuredData.clarification_questions && structuredData.clarification_questions.length > 0) {
-      content.push(
-        <div key="clarification" className="mb-4">
-          <p className="font-medium text-gray-800 mb-2">I need some clarification:</p>
-          <ol className="list-decimal list-inside space-y-1 text-gray-700 ml-4">
-            {structuredData.clarification_questions.map((question, index) => (
-              <li key={index} className="leading-relaxed">{question}</li>
-            ))}
-          </ol>
-        </div>
-      );
-    }
+      // Steps
+      if (structuredData.steps && structuredData.steps.length > 0) {
+        content.push(
+          <div key="steps" className="mb-4">
+            <p className="font-medium text-gray-800 mb-2">Steps:</p>
+            <ol className="list-decimal list-inside space-y-1 text-gray-700 ml-4">
+              {structuredData.steps.map((step, index) => (
+                <li key={index} className="leading-relaxed">{step}</li>
+              ))}
+            </ol>
+          </div>
+        );
+      }
 
-    // AI Agents - Separate cards as requested
-    if (structuredData.agents && structuredData.agents.length > 0) {
-      content.push(
-        <div key="agents" className="mb-4">
-          <p className="font-medium text-gray-800 mb-3">Recommended AI Agents:</p>
-          <div className="space-y-3">
-            {structuredData.agents.map((agent, index) => {
-              if (dismissedAgents.has(agent.name)) return null;
-              
-              return (
-                <div key={index} className="border border-blue-200/50 rounded-lg p-4 bg-blue-50/30 backdrop-blur-sm">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-gray-800">{agent.name}</h4>
-                      <p className="text-sm text-gray-600">{agent.role}</p>
-                    </div>
-                    <div className="flex gap-2 ml-4">
-                      <Button
-                        size="sm"
-                        onClick={() => onAgentAdd?.(agent)}
-                        className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-3 py-1 text-xs border-0"
-                      >
-                        <Plus className="w-3 h-3 mr-1" />
-                        Add Agent
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onAgentDismiss?.(agent.name)}
-                        className="border-gray-300 text-gray-600 hover:bg-gray-100 px-3 py-1 text-xs"
-                      >
-                        <X className="w-3 h-3 mr-1" />
-                        Dismiss
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="space-y-2 text-sm text-gray-700">
-                    <p><strong className="text-gray-800">Goal:</strong> {agent.goal}</p>
-                    <p><strong className="text-gray-800">Why needed:</strong> {agent.why_needed}</p>
-                  </div>
+      // Platforms
+      if (structuredData.platforms && structuredData.platforms.length > 0) {
+        content.push(
+          <div key="platforms" className="mb-4">
+            <p className="font-medium text-gray-800 mb-2">Required Platform Credentials:</p>
+            <div className="text-gray-700 ml-4 space-y-2">
+              {structuredData.platforms.map((platform, index) => (
+                <div key={index}>
+                  <p className="font-medium text-gray-800">{platform.name}</p>
+                  {platform.credentials && platform.credentials.length > 0 && (
+                    <ul className="list-disc list-inside ml-4 space-y-1">
+                      {platform.credentials.map((cred, credIndex) => (
+                        <li key={credIndex} className="text-sm">
+                          <strong>{cred.field.replace(/_/g, ' ').toUpperCase()}</strong>: {cred.why_needed}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
-        </div>
-      );
-    }
+        );
+      }
 
-    return content;
+      // Clarification Questions
+      if (structuredData.clarification_questions && structuredData.clarification_questions.length > 0) {
+        content.push(
+          <div key="clarification" className="mb-4">
+            <p className="font-medium text-gray-800 mb-2">I need some clarification:</p>
+            <ol className="list-decimal list-inside space-y-1 text-gray-700 ml-4">
+              {structuredData.clarification_questions.map((question, index) => (
+                <li key={index} className="leading-relaxed">{question}</li>
+              ))}
+            </ol>
+          </div>
+        );
+      }
+
+      // AI Agents
+      if (structuredData.agents && structuredData.agents.length > 0) {
+        content.push(
+          <div key="agents" className="mb-4">
+            <p className="font-medium text-gray-800 mb-3">Recommended AI Agents:</p>
+            <div className="space-y-3">
+              {structuredData.agents.map((agent, index) => {
+                if (dismissedAgents.has(agent.name)) return null;
+                
+                return (
+                  <div key={index} className="border border-blue-200/50 rounded-lg p-4 bg-blue-50/30 backdrop-blur-sm">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-gray-800">{agent.name}</h4>
+                        <p className="text-sm text-gray-600">{agent.role}</p>
+                      </div>
+                      <div className="flex gap-2 ml-4">
+                        <Button
+                          size="sm"
+                          onClick={() => onAgentAdd?.(agent)}
+                          className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-3 py-1 text-xs border-0"
+                        >
+                          <Plus className="w-3 h-3 mr-1" />
+                          Add Agent
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onAgentDismiss?.(agent.name)}
+                          className="border-gray-300 text-gray-600 hover:bg-gray-100 px-3 py-1 text-xs"
+                        >
+                          <X className="w-3 h-3 mr-1" />
+                          Dismiss
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="space-y-2 text-sm text-gray-700">
+                      <p><strong className="text-gray-800">Goal:</strong> {agent.goal}</p>
+                      <p><strong className="text-gray-800">Why needed:</strong> {agent.why_needed}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      }
+
+      return content;
+    } catch (error: any) {
+      handleError(error, 'Structured content rendering');
+      return [<div key="error" className="text-red-600 p-4">Error rendering structured content</div>];
+    }
   };
 
   return (
@@ -220,10 +210,15 @@ const ChatCard = ({
       
       <ScrollArea className="flex-1 relative z-10" ref={scrollAreaRef}>
         <div className="space-y-6 pr-4">
-          {messages.map(message => {
+          {optimizedMessages.map(message => {
             let structuredData = message.structuredData;
             if (message.isBot && !structuredData) {
-              structuredData = parseStructuredResponse(message.text);
+              try {
+                structuredData = parseStructuredResponse(message.text);
+              } catch (error: any) {
+                handleError(error, `Parsing message ${message.id}`);
+                structuredData = null;
+              }
             }
 
             return (
@@ -247,7 +242,6 @@ const ChatCard = ({
                   ) : (
                     /* Show formatted text for user messages or if no structured data */
                     <div className="leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
-                      {/* Call the ultra-safe formatting function */}
                       {safeFormatMessageText(message.text)} 
                     </div>
                   )}

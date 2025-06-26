@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useErrorRecovery } from "@/hooks/useErrorRecovery";
+import { useAsyncOperation } from "@/hooks/useAsyncOperation";
 
 const Index = () => {
   const [message, setMessage] = useState("");
@@ -26,6 +28,18 @@ const Index = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { handleError } = useErrorRecovery();
+  
+  const { execute: executeChatRequest } = useAsyncOperation('chat-request', {
+    onError: (error) => {
+      toast({
+        title: "Connection Error",
+        description: "Unable to connect to AI service. Please check your connection and try again.",
+        variant: "destructive",
+      });
+    },
+    errorSeverity: 'medium'
+  });
 
   const handleSendMessage = async () => {
     if (!message.trim() || isLoading) {
@@ -45,54 +59,60 @@ const Index = () => {
     setIsLoading(true);
 
     try {
-      // Enhanced payload with proper typing
-      const payload: {
-        message: string;
-        messages: Array<{
-          id: number;
-          text: string;
-          isBot: boolean;
-          timestamp: Date;
-        }>;
-        agentConfig?: any;
-        llmProvider?: string;
-        model?: string;
-      } = { 
-        message: currentMessage,
-        messages: Array.isArray(messages) ? messages.slice(-10) : []
-      };
+      const result = await executeChatRequest(async () => {
+        const payload: {
+          message: string;
+          messages: Array<{
+            id: number;
+            text: string;
+            isBot: boolean;
+            timestamp: Date;
+          }>;
+          agentConfig?: any;
+          llmProvider?: string;
+          model?: string;
+        } = { 
+          message: currentMessage,
+          messages: Array.isArray(messages) ? messages.slice(-10) : []
+        };
 
-      // Add agent configuration with null checks
-      if (currentAgentConfig && typeof currentAgentConfig === 'object') {
-        payload.agentConfig = currentAgentConfig.config || {};
-        payload.llmProvider = currentAgentConfig.llmProvider || 'OpenAI';
-        payload.model = currentAgentConfig.model || 'gpt-4o-mini';
-      }
+        // Add agent configuration with null checks
+        if (currentAgentConfig && typeof currentAgentConfig === 'object') {
+          payload.agentConfig = currentAgentConfig.config || {};
+          payload.llmProvider = currentAgentConfig.llmProvider || 'OpenAI';
+          payload.model = currentAgentConfig.model || 'gpt-4o-mini';
+        }
 
-      console.log('Sending enhanced payload to chat-ai...');
+        console.log('Sending enhanced payload to chat-ai...');
 
-      const { data, error } = await supabase.functions.invoke('chat-ai', {
-        body: payload
+        const { data, error } = await supabase.functions.invoke('chat-ai', {
+          body: payload
+        });
+
+        if (error) {
+          console.error('Supabase function error:', error);
+          throw error;
+        }
+
+        return data;
+      }, {
+        userAction: 'Sending chat message',
+        additionalContext: `Message: "${currentMessage}"`
       });
-
-      if (error) {
-        console.error('Supabase function error:', error);
-        throw error;
-      }
 
       // Ultra-safe response handling
       let responseText = "I apologize, but I couldn't process your request properly. Please try again.";
       
-      if (data) {
-        if (typeof data === 'string' && data.trim()) {
-          responseText = data;
-        } else if (typeof data === 'object') {
-          if (typeof data.response === 'string' && data.response.trim()) {
-            responseText = data.response;
-          } else if (typeof data.message === 'string' && data.message.trim()) {
-            responseText = data.message;
-          } else if (typeof data.text === 'string' && data.text.trim()) {
-            responseText = data.text;
+      if (result) {
+        if (typeof result === 'string' && result.trim()) {
+          responseText = result;
+        } else if (typeof result === 'object') {
+          if (typeof result.response === 'string' && result.response.trim()) {
+            responseText = result.response;
+          } else if (typeof result.message === 'string' && result.message.trim()) {
+            responseText = result.message;
+          } else if (typeof result.text === 'string' && result.text.trim()) {
+            responseText = result.text;
           }
         }
       }
@@ -106,14 +126,8 @@ const Index = () => {
       
       setMessages(prev => [...prev, botResponse]);
 
-    } catch (error) {
-      console.error('Error in chat communication:', error);
-      
-      toast({
-        title: "Connection Error",
-        description: "Unable to connect to AI service. Please check your connection and try again.",
-        variant: "destructive",
-      });
+    } catch (error: any) {
+      handleError(error, 'Chat message sending');
       
       const errorResponse = {
         id: Date.now() + 1,

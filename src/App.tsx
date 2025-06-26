@@ -13,8 +13,17 @@ import Disclaimer from "@/pages/Disclaimer";
 import Support from "@/pages/Support";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ErrorIndicator from "@/components/ErrorIndicator";
+import PerformanceMonitor from "@/components/PerformanceMonitor";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes
+    },
+  },
+});
 
 function App() {
   return (
@@ -23,6 +32,7 @@ function App() {
         <div className="min-h-screen bg-gray-50">
           <Toaster />
           <ErrorIndicator />
+          <PerformanceMonitor />
           <Router>
             <Routes>
               <Route path="/" element={<Index />} />

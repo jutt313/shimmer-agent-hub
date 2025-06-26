@@ -17,7 +17,7 @@ const Index = () => {
   const [message, setMessage] = useState("");
   const [showAgentForm, setShowAgentForm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [currentAgentConfig, setCurrentAgentConfig] = useState(null);
+  const [currentAgentConfig, setCurrentAgentConfig] = useState<any>(null);
   const [messages, setMessages] = useState([{
     id: 1,
     text: "I am YusrAI, your AI assistant powered by OpenAI. How can I help you today?",
@@ -60,23 +60,13 @@ const Index = () => {
 
     try {
       const result = await executeChatRequest(async () => {
-        const payload: {
-          message: string;
-          messages: Array<{
-            id: number;
-            text: string;
-            isBot: boolean;
-            timestamp: Date;
-          }>;
-          agentConfig?: any;
-          llmProvider?: string;
-          model?: string;
-        } = { 
+        // Safe payload construction with null checks
+        const payload: any = { 
           message: currentMessage,
           messages: Array.isArray(messages) ? messages.slice(-10) : []
         };
 
-        // Add agent configuration with null checks
+        // Safe agent configuration with bulletproof null checks
         if (currentAgentConfig && typeof currentAgentConfig === 'object') {
           payload.agentConfig = currentAgentConfig.config || {};
           payload.llmProvider = currentAgentConfig.llmProvider || 'OpenAI';
@@ -100,13 +90,13 @@ const Index = () => {
         additionalContext: `Message: "${currentMessage}"`
       });
 
-      // Ultra-safe response handling
+      // Ultra-safe response handling with multiple fallbacks
       let responseText = "I apologize, but I couldn't process your request properly. Please try again.";
       
       if (result) {
         if (typeof result === 'string' && result.trim()) {
           responseText = result;
-        } else if (typeof result === 'object') {
+        } else if (typeof result === 'object' && result !== null) {
           if (typeof result.response === 'string' && result.response.trim()) {
             responseText = result.response;
           } else if (typeof result.message === 'string' && result.message.trim()) {
@@ -148,23 +138,33 @@ const Index = () => {
     }
   }, [handleSendMessage, isLoading]);
 
+  // Simplified and bulletproof agent config handler
   const handleAgentConfigSaved = useCallback((agentName: string, agentId?: string, llmProvider?: string, model?: string, config?: any, apiKey?: string) => {
-    // Enhanced null safety for agent configuration
-    const safeAgentConfig = {
-      name: agentName && typeof agentName === 'string' ? agentName : 'AI Agent',
-      llmProvider: llmProvider && typeof llmProvider === 'string' ? llmProvider : 'OpenAI',
-      model: model && typeof model === 'string' ? model : 'gpt-4o-mini',
-      config: config && typeof config === 'object' ? config : {},
-      apiKey: apiKey && typeof apiKey === 'string' ? apiKey : ''
-    };
+    try {
+      // Enhanced null safety for agent configuration
+      const safeAgentConfig = {
+        name: agentName && typeof agentName === 'string' ? agentName : 'AI Agent',
+        llmProvider: llmProvider && typeof llmProvider === 'string' ? llmProvider : 'OpenAI',
+        model: model && typeof model === 'string' ? model : 'gpt-4o-mini',
+        config: config && typeof config === 'object' ? config : {},
+        apiKey: apiKey && typeof apiKey === 'string' ? apiKey : ''
+      };
 
-    setCurrentAgentConfig(safeAgentConfig);
-    
-    toast({
-      title: "AI Agent Configured",
-      description: `AI Agent "${safeAgentConfig.name}" is now active for this chat session.`,
-    });
-  }, [toast]);
+      setCurrentAgentConfig(safeAgentConfig);
+      
+      toast({
+        title: "AI Agent Configured",
+        description: `AI Agent "${safeAgentConfig.name}" is now active for this chat session.`,
+      });
+    } catch (error: any) {
+      handleError(error, 'Agent configuration saving');
+      toast({
+        title: "Configuration Error",
+        description: "Failed to save agent configuration. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [toast, handleError]);
 
   // Memoize the agent status display to prevent re-renders
   const agentStatusDisplay = useMemo(() => {

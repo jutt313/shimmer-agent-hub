@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { globalErrorLogger } from '@/utils/errorLogger';
 
@@ -23,21 +23,18 @@ export const useErrorRecovery = () => {
   const handleError = useCallback((error: Error | string, context?: string) => {
     const errorMessage = typeof error === 'string' ? error : error.message;
     
-    setState(prev => {
-      const newState = {
-        ...prev,
-        hasError: true,
-        errorCount: prev.errorCount + 1,
-        lastError: errorMessage
-      };
+    // Update state safely
+    setState(prev => ({
+      ...prev,
+      hasError: true,
+      errorCount: prev.errorCount + 1,
+      lastError: errorMessage
+    }));
 
-      globalErrorLogger.log('ERROR', `Error recovery triggered: ${errorMessage}`, {
-        context,
-        errorCount: newState.errorCount,
-        recoveryAttempts: prev.recoveryAttempts
-      });
-
-      return newState;
+    // Log error
+    globalErrorLogger.log('ERROR', `Error recovery triggered: ${errorMessage}`, {
+      context,
+      timestamp: Date.now()
     });
 
     // Show toast for non-critical errors
@@ -48,21 +45,17 @@ export const useErrorRecovery = () => {
         variant: "destructive",
       });
     }
-  }, [toast]); // Remove state dependencies to prevent loops
+  }, [toast]);
 
   const attemptRecovery = useCallback(() => {
-    setState(prev => {
-      const newState = {
-        ...prev,
-        recoveryAttempts: prev.recoveryAttempts + 1,
-        hasError: false
-      };
+    setState(prev => ({
+      ...prev,
+      recoveryAttempts: prev.recoveryAttempts + 1,
+      hasError: false
+    }));
 
-      globalErrorLogger.log('INFO', 'Recovery attempt initiated', {
-        attempt: newState.recoveryAttempts
-      });
-
-      return newState;
+    globalErrorLogger.log('INFO', 'Recovery attempt initiated', {
+      timestamp: Date.now()
     });
   }, []);
 
@@ -75,10 +68,10 @@ export const useErrorRecovery = () => {
     });
   }, []);
 
-  return useMemo(() => ({
+  return {
     ...state,
     handleError,
     attemptRecovery,
     reset
-  }), [state, handleError, attemptRecovery, reset]);
+  };
 };

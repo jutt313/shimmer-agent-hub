@@ -1,13 +1,10 @@
 
-// src/components/ChatCard.tsx
-
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Bot, Plus, X } from "lucide-react";
 import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
 import { useEffect, useRef } from "react";
 import { useErrorRecovery } from "@/hooks/useErrorRecovery";
-import { useChatOptimization } from "@/hooks/useChatOptimization";
 
 interface Message {
   id: number;
@@ -37,28 +34,38 @@ const ChatCard = ({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { handleError } = useErrorRecovery();
-  const { optimizeMessages } = useChatOptimization();
 
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // Optimize messages for performance
+  // Optimize messages for performance with safe array handling
+  const optimizeMessages = (msgs: Message[]) => {
+    try {
+      if (!Array.isArray(msgs)) {
+        console.warn('Messages is not an array, using empty array');
+        return [];
+      }
+      return msgs.slice(-50);
+    } catch (error) {
+      console.error('Error optimizing messages:', error);
+      return [];
+    }
+  };
+
   const optimizedMessages = optimizeMessages(messages);
 
-  // Enhanced safe text formatting with error recovery
+  // Ultra-safe text formatting with bulletproof error recovery
   const safeFormatMessageText = (inputText: string | undefined | null): React.ReactNode[] => {
     try {
-      if (typeof inputText !== 'string' || inputText === null || inputText === undefined) {
-        console.warn('safeFormatMessageText: Invalid input, using fallback');
+      if (!inputText || typeof inputText !== 'string') {
         return [<span key="fallback-input-error">Message content unavailable.</span>];
       }
 
       const cleanHtmlString = cleanDisplayText(inputText);
       
       if (typeof cleanHtmlString !== 'string') {
-        console.error('safeFormatMessageText: cleanDisplayText returned non-string');
         return [<span key="processing-error">Error displaying message content.</span>];
       }
 
@@ -82,8 +89,8 @@ const ChatCard = ({
     const content = [];
 
     try {
-      // Summary
-      if (structuredData.summary) {
+      // Summary - Safe rendering
+      if (structuredData.summary && typeof structuredData.summary === 'string') {
         content.push(
           <div key="summary" className="mb-4">
             <p className="text-gray-800 leading-relaxed">{structuredData.summary}</p>
@@ -91,74 +98,112 @@ const ChatCard = ({
         );
       }
 
-      // Steps
-      if (structuredData.steps && structuredData.steps.length > 0) {
+      // Steps - Safe array rendering
+      if (Array.isArray(structuredData.steps) && structuredData.steps.length > 0) {
         content.push(
           <div key="steps" className="mb-4">
             <p className="font-medium text-gray-800 mb-2">Steps:</p>
             <ol className="list-decimal list-inside space-y-1 text-gray-700 ml-4">
-              {structuredData.steps.map((step, index) => (
-                <li key={index} className="leading-relaxed">{step}</li>
-              ))}
+              {structuredData.steps.map((step, index) => {
+                if (typeof step === 'string') {
+                  return <li key={index} className="leading-relaxed">{step}</li>;
+                }
+                return null;
+              }).filter(Boolean)}
             </ol>
           </div>
         );
       }
 
-      // Platforms
-      if (structuredData.platforms && structuredData.platforms.length > 0) {
+      // Platforms - BULLETPROOF RENDERING WITH NULL CHECKS
+      if (Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
         content.push(
           <div key="platforms" className="mb-4">
             <p className="font-medium text-gray-800 mb-2">Required Platform Credentials:</p>
             <div className="text-gray-700 ml-4 space-y-2">
-              {structuredData.platforms.map((platform, index) => (
-                <div key={index}>
-                  <p className="font-medium text-gray-800">{platform.name}</p>
-                  {platform.credentials && platform.credentials.length > 0 && (
-                    <ul className="list-disc list-inside ml-4 space-y-1">
-                      {platform.credentials.map((cred, credIndex) => (
-                        <li key={credIndex} className="text-sm">
-                          <strong>{cred.field.replace(/_/g, ' ').toUpperCase()}</strong>: {cred.why_needed}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
+              {structuredData.platforms.map((platform, index) => {
+                // CRITICAL FIX: Safe platform validation
+                if (!platform || typeof platform !== 'object') {
+                  return null;
+                }
+
+                const platformName = platform.name || 'Unknown Platform';
+                
+                return (
+                  <div key={index}>
+                    <p className="font-medium text-gray-800">{platformName}</p>
+                    {Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
+                      <ul className="list-disc list-inside ml-4 space-y-1">
+                        {platform.credentials.map((cred, credIndex) => {
+                          // CRITICAL FIX: Safe credential validation
+                          if (!cred || typeof cred !== 'object') {
+                            return null;
+                          }
+
+                          // BULLETPROOF field handling - this was causing the crashes
+                          const fieldName = cred.field && typeof cred.field === 'string' 
+                            ? cred.field.replace(/_/g, ' ').toUpperCase()
+                            : 'CREDENTIAL';
+                          
+                          const whyNeeded = cred.why_needed && typeof cred.why_needed === 'string'
+                            ? cred.why_needed
+                            : 'Required for platform integration';
+
+                          return (
+                            <li key={credIndex} className="text-sm">
+                              <strong>{fieldName}</strong>: {whyNeeded}
+                            </li>
+                          );
+                        }).filter(Boolean)}
+                      </ul>
+                    )}
+                  </div>
+                );
+              }).filter(Boolean)}
             </div>
           </div>
         );
       }
 
-      // Clarification Questions
-      if (structuredData.clarification_questions && structuredData.clarification_questions.length > 0) {
+      // Clarification Questions - Safe rendering
+      if (Array.isArray(structuredData.clarification_questions) && structuredData.clarification_questions.length > 0) {
         content.push(
           <div key="clarification" className="mb-4">
             <p className="font-medium text-gray-800 mb-2">I need some clarification:</p>
             <ol className="list-decimal list-inside space-y-1 text-gray-700 ml-4">
-              {structuredData.clarification_questions.map((question, index) => (
-                <li key={index} className="leading-relaxed">{question}</li>
-              ))}
+              {structuredData.clarification_questions.map((question, index) => {
+                if (typeof question === 'string') {
+                  return <li key={index} className="leading-relaxed">{question}</li>;
+                }
+                return null;
+              }).filter(Boolean)}
             </ol>
           </div>
         );
       }
 
-      // AI Agents
-      if (structuredData.agents && structuredData.agents.length > 0) {
+      // AI Agents - Safe rendering with agent validation
+      if (Array.isArray(structuredData.agents) && structuredData.agents.length > 0) {
         content.push(
           <div key="agents" className="mb-4">
             <p className="font-medium text-gray-800 mb-3">Recommended AI Agents:</p>
             <div className="space-y-3">
               {structuredData.agents.map((agent, index) => {
-                if (dismissedAgents.has(agent.name)) return null;
+                // Safe agent validation
+                if (!agent || typeof agent !== 'object' || typeof agent.name !== 'string') {
+                  return null;
+                }
+
+                if (dismissedAgents.has(agent.name)) {
+                  return null;
+                }
                 
                 return (
                   <div key={index} className="border border-blue-200/50 rounded-lg p-4 bg-blue-50/30 backdrop-blur-sm">
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex-1 min-w-0">
                         <h4 className="font-semibold text-gray-800">{agent.name}</h4>
-                        <p className="text-sm text-gray-600">{agent.role}</p>
+                        <p className="text-sm text-gray-600">{agent.role || 'AI Agent'}</p>
                       </div>
                       <div className="flex gap-2 ml-4">
                         <Button
@@ -181,12 +226,12 @@ const ChatCard = ({
                       </div>
                     </div>
                     <div className="space-y-2 text-sm text-gray-700">
-                      <p><strong className="text-gray-800">Goal:</strong> {agent.goal}</p>
-                      <p><strong className="text-gray-800">Why needed:</strong> {agent.why_needed}</p>
+                      <p><strong className="text-gray-800">Goal:</strong> {agent.goal || 'Not specified'}</p>
+                      <p><strong className="text-gray-800">Why needed:</strong> {agent.why_needed || 'Not specified'}</p>
                     </div>
                   </div>
                 );
-              })}
+              }).filter(Boolean)}
             </div>
           </div>
         );

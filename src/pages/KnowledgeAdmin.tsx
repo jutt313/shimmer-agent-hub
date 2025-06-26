@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -7,10 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
-import { Trash2, Edit, Search, Plus, Database, Brain, Lock, Settings } from "lucide-react";
+import { Trash2, Edit, Search, Plus, Database, Brain, Lock, Settings, FileJson, Wrench } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import KnowledgeChat from "@/components/KnowledgeChat";
+import PlatformCredentialManager from "@/components/PlatformCredentialManager";
+import JsonDataImporter from "@/components/JsonDataImporter";
 
 interface KnowledgeEntry {
   id: string;
@@ -23,6 +27,10 @@ interface KnowledgeEntry {
   usage_count: number;
   created_at: string;
   updated_at: string;
+  platform_name?: string;
+  credential_fields?: any[];
+  platform_description?: string;
+  use_cases?: string[];
 }
 
 const KnowledgeAdmin = () => {
@@ -42,6 +50,7 @@ const KnowledgeAdmin = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [editingEntry, setEditingEntry] = useState<KnowledgeEntry | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showPlatformManager, setShowPlatformManager] = useState(false);
 
   const { toast } = useToast();
 
@@ -298,6 +307,101 @@ const KnowledgeAdmin = () => {
     }
   };
 
+  const handleSavePlatformData = async (platformData: any) => {
+    try {
+      const { error } = await supabase
+        .from('universal_knowledge_store')
+        .insert({
+          category: 'platform_knowledge',
+          title: `${platformData.platform_name} Integration`,
+          summary: platformData.summary,
+          platform_name: platformData.platform_name,
+          credential_fields: platformData.credential_fields,
+          platform_description: platformData.platform_description,
+          use_cases: platformData.use_cases,
+          details: {
+            credential_count: platformData.credential_fields.length,
+            integration_type: 'API',
+            last_updated: new Date().toISOString()
+          },
+          tags: [platformData.platform_name.toLowerCase().replace(/\s+/g, '-'), 'platform', 'integration'],
+          priority: 5,
+          source_type: 'admin'
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `${platformData.platform_name} platform data saved successfully`,
+      });
+      
+      setShowPlatformManager(false);
+      fetchKnowledge();
+    } catch (error) {
+      console.error('Error saving platform data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save platform data",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleImportJsonData = async (jsonData: any[]) => {
+    try {
+      const insertPromises = jsonData.map(platformData => 
+        supabase
+          .from('universal_knowledge_store')
+          .insert({
+            category: 'platform_knowledge',
+            title: `${platformData.platform_name} Integration`,
+            summary: platformData.summary,
+            platform_name: platformData.platform_name,
+            credential_fields: platformData.credential_fields,
+            platform_description: platformData.platform_description,
+            use_cases: platformData.use_cases,
+            details: {
+              credential_count: platformData.credential_fields?.length || 0,
+              integration_type: 'API',
+              imported_at: new Date().toISOString()
+            },
+            tags: [platformData.platform_name.toLowerCase().replace(/\s+/g, '-'), 'platform', 'integration'],
+            priority: 5,
+            source_type: 'import'
+          })
+      );
+
+      await Promise.all(insertPromises);
+      
+      toast({
+        title: "Import Successful",
+        description: `Imported ${jsonData.length} platform entries`,
+      });
+      
+      fetchKnowledge();
+    } catch (error) {
+      console.error('Error importing data:', error);
+      toast({
+        title: "Import Failed",
+        description: "Failed to import platform data",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExportJsonData = () => {
+    return knowledge
+      .filter(entry => entry.platform_name)
+      .map(entry => ({
+        platform_name: entry.platform_name,
+        summary: entry.summary,
+        platform_description: entry.platform_description,
+        credential_fields: entry.credential_fields || [],
+        use_cases: entry.use_cases || []
+      }));
+  };
+
   const filteredKnowledge = knowledge.filter(entry => {
     const matchesSearch = searchTerm === "" || 
       entry.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -426,6 +530,15 @@ const KnowledgeAdmin = () => {
                   </DropdownMenuContent>
                 </DropdownMenu>
                 
+                <Button 
+                  onClick={() => setShowPlatformManager(true)}
+                  variant="outline" 
+                  className="border-indigo-300 text-indigo-600 hover:bg-indigo-50 rounded-xl"
+                >
+                  <Wrench className="h-4 w-4 mr-2" />
+                  Platform Manager
+                </Button>
+
                 <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
                   <DialogTrigger asChild>
                     <Button className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 rounded-xl">
@@ -518,6 +631,30 @@ const KnowledgeAdmin = () => {
             </div>
           </div>
 
+          {/* Platform Manager Dialog */}
+          <Dialog open={showPlatformManager} onOpenChange={setShowPlatformManager}>
+            <DialodContent className="max-w-6xl max-h-[90vh] overflow-y-auto rounded-2xl">
+              <DialogHeader>
+                <DialogTitle>Platform Credential Manager</DialogTitle>
+              </DialogHeader>
+              <Tabs defaultValue="manager" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="manager">Platform Manager</TabsTrigger>
+                  <TabsTrigger value="import">JSON Import/Export</TabsTrigger>
+                </TabsList>
+                <TabsContent value="manager">
+                  <PlatformCredentialManager onSave={handleSavePlatformData} />
+                </TabsContent>
+                <TabsContent value="import">
+                  <JsonDataImporter 
+                    onImport={handleImportJsonData}
+                    onExport={handleExportJsonData}
+                  />
+                </TabsContent>
+              </Tabs>
+            </DialogContent>
+          </Dialog>
+
           {/* Knowledge Entries Grid */}
           <div className="flex-1 overflow-y-auto p-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -530,6 +667,11 @@ const KnowledgeAdmin = () => {
                           {entry.category.replace('_', ' ')}
                         </Badge>
                         <CardTitle className="text-lg text-gray-800">{entry.title}</CardTitle>
+                        {entry.platform_name && (
+                          <Badge variant="secondary" className="mt-2 bg-green-100 text-green-700">
+                            {entry.platform_name}
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex gap-2">
                         <Button size="sm" variant="ghost" onClick={() => setEditingEntry(entry)} className="rounded-lg">
@@ -543,6 +685,32 @@ const KnowledgeAdmin = () => {
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-gray-600 mb-3">{entry.summary}</p>
+                    
+                    {/* Show credential fields count for platform entries */}
+                    {entry.credential_fields && entry.credential_fields.length > 0 && (
+                      <div className="mb-3">
+                        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700">
+                          {entry.credential_fields.length} credential fields
+                        </Badge>
+                      </div>
+                    )}
+
+                    {/* Show use cases */}
+                    {entry.use_cases && entry.use_cases.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {entry.use_cases.slice(0, 3).map((useCase, index) => (
+                          <Badge key={index} variant="secondary" className="text-xs bg-purple-50 text-purple-700 rounded-lg">
+                            {useCase}
+                          </Badge>
+                        ))}
+                        {entry.use_cases.length > 3 && (
+                          <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600 rounded-lg">
+                            +{entry.use_cases.length - 3}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+
                     <div className="flex flex-wrap gap-1 mb-3">
                       {entry.tags.map((tag, index) => (
                         <Badge key={index} variant="secondary" className="text-xs bg-gray-100 text-gray-700 rounded-lg">

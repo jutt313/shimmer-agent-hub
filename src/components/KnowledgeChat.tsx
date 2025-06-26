@@ -1,25 +1,20 @@
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useToast } from "@/components/ui/use-toast";
-import { Bot, Send, User, Crown, Plus, X } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import ProblemCategorizer from "./ProblemCategorizer";
-import { analyzeProblem } from "@/utils/problemAnalyzer";
-import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
+import { Send, Bot, User, Save, Database } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 
-interface ChatMessage {
+interface Message {
   id: string;
-  type: 'user' | 'ai' | 'system';
-  message: string;
+  content: string;
+  isBot: boolean;
   timestamp: Date;
-  showProblemCard?: boolean;
-  problemData?: any;
-  structuredData?: StructuredResponse;
+  platformData?: any;
 }
 
 interface KnowledgeChatProps {
@@ -27,373 +22,380 @@ interface KnowledgeChatProps {
 }
 
 const KnowledgeChat = ({ onKnowledgeUpdate }: KnowledgeChatProps) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { 
-      id: '1', 
-      type: 'system', 
-      message: 'Hello! I am your Universal Memory AI. I can help you solve problems and automatically organize solutions in our knowledge store. Just tell me about any automation you want to create!', 
-      timestamp: new Date() 
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      content: `Hello! I'm your Knowledge Assistant. 
+
+I can help you:
+🔧 **Save Platform Data**: Just tell me about a platform and its credentials
+📊 **Parse JSON Data**: Give me platform data in any format and I'll structure it
+🏷️ **Organize Information**: I'll categorize and tag your data automatically
+💡 **Suggest Improvements**: I'll help optimize your knowledge base
+
+**Examples:**
+- "Save Slack platform: needs bot_token, channel_id, and workspace_id"
+- "Add Gmail integration with OAuth credentials"
+- "Parse this platform data: [paste your data]"
+
+What would you like to do?`,
+      isBot: true,
+      timestamp: new Date()
     }
   ]);
-  const [newMessage, setNewMessage] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
+  const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [dismissedAgents, setDismissedAgents] = useState<Set<string>>(new Set());
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  const categories = [
-    'platform_knowledge',
-    'credential_knowledge', 
-    'workflow_patterns',
-    'agent_recommendations',
-    'error_solutions',
-    'automation_patterns',
-    'conversation_insights',
-    'summary_templates'
-  ];
-
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+    }
   }, [messages]);
 
-  const addMessage = (message: string, type: 'user' | 'ai' | 'system' = 'user', showProblemCard = false, problemData?: any, structuredData?: StructuredResponse) => {
-    const newMsg: ChatMessage = {
-      id: Date.now().toString(),
-      type,
-      message,
-      timestamp: new Date(),
-      showProblemCard,
-      problemData,
-      structuredData
-    };
-    setMessages(prev => [...prev, newMsg]);
-    return newMsg.id;
+  const parseUserMessage = (message: string) => {
+    const lowerMessage = message.toLowerCase();
+    
+    // Check if user wants to save platform data
+    if (lowerMessage.includes('save') || lowerMessage.includes('add') || lowerMessage.includes('platform')) {
+      return 'save_platform';
+    }
+    
+    // Check if user is providing JSON data
+    if (message.includes('{') && message.includes('}')) {
+      return 'parse_json';
+    }
+    
+    // Check if user is asking for help or examples
+    if (lowerMessage.includes('help') || lowerMessage.includes('example') || lowerMessage.includes('how')) {
+      return 'help';
+    }
+    
+    return 'general';
   };
 
-  const sendToAI = async (message: string) => {
-    setIsLoading(true);
-    try {
-      console.log('Sending message to AI:', message);
+  const extractPlatformInfo = (message: string) => {
+    const lines = message.split('\n');
+    const platformData: any = {
+      platform_name: '',
+      credential_fields: [],
+      summary: '',
+      use_cases: []
+    };
 
-      const { data, error } = await supabase.functions.invoke('knowledge-ai-chat', {
-        body: { 
-          message: message,
-          category: selectedCategory || null,
-          userRole: 'founder',
-          context: 'automation_creation'
+    // Try to extract platform name
+    const platformMatch = message.match(/(?:platform|service|app)[\s:]*([a-zA-Z\s]+?)(?:\s|:|,|needs|requires)/i);
+    if (platformMatch) {
+      platformData.platform_name = platformMatch[1].trim();
+    }
+
+    // Extract credentials mentioned
+    const credentialKeywords = ['token', 'key', 'id', 'secret', 'password', 'username', 'email', 'url', 'endpoint'];
+    const foundCredentials = [];
+    
+    credentialKeywords.forEach(keyword => {
+      const regex = new RegExp(`\\b\\w*${keyword}\\w*\\b`, 'gi');
+      const matches = message.match(regex);
+      if (matches) {
+        matches.forEach(match => {
+          if (!foundCredentials.some(cred => cred.field === match.toLowerCase())) {
+            foundCredentials.push({
+              field: match.toLowerCase(),
+              description: `${match} for ${platformData.platform_name} integration`,
+              required: true,
+              type: match.toLowerCase().includes('email') ? 'email' : 'string'
+            });
+          }
+        });
+      }
+    });
+
+    platformData.credential_fields = foundCredentials;
+    platformData.summary = `${platformData.platform_name} integration for automation`;
+
+    return platformData;
+  };
+
+  const generateBotResponse = (userMessage: string, messageType: string) => {
+    switch (messageType) {
+      case 'save_platform':
+        const platformData = extractPlatformInfo(userMessage);
+        
+        if (!platformData.platform_name) {
+          return {
+            content: `I can see you want to save platform data, but I need more information. Please specify:
+
+📝 **Platform Name**: What platform are you adding?
+🔑 **Credentials**: What credentials does it need?
+
+**Example**: "Add Slack platform: needs bot_token, channel_id, and workspace_id for team notifications"`,
+            platformData: null
+          };
         }
+
+        return {
+          content: `Great! I've extracted this platform information:
+
+🔧 **Platform**: ${platformData.platform_name}
+📋 **Credentials Found**: ${platformData.credential_fields.length > 0 
+  ? platformData.credential_fields.map(c => c.field).join(', ') 
+  : 'None detected'}
+
+${platformData.credential_fields.length > 0 ? 
+  `**Credential Details**:
+${platformData.credential_fields.map(c => `• **${c.field}**: ${c.description}`).join('\n')}
+
+Would you like me to save this to the knowledge base? Click "Save Platform" below.` 
+  : 'Please specify what credentials this platform needs.'}`,
+          platformData
+        };
+
+      case 'parse_json':
+        try {
+          const jsonMatch = userMessage.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            return {
+              content: `📊 **JSON Parsed Successfully!**
+
+I found this data structure:
+${Object.keys(parsed).map(key => `• **${key}**: ${typeof parsed[key]} ${Array.isArray(parsed[key]) ? `(${parsed[key].length} items)` : ''}`).join('\n')}
+
+If this is platform data, I can help you format it properly for the knowledge base. Just let me know!`,
+              platformData: parsed.platform_name ? parsed : null
+            };
+          }
+        } catch (e) {
+          return {
+            content: `❌ **JSON Parse Error**
+
+The JSON format seems incorrect. Please check:
+• Proper quotation marks around strings
+• Correct bracket matching
+• No trailing commas
+
+**Example**:
+\`\`\`json
+{
+  "platform_name": "Slack",
+  "credentials": ["bot_token", "channel_id"]
+}
+\`\`\``,
+            platformData: null
+          };
+        }
+        break;
+
+      case 'help':
+        return {
+          content: `🚀 **Knowledge Assistant Help**
+
+**I can help you with:**
+
+📝 **Adding Platforms**:
+- "Add Slack: needs bot_token and channel_id"
+- "Save Gmail integration with OAuth setup"
+
+📊 **Parsing Data**:
+- Paste JSON data and I'll structure it
+- Extract credentials from descriptions
+
+🏷️ **Auto-Organization**:
+- I categorize data automatically
+- Add relevant tags and use cases
+
+**Quick Commands**:
+• "help" - Show this help
+• "examples" - Show more examples
+• "save [platform]" - Add platform data
+
+What would you like to do?`,
+          platformData: null
+        };
+
+      default:
+        return {
+          content: `I'm here to help with your knowledge base! Try:
+
+• **"Add [Platform Name] with [credentials]"** to save platform data
+• **Paste JSON data** for me to parse and structure
+• **"help"** for more assistance options
+
+What would you like to work on?`,
+          platformData: null
+        };
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!input.trim()) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content: input,
+      isBot: false,
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setIsLoading(true);
+
+    // Process the message
+    const messageType = parseUserMessage(input);
+    const response = generateBotResponse(input, messageType);
+
+    setTimeout(() => {
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: response.content,
+        isBot: true,
+        timestamp: new Date(),
+        platformData: response.platformData
+      };
+
+      setMessages(prev => [...prev, botMessage]);
+      setIsLoading(false);
+    }, 1000);
+  };
+
+  const handleSavePlatform = async (platformData: any) => {
+    try {
+      const { error } = await supabase
+        .from('universal_knowledge_store')
+        .insert({
+          category: 'platform_knowledge',
+          title: `${platformData.platform_name} Integration`,
+          summary: platformData.summary || `${platformData.platform_name} integration for automation`,
+          platform_name: platformData.platform_name,
+          credential_fields: platformData.credential_fields || [],
+          platform_description: platformData.platform_description || `${platformData.platform_name} platform integration`,
+          use_cases: platformData.use_cases || ['automation', 'integration'],
+          details: {
+            credential_count: platformData.credential_fields?.length || 0,
+            integration_type: 'API',
+            saved_via: 'chat_assistant',
+            saved_at: new Date().toISOString()
+          },
+          tags: [platformData.platform_name.toLowerCase().replace(/\s+/g, '-'), 'platform', 'integration'],
+          priority: 4,
+          source_type: 'chat'
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success!",
+        description: `${platformData.platform_name} platform saved successfully`,
       });
 
-      if (error) {
-        console.error('Supabase function error:', error);
-        throw error;
-      }
-      
-      console.log('AI response received:', data);
-      
-      let aiResponse = data.response || "I'm sorry, I couldn't process your request.";
+      // Add confirmation message
+      const confirmMessage: Message = {
+        id: Date.now().toString(),
+        content: `✅ **Platform Saved Successfully!**
 
-      // Parse structured response from AI
-      const structuredData = parseStructuredResponse(aiResponse);
-      console.log('Parsed structured data:', structuredData);
+${platformData.platform_name} has been added to your knowledge base with ${platformData.credential_fields?.length || 0} credential fields.
 
-      // Analyze if this is a problem that should be categorized
-      const problemAnalysis = analyzeProblem(message, aiResponse);
-      console.log('Problem analysis:', problemAnalysis);
-      
-      if (problemAnalysis) {
-        // Add AI response with problem card
-        addMessage(aiResponse, 'ai', true, problemAnalysis, structuredData);
-      } else {
-        // Regular AI response with structured data
-        addMessage(aiResponse, 'ai', false, undefined, structuredData);
-      }
+Ready for the next platform! What else would you like to add?`,
+        isBot: true,
+        timestamp: new Date()
+      };
+
+      setMessages(prev => [...prev, confirmMessage]);
+      onKnowledgeUpdate();
 
     } catch (error) {
-      console.error('AI Chat Error:', error);
-      addMessage("Sorry, I encountered an issue. Please try again.", 'system');
+      console.error('Error saving platform:', error);
       toast({
         title: "Error",
-        description: "Failed to get AI response. Please try again.",
+        description: "Failed to save platform data",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
-  };
-
-  const handleSendMessage = () => {
-    if (newMessage.trim()) {
-      let fullMessage = newMessage;
-      
-      if (selectedCategory) {
-        fullMessage = `Context: ${selectedCategory.replace('_', ' ')} - ${newMessage}`;
-      }
-      
-      addMessage(fullMessage);
-      sendToAI(fullMessage);
-      setNewMessage("");
-      setSelectedCategory("");
-    }
-  };
-
-  const handleProblemSaved = (messageId: string) => {
-    setMessages(prev => prev.map(msg => 
-      msg.id === messageId 
-        ? { ...msg, showProblemCard: false }
-        : msg
-    ));
-    onKnowledgeUpdate();
-    toast({
-      title: "Knowledge Updated",
-      description: "Problem and solution have been added to the knowledge store.",
-    });
-  };
-
-  const handleProblemDismissed = (messageId: string) => {
-    setMessages(prev => prev.map(msg => 
-      msg.id === messageId 
-        ? { ...msg, showProblemCard: false }
-        : msg
-    ));
-  };
-
-  const handleAgentAdd = (agent: any) => {
-    toast({
-      title: "Agent Recommended",
-      description: `${agent.name} has been suggested for your automation.`,
-    });
-  };
-
-  const handleAgentDismiss = (agentName: string) => {
-    setDismissedAgents(prev => new Set([...prev, agentName]));
-  };
-
-  const renderStructuredContent = (structuredData: StructuredResponse) => {
-    const content = [];
-
-    // Summary
-    if (structuredData.summary) {
-      content.push(
-        <div key="summary" className="mb-4">
-          <h4 className="font-medium text-blue-800 mb-2">Automation Summary</h4>
-          <p className="text-sm text-gray-700 bg-white p-3 rounded border">{structuredData.summary}</p>
-        </div>
-      );
-    }
-
-    // Steps
-    if (structuredData.steps && structuredData.steps.length > 0) {
-      content.push(
-        <div key="steps" className="mb-4">
-          <h4 className="font-medium text-blue-800 mb-2">Step-by-Step Workflow</h4>
-          <ol className="list-decimal list-inside space-y-1 text-sm text-gray-700 bg-white p-3 rounded border">
-            {structuredData.steps.map((step, index) => (
-              <li key={index}>{step}</li>
-            ))}
-          </ol>
-        </div>
-      );
-    }
-
-    // Platforms
-    if (structuredData.platforms && structuredData.platforms.length > 0) {
-      content.push(
-        <div key="platforms" className="mb-4">
-          <h4 className="font-medium text-blue-800 mb-2">Required Platform Credentials</h4>
-          <div className="bg-white p-3 rounded border space-y-3">
-            {structuredData.platforms.map((platform, index) => (
-              <div key={index}>
-                <h5 className="font-medium text-gray-800">{platform.name}</h5>
-                {platform.credentials && platform.credentials.length > 0 && (
-                  <ul className="list-disc list-inside ml-4 text-sm text-gray-700">
-                    {platform.credentials.map((cred, credIndex) => (
-                      <li key={credIndex}>
-                        <strong>{cred.field.replace(/_/g, ' ').toUpperCase()}</strong>: {cred.why_needed}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    }
-
-    // AI Agents
-    if (structuredData.agents && structuredData.agents.length > 0) {
-      content.push(
-        <div key="agents" className="mb-4">
-          <h4 className="font-medium text-blue-800 mb-3">Recommended AI Agents</h4>
-          <div className="space-y-3">
-            {structuredData.agents.map((agent, index) => {
-              if (dismissedAgents.has(agent.name)) return null;
-              
-              return (
-                <div key={index} className="border rounded-lg p-4 bg-blue-50/50 border-blue-200">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-1">
-                      <h5 className="font-semibold text-blue-800">{agent.name}</h5>
-                      <p className="text-sm text-blue-600">{agent.role}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => handleAgentAdd(agent)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 text-xs"
-                      >
-                        <Plus className="w-3 h-3 mr-1" />
-                        Add
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleAgentDismiss(agent.name)}
-                        className="border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-1 text-xs"
-                      >
-                        <X className="w-3 h-3 mr-1" />
-                        Dismiss
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="space-y-1 text-sm text-gray-700">
-                    <p><strong>Goal:</strong> {agent.goal}</p>
-                    <p><strong>Why needed:</strong> {agent.why_needed}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      );
-    }
-
-    // Clarification Questions
-    if (structuredData.clarification_questions && structuredData.clarification_questions.length > 0) {
-      content.push(
-        <div key="clarification" className="mb-4">
-          <h4 className="font-medium text-yellow-800 mb-2">I need some clarification:</h4>
-          <ol className="list-decimal list-inside space-y-1 text-sm text-yellow-700 bg-yellow-50 p-3 rounded border border-yellow-200">
-            {structuredData.clarification_questions.map((question, index) => (
-              <li key={index}>{question}</li>
-            ))}
-          </ol>
-        </div>
-      );
-    }
-
-    return content;
   };
 
   return (
-    <div className="h-full flex flex-col bg-white rounded-2xl border border-gray-200 shadow-lg">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50 rounded-t-2xl">
-        <div className="flex items-center gap-2 mb-2">
-          <Bot className="h-6 w-6 text-blue-600" />
-          <Crown className="h-4 w-4 text-yellow-500" />
-          <h3 className="text-lg font-semibold text-gray-800">Universal Memory AI</h3>
-        </div>
-        <p className="text-sm text-gray-600">Your automation expert with comprehensive workflow guidance</p>
-      </div>
-
-      {/* Messages */}
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4">
-          {messages.map((msg) => (
-            <div key={msg.id}>
-              <div className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className="max-w-4xl">
-                  <div className={`px-4 py-3 rounded-2xl text-sm ${
-                    msg.type === 'user' 
-                      ? 'bg-blue-500 text-white' 
-                      : msg.type === 'ai'
-                      ? 'bg-gray-50 text-gray-800 border border-gray-200'
-                      : 'bg-green-50 text-green-800 border border-green-200'
-                  }`}>
-                    {msg.type === 'user' && <User className="w-4 h-4 inline mr-2" />}
-                    {msg.type === 'ai' && <Bot className="w-4 h-4 inline mr-2 text-blue-600" />}
-                    
-                    {/* Show structured content for AI messages if available */}
-                    {msg.type === 'ai' && msg.structuredData ? (
-                      <div className="space-y-3">
-                        <div className="whitespace-pre-wrap">{cleanDisplayText(msg.message)}</div>
-                        {renderStructuredContent(msg.structuredData)}
-                      </div>
+    <Card className="h-full flex flex-col bg-white/80">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <Bot className="h-5 w-5 text-blue-600" />
+          Knowledge Assistant
+        </CardTitle>
+      </CardHeader>
+      
+      <CardContent className="flex-1 flex flex-col p-0">
+        <ScrollArea className="flex-1 px-4" ref={scrollAreaRef}>
+          <div className="space-y-4 pb-4">
+            {messages.map((message) => (
+              <div key={message.id} className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}>
+                <div className={`max-w-[85%] ${message.isBot ? 'bg-blue-50 border-blue-200' : 'bg-gray-100 border-gray-200'} rounded-lg p-3 border`}>
+                  <div className="flex items-start gap-2">
+                    {message.isBot ? (
+                      <Bot className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
                     ) : (
-                      <span className="whitespace-pre-wrap">{msg.message}</span>
+                      <User className="h-4 w-4 text-gray-600 mt-0.5 flex-shrink-0" />
                     )}
+                    <div className="flex-1">
+                      <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+                      
+                      {/* Show platform data save button if available */}
+                      {message.platformData && message.platformData.platform_name && (
+                        <div className="mt-3 p-2 bg-white rounded border">
+                          <div className="text-xs text-gray-600 mb-2">
+                            <Database className="h-3 w-3 inline mr-1" />
+                            Platform Data Ready
+                          </div>
+                          <Button
+                            onClick={() => handleSavePlatform(message.platformData)}
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            <Save className="h-3 w-3 mr-1" />
+                            Save Platform
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  
-                  <p className="text-xs text-gray-500 mt-1">
-                    {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
                 </div>
               </div>
-
-              {/* Problem Categorizer Card */}
-              {msg.showProblemCard && msg.problemData && (
-                <div className="mt-3">
-                  <ProblemCategorizer
-                    problemData={msg.problemData}
-                    onSave={() => handleProblemSaved(msg.id)}
-                    onDismiss={() => handleProblemDismissed(msg.id)}
-                  />
-                </div>
-              )}
-            </div>
-          ))}
-          
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-gray-50 text-gray-800 px-4 py-3 rounded-2xl border border-gray-200">
-                <Bot className="w-4 h-4 inline mr-2 animate-pulse text-blue-600" />
-                <span className="text-sm">AI is creating your comprehensive automation plan...</span>
-              </div>
-            </div>
-          )}
-          
-          <div ref={messagesEndRef} />
-        </div>
-      </ScrollArea>
-
-      {/* Input Area */}
-      <div className="p-4 border-t border-gray-200 space-y-3">
-        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-          <SelectTrigger className="text-sm">
-            <SelectValue placeholder="Select category for focused help (optional)" />
-          </SelectTrigger>
-          <SelectContent className="bg-white border border-gray-200 rounded-xl shadow-lg z-50">
-            {categories.map(cat => (
-              <SelectItem key={cat} value={cat} className="hover:bg-blue-50">
-                {cat.replace('_', ' ')}
-              </SelectItem>
             ))}
-          </SelectContent>
-        </Select>
+            
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="bg-blue-50 border-blue-200 rounded-lg p-3 border">
+                  <div className="flex items-center gap-2">
+                    <Bot className="h-4 w-4 text-blue-600" />
+                    <div className="text-sm text-gray-600">Thinking...</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
         
-        <div className="flex gap-2">
-          <Input
-            placeholder="Describe the automation you want to create..."
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && !isLoading && handleSendMessage()}
-            className="text-sm"
-            disabled={isLoading}
-          />
-          <Button 
-            onClick={handleSendMessage} 
-            disabled={isLoading || !newMessage.trim()}
-            size="sm"
-            className="bg-blue-500 hover:bg-blue-600"
-          >
-            <Send className="w-4 h-4" />
-          </Button>
+        <div className="p-4 border-t">
+          <div className="flex gap-2">
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Describe a platform, paste JSON data, or ask for help..."
+              onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+              disabled={isLoading}
+              className="text-sm"
+            />
+            <Button 
+              onClick={handleSendMessage} 
+              disabled={isLoading || !input.trim()}
+              size="sm"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 };
 

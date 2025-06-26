@@ -158,23 +158,23 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   // Callback for connecting nodes
   const onConnect = useCallback((params: any) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
 
-  // Enhanced edge options with dynamic styling
+  // Enhanced edge options with SOFT colors
   const defaultEdgeOptions = useMemo(() => ({
     animated: true,
     markerEnd: {
       type: MarkerType.ArrowClosed,
       width: 20,
       height: 20,
-      color: '#9333ea',
+      color: '#a855f7', // Soft purple
     },
     style: {
-      strokeWidth: 3,
-      stroke: '#9333ea',
-      strokeDasharray: '8,4',
+      strokeWidth: 2,
+      stroke: '#a855f7', // Soft purple
+      strokeDasharray: '5,5',
     },
   }), []);
 
-  // FIXED: Auto-save functionality with comprehensive error handling and UUID validation
+  // FIXED: Auto-save functionality with proper automation ID handling
   const saveDiagramLayout = useCallback(async (updatedNodes: any[], updatedEdges: any[]) => {
     if (!user || !automationBlueprint) {
       console.log('⚠️ Cannot save diagram: missing user or blueprint');
@@ -182,21 +182,10 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     }
 
     try {
-      // FIXED: Ensure we have a proper automation ID with robust validation
-      let automationId = automationBlueprint.id;
+      // FIXED: Ensure we have a valid automation ID
+      const automationId = automationBlueprint.id || generateUUID();
       
-      if (!automationId || typeof automationId !== 'string') {
-        console.warn('⚠️ Invalid automation ID, generating new one');
-        automationId = generateUUID();
-      }
-
-      // Validate UUID format with enhanced checking
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(automationId)) {
-        console.error('❌ Invalid UUID format for automation_id:', automationId);
-        automationId = generateUUID();
-        console.log('✅ Generated new UUID:', automationId);
-      }
+      console.log('💾 Attempting to save diagram with automation_id:', automationId);
 
       const diagramData = {
         nodes: Array.isArray(updatedNodes) ? updatedNodes : [],
@@ -205,13 +194,43 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         savedAt: new Date().toISOString()
       };
 
-      console.log('💾 Saving diagram layout:', { 
-        automationId, 
-        userId: user.id, 
-        nodesCount: diagramData.nodes.length,
-        edgesCount: diagramData.edges.length
-      });
+      // FIXED: First check if automation exists, if not create a minimal one
+      const { data: existingAutomation, error: checkError } = await supabase
+        .from('automations')
+        .select('id')
+        .eq('id', automationId)
+        .maybeSingle();
 
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('❌ Error checking automation:', checkError);
+        return;
+      }
+
+      // If automation doesn't exist, create a minimal one
+      if (!existingAutomation) {
+        console.log('🔧 Creating automation entry for diagram');
+        const { error: createError } = await supabase
+          .from('automations')
+          .insert({
+            id: automationId,
+            title: 'Generated Automation',
+            description: 'Automation created for diagram',
+            user_id: user.id,
+            status: 'draft'
+          });
+
+        if (createError) {
+          console.error('❌ Error creating automation:', createError);
+          toast({
+            title: "Save Error",
+            description: "Failed to create automation entry",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      // Now save the diagram
       const { data, error } = await supabase
         .from('automation_diagrams')
         .upsert({
@@ -233,7 +252,6 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         });
       } else {
         console.log('✅ Diagram saved successfully');
-        // FIXED: Safely handle the data response with comprehensive null checks
         if (data && Array.isArray(data) && data.length > 0 && data[0]?.id) {
           setDiagramId(data[0].id);
         }
@@ -251,25 +269,13 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   // Load saved diagram layout with enhanced error handling
   useEffect(() => {
     const loadDiagramLayout = async () => {
-      if (!user || !automationBlueprint) return;
+      if (!user || !automationBlueprint?.id) return;
 
       try {
         setLoading(true);
         
-        let automationId = automationBlueprint.id;
-        if (!automationId || typeof automationId !== 'string') {
-          console.warn('⚠️ No valid automation ID for loading diagram');
-          return;
-        }
-
-        // Validate UUID format
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        if (!uuidRegex.test(automationId)) {
-          console.warn('⚠️ Invalid UUID format, skipping load:', automationId);
-          return;
-        }
-
-        console.log('🔄 Loading diagram layout:', { automationId, userId: user.id });
+        const automationId = automationBlueprint.id;
+        console.log('🔄 Loading diagram layout for:', automationId);
 
         const { data, error } = await supabase
           .from('automation_diagrams')
@@ -278,7 +284,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           .eq('user_id', user.id)
           .maybeSingle();
 
-        if (error) {
+        if (error && error.code !== 'PGRST116') {
           console.error('❌ Error loading diagram:', error);
           return;
         }
@@ -322,10 +328,10 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   if (!automationBlueprint) {
     return (
       <div className="w-full h-[65vh] flex flex-col rounded-3xl overflow-hidden bg-white/90 backdrop-blur-md shadow-2xl border-0 relative">
-        <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-purple-100/40 to-blue-100/40 pointer-events-none"></div>
+        <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-50/40 to-purple-50/40 pointer-events-none"></div>
         
-        <CardHeader className="pb-3 border-b border-purple-200/50 bg-gradient-to-r from-purple-50/80 to-blue-50/80 rounded-t-3xl relative z-10">
-          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+        <CardHeader className="pb-3 border-b border-blue-100/50 bg-gradient-to-r from-blue-50/80 to-purple-50/80 rounded-t-3xl relative z-10">
+          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
             Workflow Diagram
           </CardTitle>
         </CardHeader>
@@ -344,17 +350,17 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   if (loading) {
     return (
       <div className="w-full h-[65vh] flex flex-col rounded-3xl overflow-hidden bg-white/90 backdrop-blur-md shadow-2xl border-0 relative">
-        <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-purple-100/40 to-blue-100/40 pointer-events-none"></div>
+        <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-50/40 to-purple-50/40 pointer-events-none"></div>
         
-        <CardHeader className="pb-3 border-b border-purple-200/50 bg-gradient-to-r from-purple-50/80 to-blue-50/80 rounded-t-3xl relative z-10">
-          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+        <CardHeader className="pb-3 border-b border-blue-100/50 bg-gradient-to-r from-blue-50/80 to-purple-50/80 rounded-t-3xl relative z-10">
+          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
             Workflow Diagram
           </CardTitle>
         </CardHeader>
         
         <CardContent className="flex-1 flex items-center justify-center relative z-10">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto mb-4"></div>
             <p className="text-gray-700 font-medium">Loading diagram...</p>
           </div>
         </CardContent>
@@ -364,24 +370,24 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
 
   return (
     <div className="w-full h-[65vh] flex flex-col rounded-3xl overflow-hidden bg-white/90 backdrop-blur-md shadow-2xl border-0 relative">
-      <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-purple-100/40 to-blue-100/40 pointer-events-none"></div>
+      <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-50/40 to-purple-50/40 pointer-events-none"></div>
       
-      <CardHeader className="pb-3 border-b border-purple-200/50 bg-gradient-to-r from-purple-50/80 to-blue-50/80 rounded-t-3xl relative z-10">
+      <CardHeader className="pb-3 border-b border-blue-100/50 bg-gradient-to-r from-blue-50/80 to-purple-50/80 rounded-t-3xl relative z-10">
         <div className="flex justify-between items-center">
-          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
             Workflow Diagram
           </CardTitle>
           
-          {/* Recommended Agents */}
+          {/* Recommended Agents with SOFT colors */}
           {recommendedAgents.length > 0 && (
             <div className="flex gap-2">
               {recommendedAgents.map((agent, index) => (
-                <div key={index} className="flex items-center gap-2 bg-blue-100/50 border border-blue-200/50 rounded-lg px-3 py-1">
-                  <span className="text-sm font-medium text-blue-700">{agent.name || 'Unnamed Agent'}</span>
+                <div key={index} className="flex items-center gap-2 bg-blue-50/50 border border-blue-200/50 rounded-lg px-3 py-1">
+                  <span className="text-sm font-medium text-blue-600">{agent.name || 'Unnamed Agent'}</span>
                   <Button
                     size="sm"
                     onClick={() => onAgentAdd?.(agent)}
-                    className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-2 py-1 text-xs h-6"
+                    className="bg-gradient-to-r from-blue-400 to-purple-400 hover:from-blue-500 hover:to-purple-500 text-white px-2 py-1 text-xs h-6"
                   >
                     <Plus className="w-3 h-3" />
                   </Button>
@@ -389,7 +395,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
                     size="sm"
                     variant="outline"
                     onClick={() => onAgentDismiss?.(agent.name || 'Unnamed Agent')}
-                    className="border-blue-300/50 text-blue-600 hover:bg-blue-100/50 px-2 py-1 text-xs h-6"
+                    className="border-blue-200/50 text-blue-500 hover:bg-blue-50/50 px-2 py-1 text-xs h-6"
                   >
                     <X className="w-3 h-3" />
                   </Button>
@@ -416,18 +422,19 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         >
           <MiniMap 
             nodeColor={(n) => {
-              if (n.type === 'input') return '#a855f7';
-              if (n.type === 'output') return '#ef4444';
-              if (n.type === 'conditionNode') return '#f97316';
-              if (n.type === 'aiAgentNode') return '#10b981';
-              if (n.type === 'loopNode') return '#8b5cf6';
-              if (n.type === 'delayNode') return '#6b7280';
-              return '#9333ea';
+              // SOFT color palette
+              if (n.type === 'input') return '#a78bfa';        // Soft purple
+              if (n.type === 'output') return '#f87171';       // Soft red
+              if (n.type === 'conditionNode') return '#fb923c'; // Soft orange
+              if (n.type === 'aiAgentNode') return '#34d399';  // Soft green
+              if (n.type === 'loopNode') return '#a78bfa';     // Soft purple
+              if (n.type === 'delayNode') return '#9ca3af';    // Soft gray
+              return '#8b5cf6';                                // Default soft purple
             }}
-            className="!bg-white/90 !border-2 !border-purple-200 !rounded-lg !shadow-lg"
+            className="!bg-white/90 !border-2 !border-blue-100 !rounded-lg !shadow-lg"
           />
           <Controls 
-            className="!bg-white/90 !border-2 !border-purple-200 !rounded-lg !shadow-lg" 
+            className="!bg-white/90 !border-2 !border-blue-100 !rounded-lg !shadow-lg" 
             showZoom={true}
             showFitView={true}
             showInteractive={true}
@@ -436,8 +443,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             variant={BackgroundVariant.Dots}
             gap={20} 
             size={1.5} 
-            color="#9333ea"
-            className="opacity-50"
+            color="#a78bfa"
+            className="opacity-30"
           />
         </ReactFlow>
       </CardContent>

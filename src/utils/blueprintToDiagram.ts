@@ -244,7 +244,7 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
         localYCursor = nodeY + ySpacing;
       }
       
-      maxXReachedInSegment = Math.max(maxXInCurrentFlow, currentColumnX + xSpacing); // Further most X reached by this step's column
+      maxXReachedInSegment = Math.max(maxXReachedInSegment, currentColumnX + xSpacing); // Further most X reached by this step's column
       maxYReachedByFlow = Math.max(maxYReachedByFlow, subFlowMaxY); // Max Y including any nested branches
 
     });

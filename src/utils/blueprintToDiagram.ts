@@ -1,4 +1,9 @@
-import { Node, Edge, XYPosition } from '@xyflow/react';
+import { Node, Edge, XYPosition, Position } from '@xyflow/react'; // Added Position import
+
+// Define a new type to include 'id' along with XYPosition for recursive function returns
+interface ProcessedNodePosition extends XYPosition {
+  id: string;
+}
 
 // Define the structure of a blueprint step, including nested steps for conditions and loops
 interface BlueprintStep {
@@ -75,7 +80,8 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
   const yOffset = nodeHeight + 50; // Vertical spacing for branches
 
   // Recursively processes steps and generates nodes/edges
-  const processStep = (step: BlueprintStep, x: number, y: number, parentId: string | null, edgeType: 'default' | 'true' | 'false' = 'default'): XYPosition => {
+  // Changed return type to ProcessedNodePosition
+  const processStep = (step: BlueprintStep, x: number, y: number, parentId: string | null, edgeType: 'default' | 'true' | 'false' = 'default'): ProcessedNodePosition => {
     // If step already processed (e.g., part of multiple paths converging), skip re-adding node but still draw edge
     if (processedStepIds.has(step.id)) {
       // Find existing node to connect to
@@ -112,7 +118,8 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
           });
         }
       }
-      return { x: existingNode?.position.x || x, y: existingNode?.position.y || y };
+      // Ensure existingNode.position is valid before accessing, and return ProcessedNodePosition
+      return { id: step.id, x: existingNode?.position.x || x, y: existingNode?.position.y || y };
     }
 
     processedStepIds.add(step.id); // Mark as processed
@@ -133,8 +140,8 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
         agent: step.ai_agent_call // Use ai_agent_call for agent data
       },
       // Ensure specific handles are available for condition nodes
-      sourcePosition: nodeType === 'conditionNode' ? undefined : 'right',
-      targetPosition: 'left',
+      sourcePosition: nodeType === 'conditionNode' ? undefined : Position.Right, // Fixed: Use Position.Right
+      targetPosition: Position.Left, // Fixed: Use Position.Left
     };
     nodes.push(newNode);
 
@@ -188,7 +195,7 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
         conditionSteps.forEach((branch, i) => {
           let branchNodeX = x + xOffset;
           let branchNodeY = currentBranchY;
-          let lastBranchNodePos: XYPosition = { x: branchNodeX, y: branchNodeY };
+          let lastBranchNodePos: ProcessedNodePosition = { id: '', x: branchNodeX, y: branchNodeY }; // Fixed type
 
           branch.steps.forEach((subStep, subIndex) => {
             lastBranchNodePos = processStep(subStep, branchNodeX, branchNodeY, subIndex === 0 ? step.id : lastBranchNodePos.id, branch.type);
@@ -204,7 +211,7 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
       // For loops, lay out children sequentially after the loop node
       let loopNodeX = x + xOffset;
       let loopNodeY = y;
-      let lastLoopNodePos: XYPosition = { x: loopNodeX, y: loopNodeY };
+      let lastLoopNodePos: ProcessedNodePosition = { id: '', x: loopNodeX, y: loopNodeY }; // Fixed type
 
       if (step.loop.steps && step.loop.steps.length > 0) {
         step.loop.steps.forEach((subStep, subIndex) => {
@@ -234,7 +241,8 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
     // This simple check might not be perfect for complex graph structures,
     // but prevents duplicates for basic sequential processing.
     if (!processedStepIds.has(step.id)) {
-        const nodePosition = processStep(step, lastX, lastY, null);
+        // Updated processStep call to correctly use the returned object structure
+        const nodePosition = processStep(step, lastX, lastY, null); 
         lastX += xOffset; // Move next node horizontally
         // For sequential steps, if a branch caused a large Y displacement, align subsequent steps below it.
         lastY = Math.max(lastY, nodePosition.y); 

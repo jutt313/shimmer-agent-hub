@@ -633,7 +633,7 @@ const KnowledgeAdmin = () => {
 
           {/* Platform Manager Dialog */}
           <Dialog open={showPlatformManager} onOpenChange={setShowPlatformManager}>
-            <DialodContent className="max-w-6xl max-h-[90vh] overflow-y-auto rounded-2xl">
+            <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto rounded-2xl">
               <DialogHeader>
                 <DialogTitle>Platform Credential Manager</DialogTitle>
               </DialogHeader>

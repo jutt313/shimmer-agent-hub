@@ -1,4 +1,3 @@
-
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Bot, Plus, X } from "lucide-react";
@@ -39,7 +38,13 @@ const ChatCard = ({
   }, [messages, isLoading]);
 
   const formatMessageText = (text: string) => {
-    const cleanText = cleanDisplayText(text);
+    let cleanText = cleanDisplayText(text);
+    
+    // FIXED: Defensive check to ensure cleanText is always a string
+    if (typeof cleanText !== 'string' || cleanText === null || cleanText === undefined) {
+      console.error("formatMessageText: cleanDisplayText returned non-string value, defaulting to empty string.", cleanText);
+      cleanText = ''; // Fallback to empty string to prevent the TypeError
+    }
     
     return cleanText
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')

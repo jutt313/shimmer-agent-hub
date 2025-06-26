@@ -1,5 +1,4 @@
 
-
 // Enhanced JSON parser with comprehensive error handling and null checks
 
 export interface StructuredResponse {
@@ -155,36 +154,39 @@ const extractArrayField = (text: string, fieldName: string) => {
   }
 };
 
-// FIXED: Clean display text function with robust null/undefined handling
+// SUPER FIXED: Clean display text function with ultra-robust null/undefined handling and guaranteed string return
 export const cleanDisplayText = (text: string | undefined | null): string => {
-  // Early return for null/undefined to prevent .replace() errors
-  if (!text || typeof text !== 'string') {
-    return '';
-  }
-
   try {
-    // Safely handle text processing with additional checks
+    // CRITICAL: Always return a string, never undefined/null
+    if (!text || typeof text !== 'string') {
+      console.warn('cleanDisplayText: Invalid input, returning empty string:', typeof text);
+      return '';
+    }
+
     let cleanText = text;
     
-    // Remove JSON code blocks only if text is valid
-    if (cleanText && typeof cleanText === 'string') {
+    // Only proceed if we still have a valid string
+    if (typeof cleanText === 'string') {
+      // Remove JSON code blocks
       cleanText = cleanText.replace(/```json[\s\S]*?```/g, '');
-    }
-    
-    // Remove standalone JSON objects only if text is still valid
-    if (cleanText && typeof cleanText === 'string') {
+      
+      // Remove standalone JSON objects
       cleanText = cleanText.replace(/^\s*\{[\s\S]*?\}\s*$/gm, '');
-    }
-    
-    // Clean up extra whitespace only if text is still valid
-    if (cleanText && typeof cleanText === 'string') {
+      
+      // Clean up extra whitespace
       cleanText = cleanText.replace(/\n\s*\n/g, '\n').trim();
     }
     
-    return cleanText || '';
+    // FINAL SAFETY: Guarantee we return a string
+    if (typeof cleanText !== 'string') {
+      console.error('cleanDisplayText: Processing failed, returning original or fallback');
+      return typeof text === 'string' ? text : '';
+    }
+    
+    return cleanText;
   } catch (error) {
-    console.error('Error cleaning display text:', error);
-    // Return the original text as fallback instead of throwing
+    console.error('cleanDisplayText: Critical error, returning safe fallback:', error);
+    // Final fallback - always return a string
     return typeof text === 'string' ? text : '';
   }
 };

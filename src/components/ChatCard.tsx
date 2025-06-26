@@ -1,3 +1,4 @@
+// src/components/ChatCard.tsx
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -38,49 +39,57 @@ const ChatCard = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  const safeFormatMessageText = (inputText: string | undefined | null) => {
-    // ULTIMATE SAFETY: Multiple layers of protection
-    if (!inputText || typeof inputText !== 'string') {
-      console.warn('safeFormatMessageText: Invalid input, using fallback');
-      return [<span key="fallback">Message could not be displayed</span>];
+  // Renamed and made more robust for rendering message text into HTML
+  const safeFormatMessageText = (inputText: string | undefined | null): React.ReactNode[] => {
+    console.log('safeFormatMessageText: InputText value:', inputText, 'Type:', typeof inputText);
+
+    // ULTIMATE SAFETY: Initial check for null/undefined/non-string input
+    if (typeof inputText !== 'string' || inputText === null || inputText === undefined) {
+      console.warn('safeFormatMessageText: Invalid inputText type received, returning fallback span. Type:', typeof inputText, 'Value:', inputText);
+      return [<span key="fallback-input-error">Message content unavailable.</span>];
     }
 
+    let cleanHtmlString: string = '';
     try {
-      // Clean the text with enhanced safety
-      let cleanText = cleanDisplayText(inputText);
+      // Step 1: Clean the text using the bulletproof cleanDisplayText
+      cleanHtmlString = cleanDisplayText(inputText);
+      console.log('safeFormatMessageText: After cleanDisplayText. Value:', cleanHtmlString, 'Type:', typeof cleanHtmlString);
+
+      // CRITICAL: Final check that cleanDisplayText indeed returned a string
+      if (typeof cleanHtmlString !== 'string') {
+        console.error('safeFormatMessageText: CRITICAL - cleanDisplayText returned non-string! Forcing to string.', cleanHtmlString);
+        cleanHtmlString = String(cleanHtmlString || ''); // Force to string as last resort
+      }
       
-      // CRITICAL: Triple-check the cleaned text
-      if (!cleanText || typeof cleanText !== 'string') {
-        console.error('safeFormatMessageText: cleanDisplayText failed, using original');
-        cleanText = String(inputText || '');
+      // Step 2: Perform markdown-like replacements safely
+      // Ensure cleanHtmlString is a string here before .replace()
+      if (typeof cleanHtmlString === 'string') {
+        cleanHtmlString = cleanHtmlString.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      } else {
+        console.error('safeFormatMessageText: cleanHtmlString unexpectedly non-string before markdown replace. Value:', cleanHtmlString);
+        cleanHtmlString = ''; // Reset to empty string if type is wrong
       }
 
-      // FINAL SAFETY: Ensure we have a valid string before any operations
-      if (typeof cleanText !== 'string') {
-        console.error('safeFormatMessageText: Final safety check failed');
-        return [<span key="error">Error displaying message</span>];
-      }
+      // Step 3: Split into lines and map to ReactNode array
+      const lines = cleanHtmlString.split('\n');
+      return lines.map((line, index) => {
+        // Ensure each line is also a string before injecting into HTML
+        const safeLine = typeof line === 'string' ? line : String(line || '');
+        
+        return (
+          <span key={`line-${index}`}>
+            {/* Using dangerouslySetInnerHTML as per original intent */}
+            <span dangerouslySetInnerHTML={{ __html: safeLine }} />
+            {/* Add <br /> between lines, excluding the last one */}
+            {index < lines.length - 1 && <br />}
+          </span>
+        );
+      });
 
-      // Safe string operations with additional checks
-      const processedText = cleanText
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .split('\n')
-        .map((line, index) => {
-          // Ensure line is a string
-          const safeLine = typeof line === 'string' ? line : String(line || '');
-          
-          return (
-            <span key={`line-${index}`}>
-              <span dangerouslySetInnerHTML={{ __html: safeLine }} />
-              {index < cleanText.split('\n').length - 1 && <br />}
-            </span>
-          );
-        });
-
-      return processedText;
-    } catch (error) {
-      console.error('safeFormatMessageText: Critical error:', error);
-      return [<span key="critical-error">Error processing message</span>];
+    } catch (error: any) {
+      console.error('safeFormatMessageText: Top-level error caught during text formatting. Error:', error, 'Input:', inputText, 'Current cleanHtmlString:', cleanHtmlString);
+      // Fallback in case any operation within this function throws an error
+      return [<span key="processing-error">Error displaying message content.</span>];
     }
   };
 
@@ -238,7 +247,8 @@ const ChatCard = ({
                   ) : (
                     /* Show formatted text for user messages or if no structured data */
                     <div className="leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
-                      {safeFormatMessageText(message.text)}
+                      {/* Call the ultra-safe formatting function */}
+                      {safeFormatMessageText(message.text)} 
                     </div>
                   )}
                   

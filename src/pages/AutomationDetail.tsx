@@ -187,7 +187,7 @@ const AutomationDetail = () => {
       const { data, error } = await supabase.functions.invoke('chat-ai', {
         body: {
           message: messageText,
-          messages: messages, // Send ALL messages, not just last 5
+          messages: messages,
           automationId: automation.id,
           automationContext: automationContext
         }
@@ -198,49 +198,43 @@ const AutomationDetail = () => {
         throw error;
       }
 
-      console.log('✅ Received response from chat-ai function with full context');
+      console.log('✅ Received response from chat-ai function');
 
-      let aiResponse = data.response || "I'm sorry, I couldn't process your request.";
-      
-      // Parse structured response
-      let structuredData = null;
-      try {
-        // Try to parse as JSON first
-        if (aiResponse.startsWith('{') && aiResponse.endsWith('}')) {
-          structuredData = JSON.parse(aiResponse);
-          console.log('✅ Parsed structured data successfully');
-        } else {
-          // Try to extract JSON from the response
-          const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            structuredData = JSON.parse(jsonMatch[0]);
-            console.log('✅ Extracted and parsed JSON from response');
-          }
+      // The response is now already a parsed object (no double wrapping)
+      let structuredData = data;
+      let aiResponseText = "";
+
+      // Create display text from structured data
+      if (structuredData && structuredData.summary) {
+        aiResponseText = structuredData.summary;
+        if (structuredData.steps && structuredData.steps.length > 0) {
+          aiResponseText += "\n\nSteps:\n" + structuredData.steps.map((step: string, i: number) => `${i + 1}. ${step}`).join('\n');
         }
-      } catch (parseError) {
-        console.log('⚠️ Could not parse structured data:', parseError);
+      } else {
+        aiResponseText = "I'm sorry, I couldn't process your request properly.";
+        structuredData = null;
       }
 
       const aiMessage = {
         id: Date.now() + 1,
-        text: aiResponse,
+        text: aiResponseText,
         isBot: true,
         timestamp: new Date(),
         structuredData: structuredData
       };
 
-      console.log('📤 Adding AI message to chat with conversation context');
+      console.log('📤 Adding AI message to chat');
       setMessages(prev => [...prev, aiMessage]);
 
-      // Handle platform management with conversation context
+      // Handle platform management
       if (structuredData) {
         // Handle platform additions
         if (structuredData.platforms && Array.isArray(structuredData.platforms)) {
-          console.log('🔗 Processing platform additions from contextualized response');
+          console.log('🔗 Processing platform additions:', structuredData.platforms.length);
           setCurrentPlatforms(prev => {
             const newPlatforms = [...prev];
             structuredData.platforms.forEach((platform: any) => {
-              if (!newPlatforms.find(p => p.name === platform.name)) {
+              if (platform && platform.name && !newPlatforms.find(p => p.name === platform.name)) {
                 newPlatforms.push(platform);
               }
             });
@@ -248,9 +242,9 @@ const AutomationDetail = () => {
           });
         }
 
-        // Handle platform removals (NEW FUNCTIONALITY)
+        // Handle platform removals
         if (structuredData.platforms_to_remove && Array.isArray(structuredData.platforms_to_remove)) {
-          console.log('🗑️ Processing platform removals from contextualized response');
+          console.log('🗑️ Processing platform removals');
           setCurrentPlatforms(prev => 
             prev.filter(platform => !structuredData.platforms_to_remove.includes(platform.name))
           );
@@ -260,16 +254,11 @@ const AutomationDetail = () => {
             description: `Removed platforms: ${structuredData.platforms_to_remove.join(', ')}`,
           });
         }
-
-        // Show conversation context acknowledgment
-        if (structuredData.conversation_updates) {
-          console.log('🧠 AI acknowledged conversation context:', structuredData.conversation_updates.context_acknowledged);
-        }
       }
 
       // Update automation blueprint if available
       if (structuredData?.automation_blueprint) {
-        console.log('🔧 Updating automation blueprint with conversation context');
+        console.log('🔧 Updating automation blueprint');
         const { error: updateError } = await supabase
           .from('automations')
           .update({ automation_blueprint: structuredData.automation_blueprint })
@@ -282,18 +271,18 @@ const AutomationDetail = () => {
           }));
           toast({
             title: "Blueprint Updated",
-            description: "Automation blueprint has been updated with conversation context.",
+            description: "Automation blueprint has been updated.",
           });
         }
       }
 
-      // Save AI response to database
+      // Save AI response to database (save the structured data as JSON string)
       await supabase
         .from('automation_chats')
         .insert({
           automation_id: automation.id,
           sender: 'ai',
-          message_content: aiResponse
+          message_content: JSON.stringify(structuredData)
         });
 
     } catch (error) {

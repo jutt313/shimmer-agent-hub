@@ -36,7 +36,7 @@ serve(async (req) => {
     console.log('📚 Conversation history length:', messages.length)
     console.log('🔧 Automation context:', automationId)
 
-    // Enhanced system prompt with strict JSON formatting
+    // Enhanced system prompt with strict JSON formatting and credential structure requirements
     const systemPrompt = `You are YusrAI, an advanced automation assistant. You help users create, modify, and understand automation workflows.
 
 CRITICAL JSON FORMAT REQUIREMENTS:
@@ -47,11 +47,35 @@ CRITICAL JSON FORMAT REQUIREMENTS:
 - Escape special characters properly in strings
 - Validate your JSON before responding
 
+CRITICAL PLATFORM CREDENTIALS STRUCTURE:
+When providing platforms with credentials, you MUST use this exact structure:
+{
+  "platforms": [
+    {
+      "name": "Platform Name",
+      "credentials": [
+        {
+          "field": "api_key",
+          "placeholder": "Enter your Platform API key",
+          "link": "https://platform.com/api-keys",
+          "why_needed": "Required to authenticate API requests to Platform"
+        }
+      ]
+    }
+  ]
+}
+
+ENSURE EVERY CREDENTIAL OBJECT HAS ALL FOUR FIELDS:
+- field: string (required, non-empty)
+- placeholder: string (required, non-empty)  
+- link: string (required, valid URL)
+- why_needed: string (required, non-empty explanation)
+
 Required JSON structure:
 {
   "summary": "Brief summary of what you're doing",
   "steps": ["Step 1", "Step 2", ...],
-  "platforms": [{"name": "Platform Name", "api_config": {...}, "credentials": [...]}],
+  "platforms": [{"name": "Platform Name", "credentials": [...]}],
   "platforms_to_remove": ["platform1", "platform2"],
   "agents": [{"name": "Agent Name", "role": "Role", "goal": "Goal", "why_needed": "Explanation"}],
   "clarification_questions": ["Question 1", "Question 2"],
@@ -74,9 +98,9 @@ Context Awareness:
 - Remember user preferences and choices from earlier messages
 
 Platform Integration:
-- Provide complete API configurations with proper authentication
-- Include all required credential fields with clear explanations
-- Use proper HTTP methods and endpoints
+- Provide complete credential configurations with all required fields
+- Include clear explanations for why each credential is needed
+- Use proper field names that are intuitive
 - Handle error cases appropriately
 
 Current conversation context: ${JSON.stringify(messages.slice(-5))}
@@ -124,13 +148,37 @@ Current automation: ${JSON.stringify(automationContext)}
       throw new Error('No response from OpenAI')
     }
 
-    console.log('✅ Received enhanced OpenAI response, length:', aiResponse.length)
+    console.log('✅ Received OpenAI response, length:', aiResponse.length)
 
     // Validate and parse JSON response
     let parsedResponse
     try {
       parsedResponse = JSON.parse(aiResponse)
-      console.log('✅ Enhanced JSON validation successful with full context awareness')
+      console.log('✅ JSON validation successful')
+      
+      // Validate platform credentials structure
+      if (parsedResponse.platforms && Array.isArray(parsedResponse.platforms)) {
+        parsedResponse.platforms.forEach((platform: any, platformIndex: number) => {
+          if (platform.credentials && Array.isArray(platform.credentials)) {
+            platform.credentials.forEach((cred: any, credIndex: number) => {
+              if (!cred.field || typeof cred.field !== 'string' || !cred.field.trim()) {
+                console.warn(`Invalid credential field at platform ${platformIndex}, credential ${credIndex}`);
+                cred.field = cred.field || 'api_key';
+              }
+              if (!cred.placeholder || typeof cred.placeholder !== 'string') {
+                cred.placeholder = `Enter your ${platform.name || 'Platform'} credential`;
+              }
+              if (!cred.link || typeof cred.link !== 'string') {
+                cred.link = '#';
+              }
+              if (!cred.why_needed || typeof cred.why_needed !== 'string') {
+                cred.why_needed = 'Required for platform integration';
+              }
+            });
+          }
+        });
+      }
+      
     } catch (parseError) {
       console.error('❌ JSON parse error with OpenAI response:', parseError)
       console.error('Raw AI response causing parse error:', aiResponse)
@@ -155,7 +203,7 @@ Current automation: ${JSON.stringify(automationContext)}
       }
     }
 
-    // Ensure response has required structure
+    // Ensure response has required structure with proper defaults
     const structuredResponse = {
       summary: parsedResponse.summary || "Processing your automation request",
       steps: Array.isArray(parsedResponse.steps) ? parsedResponse.steps : [],
@@ -174,16 +222,10 @@ Current automation: ${JSON.stringify(automationContext)}
       recheck_status: parsedResponse.recheck_status || "none"
     }
 
-    // Return the structured response as JSON string for parsing
-    const finalResponse = JSON.stringify(structuredResponse)
-    
-    console.log('🎯 Returning structured response with full conversation context')
+    console.log('🎯 Returning clean structured response')
 
-    return new Response(JSON.stringify({ 
-      response: finalResponse,
-      conversationContextApplied: true,
-      messagesProcessed: messages.length 
-    }), {
+    // Return the structured response directly (no double wrapping)
+    return new Response(JSON.stringify(structuredResponse), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 
@@ -209,11 +251,7 @@ Current automation: ${JSON.stringify(automationContext)}
       recheck_status: "error"
     }
 
-    return new Response(JSON.stringify({ 
-      response: JSON.stringify(errorResponse),
-      error: error.message,
-      conversationContextApplied: false
-    }), {
+    return new Response(JSON.stringify(errorResponse), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200, // Return 200 to prevent client-side errors
     })

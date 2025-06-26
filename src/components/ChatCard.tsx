@@ -93,7 +93,13 @@ const ChatCard = ({
         typeof cred === 'object' && 
         cred.field && 
         typeof cred.field === 'string' &&
-        cred.field.trim().length > 0
+        cred.field.trim().length > 0 &&
+        cred.placeholder &&
+        typeof cred.placeholder === 'string' &&
+        cred.link &&
+        typeof cred.link === 'string' &&
+        cred.why_needed &&
+        typeof cred.why_needed === 'string'
       );
     } catch (error) {
       console.error('Error validating credential:', error);
@@ -185,7 +191,6 @@ const ChatCard = ({
       // Platforms - COMPLETELY BULLETPROOF RENDERING
       if (Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
         try {
-          // Filter and validate platforms first
           const validPlatforms = structuredData.platforms.filter(validatePlatform);
           
           if (validPlatforms.length > 0) {
@@ -204,13 +209,16 @@ const ChatCard = ({
                             <ul className="list-disc list-inside ml-4 space-y-1">
                               {platform.credentials.map((cred, credIndex) => {
                                 try {
-                                  // CRITICAL: Validate credential before processing
+                                  // Enhanced credential validation
                                   if (!validateCredential(cred)) {
                                     console.warn('Invalid credential skipped:', cred);
-                                    return null;
+                                    return (
+                                      <li key={`cred-fallback-${credIndex}`} className="text-sm text-yellow-600">
+                                        Credential configuration incomplete
+                                      </li>
+                                    );
                                   }
 
-                                  // BULLETPROOF field handling with multiple fallbacks
                                   const fieldName = safeProcessCredentialField(cred.field);
                                   const whyNeeded = safeProcessWhyNeeded(cred.why_needed);
 
@@ -282,7 +290,6 @@ const ChatCard = ({
             <p className="font-medium text-gray-800 mb-3">Recommended AI Agents:</p>
             <div className="space-y-3">
               {structuredData.agents.map((agent, index) => {
-                // Safe agent validation
                 if (!agent || typeof agent !== 'object' || typeof agent.name !== 'string') {
                   return null;
                 }

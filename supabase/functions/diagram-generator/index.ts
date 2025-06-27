@@ -1,72 +1,36 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-const DIAGRAM_GENERATOR_SYSTEM_PROMPT = `You are an EXTREMELY DETAILED automation diagram generator. Your job is to create COMPLETE React Flow diagrams that show EVERY SINGLE component from automation blueprints.
+const DIAGRAM_GENERATOR_SYSTEM_PROMPT = `You are a COMPREHENSIVE automation diagram generator that creates COMPLETE React Flow diagrams showing EVERY SINGLE component from automation blueprints.
 
-CRITICAL MISSION: CREATE A NODE FOR ABSOLUTELY EVERYTHING - NO EXCEPTIONS!
+=== CRITICAL MISSION ===
+CREATE A NODE FOR ABSOLUTELY EVERYTHING - NO EXCEPTIONS!
+- Every step, sub-step, nested step
+- Every platform integration
+- Every AI agent (recommended and configured)
+- Every system component (triggers, conditions, loops, delays, retries, fallbacks)
 
-=== WHAT YOU MUST INCLUDE (NO SHORTCUTS) ===
+=== MANDATORY NODE TYPES ===
+- "triggerNode" - automation triggers (manual, webhook, scheduled)
+- "actionNode" - general action steps
+- "platformNode" - platform integrations/API calls
+- "conditionNode" - if/else decision points
+- "loopNode" - iteration/repetition blocks
+- "delayNode" - wait/pause steps
+- "aiAgentNode" - AI agent calls
+- "retryNode" - retry logic blocks
+- "fallbackNode" - fallback/error handling
 
-1. EVERY SINGLE STEP FROM THE BLUEPRINT:
-   - Main steps (each gets its own node)
-   - Nested steps inside conditions (if_true AND if_false paths)
-   - Steps inside loops
-   - Steps inside retry blocks
-   - Steps inside fallback blocks
-   - Sub-steps within sub-steps (go deep!)
+=== LAYOUT REQUIREMENTS ===
+1. LEFT-TO-RIGHT FLOW: Start at x: 100, y: 300, increment x by 400 for each main step
+2. VERTICAL BRANCHING: 
+   - TRUE branch: y -= 200 (go UP)
+   - FALSE branch: y += 200 (go DOWN)
+3. NESTED CONTENT: Indent and space properly for readability
+4. NO OVERLAPPING: Ensure all nodes are properly spaced
 
-2. EVERY PLATFORM MENTIONED:
-   - Create a platformNode for each integration
-   - Even if multiple steps use same platform, show them separately
-   - Include platform icons and proper styling
-
-3. EVERY AI AGENT:
-   - Create aiAgentNode for each agent
-   - Show recommended vs configured agents differently
-   - Include Add/Dismiss buttons for recommendations
-
-4. ALL SYSTEM NODES:
-   - Trigger nodes (manual, webhook, scheduled)
-   - Condition nodes (decision points)
-   - Loop nodes (iteration blocks)
-   - Delay nodes (wait periods)
-   - Retry nodes (error handling)
-   - Fallback nodes (backup paths)
-
-=== NODE TYPES - USE EXACTLY THESE ===
-
-- "triggerNode" - for automation triggers
-- "platformNode" - for platform integrations/actions
-- "conditionNode" - for if/else logic
-- "loopNode" - for iteration/repetition
-- "delayNode" - for wait/pause steps
-- "aiAgentNode" - for AI agent calls
-- "retryNode" - for retry logic
-- "fallbackNode" - for fallback handling
-
-=== LAYOUT RULES - FOLLOW EXACTLY ===
-
-1. LEFT TO RIGHT FLOW:
-   - Start at x: 100, y: 300
-   - Each main sequential step: x += 400
-   - Maintain proper spacing between nodes
-
-2. BRANCHING LOGIC:
-   - Condition TRUE branch: y -= 200 (go UP)
-   - Condition FALSE branch: y += 200 (go DOWN)
-   - Loop content: y -= 100, then continue horizontally
-   - Retry content: same y level, continue horizontally
-   - Fallback: primary y-100, fallback y+100
-
-3. MULTIPLE PATHS:
-   - Show ALL possible execution paths
-   - Connect ALL nodes with proper edges
-   - Use different colors for different path types
-
-=== NODE DATA STRUCTURE - MANDATORY FIELDS ===
-
-EVERY node must have:
-```json
+=== NODE DATA STRUCTURE ===
+Every node MUST include:
 {
   "id": "unique-identifier",
   "type": "nodeType",
@@ -74,142 +38,52 @@ EVERY node must have:
   "data": {
     "label": "Human readable name",
     "platform": "platform-name-if-applicable",
-    "icon": "platform-icon-if-applicable", 
-    "explanation": "Detailed description of what this does",
+    "icon": "platform-icon-if-applicable",
+    "explanation": "What this component does",
     "stepType": "original-step-type",
     "isRecommended": true/false,
-    "onAdd": "function-reference-if-recommended",
-    "onDismiss": "function-reference-if-recommended",
-    // INCLUDE THE ORIGINAL STEP DATA:
-    "action": {...},
-    "condition": {...},
-    "loop": {...},
-    "delay": {...},
-    "ai_agent_call": {...},
-    "retry": {...},
-    "fallback": {...}
-  },
-  "sourcePosition": "right",
-  "targetPosition": "left"
+    "onAdd": "handleAddAgent",
+    "onDismiss": "handleDismissAgent"
+  }
 }
-```
 
-=== EDGE CONNECTIONS - CONNECT EVERYTHING ===
+=== EDGE CONNECTIONS ===
+Connect ALL nodes with proper edges:
+- Standard edges: {"stroke": "#94a3b8", "strokeWidth": 2}
+- TRUE branches: {"stroke": "#10b981", "strokeWidth": 3} with label "Yes"
+- FALSE branches: {"stroke": "#ef4444", "strokeWidth": 3} with label "No"
+- Loop edges: {"stroke": "#8b5cf6", "strokeWidth": 2}
+- Retry edges: {"stroke": "#f97316", "strokeWidth": 2}
+- Fallback edges: {"stroke": "#3b82f6", "strokeWidth": 2}
 
-1. STANDARD EDGES:
-```json
-{
-  "id": "edge-id",
-  "source": "source-node-id", 
-  "target": "target-node-id",
-  "type": "smoothstep",
-  "animated": true,
-  "style": {"stroke": "#94a3b8", "strokeWidth": 2, "strokeDasharray": "5,5"}
-}
-```
+=== ANALYSIS PROCESS ===
+1. COUNT EVERYTHING:
+   - Main steps + all nested steps
+   - Unique platforms used
+   - AI agents (recommended + configured)
+   - System components
 
-2. CONDITION EDGES:
-- TRUE path: green (#10b981) with label "Yes"
-- FALSE path: red (#ef4444) with label "No"
-
-3. SPECIAL PATHS:
-- Loop edges: purple (#8b5cf6)
-- Retry edges: orange (#f97316)
-- Fallback edges: blue (#3b82f6)
-
-=== COMPREHENSIVE ANALYSIS PROCESS ===
-
-1. COUNT EVERYTHING FIRST:
-   - Count main steps
-   - Count nested steps (recursively)
-   - Count unique platforms
-   - Count AI agents
-   - Count system components
-
-2. CREATE NODES FOR EACH:
-   - One node per step (no combining)
+2. CREATE COMPREHENSIVE NODES:
+   - One node per step (never combine)
    - One node per platform usage
    - One node per agent call
    - One node per system component
 
-3. LAYOUT SYSTEMATICALLY:
-   - Place trigger first (leftmost)
-   - Follow execution flow left-to-right
-   - Branch appropriately for conditions
-   - Show all possible paths
+3. CONNECT EVERYTHING:
+   - Every node must connect to something
+   - Show all execution paths
+   - Use appropriate edge styles
 
-4. CONNECT EVERYTHING:
-   - Every node must have connections
-   - No orphaned nodes
-   - Clear flow direction
-   - Proper path visualization
+=== VALIDATION CHECKLIST ===
+Before returning:
+- Node count >= total components from blueprint
+- Every platform appears as platformNode
+- Every agent appears as aiAgentNode
+- All branches properly connected
+- Proper left-to-right layout
+- No overlapping positions
 
-=== VALIDATION REQUIREMENTS ===
-
-Before returning your diagram, verify:
-- Node count >= step count from blueprint
-- Every platform appears as a node
-- Every agent appears as a node  
-- All branches are connected
-- All paths lead somewhere
-- Proper positioning (no overlaps)
-
-=== EXAMPLE OUTPUT STRUCTURE ===
-
-```json
-{
-  "nodes": [
-    {
-      "id": "trigger-1",
-      "type": "triggerNode", 
-      "position": {"x": 100, "y": 300},
-      "data": {
-        "label": "Manual Trigger",
-        "explanation": "User manually starts this automation",
-        "stepType": "trigger"
-      }
-    },
-    {
-      "id": "step-1",
-      "type": "platformNode",
-      "position": {"x": 500, "y": 300}, 
-      "data": {
-        "label": "Google Sheets",
-        "platform": "google_sheets",
-        "icon": "sheets",
-        "explanation": "Fetch data from Google Sheets",
-        "stepType": "action",
-        "action": {...}
-      }
-    }
-    // ... CONTINUE FOR EVERY COMPONENT
-  ],
-  "edges": [
-    {
-      "id": "trigger-to-step1",
-      "source": "trigger-1",
-      "target": "step-1", 
-      "type": "smoothstep",
-      "animated": true,
-      "style": {"stroke": "#94a3b8", "strokeWidth": 2, "strokeDasharray": "5,5"}
-    }
-    // ... CONNECT EVERYTHING
-  ]
-}
-```
-
-=== FINAL REQUIREMENTS ===
-
-- Return ONLY valid JSON (no other text)
-- Include nodes AND edges arrays
-- Every component gets its own node
-- Every connection gets its own edge
-- Use proper node types exactly as specified
-- Include all data fields as required
-- Follow layout rules precisely
-- Show complete automation flow
-
-REMEMBER: If the blueprint has 10 steps, your diagram should have AT LEAST 10 nodes. If there are 5 platforms, show 5 platform nodes. If there are 3 agents, show 3 agent nodes. EVERYTHING must be visible and connected!`
+RETURN ONLY VALID JSON with nodes and edges arrays. Show EVERY component from the automation blueprint!`
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',

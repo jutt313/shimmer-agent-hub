@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ReactFlow, 
@@ -67,7 +68,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     messages.forEach(message => {
       if (message.isBot && message.structuredData?.ai_agents) {
         message.structuredData.ai_agents.forEach((agent: any) => {
-          if (!dismissedAgents.has(agent.name)) {
+          if (agent && agent.name && !dismissedAgents.has(agent.name)) {
             recommendations.push(agent);
           }
         });
@@ -88,7 +89,13 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       const processedNodes = automationDiagramData.nodes.map(node => {
         // Check if this is an AI agent node that matches a recommendation
         const recommendation = aiAgentRecommendations.find(agent => 
-          node.type === 'aiAgentNode' && agent.name === node.data?.agent?.agent_id
+          node.type === 'aiAgentNode' && 
+          agent && 
+          agent.name && 
+          node.data?.agent && 
+          typeof node.data.agent === 'object' && 
+          'agent_id' in node.data.agent &&
+          agent.name === node.data.agent.agent_id
         );
         
         if (recommendation) {

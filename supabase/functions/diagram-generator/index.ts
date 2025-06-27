@@ -1,70 +1,133 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-const ENHANCED_DIAGRAM_GENERATOR_SYSTEM_PROMPT = `You are an EXPERT automation diagram generator that creates COMPREHENSIVE React Flow diagrams.
+const ENHANCED_DIAGRAM_GENERATOR_SYSTEM_PROMPT = `You are an EXPERT visual automation flow designer that creates comprehensive React Flow diagrams similar to Make.com and Zapier.
 
-=== CRITICAL MISSION ===
-Generate a COMPLETE visual diagram showing EVERY component from the automation blueprint - NO EXCEPTIONS!
+=== YOUR MISSION ===
+Create a VISUAL AUTOMATION FLOW that shows exactly how the automation works from start to finish, step by step.
 
-=== STRICT REQUIREMENTS ===
-1. CREATE ONE NODE FOR EACH:
-   - Main automation step
-   - Platform integration (separate node per platform usage)
-   - AI agent call (separate node per agent)
-   - Condition/decision point
-   - Loop iteration
-   - Delay/wait period
-   - Retry mechanism
-   - Fallback handler
-   - Trigger point
+=== CORE PRINCIPLES ===
+1. Think like Make.com or Zapier - show the ACTUAL FLOW of data and actions
+2. Every platform integration gets its own node
+3. Every AI agent gets its own node  
+4. Every condition creates branching paths (Yes/No)
+5. Every loop shows iteration clearly
+6. Show the REAL WORKFLOW - how data flows from one step to the next
 
-2. MANDATORY NODE TYPES:
-   - "triggerNode" - automation triggers
-   - "platformNode" - platform integrations 
-   - "actionNode" - general actions
-   - "conditionNode" - decision points
-   - "loopNode" - iterations
-   - "delayNode" - wait periods
-   - "aiAgentNode" - AI agent calls
-   - "retryNode" - retry logic
-   - "fallbackNode" - error handling
+=== REQUIRED NODE TYPES ===
+- "triggerNode" - How the automation starts
+- "platformNode" - Platform integrations (Google Sheets, Slack, etc.)
+- "actionNode" - General actions and processing
+- "conditionNode" - Decision points with Yes/No branches
+- "loopNode" - Iterations and repeating actions
+- "delayNode" - Wait periods
+- "aiAgentNode" - AI agent calls
+- "retryNode" - Retry mechanisms
+- "fallbackNode" - Error handling
 
-3. LAYOUT RULES:
-   - Start: x: 100, y: 300
-   - Horizontal spacing: +400 per main step
-   - Vertical branching: ±200 for conditions
-   - NO overlapping nodes
-   - Left-to-right flow
+=== LAYOUT RULES ===
+- Start at x: 100, y: 300
+- Flow LEFT TO RIGHT
+- Horizontal spacing: +350 between main steps
+- Vertical branching: ±150 for conditions
+- Keep nodes organized and readable
+- NO overlapping nodes
 
-4. NODE STRUCTURE (EXACT FORMAT):
+=== NODE STRUCTURE (EXACT FORMAT) ===
 {
-  "id": "unique-id",
+  "id": "unique-descriptive-id",
   "type": "nodeType",
   "position": {"x": number, "y": number},
   "data": {
-    "label": "Clear description",
+    "label": "Clear, descriptive label",
     "platform": "platform-name",
     "icon": "icon-name",
-    "explanation": "What this does",
+    "explanation": "What this step does",
     "stepType": "step-type"
   }
 }
 
-5. EDGE CONNECTIONS:
-   - Standard: {"stroke": "#94a3b8", "strokeWidth": 2}
-   - Condition TRUE: {"stroke": "#10b981", "strokeWidth": 3, "label": "Yes"}
-   - Condition FALSE: {"stroke": "#ef4444", "strokeWidth": 3, "label": "No"}
+=== EDGE CONNECTIONS ===
+- Standard flow: {"stroke": "#3b82f6", "strokeWidth": 2, "animated": true}
+- Condition YES: {"stroke": "#10b981", "strokeWidth": 3, "label": "Yes", "animated": true}
+- Condition NO: {"stroke": "#ef4444", "strokeWidth": 3, "label": "No", "animated": true}
+- Loop flow: {"stroke": "#8b5cf6", "strokeWidth": 2, "animated": true}
 
-=== VALIDATION CHECKLIST ===
+=== EXAMPLES ===
+Trigger Node:
+{
+  "id": "trigger-start",
+  "type": "triggerNode",
+  "position": {"x": 100, "y": 300},
+  "data": {
+    "label": "New Email Received",
+    "platform": "Email",
+    "icon": "mail",
+    "explanation": "Automation starts when new email arrives",
+    "stepType": "trigger"
+  }
+}
+
+Platform Node:
+{
+  "id": "platform-sheets",
+  "type": "platformNode", 
+  "position": {"x": 450, "y": 300},
+  "data": {
+    "label": "Update Google Sheets",
+    "platform": "Google Sheets",
+    "icon": "sheet",
+    "explanation": "Add new row with email data",
+    "stepType": "platform"
+  }
+}
+
+Condition Node (creates branching):
+{
+  "id": "condition-priority",
+  "type": "conditionNode",
+  "position": {"x": 800, "y": 300},
+  "data": {
+    "label": "Is High Priority?",
+    "explanation": "Check if email is marked urgent",
+    "stepType": "condition"
+  }
+}
+
+=== CONDITION BRANCHING ===
+When you create a condition node, you MUST create separate paths:
+- YES path: continues at same Y level or Y-150
+- NO path: continues at Y+150
+- Connect with appropriate edge labels
+
+=== AI AGENT INTEGRATION ===
+Every AI agent call gets its own aiAgentNode:
+{
+  "id": "agent-analyzer",
+  "type": "aiAgentNode",
+  "position": {"x": 1150, "y": 200},
+  "data": {
+    "label": "AI Content Analyzer",
+    "agent": {"agent_id": "content-analyzer"},
+    "explanation": "AI processes and categorizes the content",
+    "stepType": "ai_agent_call"
+  }
+}
+
+=== VALIDATION REQUIREMENTS ===
 Before returning, ensure:
-- Node count >= expected components
-- Every platform has a platformNode
-- Every agent has an aiAgentNode
-- All conditions have proper branching
-- No missing connections
-- Proper positioning
+✓ Every platform mentioned has a platformNode
+✓ Every AI agent has an aiAgentNode
+✓ All conditions have proper YES/NO branching
+✓ Flow goes LEFT TO RIGHT logically
+✓ All nodes are properly connected
+✓ No missing or broken connections
 
-RETURN ONLY VALID JSON with "nodes" and "edges" arrays.`
+=== OUTPUT FORMAT ===
+Return ONLY valid JSON with "nodes" and "edges" arrays.
+Make the flow VISUAL and LOGICAL - like a real automation builder tool.
+
+REMEMBER: You're creating a VISUAL REPRESENTATION of how the automation actually works, not just a list of components!`
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -72,7 +135,7 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-    console.log('🚀 ENHANCED Diagram Generator - Request received');
+    console.log('🚀 Enhanced Visual Flow Generator - Request received');
     
     if (req.method === 'OPTIONS') {
         return new Response(null, { headers: corsHeaders });
@@ -90,145 +153,61 @@ serve(async (req) => {
         const requestBody = await req.json();
         const { automation_blueprint } = requestBody;
 
-        console.log('📋 DIAGNOSTIC: Raw blueprint received');
-        console.log('📋 Blueprint exists:', !!automation_blueprint);
-        console.log('📋 Blueprint steps exist:', !!automation_blueprint?.steps);
-        console.log('📋 Blueprint steps count:', automation_blueprint?.steps?.length || 0);
+        console.log('📋 Blueprint analysis - Steps:', automation_blueprint?.steps?.length || 0);
         
-        if (automation_blueprint) {
-            console.log('📋 FULL BLUEPRINT ANALYSIS:', JSON.stringify(automation_blueprint, null, 2));
-        }
-
         if (!automation_blueprint || !automation_blueprint.steps) {
-            console.error('❌ Missing or invalid automation blueprint');
+            console.error('❌ Missing automation blueprint');
             return new Response(
                 JSON.stringify({ 
-                    error: 'Missing or invalid automation blueprint',
-                    received: automation_blueprint
+                    error: 'Missing automation blueprint - cannot create visual flow'
                 }),
                 { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
-        // ENHANCED COMPREHENSIVE ANALYSIS
+        // Enhanced analysis for better prompting
         const analyzeBlueprint = (blueprint) => {
-            console.log('🔍 STARTING COMPREHENSIVE ANALYSIS');
-            
             let totalSteps = 0;
             const platforms = new Set();
             const agents = new Set();
-            let conditions = 0;
-            let loops = 0;
-            let delays = 0;
-            let retries = 0;
-            let fallbacks = 0;
-            const detailedSteps = [];
-
-            const processSteps = (steps, depth = 0, parentPath = '') => {
-                console.log(`🔍 Processing ${steps.length} steps at depth ${depth}`);
-                
-                steps.forEach((step, index) => {
-                    const stepPath = `${parentPath}step-${index}`;
+            const stepTypes = new Set();
+            
+            const processSteps = (steps) => {
+                steps.forEach((step) => {
                     totalSteps++;
+                    stepTypes.add(step.type);
                     
-                    console.log(`📝 Step ${totalSteps}: ${step.name || step.type} (${step.type})`);
-                    
-                    detailedSteps.push({
-                        path: stepPath,
-                        name: step.name || `Step ${totalSteps}`,
-                        type: step.type,
-                        depth: depth
-                    });
-                    
-                    // Platform detection
                     if (step.action?.integration) {
                         platforms.add(step.action.integration);
-                        console.log(`🔌 Found platform: ${step.action.integration}`);
                     }
                     
-                    // Agent detection
                     if (step.ai_agent_call?.agent_id) {
                         agents.add(step.ai_agent_call.agent_id);
-                        console.log(`🤖 Found agent: ${step.ai_agent_call.agent_id}`);
                     }
                     
-                    // System component detection
-                    switch (step.type) {
-                        case 'condition':
-                            conditions++;
-                            console.log(`🔀 Found condition: ${step.condition?.expression}`);
-                            if (step.condition?.if_true) {
-                                console.log(`✅ Condition TRUE branch: ${step.condition.if_true.length} steps`);
-                                processSteps(step.condition.if_true, depth + 1, `${stepPath}-true-`);
-                            }
-                            if (step.condition?.if_false) {
-                                console.log(`❌ Condition FALSE branch: ${step.condition.if_false.length} steps`);
-                                processSteps(step.condition.if_false, depth + 1, `${stepPath}-false-`);
-                            }
-                            break;
-                        case 'loop':
-                            loops++;
-                            console.log(`🔄 Found loop: ${step.loop?.array_source}`);
-                            if (step.loop?.steps) {
-                                console.log(`🔄 Loop contains: ${step.loop.steps.length} steps`);
-                                processSteps(step.loop.steps, depth + 1, `${stepPath}-loop-`);
-                            }
-                            break;
-                        case 'delay':
-                            delays++;
-                            console.log(`⏱️ Found delay: ${step.delay?.duration_seconds}s`);
-                            break;
-                        case 'retry':
-                            retries++;
-                            console.log(`🔁 Found retry: ${step.retry?.max_attempts} attempts`);
-                            if (step.retry?.steps) {
-                                processSteps(step.retry.steps, depth + 1, `${stepPath}-retry-`);
-                            }
-                            break;
-                        case 'fallback':
-                            fallbacks++;
-                            console.log(`🛡️ Found fallback`);
-                            if (step.fallback?.primary_steps) {
-                                processSteps(step.fallback.primary_steps, depth + 1, `${stepPath}-primary-`);
-                            }
-                            if (step.fallback?.fallback_steps) {
-                                processSteps(step.fallback.fallback_steps, depth + 1, `${stepPath}-fallback-`);
-                            }
-                            break;
-                    }
+                    // Process nested steps
+                    if (step.condition?.if_true) processSteps(step.condition.if_true);
+                    if (step.condition?.if_false) processSteps(step.condition.if_false);
+                    if (step.loop?.steps) processSteps(step.loop.steps);
+                    if (step.retry?.steps) processSteps(step.retry.steps);
+                    if (step.fallback?.primary_steps) processSteps(step.fallback.primary_steps);
+                    if (step.fallback?.fallback_steps) processSteps(step.fallback.fallback_steps);
                 });
             };
 
             processSteps(blueprint.steps);
             
-            const analysis = {
+            return {
                 totalSteps,
                 platforms: Array.from(platforms),
                 agents: Array.from(agents),
-                conditions,
-                loops,
-                delays,
-                retries,
-                fallbacks,
-                expectedMinNodes: totalSteps + platforms.size + agents.size + 1, // +1 for trigger
-                detailedSteps
+                stepTypes: Array.from(stepTypes),
+                trigger: blueprint.trigger
             };
-            
-            console.log('📊 FINAL COMPREHENSIVE ANALYSIS:');
-            console.log(`📈 Total Steps Found: ${analysis.totalSteps}`);
-            console.log(`🔌 Platforms Found: ${analysis.platforms.join(', ')} (${analysis.platforms.length})`);
-            console.log(`🤖 Agents Found: ${analysis.agents.join(', ')} (${analysis.agents.length})`);
-            console.log(`🔀 Conditions: ${analysis.conditions}`);
-            console.log(`🔄 Loops: ${analysis.loops}`);
-            console.log(`⏱️ Delays: ${analysis.delays}`);
-            console.log(`🔁 Retries: ${analysis.retries}`);
-            console.log(`🛡️ Fallbacks: ${analysis.fallbacks}`);
-            console.log(`🎯 Expected Minimum Nodes: ${analysis.expectedMinNodes}`);
-            
-            return analysis;
         };
 
         const analysis = analyzeBlueprint(automation_blueprint);
+        console.log('📊 Flow analysis:', analysis);
 
         // Check OpenAI API key
         const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
@@ -240,47 +219,40 @@ serve(async (req) => {
             );
         }
 
-        // ENHANCED USER PROMPT with detailed requirements
-        const userPrompt = `CREATE A COMPREHENSIVE AUTOMATION DIAGRAM
+        // Enhanced user prompt focusing on visual flow
+        const userPrompt = `CREATE A VISUAL AUTOMATION FLOW DIAGRAM
 
-BLUEPRINT ANALYSIS:
+AUTOMATION OVERVIEW:
+- Title: ${automation_blueprint.description || 'Automation Flow'}
 - Total Steps: ${analysis.totalSteps}
-- Platforms: ${analysis.platforms.join(', ')} (${analysis.platforms.length} unique)
-- AI Agents: ${analysis.agents.join(', ')} (${analysis.agents.length} unique)
-- Conditions: ${analysis.conditions}
-- Loops: ${analysis.loops}
-- Delays: ${analysis.delays}
-- Retries: ${analysis.retries}
-- Fallbacks: ${analysis.fallbacks}
+- Platforms: ${analysis.platforms.join(', ')} (${analysis.platforms.length} total)
+- AI Agents: ${analysis.agents.join(', ')} (${analysis.agents.length} total)
+- Step Types: ${analysis.stepTypes.join(', ')}
+- Trigger: ${analysis.trigger?.type || 'manual'}
 
-MINIMUM NODES REQUIRED: ${analysis.expectedMinNodes}
+VISUAL FLOW REQUIREMENTS:
+1. Start with a trigger node showing how this automation begins
+2. Create a platformNode for each platform: ${analysis.platforms.join(', ')}
+3. Create an aiAgentNode for each agent: ${analysis.agents.join(', ')}
+4. Show the ACTUAL FLOW - how data moves from step to step
+5. For conditions: create YES/NO branching paths
+6. For loops: show the iteration clearly
+7. Make it look like Make.com or Zapier - visual and logical
 
-DETAILED STEP BREAKDOWN:
-${analysis.detailedSteps.map(step => `- ${step.name} (${step.type}) at depth ${step.depth}`).join('\n')}
-
-FULL BLUEPRINT:
+AUTOMATION BLUEPRINT:
 ${JSON.stringify(automation_blueprint, null, 2)}
 
-MANDATORY REQUIREMENTS:
-1. Create ${analysis.expectedMinNodes}+ nodes minimum
-2. One platformNode for each platform: ${analysis.platforms.join(', ')}
-3. One aiAgentNode for each agent: ${analysis.agents.join(', ')}
-4. Show all ${analysis.conditions} conditions with branching
-5. Show all ${analysis.loops} loops with internal steps
-6. Show all ${analysis.delays} delays
-7. Show all ${analysis.retries} retries
-8. Show all ${analysis.fallbacks} fallbacks
-9. Connect everything with proper edges
-10. Use left-to-right layout with vertical branching
+INSTRUCTIONS:
+- Think of this as a VISUAL WORKFLOW BUILDER
+- Every step should be connected logically
+- Show the user exactly how their automation will execute
+- Make branching paths clear for conditions
+- Position nodes so they don't overlap
+- Use descriptive labels that explain what each step does
 
-EXAMPLE NODES:
-- Trigger: {"id": "trigger", "type": "triggerNode", "position": {"x": 100, "y": 300}, "data": {"label": "Start", "stepType": "trigger"}}
-- Platform: {"id": "platform-sheets", "type": "platformNode", "position": {"x": 500, "y": 300}, "data": {"label": "Google Sheets", "platform": "Google Sheets", "stepType": "platform"}}
+Create a comprehensive visual flow that shows exactly how this automation works from start to finish!`;
 
-Return ONLY valid JSON with nodes and edges arrays showing EVERY component!`;
-
-        console.log('🤖 Calling OpenAI with ENHANCED prompt');
-        console.log(`📏 Prompt length: ${userPrompt.length} characters`);
+        console.log('🤖 Generating visual flow with enhanced prompt');
 
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -289,13 +261,13 @@ Return ONLY valid JSON with nodes and edges arrays showing EVERY component!`;
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: 'gpt-4o',  // Using more powerful model
+                model: 'gpt-4o',
                 messages: [
                     { role: "system", content: ENHANCED_DIAGRAM_GENERATOR_SYSTEM_PROMPT },
                     { role: "user", content: userPrompt }
                 ],
                 response_format: { type: "json_object" },
-                temperature: 0.1,
+                temperature: 0.2,
                 max_tokens: 16000
             }),
         });
@@ -311,7 +283,6 @@ Return ONLY valid JSON with nodes and edges arrays showing EVERY component!`;
 
         const result = await response.json();
         console.log('✅ OpenAI response received');
-        console.log(`📏 Response length: ${result.choices[0].message.content.length} characters`);
 
         if (!result.choices || result.choices.length === 0) {
             console.error('❌ No response from OpenAI');
@@ -322,72 +293,56 @@ Return ONLY valid JSON with nodes and edges arrays showing EVERY component!`;
         }
 
         const diagramDataString = result.choices[0].message.content;
-        console.log('📄 Raw AI response preview:', diagramDataString.substring(0, 500) + '...');
-
+        
         let diagramData;
         try {
             diagramData = JSON.parse(diagramDataString);
-            console.log('✅ JSON parsing successful');
         } catch (parseError) {
             console.error('❌ JSON parsing error:', parseError);
-            console.error('❌ Raw content:', diagramDataString);
             return new Response(
                 JSON.stringify({ 
                     error: 'Failed to parse AI response as JSON',
-                    raw_content: diagramDataString.substring(0, 1000)
+                    raw_content: diagramDataString.substring(0, 500)
                 }),
                 { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
-        // COMPREHENSIVE VALIDATION
         if (!diagramData || !diagramData.nodes || !diagramData.edges) {
-            console.error('❌ Invalid diagram structure:', diagramData);
+            console.error('❌ Invalid diagram structure');
             return new Response(
                 JSON.stringify({ 
-                    error: 'Invalid diagram structure from AI',
-                    received: diagramData
+                    error: 'Invalid diagram structure from AI'
                 }),
                 { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
-        const nodeCount = diagramData.nodes.length;
-        const edgeCount = diagramData.edges.length;
-
-        console.log('🎯 DIAGRAM GENERATION RESULTS:');
-        console.log(`📊 Generated nodes: ${nodeCount} (expected: ${analysis.expectedMinNodes})`);
-        console.log(`🔗 Generated edges: ${edgeCount}`);
-        console.log('📋 Node types:', [...new Set(diagramData.nodes.map(n => n.type))]);
-
-        // VALIDATION CHECK
-        if (nodeCount < analysis.expectedMinNodes * 0.8) {
-            const warningMessage = `Insufficient nodes: Generated ${nodeCount} but expected ${analysis.expectedMinNodes}`;
-            console.warn(`⚠️ ${warningMessage}`);
-            diagramData.warning = warningMessage;
-        }
-
-        // Check for platform coverage
-        const generatedPlatformNodes = diagramData.nodes.filter(n => n.type === 'platformNode');
-        console.log(`🔌 Generated platform nodes: ${generatedPlatformNodes.length} (expected: ${analysis.platforms.length})`);
-        
-        if (generatedPlatformNodes.length < analysis.platforms.length) {
-            console.warn(`⚠️ Missing platform nodes: Expected ${analysis.platforms.length}, got ${generatedPlatformNodes.length}`);
-        }
-
-        // Enhance edges with proper styling
+        // Enhance edges with proper styling and interactivity
         diagramData.edges = diagramData.edges.map(edge => ({
             ...edge,
-            type: edge.type || 'smoothstep',
-            animated: edge.animated !== undefined ? edge.animated : true,
+            type: 'smoothstep',
+            animated: true,
             style: {
-                stroke: edge.style?.stroke || '#94a3b8',
+                stroke: edge.style?.stroke || '#3b82f6',
                 strokeWidth: edge.style?.strokeWidth || 2,
                 ...edge.style
             }
         }));
 
-        console.log('✅ ENHANCED diagram generation completed successfully!');
+        // Enhance nodes for better interactivity
+        diagramData.nodes = diagramData.nodes.map(node => ({
+            ...node,
+            draggable: true,
+            selectable: true,
+            connectable: false
+        }));
+
+        console.log('✅ Generated interactive visual flow:', {
+            nodes: diagramData.nodes.length,
+            edges: diagramData.edges.length,
+            nodeTypes: [...new Set(diagramData.nodes.map(n => n.type))]
+        });
 
         return new Response(JSON.stringify(diagramData), {
             status: 200,
@@ -395,14 +350,12 @@ Return ONLY valid JSON with nodes and edges arrays showing EVERY component!`;
         });
 
     } catch (error) {
-        console.error('💥 CRITICAL ERROR in diagram generator:', error);
-        console.error('💥 Error stack:', error.stack);
+        console.error('💥 Error in visual flow generator:', error);
         
         return new Response(
             JSON.stringify({
-                error: error.message || 'Enhanced diagram generation failed',
-                details: error.toString(),
-                stack: error.stack?.substring(0, 500)
+                error: error.message || 'Visual flow generation failed',
+                details: error.toString()
             }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );

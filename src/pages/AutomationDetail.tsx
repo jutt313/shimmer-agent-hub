@@ -69,9 +69,10 @@ const AutomationDetail = () => {
     setGeneratingDiagram(true);
     
     try {
-      console.log('🎨 Generating AI-powered diagram for automation:', automationId);
+      console.log('🎨 Generating comprehensive AI-powered diagram for automation:', automationId);
+      console.log('📊 Blueprint has', blueprint.steps.length, 'main steps');
       
-      // Call the new diagram-generator Edge Function
+      // Call the enhanced diagram-generator Edge Function
       const { data, error } = await supabase.functions.invoke('diagram-generator', {
         body: { automation_blueprint: blueprint },
       });
@@ -80,7 +81,7 @@ const AutomationDetail = () => {
         console.error('❌ Error invoking diagram-generator:', error);
         toast({
           title: "Diagram Generation Failed",
-          description: "Could not generate diagram. Please try again.",
+          description: "Could not generate comprehensive diagram. Please try again.",
           variant: "destructive",
         });
         return;
@@ -96,7 +97,12 @@ const AutomationDetail = () => {
         return;
       }
 
-      console.log('✅ Generated diagram with', data.nodes.length, 'nodes and', data.edges.length, 'edges');
+      console.log('✅ Generated comprehensive diagram with', data.nodes.length, 'nodes and', data.edges.length, 'edges');
+
+      // Validate that we got a reasonable number of nodes
+      if (data.nodes.length < blueprint.steps.length) {
+        console.warn('⚠️ Generated fewer nodes than expected. Some steps may be missing.');
+      }
 
       // Save the generated diagram data back to the database
       const { error: updateError } = await supabase
@@ -120,17 +126,17 @@ const AutomationDetail = () => {
         automation_diagram_data: data
       }));
 
-      console.log('✅ Diagram generated and saved successfully!');
+      console.log('✅ Comprehensive diagram generated and saved successfully!');
       toast({
-        title: "Diagram Generated",
-        description: "AI has created a beautiful diagram for your automation!",
+        title: "Complete Diagram Generated",
+        description: `AI has created a comprehensive diagram showing all ${data.nodes.length} steps of your automation!`,
       });
 
     } catch (err) {
       console.error('💥 Unexpected error in generateAndSaveDiagram:', err);
       toast({
         title: "Generation Error",
-        description: "An unexpected error occurred while generating the diagram.",
+        description: "An unexpected error occurred while generating the comprehensive diagram.",
         variant: "destructive",
       });
     } finally {
@@ -565,10 +571,10 @@ const AutomationDetail = () => {
             )}
           </div>
 
-          {/* Diagram Card - MUCH BIGGER with improved layout */}
+          {/* Enhanced Diagram Card - MUCH BIGGER with complete coverage */}
           <div className={`transition-transform duration-500 ease-in-out ${showDiagram ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} ${showDiagram ? 'relative' : 'absolute'} w-full`}>
             {showDiagram && (
-              <div style={{ height: '75vh' }}>
+              <div style={{ height: '80vh' }}>
                 <AutomationDiagramDisplay
                   automationBlueprint={automation?.automation_blueprint}
                   automationDiagramData={automation?.automation_diagram_data}

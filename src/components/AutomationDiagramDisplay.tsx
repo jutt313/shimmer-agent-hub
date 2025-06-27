@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ReactFlow, 
@@ -80,7 +81,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   // Load diagram data when available
   useEffect(() => {
     if (automationDiagramData && automationDiagramData.nodes && automationDiagramData.edges) {
-      console.log('🎨 Loading AI-generated diagram data:', {
+      console.log('🎨 Loading AI-generated comprehensive diagram data:', {
         nodes: automationDiagramData.nodes.length,
         edges: automationDiagramData.edges.length
       });
@@ -116,8 +117,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       setNodes(processedNodes);
       setEdges(automationDiagramData.edges);
     } else if (automationBlueprint && automationBlueprint.steps && automationBlueprint.steps.length > 0) {
-      console.log('⚠️ No AI diagram data, creating enhanced fallback layout');
-      createEnhancedFallbackDiagram();
+      console.log('⚠️ No AI diagram data, creating comprehensive fallback layout');
+      createComprehensiveFallbackDiagram();
     } else {
       console.log('📝 No blueprint or diagram data available');
       setNodes([]);
@@ -125,60 +126,102 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     }
   }, [automationDiagramData, automationBlueprint, aiAgentRecommendations]);
 
-  const createEnhancedFallbackDiagram = () => {
+  const createComprehensiveFallbackDiagram = () => {
     if (!automationBlueprint?.steps) return;
 
     const fallbackNodes: Node[] = [];
     const fallbackEdges: Edge[] = [];
+    let nodeCounter = 0;
 
-    automationBlueprint.steps.forEach((step, index) => {
-      const nodeId = step.id || `step-${index}`;
-      
-      // Use platformNode for actions, appropriate node types for others
-      const nodeType = step.type === 'action' ? 'platformNode' : getNodeType(step.type);
-      
-      const node: Node = {
-        id: nodeId,
-        type: nodeType,
-        position: { x: 100 + (index * 350), y: 300 },
-        data: {
-          label: step.name || `Step ${index + 1}`,
-          explanation: getStepExplanation(step),
-          platform: step.action?.integration,
-          icon: step.action?.integration?.toLowerCase(),
-          action: step.action,
-          condition: step.condition,
-          loop: step.loop,
-          delay: step.delay,
-          agent: step.ai_agent_call,
-          retry: step.retry,
-          fallback: step.fallback,
-          stepType: step.type
-        },
-        sourcePosition: Position.Right,
-        targetPosition: Position.Left,
-      };
+    // Process all steps including nested ones
+    const processSteps = (steps: any[], startX: number, startY: number, parentId?: string) => {
+      let currentX = startX;
+      let lastNodeId = parentId;
 
-      fallbackNodes.push(node);
+      steps.forEach((step, index) => {
+        const nodeId = step.id || `step-${nodeCounter++}`;
+        
+        // Determine node type based on step type
+        const nodeType = step.type === 'action' ? 'platformNode' : getNodeType(step.type);
+        
+        const node: Node = {
+          id: nodeId,
+          type: nodeType,
+          position: { x: currentX, y: startY },
+          data: {
+            label: step.name || getStepLabel(step),
+            explanation: getStepExplanation(step),
+            platform: step.action?.integration,
+            icon: step.action?.integration?.toLowerCase(),
+            action: step.action,
+            condition: step.condition,
+            loop: step.loop,
+            delay: step.delay,
+            agent: step.ai_agent_call,
+            retry: step.retry,
+            fallback: step.fallback,
+            stepType: step.type
+          },
+          sourcePosition: Position.Right,
+          targetPosition: Position.Left,
+        };
 
-      // Create edge to next step with dotted lines
-      if (index < automationBlueprint.steps.length - 1) {
-        const nextStepId = automationBlueprint.steps[index + 1].id || `step-${index + 1}`;
-        fallbackEdges.push({
-          id: `${nodeId}-${nextStepId}`,
-          source: nodeId,
-          target: nextStepId,
-          type: 'smoothstep',
-          animated: true,
-          style: { 
-            stroke: '#94a3b8', 
-            strokeWidth: 2,
-            strokeDasharray: '5,5'
+        fallbackNodes.push(node);
+
+        // Connect to previous node
+        if (lastNodeId) {
+          fallbackEdges.push({
+            id: `${lastNodeId}-${nodeId}`,
+            source: lastNodeId,
+            target: nodeId,
+            type: 'smoothstep',
+            animated: true,
+            style: { 
+              stroke: '#94a3b8', 
+              strokeWidth: 2,
+              strokeDasharray: '5,5'
+            }
+          });
+        }
+
+        // Process nested steps
+        if (step.condition) {
+          if (step.condition.if_true) {
+            processSteps(step.condition.if_true, currentX + 450, startY - 150, nodeId);
           }
-        });
-      }
-    });
+          if (step.condition.if_false) {
+            processSteps(step.condition.if_false, currentX + 450, startY + 150, nodeId);
+          }
+        }
 
+        if (step.loop && step.loop.steps) {
+          processSteps(step.loop.steps, currentX + 450, startY, nodeId);
+        }
+
+        if (step.retry && step.retry.steps) {
+          processSteps(step.retry.steps, currentX + 450, startY, nodeId);
+        }
+
+        if (step.fallback) {
+          if (step.fallback.primary_steps) {
+            processSteps(step.fallback.primary_steps, currentX + 450, startY - 100, nodeId);
+          }
+          if (step.fallback.fallback_steps) {
+            processSteps(step.fallback.fallback_steps, currentX + 450, startY + 100, nodeId);
+          }
+        }
+
+        currentX += 450;
+        lastNodeId = nodeId;
+      });
+
+      return lastNodeId;
+    };
+
+    // Start processing from the main steps
+    processSteps(automationBlueprint.steps, 100, 300);
+
+    console.log(`📊 Created comprehensive fallback diagram with ${fallbackNodes.length} nodes and ${fallbackEdges.length} edges`);
     setNodes(fallbackNodes);
     setEdges(fallbackEdges);
   };
@@ -192,7 +235,28 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       case 'retry': return 'retryNode';
       case 'fallback': return 'fallbackNode';
       case 'action':
-      default: return 'actionNode';
+      default: return 'platformNode';
+    }
+  };
+
+  const getStepLabel = (step: any): string => {
+    switch (step.type) {
+      case 'action':
+        return step.action?.integration || 'Action';
+      case 'condition':
+        return 'Condition Check';
+      case 'loop':
+        return 'Loop Process';
+      case 'ai_agent_call':
+        return `AI Agent: ${step.ai_agent_call?.agent_id || 'Agent'}`;
+      case 'delay':
+        return 'Delay';
+      case 'retry':
+        return 'Retry Logic';
+      case 'fallback':
+        return 'Fallback Handler';
+      default:
+        return step.name || 'Step';
     }
   };
 
@@ -213,7 +277,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       case 'fallback':
         return 'Primary with fallback';
       default:
-        return 'Automation step';
+        return step.name || 'Automation step';
     }
   };
 
@@ -222,7 +286,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   }, []);
 
   const minimapStyle = {
-    height: 120,
+    height: 140,
     backgroundColor: '#f8fafc',
     borderRadius: '8px',
     border: '1px solid #e2e8f0'
@@ -235,8 +299,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           <div className="text-center space-y-4">
             <div className="animate-spin w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full mx-auto"></div>
             <div className="space-y-2">
-              <h3 className="text-lg font-semibold text-gray-800">AI is Creating Your Diagram</h3>
-              <p className="text-sm text-gray-600">Analyzing your automation blueprint and generating a clear visual flow...</p>
+              <h3 className="text-lg font-semibold text-gray-800">AI is Creating Your Complete Diagram</h3>
+              <p className="text-sm text-gray-600">Analyzing all automation steps and generating comprehensive visual flow...</p>
             </div>
           </div>
         </div>
@@ -255,7 +319,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             <div className="space-y-2">
               <h3 className="text-lg font-semibold text-gray-800">No Automation Blueprint Yet</h3>
               <p className="text-sm text-gray-600">
-                Start chatting with YusrAI to build your automation, and an intelligent diagram will be generated automatically.
+                Start chatting with YusrAI to build your automation, and a comprehensive diagram will be generated automatically.
               </p>
             </div>
           </div>
@@ -266,16 +330,20 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
 
   return (
     <Card className="h-full bg-white/80 backdrop-blur-sm border-0 shadow-xl overflow-hidden relative">
-      {/* Header with improved badges */}
+      {/* Enhanced header with step count */}
       <div className="absolute top-4 left-4 z-20 flex items-center gap-3">
         <Badge variant="secondary" className="bg-white/90 text-gray-700 border border-gray-200/50">
           <Sparkles className="w-3 h-3 mr-1" />
-          AI-Generated Flow
+          AI-Generated Complete Flow
+        </Badge>
+        
+        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+          {nodes.length} Total Steps
         </Badge>
         
         {automationDiagramData ? (
           <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-            {nodes.length} Steps • Clear Flow
+            Complete Coverage
           </Badge>
         ) : (
           <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
@@ -285,7 +353,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         )}
       </div>
 
-      {/* React Flow Diagram - Larger and cleaner */}
+      {/* React Flow Diagram - Enhanced with user interaction */}
       <ReactFlowProvider>
         <div className="w-full h-full">
           <ReactFlow
@@ -297,34 +365,45 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             nodeTypes={nodeTypes}
             fitView
             fitViewOptions={{
-              padding: 0.15,
-              minZoom: 0.2,
-              maxZoom: 1.5
+              padding: 0.1,
+              minZoom: 0.1,
+              maxZoom: 1.2
             }}
             className="bg-gradient-to-br from-slate-50/50 to-blue-50/30"
-            nodesDraggable={false}
+            nodesDraggable={true}
             nodesConnectable={false}
             elementsSelectable={true}
+            panOnScroll={true}
+            selectionOnDrag={true}
+            panOnDrag={[1, 2]}
+            zoomOnScroll={true}
+            zoomOnPinch={true}
+            zoomOnDoubleClick={true}
             attributionPosition="bottom-right"
             proOptions={{ hideAttribution: true }}
           >
             <Background 
               color="#e2e8f0" 
-              gap={20} 
-              size={1}
+              gap={25} 
+              size={1.5}
               variant={BackgroundVariant.Dots}
             />
             <Controls 
               className="bg-white/90 border border-gray-200/50 rounded-lg shadow-lg"
               position="bottom-left"
+              showZoom={true}
+              showFitView={true}
+              showInteractive={true}
             />
             <MiniMap 
               style={minimapStyle}
               nodeColor="#8b5cf6"
               nodeStrokeColor="#7c3aed"
               nodeStrokeWidth={2}
-              maskColor="rgba(255, 255, 255, 0.8)"
+              maskColor="rgba(255, 255, 255, 0.7)"
               position="bottom-right"
+              zoomable
+              pannable
             />
           </ReactFlow>
         </div>

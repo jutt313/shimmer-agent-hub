@@ -1,15 +1,14 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowRight, Clock, CheckCircle, XCircle, Play, Activity, Server, Bot, History } from "lucide-react";
+import { ArrowRight, Clock, CheckCircle, XCircle, Play, Activity, Server, Bot, History, Calendar, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
-import { format, subDays, startOfDay } from "date-fns";
+import { format, subDays, startOfDay, subWeeks, subMonths, startOfWeek, startOfMonth } from "date-fns";
 import AgentChatPopup from "./AgentChatPopup";
 
 interface AutomationRun {
@@ -149,73 +148,114 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
   // Get last run
   const lastRun = runs[0];
 
-  // Prepare chart data from real runs
-  const last7Days = Array.from({ length: 7 }, (_, i) => {
-    const date = startOfDay(subDays(new Date(), 6 - i));
-    const dayRuns = runs.filter(run => 
-      startOfDay(new Date(run.run_timestamp)).getTime() === date.getTime()
-    );
-    
-    return {
-      date: format(date, 'MMM dd'),
-      total: dayRuns.length,
-      successful: dayRuns.filter(run => run.status === 'completed').length,
-      failed: dayRuns.filter(run => run.status === 'failed').length
-    };
-  });
+  // Enhanced chart data for daily, weekly, monthly views
+  const getDailyData = () => {
+    return Array.from({ length: 7 }, (_, i) => {
+      const date = startOfDay(subDays(new Date(), 6 - i));
+      const dayRuns = runs.filter(run => 
+        startOfDay(new Date(run.run_timestamp)).getTime() === date.getTime()
+      );
+      
+      return {
+        date: format(date, 'MMM dd'),
+        total: dayRuns.length,
+        successful: dayRuns.filter(run => run.status === 'completed').length,
+        failed: dayRuns.filter(run => run.status === 'failed').length
+      };
+    });
+  };
 
-  // Calculate real platform performance data
-  const platformPerformanceData = platforms.map(platform => {
-    const platformRuns = runs.filter(run => 
-      run.details_log && 
-      JSON.stringify(run.details_log).toLowerCase().includes(platform.name.toLowerCase())
-    );
-    
-    const successfulPlatformRuns = platformRuns.filter(run => run.status === 'completed');
-    const successRate = platformRuns.length > 0 ? Math.round((successfulPlatformRuns.length / platformRuns.length) * 100) : 0;
-    
-    const avgTime = platformRuns.length > 0 && platformRuns.filter(run => run.duration_ms).length > 0
-      ? Math.round(platformRuns.filter(run => run.duration_ms).reduce((acc, run) => acc + (run.duration_ms || 0), 0) / platformRuns.filter(run => run.duration_ms).length)
-      : 0;
+  const getWeeklyData = () => {
+    return Array.from({ length: 4 }, (_, i) => {
+      const weekStart = startOfWeek(subWeeks(new Date(), 3 - i));
+      const weekEnd = subDays(startOfWeek(subWeeks(new Date(), 3 - i - 1)), 1);
+      const weekRuns = runs.filter(run => {
+        const runDate = new Date(run.run_timestamp);
+        return runDate >= weekStart && runDate <= weekEnd;
+      });
+      
+      return {
+        date: format(weekStart, 'MMM dd'),
+        total: weekRuns.length,
+        successful: weekRuns.filter(run => run.status === 'completed').length,
+        failed: weekRuns.filter(run => run.status === 'failed').length
+      };
+    });
+  };
 
-    return {
-      name: platform.name,
-      calls: platformRuns.length,
-      success: successRate,
-      avgTime: avgTime
-    };
-  });
-
-  // Real agent performance data based on actual runs
-  const agentPerformanceData = agents.map(agent => {
-    // Count runs that involved this agent
-    const agentRuns = runs.filter(run => 
-      run.details_log && 
-      JSON.stringify(run.details_log).toLowerCase().includes(agent.agent_name.toLowerCase())
-    );
-    
-    const successfulAgentRuns = agentRuns.filter(run => run.status === 'completed');
-    const agentSuccessRate = agentRuns.length > 0 ? Math.round((successfulAgentRuns.length / agentRuns.length) * 100) : 0;
-
-    return {
-      name: agent.agent_name,
-      tasks: agentRuns.length,
-      success: agentSuccessRate,
-      memory: agent.agent_memory ? JSON.stringify(agent.agent_memory).length : 0
-    };
-  });
-
-  // Real status distribution from actual runs
-  const statusData = [
-    { name: 'Completed', value: successfulRuns, color: '#10b981' },
-    { name: 'Failed', value: runs.filter(run => run.status === 'failed').length, color: '#ef4444' },
-    { name: 'Running', value: runs.filter(run => run.status === 'running').length, color: '#3b82f6' }
-  ].filter(item => item.value > 0);
+  const getMonthlyData = () => {
+    return Array.from({ length: 6 }, (_, i) => {
+      const monthStart = startOfMonth(subMonths(new Date(), 5 - i));
+      const monthEnd = subDays(startOfMonth(subMonths(new Date(), 5 - i - 1)), 1);
+      const monthRuns = runs.filter(run => {
+        const runDate = new Date(run.run_timestamp);
+        return runDate >= monthStart && runDate <= monthEnd;
+      });
+      
+      return {
+        date: format(monthStart, 'MMM yyyy'),
+        total: monthRuns.length,
+        successful: monthRuns.filter(run => run.status === 'completed').length,
+        failed: monthRuns.filter(run => run.status === 'failed').length
+      };
+    });
+  };
 
   // Get last 24 hours runs
   const last24Hours = runs.filter(run => 
     new Date(run.run_timestamp) > subDays(new Date(), 1)
   ).slice(0, 10);
+
+  // Recommended agents based on automation blueprint
+  const getRecommendedAgents = () => {
+    const recommendations = [];
+    
+    if (automationBlueprint?.steps) {
+      const hasEmailSteps = automationBlueprint.steps.some((step: any) => 
+        step.action?.integration?.toLowerCase().includes('email') || 
+        step.action?.method?.toLowerCase().includes('email')
+      );
+      
+      const hasDataSteps = automationBlueprint.steps.some((step: any) => 
+        step.action?.integration?.toLowerCase().includes('sheets') ||
+        step.action?.integration?.toLowerCase().includes('database')
+      );
+      
+      const hasNotificationSteps = automationBlueprint.steps.some((step: any) => 
+        step.action?.integration?.toLowerCase().includes('slack') ||
+        step.action?.integration?.toLowerCase().includes('discord')
+      );
+
+      if (hasEmailSteps && !agents.some(a => a.agent_role.toLowerCase().includes('email'))) {
+        recommendations.push({
+          name: "Email Marketing Agent",
+          role: "Email Campaign Manager",
+          goal: "Optimize email campaigns and improve engagement rates",
+          reason: "Your automation includes email operations"
+        });
+      }
+
+      if (hasDataSteps && !agents.some(a => a.agent_role.toLowerCase().includes('data'))) {
+        recommendations.push({
+          name: "Data Analysis Agent",
+          role: "Data Analyst",
+          goal: "Analyze data patterns and provide insights",
+          reason: "Your automation processes data"
+        });
+      }
+
+      if (hasNotificationSteps && !agents.some(a => a.agent_role.toLowerCase().includes('notification'))) {
+        recommendations.push({
+          name: "Communication Agent",
+          role: "Communication Manager",
+          goal: "Manage notifications and team communications",
+          reason: "Your automation sends notifications"
+        });
+      }
+    }
+
+    return recommendations;
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -268,12 +308,12 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
         style={{
           boxShadow: '0 0 50px rgba(92, 142, 246, 0.2), 0 0 100px rgba(154, 94, 255, 0.1)'
         }} 
-        className="w-[calc(100vw-6rem)] max-w-none h-[75vh] bg-white/70 backdrop-blur-md rounded-3xl p-8 shadow-2xl border-0 relative mx-12"
+        className="w-[calc(100vw-6rem)] max-w-none h-[75vh] bg-white/70 backdrop-blur-md rounded-3xl p-6 shadow-2xl border-0 relative mx-12"
       >
         <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/30 to-purple-100/30 pointer-events-none"></div>
         
         {/* Header */}
-        <div className="relative z-10 flex justify-between items-center mb-6">
+        <div className="relative z-10 flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             {automationTitle} Dashboard
           </h2>
@@ -287,9 +327,9 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
         </div>
 
         {/* Tabs Navigation */}
-        <div className="relative z-10 h-[calc(100%-5rem)]">
+        <div className="relative z-10 h-[calc(100%-4rem)]">
           <Tabs defaultValue="overview" className="h-full">
-            <TabsList className="grid w-full grid-cols-4 bg-white/50 rounded-2xl p-1">
+            <TabsList className="grid w-full grid-cols-4 bg-white/50 rounded-2xl p-1 mb-4">
               <TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 <Activity className="w-4 h-4" />
                 Overview
@@ -309,30 +349,29 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
             </TabsList>
 
             {/* Overview Tab */}
-            <TabsContent value="overview" className="mt-6 h-[calc(100%-4rem)]">
+            <TabsContent value="overview" className="mt-0 h-[calc(100%-5rem)]">
               <ScrollArea className="h-full">
-                <div className="space-y-6 pr-4">
-                  {/* Last Run Status */}
-                  {lastRun ? (
-                    <div className="bg-white/50 rounded-2xl p-4 border border-blue-200/50">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {getStatusIcon(lastRun.status)}
-                          <div>
-                            <p className="font-medium text-gray-800">Last Run</p>
-                            <p className="text-sm text-gray-600">
-                              {new Date(lastRun.run_timestamp).toLocaleString()}
-                            </p>
-                          </div>
+                <div className="space-y-4 pr-4">
+                  {/* Status Message */}
+                  <div className="bg-white/50 rounded-2xl p-4 border border-blue-200/50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {lastRun ? getStatusIcon(lastRun.status) : <Clock className="w-4 h-4 text-gray-400" />}
+                        <div>
+                          <p className="font-medium text-gray-800">
+                            {lastRun ? 'Last Run' : 'Automation Status'}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {lastRun 
+                              ? new Date(lastRun.run_timestamp).toLocaleString()
+                              : 'Automation is configured but not yet started'
+                            }
+                          </p>
                         </div>
-                        {getStatusBadge(lastRun.status)}
                       </div>
+                      {lastRun ? getStatusBadge(lastRun.status) : <Badge variant="outline">Ready to Start</Badge>}
                     </div>
-                  ) : (
-                    <div className="bg-white/50 rounded-2xl p-4 border border-blue-200/50 text-center">
-                      <p className="text-gray-500">No automation runs yet</p>
-                    </div>
-                  )}
+                  </div>
 
                   {/* Metrics Cards */}
                   <div className="grid grid-cols-3 gap-4">
@@ -364,15 +403,44 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                     </Card>
                   </div>
 
-                  {/* Charts Row - Only show if there's data */}
-                  {runs.length > 0 && (
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* Activity Chart */}
-                      <Card className="bg-white/50 border-blue-200/50">
-                        <CardHeader>
-                          <CardTitle className="text-lg">Last 7 Days Activity</CardTitle>
-                        </CardHeader>
-                        <CardContent>
+                  {/* Multi-timeframe Charts */}
+                  <Card className="bg-white/50 border-blue-200/50">
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5" />
+                        Automation Activity Trends
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <Tabs defaultValue="daily" className="w-full">
+                        <TabsList className="grid w-full grid-cols-3 mb-4">
+                          <TabsTrigger value="daily">Daily (7 days)</TabsTrigger>
+                          <TabsTrigger value="weekly">Weekly (4 weeks)</TabsTrigger>
+                          <TabsTrigger value="monthly">Monthly (6 months)</TabsTrigger>
+                        </TabsList>
+                        
+                        <TabsContent value="daily">
+                          <ChartContainer
+                            config={{
+                              successful: { label: "Successful", color: "#10b981" },
+                              failed: { label: "Failed", color: "#ef4444" },
+                              total: { label: "Total", color: "#3b82f6" }
+                            }}
+                            className="h-[200px]"
+                          >
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={getDailyData()}>
+                                <XAxis dataKey="date" />
+                                <YAxis />
+                                <ChartTooltip content={<ChartTooltipContent />} />
+                                <Bar dataKey="successful" fill="#10b981" name="Successful" />
+                                <Bar dataKey="failed" fill="#ef4444" name="Failed" />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </ChartContainer>
+                        </TabsContent>
+                        
+                        <TabsContent value="weekly">
                           <ChartContainer
                             config={{
                               successful: { label: "Successful", color: "#10b981" },
@@ -381,79 +449,81 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                             className="h-[200px]"
                           >
                             <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={last7Days}>
+                              <BarChart data={getWeeklyData()}>
                                 <XAxis dataKey="date" />
                                 <YAxis />
                                 <ChartTooltip content={<ChartTooltipContent />} />
-                                <Bar dataKey="successful" fill="#10b981" />
-                                <Bar dataKey="failed" fill="#ef4444" />
+                                <Bar dataKey="successful" fill="#10b981" name="Successful" />
+                                <Bar dataKey="failed" fill="#ef4444" name="Failed" />
                               </BarChart>
                             </ResponsiveContainer>
                           </ChartContainer>
-                        </CardContent>
-                      </Card>
+                        </TabsContent>
+                        
+                        <TabsContent value="monthly">
+                          <ChartContainer
+                            config={{
+                              successful: { label: "Successful", color: "#10b981" },
+                              failed: { label: "Failed", color: "#ef4444" }
+                            }}
+                            className="h-[200px]"
+                          >
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={getMonthlyData()}>
+                                <XAxis dataKey="date" />
+                                <YAxis />
+                                <ChartTooltip content={<ChartTooltipContent />} />
+                                <Bar dataKey="successful" fill="#10b981" name="Successful" />
+                                <Bar dataKey="failed" fill="#ef4444" name="Failed" />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </ChartContainer>
+                        </TabsContent>
+                      </Tabs>
+                    </CardContent>
+                  </Card>
 
-                      {/* Status Distribution - Only show if there's status data */}
-                      {statusData.length > 0 && (
-                        <Card className="bg-white/50 border-blue-200/50">
-                          <CardHeader>
-                            <CardTitle className="text-lg">Run Status Distribution</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <ChartContainer
-                              config={{
-                                completed: { label: "Completed", color: "#10b981" },
-                                failed: { label: "Failed", color: "#ef4444" },
-                                running: { label: "Running", color: "#3b82f6" }
-                              }}
-                              className="h-[200px]"
-                            >
-                              <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                  <Pie
-                                    data={statusData}
-                                    cx="50%"
-                                    cy="50%"
-                                    outerRadius={60}
-                                    dataKey="value"
-                                  >
-                                    {statusData.map((entry, index) => (
-                                      <Cell key={`cell-${index}`} fill={entry.color} />
-                                    ))}
-                                  </Pie>
-                                  <ChartTooltip content={<ChartTooltipContent />} />
-                                </PieChart>
-                              </ResponsiveContainer>
-                            </ChartContainer>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Last 24 Hours - Only show if there are recent runs */}
-                  {last24Hours.length > 0 && (
-                    <Card className="bg-white/50 border-blue-200/50">
-                      <CardHeader>
-                        <CardTitle className="text-lg">Last 24 Hours</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
+                  {/* Last 24 Hours History */}
+                  <Card className="bg-white/50 border-blue-200/50">
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Calendar className="w-5 h-5" />
+                        Last 24 Hours Activity
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {last24Hours.length > 0 ? (
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
                           {last24Hours.map((run) => (
-                            <div key={run.id} className="flex items-center justify-between p-2 rounded-lg bg-gray-50/50">
-                              <div className="flex items-center gap-2">
+                            <div key={run.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50/50 border border-gray-200/50">
+                              <div className="flex items-center gap-3">
                                 {getStatusIcon(run.status)}
-                                <span className="text-sm">
-                                  {new Date(run.run_timestamp).toLocaleTimeString()}
-                                </span>
+                                <div>
+                                  <span className="text-sm font-medium">
+                                    Run {run.id.slice(0, 8)}...
+                                  </span>
+                                  <p className="text-xs text-gray-500">
+                                    {new Date(run.run_timestamp).toLocaleTimeString()}
+                                  </p>
+                                  {run.duration_ms && (
+                                    <p className="text-xs text-gray-400">
+                                      {run.duration_ms}ms
+                                    </p>
+                                  )}
+                                </div>
                               </div>
                               {getStatusBadge(run.status)}
                             </div>
                           ))}
                         </div>
-                      </CardContent>
-                    </Card>
-                  )}
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          <Clock className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                          <p>No activity in the last 24 hours</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 </div>
               </ScrollArea>
             </TabsContent>
@@ -476,7 +546,10 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                                 <div className="flex gap-2">
                                   <Badge variant="secondary">Configured</Badge>
                                   <Badge variant="outline">
-                                    {platformPerformanceData.find(p => p.name === platform.name)?.calls || 0} calls
+                                    {runs.filter(run => 
+                                      run.details_log && 
+                                      JSON.stringify(run.details_log).toLowerCase().includes(platform.name.toLowerCase())
+                                    ).length} calls
                                   </Badge>
                                 </div>
                               </div>
@@ -484,36 +557,6 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                           </Card>
                         ))}
                       </div>
-
-                      {/* Platform Performance Chart - Only show if there's performance data */}
-                      {platformPerformanceData.some(p => p.calls > 0) && (
-                        <Card className="bg-white/50 border-blue-200/50">
-                          <CardHeader>
-                            <CardTitle className="text-lg">Platform Performance</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <ChartContainer
-                              config={{
-                                calls: { label: "API Calls", color: "#3b82f6" },
-                                success: { label: "Success Rate %", color: "#10b981" },
-                                avgTime: { label: "Avg Time (ms)", color: "#f59e0b" }
-                              }}
-                              className="h-[300px]"
-                            >
-                              <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={platformPerformanceData.filter(p => p.calls > 0)}>
-                                  <XAxis dataKey="name" />
-                                  <YAxis />
-                                  <ChartTooltip content={<ChartTooltipContent />} />
-                                  <Bar dataKey="calls" fill="#3b82f6" name="API Calls" />
-                                  <Bar dataKey="success" fill="#10b981" name="Success Rate %" />
-                                  <Bar dataKey="avgTime" fill="#f59e0b" name="Avg Time (ms)" />
-                                </BarChart>
-                              </ResponsiveContainer>
-                            </ChartContainer>
-                          </CardContent>
-                        </Card>
-                      )}
                     </>
                   ) : (
                     <Card className="bg-white/50 border-blue-200/50">
@@ -528,81 +571,81 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
             </TabsContent>
 
             {/* AI Agents Tab */}
-            <TabsContent value="agents" className="mt-6 h-[calc(100%-4rem)]">
+            <TabsContent value="agents" className="mt-0 h-[calc(100%-5rem)]">
               <ScrollArea className="h-full">
-                <div className="space-y-6 pr-4">
-                  {agents.length > 0 ? (
-                    <>
-                      <div className="space-y-4">
-                        {agents.map((agent) => (
-                          <Card key={agent.id} className="bg-white/50 border-blue-200/50">
-                            <CardHeader>
+                <div className="space-y-4 pr-4">
+                  {/* Current Agents */}
+                  {agents.length > 0 && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-gray-800">Active AI Agents</h3>
+                      {agents.map((agent) => (
+                        <Card key={agent.id} className="bg-white/50 border-blue-200/50">
+                          <CardHeader>
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <CardTitle className="text-lg">{agent.agent_name}</CardTitle>
+                                <p className="text-sm text-gray-600">{agent.agent_role}</p>
+                              </div>
+                              <Button
+                                onClick={() => handleTalkToAgent(agent)}
+                                size="sm"
+                                className="bg-blue-600 hover:bg-blue-700 text-white"
+                              >
+                                Talk to Agent
+                              </Button>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-2">
+                              <p className="text-sm"><strong>Goal:</strong> {agent.agent_goal}</p>
+                              <p className="text-sm"><strong>Provider:</strong> {agent.llm_provider} - {agent.model}</p>
+                              <Badge variant="secondary">Active</Badge>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Recommended Agents */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-800">Recommended AI Agents</h3>
+                    {getRecommendedAgents().length > 0 ? (
+                      <div className="space-y-3">
+                        {getRecommendedAgents().map((recommendation, index) => (
+                          <Card key={index} className="bg-gradient-to-r from-blue-50/50 to-purple-50/50 border-blue-200/50">
+                            <CardContent className="p-4">
                               <div className="flex justify-between items-start">
-                                <div>
-                                  <CardTitle className="text-lg">{agent.agent_name}</CardTitle>
-                                  <p className="text-sm text-gray-600">{agent.agent_role}</p>
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-gray-800">{recommendation.name}</h4>
+                                  <p className="text-sm text-gray-600 mb-1">{recommendation.role}</p>
+                                  <p className="text-sm text-gray-700 mb-2">{recommendation.goal}</p>
+                                  <p className="text-xs text-blue-600 bg-blue-100/50 px-2 py-1 rounded">
+                                    💡 {recommendation.reason}
+                                  </p>
                                 </div>
                                 <Button
-                                  onClick={() => handleTalkToAgent(agent)}
                                   size="sm"
-                                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                                  variant="outline"
+                                  className="ml-4 border-blue-300 text-blue-600 hover:bg-blue-50"
                                 >
-                                  Talk to Agent
+                                  Add Agent
                                 </Button>
-                              </div>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="space-y-2">
-                                <p className="text-sm"><strong>Goal:</strong> {agent.agent_goal}</p>
-                                <p className="text-sm"><strong>Provider:</strong> {agent.llm_provider} - {agent.model}</p>
-                                <div className="flex gap-2">
-                                  <Badge variant="secondary">Active</Badge>
-                                  <Badge variant="outline">
-                                    {agentPerformanceData.find(a => a.name === agent.agent_name)?.tasks || 0} tasks
-                                  </Badge>
-                                </div>
                               </div>
                             </CardContent>
                           </Card>
                         ))}
                       </div>
-
-                      {/* Agent Performance Chart - Only show if agents have activity */}
-                      {agentPerformanceData.some(a => a.tasks > 0) && (
-                        <Card className="bg-white/50 border-blue-200/50">
-                          <CardHeader>
-                            <CardTitle className="text-lg">Agent Performance</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <ChartContainer
-                              config={{
-                                tasks: { label: "Tasks Completed", color: "#8b5cf6" },
-                                success: { label: "Success Rate", color: "#10b981" }
-                              }}
-                              className="h-[300px]"
-                            >
-                              <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={agentPerformanceData.filter(a => a.tasks > 0)}>
-                                  <XAxis dataKey="name" />
-                                  <YAxis />
-                                  <ChartTooltip content={<ChartTooltipContent />} />
-                                  <Line type="monotone" dataKey="tasks" stroke="#8b5cf6" strokeWidth={2} />
-                                  <Line type="monotone" dataKey="success" stroke="#10b981" strokeWidth={2} />
-                                </LineChart>
-                              </ResponsiveContainer>
-                            </ChartContainer>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </>
-                  ) : (
-                    <Card className="bg-white/50 border-blue-200/50">
-                      <CardContent className="text-center py-8">
-                        <Bot className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                        <p className="text-gray-500">No AI agents configured yet</p>
-                      </CardContent>
-                    </Card>
-                  )}
+                    ) : (
+                      <Card className="bg-white/50 border-blue-200/50">
+                        <CardContent className="text-center py-8">
+                          <Bot className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                          <p className="text-gray-500">No specific agent recommendations available</p>
+                          <p className="text-sm text-gray-400 mt-1">Recommendations will appear based on your automation's needs</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
                 </div>
               </ScrollArea>
             </TabsContent>

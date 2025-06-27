@@ -1,89 +1,70 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-const DIAGRAM_GENERATOR_SYSTEM_PROMPT = `You are a COMPREHENSIVE automation diagram generator that creates COMPLETE React Flow diagrams showing EVERY SINGLE component from automation blueprints.
+const ENHANCED_DIAGRAM_GENERATOR_SYSTEM_PROMPT = `You are an EXPERT automation diagram generator that creates COMPREHENSIVE React Flow diagrams.
 
 === CRITICAL MISSION ===
-CREATE A NODE FOR ABSOLUTELY EVERYTHING - NO EXCEPTIONS!
-- Every step, sub-step, nested step
-- Every platform integration
-- Every AI agent (recommended and configured)
-- Every system component (triggers, conditions, loops, delays, retries, fallbacks)
+Generate a COMPLETE visual diagram showing EVERY component from the automation blueprint - NO EXCEPTIONS!
 
-=== MANDATORY NODE TYPES ===
-- "triggerNode" - automation triggers (manual, webhook, scheduled)
-- "actionNode" - general action steps
-- "platformNode" - platform integrations/API calls
-- "conditionNode" - if/else decision points
-- "loopNode" - iteration/repetition blocks
-- "delayNode" - wait/pause steps
-- "aiAgentNode" - AI agent calls
-- "retryNode" - retry logic blocks
-- "fallbackNode" - fallback/error handling
+=== STRICT REQUIREMENTS ===
+1. CREATE ONE NODE FOR EACH:
+   - Main automation step
+   - Platform integration (separate node per platform usage)
+   - AI agent call (separate node per agent)
+   - Condition/decision point
+   - Loop iteration
+   - Delay/wait period
+   - Retry mechanism
+   - Fallback handler
+   - Trigger point
 
-=== LAYOUT REQUIREMENTS ===
-1. LEFT-TO-RIGHT FLOW: Start at x: 100, y: 300, increment x by 400 for each main step
-2. VERTICAL BRANCHING: 
-   - TRUE branch: y -= 200 (go UP)
-   - FALSE branch: y += 200 (go DOWN)
-3. NESTED CONTENT: Indent and space properly for readability
-4. NO OVERLAPPING: Ensure all nodes are properly spaced
+2. MANDATORY NODE TYPES:
+   - "triggerNode" - automation triggers
+   - "platformNode" - platform integrations 
+   - "actionNode" - general actions
+   - "conditionNode" - decision points
+   - "loopNode" - iterations
+   - "delayNode" - wait periods
+   - "aiAgentNode" - AI agent calls
+   - "retryNode" - retry logic
+   - "fallbackNode" - error handling
 
-=== NODE DATA STRUCTURE ===
-Every node MUST include:
+3. LAYOUT RULES:
+   - Start: x: 100, y: 300
+   - Horizontal spacing: +400 per main step
+   - Vertical branching: ±200 for conditions
+   - NO overlapping nodes
+   - Left-to-right flow
+
+4. NODE STRUCTURE (EXACT FORMAT):
 {
-  "id": "unique-identifier",
+  "id": "unique-id",
   "type": "nodeType",
   "position": {"x": number, "y": number},
   "data": {
-    "label": "Human readable name",
-    "platform": "platform-name-if-applicable",
-    "icon": "platform-icon-if-applicable",
-    "explanation": "What this component does",
-    "stepType": "original-step-type",
-    "isRecommended": true/false,
-    "onAdd": "handleAddAgent",
-    "onDismiss": "handleDismissAgent"
+    "label": "Clear description",
+    "platform": "platform-name",
+    "icon": "icon-name",
+    "explanation": "What this does",
+    "stepType": "step-type"
   }
 }
 
-=== EDGE CONNECTIONS ===
-Connect ALL nodes with proper edges:
-- Standard edges: {"stroke": "#94a3b8", "strokeWidth": 2}
-- TRUE branches: {"stroke": "#10b981", "strokeWidth": 3} with label "Yes"
-- FALSE branches: {"stroke": "#ef4444", "strokeWidth": 3} with label "No"
-- Loop edges: {"stroke": "#8b5cf6", "strokeWidth": 2}
-- Retry edges: {"stroke": "#f97316", "strokeWidth": 2}
-- Fallback edges: {"stroke": "#3b82f6", "strokeWidth": 2}
-
-=== ANALYSIS PROCESS ===
-1. COUNT EVERYTHING:
-   - Main steps + all nested steps
-   - Unique platforms used
-   - AI agents (recommended + configured)
-   - System components
-
-2. CREATE COMPREHENSIVE NODES:
-   - One node per step (never combine)
-   - One node per platform usage
-   - One node per agent call
-   - One node per system component
-
-3. CONNECT EVERYTHING:
-   - Every node must connect to something
-   - Show all execution paths
-   - Use appropriate edge styles
+5. EDGE CONNECTIONS:
+   - Standard: {"stroke": "#94a3b8", "strokeWidth": 2}
+   - Condition TRUE: {"stroke": "#10b981", "strokeWidth": 3, "label": "Yes"}
+   - Condition FALSE: {"stroke": "#ef4444", "strokeWidth": 3, "label": "No"}
 
 === VALIDATION CHECKLIST ===
-Before returning:
-- Node count >= total components from blueprint
-- Every platform appears as platformNode
-- Every agent appears as aiAgentNode
-- All branches properly connected
-- Proper left-to-right layout
-- No overlapping positions
+Before returning, ensure:
+- Node count >= expected components
+- Every platform has a platformNode
+- Every agent has an aiAgentNode
+- All conditions have proper branching
+- No missing connections
+- Proper positioning
 
-RETURN ONLY VALID JSON with nodes and edges arrays. Show EVERY component from the automation blueprint!`
+RETURN ONLY VALID JSON with "nodes" and "edges" arrays.`
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -91,9 +72,8 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-    console.log('🎨 COMPREHENSIVE Diagram Generator - Request received');
+    console.log('🚀 ENHANCED Diagram Generator - Request received');
     
-    // Handle CORS preflight requests
     if (req.method === 'OPTIONS') {
         return new Response(null, { headers: corsHeaders });
     }
@@ -101,7 +81,7 @@ serve(async (req) => {
     if (req.method !== 'POST') {
         console.error('❌ Invalid method:', req.method);
         return new Response(
-            JSON.stringify({ error: 'Method Not Allowed', source: 'diagram-generator' }),
+            JSON.stringify({ error: 'Method Not Allowed' }),
             { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
     }
@@ -110,148 +90,197 @@ serve(async (req) => {
         const requestBody = await req.json();
         const { automation_blueprint } = requestBody;
 
-        console.log('📊 COMPREHENSIVE Analysis - Blueprint received:', !!automation_blueprint);
+        console.log('📋 DIAGNOSTIC: Raw blueprint received');
+        console.log('📋 Blueprint exists:', !!automation_blueprint);
+        console.log('📋 Blueprint steps exist:', !!automation_blueprint?.steps);
+        console.log('📋 Blueprint steps count:', automation_blueprint?.steps?.length || 0);
         
+        if (automation_blueprint) {
+            console.log('📋 FULL BLUEPRINT ANALYSIS:', JSON.stringify(automation_blueprint, null, 2));
+        }
+
         if (!automation_blueprint || !automation_blueprint.steps) {
             console.error('❌ Missing or invalid automation blueprint');
             return new Response(
                 JSON.stringify({ 
                     error: 'Missing or invalid automation blueprint',
-                    source: 'comprehensive-validation'
+                    received: automation_blueprint
                 }),
                 { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
-        // COMPREHENSIVE STEP COUNTING
-        const countAllComponents = (steps: any[]): { 
-            totalSteps: number, 
-            platforms: Set<string>, 
-            agents: Set<string>,
-            conditions: number,
-            loops: number,
-            delays: number,
-            retries: number,
-            fallbacks: number
-        } => {
+        // ENHANCED COMPREHENSIVE ANALYSIS
+        const analyzeBlueprint = (blueprint) => {
+            console.log('🔍 STARTING COMPREHENSIVE ANALYSIS');
+            
             let totalSteps = 0;
-            const platforms = new Set<string>();
-            const agents = new Set<string>();
+            const platforms = new Set();
+            const agents = new Set();
             let conditions = 0;
             let loops = 0;
             let delays = 0;
             let retries = 0;
             let fallbacks = 0;
+            const detailedSteps = [];
 
-            const processSteps = (stepList: any[]) => {
-                stepList.forEach(step => {
+            const processSteps = (steps, depth = 0, parentPath = '') => {
+                console.log(`🔍 Processing ${steps.length} steps at depth ${depth}`);
+                
+                steps.forEach((step, index) => {
+                    const stepPath = `${parentPath}step-${index}`;
                     totalSteps++;
                     
-                    // Count platforms
+                    console.log(`📝 Step ${totalSteps}: ${step.name || step.type} (${step.type})`);
+                    
+                    detailedSteps.push({
+                        path: stepPath,
+                        name: step.name || `Step ${totalSteps}`,
+                        type: step.type,
+                        depth: depth
+                    });
+                    
+                    // Platform detection
                     if (step.action?.integration) {
                         platforms.add(step.action.integration);
+                        console.log(`🔌 Found platform: ${step.action.integration}`);
                     }
                     
-                    // Count agents
+                    // Agent detection
                     if (step.ai_agent_call?.agent_id) {
                         agents.add(step.ai_agent_call.agent_id);
+                        console.log(`🤖 Found agent: ${step.ai_agent_call.agent_id}`);
                     }
                     
-                    // Count system components
-                    if (step.type === 'condition') {
-                        conditions++;
-                        if (step.condition?.if_true) processSteps(step.condition.if_true);
-                        if (step.condition?.if_false) processSteps(step.condition.if_false);
-                    }
-                    if (step.type === 'loop') {
-                        loops++;
-                        if (step.loop?.steps) processSteps(step.loop.steps);
-                    }
-                    if (step.type === 'delay') delays++;
-                    if (step.type === 'retry') {
-                        retries++;
-                        if (step.retry?.steps) processSteps(step.retry.steps);
-                    }
-                    if (step.type === 'fallback') {
-                        fallbacks++;
-                        if (step.fallback?.primary_steps) processSteps(step.fallback.primary_steps);
-                        if (step.fallback?.fallback_steps) processSteps(step.fallback.fallback_steps);
+                    // System component detection
+                    switch (step.type) {
+                        case 'condition':
+                            conditions++;
+                            console.log(`🔀 Found condition: ${step.condition?.expression}`);
+                            if (step.condition?.if_true) {
+                                console.log(`✅ Condition TRUE branch: ${step.condition.if_true.length} steps`);
+                                processSteps(step.condition.if_true, depth + 1, `${stepPath}-true-`);
+                            }
+                            if (step.condition?.if_false) {
+                                console.log(`❌ Condition FALSE branch: ${step.condition.if_false.length} steps`);
+                                processSteps(step.condition.if_false, depth + 1, `${stepPath}-false-`);
+                            }
+                            break;
+                        case 'loop':
+                            loops++;
+                            console.log(`🔄 Found loop: ${step.loop?.array_source}`);
+                            if (step.loop?.steps) {
+                                console.log(`🔄 Loop contains: ${step.loop.steps.length} steps`);
+                                processSteps(step.loop.steps, depth + 1, `${stepPath}-loop-`);
+                            }
+                            break;
+                        case 'delay':
+                            delays++;
+                            console.log(`⏱️ Found delay: ${step.delay?.duration_seconds}s`);
+                            break;
+                        case 'retry':
+                            retries++;
+                            console.log(`🔁 Found retry: ${step.retry?.max_attempts} attempts`);
+                            if (step.retry?.steps) {
+                                processSteps(step.retry.steps, depth + 1, `${stepPath}-retry-`);
+                            }
+                            break;
+                        case 'fallback':
+                            fallbacks++;
+                            console.log(`🛡️ Found fallback`);
+                            if (step.fallback?.primary_steps) {
+                                processSteps(step.fallback.primary_steps, depth + 1, `${stepPath}-primary-`);
+                            }
+                            if (step.fallback?.fallback_steps) {
+                                processSteps(step.fallback.fallback_steps, depth + 1, `${stepPath}-fallback-`);
+                            }
+                            break;
                     }
                 });
             };
 
-            processSteps(steps);
-            return { totalSteps, platforms, agents, conditions, loops, delays, retries, fallbacks };
+            processSteps(blueprint.steps);
+            
+            const analysis = {
+                totalSteps,
+                platforms: Array.from(platforms),
+                agents: Array.from(agents),
+                conditions,
+                loops,
+                delays,
+                retries,
+                fallbacks,
+                expectedMinNodes: totalSteps + platforms.size + agents.size + 1, // +1 for trigger
+                detailedSteps
+            };
+            
+            console.log('📊 FINAL COMPREHENSIVE ANALYSIS:');
+            console.log(`📈 Total Steps Found: ${analysis.totalSteps}`);
+            console.log(`🔌 Platforms Found: ${analysis.platforms.join(', ')} (${analysis.platforms.length})`);
+            console.log(`🤖 Agents Found: ${analysis.agents.join(', ')} (${analysis.agents.length})`);
+            console.log(`🔀 Conditions: ${analysis.conditions}`);
+            console.log(`🔄 Loops: ${analysis.loops}`);
+            console.log(`⏱️ Delays: ${analysis.delays}`);
+            console.log(`🔁 Retries: ${analysis.retries}`);
+            console.log(`🛡️ Fallbacks: ${analysis.fallbacks}`);
+            console.log(`🎯 Expected Minimum Nodes: ${analysis.expectedMinNodes}`);
+            
+            return analysis;
         };
 
-        const analysis = countAllComponents(automation_blueprint.steps);
-        
-        console.log('🔍 COMPREHENSIVE ANALYSIS RESULTS:');
-        console.log(`📈 Total Steps: ${analysis.totalSteps}`);
-        console.log(`🔌 Unique Platforms: ${Array.from(analysis.platforms).join(', ')} (${analysis.platforms.size})`);
-        console.log(`🤖 AI Agents: ${Array.from(analysis.agents).join(', ')} (${analysis.agents.size})`);
-        console.log(`🔀 Conditions: ${analysis.conditions}`);
-        console.log(`🔄 Loops: ${analysis.loops}`);
-        console.log(`⏱️ Delays: ${analysis.delays}`);
-        console.log(`🔁 Retries: ${analysis.retries}`);
-        console.log(`🛡️ Fallbacks: ${analysis.fallbacks}`);
-
-        const expectedMinimumNodes = analysis.totalSteps + analysis.platforms.size + analysis.agents.size + 1; // +1 for trigger
-        console.log(`🎯 MINIMUM EXPECTED NODES: ${expectedMinimumNodes}`);
+        const analysis = analyzeBlueprint(automation_blueprint);
 
         // Check OpenAI API key
         const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
         if (!openaiApiKey) {
             console.error('❌ OpenAI API key not found');
             return new Response(
-                JSON.stringify({ 
-                    error: 'OpenAI API key not configured',
-                    source: 'comprehensive-config'
-                }),
+                JSON.stringify({ error: 'OpenAI API key not configured' }),
                 { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
-        // COMPREHENSIVE USER PROMPT
-        const userPrompt = `GENERATE A COMPLETE AUTOMATION DIAGRAM FOR THIS BLUEPRINT:
+        // ENHANCED USER PROMPT with detailed requirements
+        const userPrompt = `CREATE A COMPREHENSIVE AUTOMATION DIAGRAM
 
-BLUEPRINT ANALYSIS SUMMARY:
+BLUEPRINT ANALYSIS:
 - Total Steps: ${analysis.totalSteps}
-- Platforms: ${Array.from(analysis.platforms).join(', ')} (${analysis.platforms.size} unique)  
-- AI Agents: ${Array.from(analysis.agents).join(', ')} (${analysis.agents.size} unique)
+- Platforms: ${analysis.platforms.join(', ')} (${analysis.platforms.length} unique)
+- AI Agents: ${analysis.agents.join(', ')} (${analysis.agents.length} unique)
 - Conditions: ${analysis.conditions}
-- Loops: ${analysis.loops}  
+- Loops: ${analysis.loops}
 - Delays: ${analysis.delays}
 - Retries: ${analysis.retries}
 - Fallbacks: ${analysis.fallbacks}
 
-MINIMUM NODES REQUIRED: ${expectedMinimumNodes}
+MINIMUM NODES REQUIRED: ${analysis.expectedMinNodes}
 
-FULL BLUEPRINT DATA:
+DETAILED STEP BREAKDOWN:
+${analysis.detailedSteps.map(step => `- ${step.name} (${step.type}) at depth ${step.depth}`).join('\n')}
+
+FULL BLUEPRINT:
 ${JSON.stringify(automation_blueprint, null, 2)}
 
 MANDATORY REQUIREMENTS:
-1. Create ${expectedMinimumNodes}+ nodes minimum
-2. Show every platform as a separate platformNode  
-3. Show every agent as a separate aiAgentNode
-4. Show every condition as a conditionNode with branching
-5. Show every loop as a loopNode with internal steps
-6. Show every delay as a delayNode
-7. Show every retry as a retryNode  
-8. Show every fallback as a fallbackNode
-9. Connect all nodes with proper edges
-10. Use left-to-right layout with proper branching
+1. Create ${analysis.expectedMinNodes}+ nodes minimum
+2. One platformNode for each platform: ${analysis.platforms.join(', ')}
+3. One aiAgentNode for each agent: ${analysis.agents.join(', ')}
+4. Show all ${analysis.conditions} conditions with branching
+5. Show all ${analysis.loops} loops with internal steps
+6. Show all ${analysis.delays} delays
+7. Show all ${analysis.retries} retries
+8. Show all ${analysis.fallbacks} fallbacks
+9. Connect everything with proper edges
+10. Use left-to-right layout with vertical branching
 
-CREATE THE MOST COMPREHENSIVE DIAGRAM POSSIBLE!
-Return only JSON with nodes and edges arrays.`;
+EXAMPLE NODES:
+- Trigger: {"id": "trigger", "type": "triggerNode", "position": {"x": 100, "y": 300}, "data": {"label": "Start", "stepType": "trigger"}}
+- Platform: {"id": "platform-sheets", "type": "platformNode", "position": {"x": 500, "y": 300}, "data": {"label": "Google Sheets", "platform": "Google Sheets", "stepType": "platform"}}
 
-        const messages = [
-            { role: "system", content: DIAGRAM_GENERATOR_SYSTEM_PROMPT },
-            { role: "user", content: userPrompt }
-        ];
+Return ONLY valid JSON with nodes and edges arrays showing EVERY component!`;
 
-        console.log('🤖 Calling OpenAI with COMPREHENSIVE prompt...');
-        console.log(`📝 User prompt length: ${userPrompt.length}`);
+        console.log('🤖 Calling OpenAI with ENHANCED prompt');
+        console.log(`📏 Prompt length: ${userPrompt.length} characters`);
 
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -260,8 +289,11 @@ Return only JSON with nodes and edges arrays.`;
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: 'gpt-4.1-2025-04-14',
-                messages: messages,
+                model: 'gpt-4o',  // Using more powerful model
+                messages: [
+                    { role: "system", content: ENHANCED_DIAGRAM_GENERATOR_SYSTEM_PROMPT },
+                    { role: "user", content: userPrompt }
+                ],
                 response_format: { type: "json_object" },
                 temperature: 0.1,
                 max_tokens: 16000
@@ -272,42 +304,37 @@ Return only JSON with nodes and edges arrays.`;
             const errorData = await response.json();
             console.error('❌ OpenAI API error:', errorData);
             return new Response(
-                JSON.stringify({ 
-                    error: `OpenAI API error: ${JSON.stringify(errorData)}`,
-                    source: 'openai-comprehensive'
-                }),
+                JSON.stringify({ error: `OpenAI API error: ${JSON.stringify(errorData)}` }),
                 { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
         const result = await response.json();
-        console.log('✅ OpenAI COMPREHENSIVE response received');
+        console.log('✅ OpenAI response received');
+        console.log(`📏 Response length: ${result.choices[0].message.content.length} characters`);
 
         if (!result.choices || result.choices.length === 0) {
             console.error('❌ No response from OpenAI');
             return new Response(
-                JSON.stringify({ 
-                    error: 'No response from OpenAI',
-                    source: 'openai-comprehensive-response'
-                }),
+                JSON.stringify({ error: 'No response from OpenAI' }),
                 { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
         const diagramDataString = result.choices[0].message.content;
-        console.log('📄 Raw response length:', diagramDataString.length);
+        console.log('📄 Raw AI response preview:', diagramDataString.substring(0, 500) + '...');
 
         let diagramData;
         try {
             diagramData = JSON.parse(diagramDataString);
+            console.log('✅ JSON parsing successful');
         } catch (parseError) {
             console.error('❌ JSON parsing error:', parseError);
-            console.error('❌ Raw content preview:', diagramDataString.substring(0, 1000));
+            console.error('❌ Raw content:', diagramDataString);
             return new Response(
                 JSON.stringify({ 
                     error: 'Failed to parse AI response as JSON',
-                    source: 'json-parsing-comprehensive',
-                    raw_content_preview: diagramDataString.substring(0, 500)
+                    raw_content: diagramDataString.substring(0, 1000)
                 }),
                 { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
@@ -315,11 +342,10 @@ Return only JSON with nodes and edges arrays.`;
 
         // COMPREHENSIVE VALIDATION
         if (!diagramData || !diagramData.nodes || !diagramData.edges) {
-            console.error('❌ Invalid diagram structure received:', diagramData);
+            console.error('❌ Invalid diagram structure:', diagramData);
             return new Response(
                 JSON.stringify({ 
                     error: 'Invalid diagram structure from AI',
-                    source: 'comprehensive-structure-validation',
                     received: diagramData
                 }),
                 { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -329,34 +355,39 @@ Return only JSON with nodes and edges arrays.`;
         const nodeCount = diagramData.nodes.length;
         const edgeCount = diagramData.edges.length;
 
-        console.log('🎯 COMPREHENSIVE RESULTS:');
-        console.log(`📊 Generated nodes: ${nodeCount} (expected minimum: ${expectedMinimumNodes})`);
+        console.log('🎯 DIAGRAM GENERATION RESULTS:');
+        console.log(`📊 Generated nodes: ${nodeCount} (expected: ${analysis.expectedMinNodes})`);
         console.log(`🔗 Generated edges: ${edgeCount}`);
+        console.log('📋 Node types:', [...new Set(diagramData.nodes.map(n => n.type))]);
 
-        // STRICT VALIDATION
-        if (nodeCount < expectedMinimumNodes * 0.8) {
-            const warningMessage = `INSUFFICIENT NODES: Generated ${nodeCount} but expected minimum ${expectedMinimumNodes}. Missing components!`;
+        // VALIDATION CHECK
+        if (nodeCount < analysis.expectedMinNodes * 0.8) {
+            const warningMessage = `Insufficient nodes: Generated ${nodeCount} but expected ${analysis.expectedMinNodes}`;
             console.warn(`⚠️ ${warningMessage}`);
-            
-            // Add warning to response but still return the diagram
             diagramData.warning = warningMessage;
         }
 
-        // Enhance edges with comprehensive styling
-        diagramData.edges = diagramData.edges.map((edge: any) => ({
+        // Check for platform coverage
+        const generatedPlatformNodes = diagramData.nodes.filter(n => n.type === 'platformNode');
+        console.log(`🔌 Generated platform nodes: ${generatedPlatformNodes.length} (expected: ${analysis.platforms.length})`);
+        
+        if (generatedPlatformNodes.length < analysis.platforms.length) {
+            console.warn(`⚠️ Missing platform nodes: Expected ${analysis.platforms.length}, got ${generatedPlatformNodes.length}`);
+        }
+
+        // Enhance edges with proper styling
+        diagramData.edges = diagramData.edges.map(edge => ({
             ...edge,
             type: edge.type || 'smoothstep',
             animated: edge.animated !== undefined ? edge.animated : true,
             style: {
                 stroke: edge.style?.stroke || '#94a3b8',
                 strokeWidth: edge.style?.strokeWidth || 2,
-                strokeDasharray: edge.style?.strokeDasharray || '5,5'
+                ...edge.style
             }
         }));
 
-        console.log('✅ COMPREHENSIVE diagram generation successful!');
-        console.log('📋 Node types generated:', [...new Set(diagramData.nodes.map((n: any) => n.type))]);
-        console.log('🔗 Edge types generated:', [...new Set(diagramData.edges.map((e: any) => e.type))]);
+        console.log('✅ ENHANCED diagram generation completed successfully!');
 
         return new Response(JSON.stringify(diagramData), {
             status: 200,
@@ -364,16 +395,14 @@ Return only JSON with nodes and edges arrays.`;
         });
 
     } catch (error) {
-        console.error('💥 COMPREHENSIVE ERROR:', error);
+        console.error('💥 CRITICAL ERROR in diagram generator:', error);
         console.error('💥 Error stack:', error.stack);
         
         return new Response(
             JSON.stringify({
-                error: error.message || 'Comprehensive diagram generation failed',
-                source: 'comprehensive-catch-all',
+                error: error.message || 'Enhanced diagram generation failed',
                 details: error.toString(),
-                stack: error.stack?.substring(0, 500),
-                user_message: "Comprehensive diagram generation failed. The system has been enhanced to capture every component."
+                stack: error.stack?.substring(0, 500)
             }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );

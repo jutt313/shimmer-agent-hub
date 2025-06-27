@@ -60,17 +60,46 @@ const AutomationDetail = () => {
     fetchAutomationAndChats();
   }, [user, id, navigate]);
 
-  const generateAndSaveDiagram = async (automationId: string, blueprint: AutomationBlueprint) => {
+  const generateAndSaveDiagram = async (automationId: string, blueprint: AutomationBlueprint, forceRegenerate = false) => {
     if (!blueprint || !blueprint.steps || blueprint.steps.length === 0) {
-      console.warn('No blueprint or steps to generate diagram for');
+      console.warn('❌ No blueprint or steps to generate diagram for');
+      toast({
+        title: "No Blueprint",
+        description: "Cannot generate diagram without automation steps",
+        variant: "destructive",
+      });
       return;
     }
 
     setGeneratingDiagram(true);
     
     try {
-      console.log('🎨 Generating comprehensive AI-powered diagram for automation:', automationId);
-      console.log('📊 Blueprint has', blueprint.steps.length, 'main steps');
+      // Count total steps for validation
+      const countAllSteps = (steps: any[]): number => {
+        let count = 0;
+        steps.forEach(step => {
+          count++;
+          if (step.condition) {
+            if (step.condition.if_true) count += countAllSteps(step.condition.if_true);
+            if (step.condition.if_false) count += countAllSteps(step.condition.if_false);
+          }
+          if (step.loop && step.loop.steps) count += countAllSteps(step.loop.steps);
+          if (step.retry && step.retry.steps) count += countAllSteps(step.retry.steps);
+          if (step.fallback) {
+            if (step.fallback.primary_steps) count += countAllSteps(step.fallback.primary_steps);
+            if (step.fallback.fallback_steps) count += countAllSteps(step.fallback.fallback_steps);
+          }
+        });
+        return count;
+      };
+
+      const totalSteps = countAllSteps(blueprint.steps);
+      console.log('🎨 Generating AI diagram for automation:', automationId);
+      console.log('📊 Blueprint analysis:', {
+        mainSteps: blueprint.steps.length,
+        totalSteps: totalSteps,
+        forceRegenerate: forceRegenerate
+      });
       
       // Call the enhanced diagram-generator Edge Function
       const { data, error } = await supabase.functions.invoke('diagram-generator', {
@@ -81,27 +110,60 @@ const AutomationDetail = () => {
         console.error('❌ Error invoking diagram-generator:', error);
         toast({
           title: "Diagram Generation Failed",
-          description: "Could not generate comprehensive diagram. Please try again.",
+          description: `Error from diagram-generator: ${error.message || 'Unknown error'}`,
           variant: "destructive",
         });
         return;
       }
 
-      if (!data || !data.nodes || !data.edges) {
-        console.error('❌ Invalid diagram data received:', data);
+      if (!data) {
+        console.error('❌ No data received from diagram-generator');
+        toast({
+          title: "No Diagram Data",
+          description: "The diagram generator returned no data",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check if there's an error in the response
+      if (data.error) {
+        console.error('❌ Diagram generation error:', data);
+        toast({
+          title: "Diagram Generation Error",
+          description: `${data.error} (Source: ${data.source || 'unknown'})`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!data.nodes || !data.edges) {
+        console.error('❌ Invalid diagram data structure received:', data);
         toast({
           title: "Invalid Diagram Data",
-          description: "Received invalid diagram data from AI.",
+          description: "Received invalid diagram structure from AI",
           variant: "destructive",
         });
         return;
       }
 
-      console.log('✅ Generated comprehensive diagram with', data.nodes.length, 'nodes and', data.edges.length, 'edges');
+      const nodeCount = data.nodes.length;
+      const edgeCount = data.edges.length;
+
+      console.log('✅ Generated comprehensive diagram:', {
+        nodes: nodeCount,
+        edges: edgeCount,
+        expectedSteps: totalSteps
+      });
 
       // Validate that we got a reasonable number of nodes
-      if (data.nodes.length < blueprint.steps.length) {
-        console.warn('⚠️ Generated fewer nodes than expected. Some steps may be missing.');
+      if (nodeCount < totalSteps * 0.7) {
+        console.warn(`⚠️ AI generated fewer nodes (${nodeCount}) than expected (${totalSteps})`);
+        toast({
+          title: "Incomplete Diagram",
+          description: `AI generated ${nodeCount} nodes but expected around ${totalSteps} steps. Some steps may be missing.`,
+          variant: "destructive",
+        });
       }
 
       // Save the generated diagram data back to the database
@@ -114,7 +176,7 @@ const AutomationDetail = () => {
         console.error('❌ Error saving diagram data to DB:', updateError);
         toast({
           title: "Save Failed",
-          description: "Could not save generated diagram.",
+          description: "Could not save generated diagram to database",
           variant: "destructive",
         });
         return;
@@ -128,15 +190,15 @@ const AutomationDetail = () => {
 
       console.log('✅ Comprehensive diagram generated and saved successfully!');
       toast({
-        title: "Complete Diagram Generated",
-        description: `AI has created a comprehensive diagram showing all ${data.nodes.length} steps of your automation!`,
+        title: "Diagram Generated Successfully",
+        description: `AI created a comprehensive diagram with ${nodeCount} nodes showing your automation flow!`,
       });
 
     } catch (err) {
       console.error('💥 Unexpected error in generateAndSaveDiagram:', err);
       toast({
         title: "Generation Error",
-        description: "An unexpected error occurred while generating the comprehensive diagram.",
+        description: `Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`,
         variant: "destructive",
       });
     } finally {
@@ -438,6 +500,12 @@ const AutomationDetail = () => {
     setDismissedAgents(prev => new Set([...prev, agentName]));
   };
 
+  const handleRegenerateDiagram = () => {
+    if (automation?.automation_blueprint) {
+      generateAndSaveDiagram(automation.id, automation.automation_blueprint, true);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
@@ -571,10 +639,10 @@ const AutomationDetail = () => {
             )}
           </div>
 
-          {/* Enhanced Diagram Card - MUCH BIGGER with complete coverage */}
+          {/* Enhanced Diagram Card - EVEN BIGGER with comprehensive error handling */}
           <div className={`transition-transform duration-500 ease-in-out ${showDiagram ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} ${showDiagram ? 'relative' : 'absolute'} w-full`}>
             {showDiagram && (
-              <div style={{ height: '80vh' }}>
+              <div style={{ height: '85vh' }}>
                 <AutomationDiagramDisplay
                   automationBlueprint={automation?.automation_blueprint}
                   automationDiagramData={automation?.automation_diagram_data}
@@ -583,6 +651,7 @@ const AutomationDetail = () => {
                   onAgentDismiss={handleAgentDismiss}
                   dismissedAgents={dismissedAgents}
                   isGenerating={generatingDiagram}
+                  onRegenerateDiagram={handleRegenerateDiagram}
                 />
               </div>
             )}

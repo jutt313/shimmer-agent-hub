@@ -126,11 +126,11 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
   let currentColumnX = startX;
   let nodeIdCounter = 0;
 
-  // Helper function to add edges with soft styling and curves
+  // Helper function to add edges with soft styling and curves - Updated type definition
   const addDiagramEdge = (
     sourceId: string, 
     targetId: string, 
-    edgeType: 'default' | 'success' | 'error' | 'branch' | 'loop' = 'default', 
+    edgeType: 'default' | 'success' | 'error' | 'branch' = 'default', 
     label?: string
   ) => {
     if (!processedNodes.has(sourceId) || !processedNodes.has(targetId)) {
@@ -156,9 +156,6 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
       label = label || 'Error';
     } else if (edgeType === 'branch') {
       color = '#ffd1a9'; // Soft orange
-      animated = true;
-    } else if (edgeType === 'loop') {
-      color = '#e1c7ff'; // Soft purple
       animated = true;
     }
 
@@ -296,7 +293,7 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
           loopContentX,
           centerY,
           step.id,
-          'loop'
+          'branch'
         );
         currentX = loopNextX;
 

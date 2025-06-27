@@ -149,7 +149,10 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         const recommendation = aiAgentRecommendations.find(agent => 
           node.type === 'aiAgentNode' && 
           agent?.name && 
-          node.data?.agent?.agent_id === agent.name
+          node.data?.agent && 
+          typeof node.data.agent === 'object' && 
+          'agent_id' in node.data.agent &&
+          node.data.agent.agent_id === agent.name
         );
         
         if (recommendation) {
@@ -245,8 +248,11 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   }
 
   return (
-    <Card className="h-full bg-gradient-to-br from-white/95 to-blue-50/30 backdrop-blur-sm border-0 shadow-2xl rounded-2xl overflow-hidden relative"
-          style={{ boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 40px rgba(59, 130, 246, 0.15)' }}>
+    <Card className="h-full bg-gradient-to-br from-white/95 to-blue-50/30 backdrop-blur-sm border-0 shadow-2xl rounded-3xl overflow-hidden relative"
+          style={{ 
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 40px rgba(59, 130, 246, 0.15), 0 0 80px rgba(59, 130, 246, 0.1)',
+            minHeight: '600px'
+          }}>
       
       {/* Enhanced header with better styling */}
       <div className="absolute top-6 left-6 right-6 z-20 flex items-start justify-between flex-wrap gap-3">

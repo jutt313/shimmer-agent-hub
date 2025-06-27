@@ -16,7 +16,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Zap, AlertCircle, RefreshCw } from 'lucide-react';
+import { Sparkles, Zap, AlertCircle, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import ActionNode from './diagram/ActionNode';
 import PlatformNode from './diagram/PlatformNode';
@@ -30,7 +30,7 @@ import { AutomationBlueprint } from "@/types/automation";
 
 interface AutomationDiagramDisplayProps {
   automationBlueprint?: AutomationBlueprint | null;
-  automationDiagramData?: { nodes: Node[]; edges: Edge[] } | null;
+  automationDiagramData?: { nodes: Node[]; edges: Edge[]; warning?: string } | null;
   messages?: any[];
   onAgentAdd?: (agent: any) => void;
   onAgentDismiss?: (agentName: string) => void;
@@ -48,6 +48,7 @@ const nodeTypes = {
   aiAgentNode: AIAgentNode,
   retryNode: RetryNode,
   fallbackNode: FallbackNode,
+  triggerNode: PlatformNode, // Use PlatformNode for triggers too
 };
 
 const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
@@ -65,6 +66,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   const [aiAgentRecommendations, setAiAgentRecommendations] = useState<any[]>([]);
   const [diagramError, setDiagramError] = useState<string | null>(null);
   const [diagramSource, setDiagramSource] = useState<'ai' | 'fallback' | 'none'>('none');
+  const [showDetails, setShowDetails] = useState(false);
+  const [componentStats, setComponentStats] = useState<any>(null);
 
   // Extract AI agent recommendations from messages
   useEffect(() => {
@@ -81,48 +84,93 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     setAiAgentRecommendations(recommendations);
   }, [messages, dismissedAgents]);
 
-  // Count all steps in blueprint including nested ones
-  const countAllSteps = useCallback((steps: any[]): number => {
-    let count = 0;
-    steps.forEach(step => {
-      count++;
-      if (step.condition) {
-        if (step.condition.if_true) count += countAllSteps(step.condition.if_true);
-        if (step.condition.if_false) count += countAllSteps(step.condition.if_false);
-      }
-      if (step.loop && step.loop.steps) count += countAllSteps(step.loop.steps);
-      if (step.retry && step.retry.steps) count += countAllSteps(step.retry.steps);
-      if (step.fallback) {
-        if (step.fallback.primary_steps) count += countAllSteps(step.fallback.primary_steps);
-        if (step.fallback.fallback_steps) count += countAllSteps(step.fallback.fallback_steps);
-      }
-    });
-    return count;
+  // COMPREHENSIVE component counting
+  const analyzeBlueprint = useCallback((blueprint: AutomationBlueprint) => {
+    let totalSteps = 0;
+    const platforms = new Set<string>();
+    const agents = new Set<string>();
+    let conditions = 0;
+    let loops = 0;
+    let delays = 0;
+    let retries = 0;
+    let fallbacks = 0;
+
+    const processSteps = (steps: any[]) => {
+      steps.forEach(step => {
+        totalSteps++;
+        
+        if (step.action?.integration) platforms.add(step.action.integration);
+        if (step.ai_agent_call?.agent_id) agents.add(step.ai_agent_call.agent_id);
+        
+        if (step.type === 'condition') {
+          conditions++;
+          if (step.condition?.if_true) processSteps(step.condition.if_true);
+          if (step.condition?.if_false) processSteps(step.condition.if_false);
+        }
+        if (step.type === 'loop') {
+          loops++;
+          if (step.loop?.steps) processSteps(step.loop.steps);
+        }
+        if (step.type === 'delay') delays++;
+        if (step.type === 'retry') {
+          retries++;
+          if (step.retry?.steps) processSteps(step.retry.steps);
+        }
+        if (step.type === 'fallback') {
+          fallbacks++;
+          if (step.fallback?.primary_steps) processSteps(step.fallback.primary_steps);
+          if (step.fallback?.fallback_steps) processSteps(step.fallback.fallback_steps);
+        }
+      });
+    };
+
+    if (blueprint.steps) processSteps(blueprint.steps);
+    
+    return {
+      totalSteps,
+      platforms: Array.from(platforms),
+      agents: Array.from(agents),
+      conditions,
+      loops,
+      delays,
+      retries,
+      fallbacks,
+      expectedMinNodes: totalSteps + platforms.size + agents.size + 1
+    };
   }, []);
 
   // Load diagram data when available
   useEffect(() => {
-    console.log('🔄 AutomationDiagramDisplay - Loading diagram data');
+    console.log('🔄 COMPREHENSIVE AutomationDiagramDisplay - Loading diagram data');
     console.log('🔄 AI diagram data available:', !!automationDiagramData);
     console.log('🔄 Blueprint available:', !!automationBlueprint);
     
     setDiagramError(null);
 
+    // Analyze blueprint for comprehensive stats
+    if (automationBlueprint) {
+      const stats = analyzeBlueprint(automationBlueprint);
+      setComponentStats(stats);
+      console.log('📊 COMPREHENSIVE BLUEPRINT ANALYSIS:', stats);
+    }
+
     if (automationDiagramData && automationDiagramData.nodes && automationDiagramData.edges) {
       const nodeCount = automationDiagramData.nodes.length;
       const edgeCount = automationDiagramData.edges.length;
-      const expectedSteps = automationBlueprint?.steps ? countAllSteps(automationBlueprint.steps) : 0;
+      const expectedNodes = componentStats?.expectedMinNodes || 0;
       
-      console.log('🎨 Loading AI-generated diagram:', {
+      console.log('🎨 Loading COMPREHENSIVE AI-generated diagram:', {
         nodes: nodeCount,
         edges: edgeCount,
-        expectedSteps: expectedSteps
+        expectedNodes: expectedNodes,
+        warning: automationDiagramData.warning
       });
 
-      // Validate the AI diagram
-      if (nodeCount < expectedSteps * 0.7) {
-        console.warn(`⚠️ AI diagram incomplete: ${nodeCount} nodes vs ${expectedSteps} expected steps`);
-        setDiagramError(`AI diagram is incomplete: Generated ${nodeCount} nodes but expected around ${expectedSteps} steps`);
+      // Check for AI warning
+      if (automationDiagramData.warning) {
+        setDiagramError(automationDiagramData.warning);
+      } else if (nodeCount < expectedNodes * 0.7) {
+        setDiagramError(`Incomplete diagram: Generated ${nodeCount} nodes but expected around ${expectedNodes} components`);
       }
       
       // Process nodes to add agent recommendations and handlers
@@ -157,8 +205,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       setDiagramSource('ai');
       
     } else if (automationBlueprint && automationBlueprint.steps && automationBlueprint.steps.length > 0) {
-      console.log('⚠️ No AI diagram data, creating fallback layout');
-      setDiagramError('AI diagram generation failed - using fallback layout');
+      console.log('⚠️ No AI diagram data, creating COMPREHENSIVE fallback layout');
+      setDiagramError('AI diagram generation failed - using comprehensive fallback layout');
       createComprehensiveFallbackDiagram();
       setDiagramSource('fallback');
     } else {
@@ -167,27 +215,44 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       setEdges([]);
       setDiagramSource('none');
     }
-  }, [automationDiagramData, automationBlueprint, aiAgentRecommendations, countAllSteps]);
+  }, [automationDiagramData, automationBlueprint, aiAgentRecommendations, analyzeBlueprint, componentStats]);
 
   const createComprehensiveFallbackDiagram = () => {
     if (!automationBlueprint?.steps) return;
 
-    console.log('🏗️ Creating comprehensive fallback diagram');
+    console.log('🏗️ Creating COMPREHENSIVE fallback diagram');
     
     const fallbackNodes: Node[] = [];
     const fallbackEdges: Edge[] = [];
     let nodeCounter = 0;
 
-    // Process all steps including nested ones
+    // Add trigger node first
+    const triggerNode: Node = {
+      id: 'trigger-node',
+      type: 'triggerNode',
+      position: { x: 100, y: 300 },
+      data: {
+        label: 'Manual Trigger',
+        explanation: 'Automation trigger point',
+        platform: 'system',
+        icon: 'play',
+        stepType: 'trigger'
+      },
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
+    };
+    fallbackNodes.push(triggerNode);
+
+    // COMPREHENSIVE step processing
     const processSteps = (steps: any[], startX: number, startY: number, parentId?: string) => {
       let currentX = startX;
-      let lastNodeId = parentId;
+      let lastNodeId = parentId || 'trigger-node';
 
       steps.forEach((step, index) => {
-        const nodeId = step.id || `fallback-step-${nodeCounter++}`;
+        const nodeId = step.id || `comprehensive-step-${nodeCounter++}`;
         
-        // Determine node type based on step type - CRITICAL: Use platformNode for actions
-        let nodeType = 'platformNode'; // default for actions
+        // Determine node type with COMPREHENSIVE coverage
+        let nodeType = 'platformNode'; // default
         if (step.type === 'condition') nodeType = 'conditionNode';
         else if (step.type === 'loop') nodeType = 'loopNode';
         else if (step.type === 'delay') nodeType = 'delayNode';
@@ -200,9 +265,9 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           type: nodeType,
           position: { x: currentX, y: startY },
           data: {
-            label: step.name || getStepLabel(step),
-            explanation: getStepExplanation(step),
-            platform: step.action?.integration || 'unknown',
+            label: step.name || getComprehensiveStepLabel(step),
+            explanation: getComprehensiveStepExplanation(step),
+            platform: step.action?.integration || 'system',
             icon: step.action?.integration?.toLowerCase() || 'settings',
             action: step.action,
             condition: step.condition,
@@ -222,7 +287,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         // Connect to previous node
         if (lastNodeId) {
           fallbackEdges.push({
-            id: `fallback-${lastNodeId}-${nodeId}`,
+            id: `comprehensive-${lastNodeId}-${nodeId}`,
             source: lastNodeId,
             target: nodeId,
             type: 'smoothstep',
@@ -235,44 +300,18 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           });
         }
 
-        // Process nested steps with proper branching
+        // COMPREHENSIVE nested processing
         if (step.condition) {
-          if (step.condition.if_true) {
-            const trueBranchLastNode = processSteps(step.condition.if_true, currentX + 400, startY - 150, nodeId);
-            // Add green edge for true branch
-            if (step.condition.if_true.length > 0) {
-              fallbackEdges.push({
-                id: `condition-true-${nodeId}-${step.condition.if_true[0].id || `fallback-step-${nodeCounter}`}`,
-                source: nodeId,
-                target: step.condition.if_true[0].id || `fallback-step-${nodeCounter}`,
-                type: 'smoothstep',
-                animated: true,
-                style: { stroke: '#10b981', strokeWidth: 2, strokeDasharray: '5,5' },
-                label: 'Yes',
-                labelStyle: { fill: '#10b981', fontWeight: 600 }
-              });
-            }
+          if (step.condition.if_true && step.condition.if_true.length > 0) {
+            processSteps(step.condition.if_true, currentX + 400, startY - 200, nodeId);
           }
-          if (step.condition.if_false) {
-            const falseBranchLastNode = processSteps(step.condition.if_false, currentX + 400, startY + 150, nodeId);
-            // Add red edge for false branch
-            if (step.condition.if_false.length > 0) {
-              fallbackEdges.push({
-                id: `condition-false-${nodeId}-${step.condition.if_false[0].id || `fallback-step-${nodeCounter}`}`,
-                source: nodeId,
-                target: step.condition.if_false[0].id || `fallback-step-${nodeCounter}`,
-                type: 'smoothstep',
-                animated: true,
-                style: { stroke: '#ef4444', strokeWidth: 2, strokeDasharray: '5,5' },
-                label: 'No',
-                labelStyle: { fill: '#ef4444', fontWeight: 600 }
-              });
-            }
+          if (step.condition.if_false && step.condition.if_false.length > 0) {
+            processSteps(step.condition.if_false, currentX + 400, startY + 200, nodeId);
           }
         }
 
         if (step.loop && step.loop.steps) {
-          processSteps(step.loop.steps, currentX + 400, startY - 80, nodeId);
+          processSteps(step.loop.steps, currentX + 400, startY - 100, nodeId);
         }
 
         if (step.retry && step.retry.steps) {
@@ -295,66 +334,53 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       return lastNodeId;
     };
 
-    // Start processing from the main steps
-    processSteps(automationBlueprint.steps, 100, 300);
+    // Start comprehensive processing
+    processSteps(automationBlueprint.steps, 500, 300);
 
-    console.log(`📊 Created comprehensive fallback diagram with ${fallbackNodes.length} nodes and ${fallbackEdges.length} edges`);
+    console.log(`📊 Created COMPREHENSIVE fallback diagram with ${fallbackNodes.length} nodes and ${fallbackEdges.length} edges`);
     setNodes(fallbackNodes);
     setEdges(fallbackEdges);
   };
 
-  const getNodeType = (stepType: string): string => {
-    switch (stepType) {
-      case 'condition': return 'conditionNode';
-      case 'loop': return 'loopNode';
-      case 'delay': return 'delayNode';
-      case 'ai_agent_call': return 'aiAgentNode';
-      case 'retry': return 'retryNode';
-      case 'fallback': return 'fallbackNode';
+  const getComprehensiveStepLabel = (step: any): string => {
+    switch (step.type) {
       case 'action':
-      default: return 'platformNode';
+        return `${step.action?.integration || 'Action'}: ${step.action?.method || 'Execute'}`;
+      case 'condition':
+        return `Decision: ${step.condition?.expression || 'Check condition'}`;
+      case 'loop':
+        return `Loop: ${step.loop?.array_source || 'Iterate items'}`;
+      case 'ai_agent_call':
+        return `AI Agent: ${step.ai_agent_call?.agent_id || 'Agent Call'}`;
+      case 'delay':
+        return `Wait: ${step.delay?.duration_seconds || 0}s`;
+      case 'retry':
+        return `Retry: ${step.retry?.max_attempts || 3}x max`;
+      case 'fallback':
+        return 'Fallback: Primary + Backup';
+      default:
+        return step.name || `Step: ${step.type || 'Unknown'}`;
     }
   };
 
-  const getStepLabel = (step: any): string => {
+  const getComprehensiveStepExplanation = (step: any): string => {
     switch (step.type) {
       case 'action':
-        return step.action?.integration || 'Action';
+        return `Execute ${step.action?.method || 'action'} on ${step.action?.integration || 'platform'} with specific parameters`;
       case 'condition':
-        return 'Condition Check';
+        return `Evaluate: ${step.condition?.expression || 'condition'} and branch execution accordingly`;
       case 'loop':
-        return 'Loop Process';
+        return `Iterate through ${step.loop?.array_source || 'data collection'} and execute sub-steps for each item`;
       case 'ai_agent_call':
-        return `AI Agent: ${step.ai_agent_call?.agent_id || 'Agent'}`;
+        return `Call AI Agent "${step.ai_agent_call?.agent_id || 'unknown'}" with input and capture output`;
       case 'delay':
-        return 'Delay';
+        return `Pause execution for ${step.delay?.duration_seconds || 0} seconds before continuing`;
       case 'retry':
-        return 'Retry Logic';
+        return `Attempt execution up to ${step.retry?.max_attempts || 3} times with error handling`;
       case 'fallback':
-        return 'Fallback Handler';
+        return 'Execute primary steps, fall back to alternate steps if primary fails';
       default:
-        return step.name || 'Step';
-    }
-  };
-
-  const getStepExplanation = (step: any): string => {
-    switch (step.type) {
-      case 'action':
-        return `${step.action?.method || 'Action'} on ${step.action?.integration || 'platform'}`;
-      case 'condition':
-        return `If ${step.condition?.expression || 'condition'}`;
-      case 'loop':
-        return `For each in ${step.loop?.array_source || 'data'}`;
-      case 'ai_agent_call':
-        return `AI Agent: ${step.ai_agent_call?.agent_id || 'unknown'}`;
-      case 'delay':
-        return `Wait ${step.delay?.duration_seconds || 0}s`;
-      case 'retry':
-        return `Retry up to ${step.retry?.max_attempts || 3} times`;
-      case 'fallback':
-        return 'Primary with fallback';
-      default:
-        return step.name || 'Automation step';
+        return step.name || `Process automation step of type: ${step.type || 'unknown'}`;
     }
   };
 
@@ -363,13 +389,11 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   }, []);
 
   const minimapStyle = {
-    height: 140,
+    height: 160,
     backgroundColor: '#f8fafc',
     borderRadius: '8px',
     border: '1px solid #e2e8f0'
   };
-
-  const expectedSteps = automationBlueprint?.steps ? countAllSteps(automationBlueprint.steps) : 0;
 
   if (isGenerating) {
     return (
@@ -378,8 +402,18 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           <div className="text-center space-y-4">
             <div className="animate-spin w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full mx-auto"></div>
             <div className="space-y-2">
-              <h3 className="text-lg font-semibold text-gray-800">AI is Creating Your Complete Diagram</h3>
-              <p className="text-sm text-gray-600">Analyzing all {expectedSteps} automation steps and generating comprehensive visual flow...</p>
+              <h3 className="text-lg font-semibold text-gray-800">AI is Creating Your COMPREHENSIVE Diagram</h3>
+              <p className="text-sm text-gray-600">
+                Analyzing all {componentStats?.totalSteps || 0} steps, {componentStats?.platforms?.length || 0} platforms, 
+                {componentStats?.agents?.length || 0} agents and generating complete visual flow...
+              </p>
+              {componentStats && (
+                <div className="text-xs text-gray-500 space-y-1">
+                  <div>Expected minimum nodes: {componentStats.expectedMinNodes}</div>
+                  <div>Platforms: {componentStats.platforms.join(', ')}</div>
+                  <div>System components: {componentStats.conditions + componentStats.loops + componentStats.delays + componentStats.retries + componentStats.fallbacks}</div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -409,39 +443,85 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
 
   return (
     <Card className="h-full bg-white/80 backdrop-blur-sm border-0 shadow-xl overflow-hidden relative">
-      {/* Enhanced header with comprehensive information */}
-      <div className="absolute top-4 left-4 z-20 flex items-center gap-3 flex-wrap">
-        <Badge variant="secondary" className="bg-white/90 text-gray-700 border border-gray-200/50">
-          <Sparkles className="w-3 h-3 mr-1" />
-          {diagramSource === 'ai' ? 'AI-Generated Flow' : 'Fallback Layout'}
-        </Badge>
-        
-        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-          {nodes.length} Nodes ({expectedSteps} Expected)
-        </Badge>
-        
-        {diagramSource === 'ai' ? (
-          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-            AI Complete
+      {/* COMPREHENSIVE header with detailed information */}
+      <div className="absolute top-4 left-4 z-20 flex items-start gap-3 flex-wrap max-w-2xl">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="secondary" className="bg-white/90 text-gray-700 border border-gray-200/50">
+            <Sparkles className="w-3 h-3 mr-1" />
+            {diagramSource === 'ai' ? 'AI-Generated Comprehensive Flow' : 'Comprehensive Fallback Layout'}
           </Badge>
-        ) : (
-          <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-            <AlertCircle className="w-3 h-3 mr-1" />
-            Fallback Mode
+          
+          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+            {nodes.length} Nodes
+            {componentStats && ` (${componentStats.expectedMinNodes} Expected)`}
           </Badge>
+          
+          {componentStats && (
+            <Button
+              onClick={() => setShowDetails(!showDetails)}
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-xs"
+            >
+              {showDetails ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+              Details
+            </Button>
+          )}
+        </div>
+
+        {showDetails && componentStats && (
+          <div className="w-full bg-white/95 rounded-lg p-3 border border-gray-200/50 text-xs space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <span className="font-medium text-gray-700">Total Steps:</span>
+                <span className="ml-1 text-gray-600">{componentStats.totalSteps}</span>
+              </div>
+              <div>
+                <span className="font-medium text-gray-700">Platforms:</span>
+                <span className="ml-1 text-gray-600">{componentStats.platforms.length}</span>
+              </div>
+              <div>
+                <span className="font-medium text-gray-700">AI Agents:</span>
+                <span className="ml-1 text-gray-600">{componentStats.agents.length}</span>
+              </div>
+              <div>
+                <span className="font-medium text-gray-700">Conditions:</span>
+                <span className="ml-1 text-gray-600">{componentStats.conditions}</span>
+              </div>
+            </div>
+            {componentStats.platforms.length > 0 && (
+              <div>
+                <span className="font-medium text-gray-700">Platforms:</span>
+                <span className="ml-1 text-gray-600">{componentStats.platforms.join(', ')}</span>
+              </div>
+            )}
+          </div>
         )}
 
-        {diagramError && (
-          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-            <AlertCircle className="w-3 h-3 mr-1" />
-            Error Detected
-          </Badge>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {diagramSource === 'ai' ? (
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+              AI Complete
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+              <AlertCircle className="w-3 h-3 mr-1" />
+              Fallback Mode
+            </Badge>
+          )}
+
+          {diagramError && (
+            <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+              <AlertCircle className="w-3 h-3 mr-1" />
+              Issue Detected
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Error message and regenerate button */}
       {diagramError && onRegenerateDiagram && (
-        <div className="absolute top-16 left-4 z-20 bg-red-50 border border-red-200 rounded-lg p-3 max-w-md">
+        <div className="absolute top-20 left-4 z-20 bg-red-50 border border-red-200 rounded-lg p-3 max-w-lg">
           <p className="text-sm text-red-700 mb-2">{diagramError}</p>
           <Button 
             onClick={onRegenerateDiagram}
@@ -449,12 +529,12 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             className="bg-red-100 hover:bg-red-200 text-red-700 border-red-300"
           >
             <RefreshCw className="w-3 h-3 mr-1" />
-            Regenerate
+            Regenerate Comprehensive
           </Button>
         </div>
       )}
 
-      {/* React Flow Diagram - Enhanced with better controls */}
+      {/* React Flow Diagram - COMPREHENSIVE with enhanced controls */}
       <ReactFlowProvider>
         <div className="w-full h-full">
           <ReactFlow
@@ -467,8 +547,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             fitView
             fitViewOptions={{
               padding: 0.15,
-              minZoom: 0.1,
-              maxZoom: 1.5
+              minZoom: 0.08,
+              maxZoom: 2.0
             }}
             className="bg-gradient-to-br from-slate-50/50 to-blue-50/30"
             nodesDraggable={true}
@@ -485,8 +565,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           >
             <Background 
               color="#e2e8f0" 
-              gap={20} 
-              size={1}
+              gap={25} 
+              size={1.5}
               variant={BackgroundVariant.Dots}
             />
             <Controls 
@@ -498,10 +578,21 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             />
             <MiniMap 
               style={minimapStyle}
-              nodeColor="#8b5cf6"
-              nodeStrokeColor="#7c3aed"
-              nodeStrokeWidth={2}
-              maskColor="rgba(255, 255, 255, 0.7)"
+              nodeColor={(node) => {
+                switch (node.type) {
+                  case 'platformNode': return '#3b82f6';
+                  case 'conditionNode': return '#f97316';
+                  case 'loopNode': return '#8b5cf6';
+                  case 'aiAgentNode': return '#10b981';
+                  case 'delayNode': return '#64748b';
+                  case 'retryNode': return '#f59e0b';
+                  case 'fallbackNode': return '#6366f1';
+                  default: return '#6b7280';
+                }
+              }}
+              nodeStrokeColor="#374151"
+              nodeStrokeWidth={1}
+              maskColor="rgba(255, 255, 255, 0.8)"
               position="bottom-right"
               zoomable
               pannable

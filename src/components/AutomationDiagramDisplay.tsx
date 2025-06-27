@@ -14,10 +14,10 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, Sparkles, Zap, AlertCircle } from 'lucide-react';
+import { Sparkles, Zap, AlertCircle } from 'lucide-react';
 import ActionNode from './diagram/ActionNode';
+import PlatformNode from './diagram/PlatformNode';
 import ConditionNode from './diagram/ConditionNode';
 import LoopNode from './diagram/LoopNode';
 import DelayNode from './diagram/DelayNode';
@@ -36,9 +36,10 @@ interface AutomationDiagramDisplayProps {
   isGenerating?: boolean;
 }
 
-// Custom node types registry
+// Enhanced node types registry with new PlatformNode
 const nodeTypes = {
   actionNode: ActionNode,
+  platformNode: PlatformNode,
   conditionNode: ConditionNode,
   loopNode: LoopNode,
   delayNode: DelayNode,
@@ -83,20 +84,41 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         edges: automationDiagramData.edges.length
       });
       
-      setNodes(automationDiagramData.nodes);
+      // Process nodes to add agent recommendations and handlers
+      const processedNodes = automationDiagramData.nodes.map(node => {
+        // Check if this is an AI agent node that matches a recommendation
+        const recommendation = aiAgentRecommendations.find(agent => 
+          node.type === 'aiAgentNode' && agent.name === node.data?.agent?.agent_id
+        );
+        
+        if (recommendation) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              isRecommended: true,
+              onAdd: () => onAgentAdd?.(recommendation),
+              onDismiss: () => onAgentDismiss?.(recommendation.name)
+            }
+          };
+        }
+        
+        return node;
+      });
+      
+      setNodes(processedNodes);
       setEdges(automationDiagramData.edges);
     } else if (automationBlueprint && automationBlueprint.steps && automationBlueprint.steps.length > 0) {
-      // Fallback to simple linear layout if no AI-generated data available
-      console.log('⚠️ No AI diagram data, creating simple fallback layout');
-      createFallbackDiagram();
+      console.log('⚠️ No AI diagram data, creating enhanced fallback layout');
+      createEnhancedFallbackDiagram();
     } else {
       console.log('📝 No blueprint or diagram data available');
       setNodes([]);
       setEdges([]);
     }
-  }, [automationDiagramData, automationBlueprint]);
+  }, [automationDiagramData, automationBlueprint, aiAgentRecommendations]);
 
-  const createFallbackDiagram = () => {
+  const createEnhancedFallbackDiagram = () => {
     if (!automationBlueprint?.steps) return;
 
     const fallbackNodes: Node[] = [];
@@ -105,14 +127,18 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     automationBlueprint.steps.forEach((step, index) => {
       const nodeId = step.id || `step-${index}`;
       
+      // Use platformNode for actions, appropriate node types for others
+      const nodeType = step.type === 'action' ? 'platformNode' : getNodeType(step.type);
+      
       const node: Node = {
         id: nodeId,
-        type: getNodeType(step.type),
+        type: nodeType,
         position: { x: 100 + (index * 350), y: 300 },
         data: {
           label: step.name || `Step ${index + 1}`,
           explanation: getStepExplanation(step),
           platform: step.action?.integration,
+          icon: step.action?.integration?.toLowerCase(),
           action: step.action,
           condition: step.condition,
           loop: step.loop,
@@ -140,7 +166,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           style: { 
             stroke: '#94a3b8', 
             strokeWidth: 2,
-            strokeDasharray: '5,5' // Add dotted lines to fallback edges too
+            strokeDasharray: '5,5'
           }
         });
       }
@@ -203,7 +229,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             <div className="animate-spin w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full mx-auto"></div>
             <div className="space-y-2">
               <h3 className="text-lg font-semibold text-gray-800">AI is Creating Your Diagram</h3>
-              <p className="text-sm text-gray-600">Analyzing your automation blueprint and generating a beautiful visual flow...</p>
+              <p className="text-sm text-gray-600">Analyzing your automation blueprint and generating a clear visual flow...</p>
             </div>
           </div>
         </div>
@@ -233,52 +259,16 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
 
   return (
     <Card className="h-full bg-white/80 backdrop-blur-sm border-0 shadow-xl overflow-hidden relative">
-      {/* AI Agent Recommendations Overlay */}
-      {aiAgentRecommendations.length > 0 && (
-        <div className="absolute top-4 right-4 z-20 space-y-2 max-w-sm">
-          {aiAgentRecommendations.slice(0, 2).map((agent, index) => (
-            <div key={agent.name || index} className="bg-white/95 backdrop-blur-sm rounded-xl border border-purple-200/50 p-3 shadow-lg">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Zap className="w-4 h-4 text-purple-600" />
-                    <span className="text-sm font-semibold text-gray-800">{agent.name}</span>
-                  </div>
-                  <p className="text-xs text-gray-600 mb-2">{agent.description}</p>
-                  <div className="flex gap-1">
-                    <Button
-                      size="sm"
-                      onClick={() => onAgentAdd?.(agent)}
-                      className="h-6 px-2 text-xs bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white border-0"
-                    >
-                      Add
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => onAgentDismiss?.(agent.name)}
-                      className="h-6 px-2 text-xs text-gray-500 hover:text-gray-700"
-                    >
-                      Dismiss
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Header */}
+      {/* Header with improved badges */}
       <div className="absolute top-4 left-4 z-20 flex items-center gap-3">
         <Badge variant="secondary" className="bg-white/90 text-gray-700 border border-gray-200/50">
           <Sparkles className="w-3 h-3 mr-1" />
-          AI-Generated Diagram
+          AI-Generated Flow
         </Badge>
         
         {automationDiagramData ? (
           <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-            {nodes.length} Nodes • {edges.length} Edges
+            {nodes.length} Steps • Clear Flow
           </Badge>
         ) : (
           <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
@@ -288,7 +278,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         )}
       </div>
 
-      {/* React Flow Diagram */}
+      {/* React Flow Diagram - Larger and cleaner */}
       <ReactFlowProvider>
         <div className="w-full h-full">
           <ReactFlow
@@ -300,14 +290,16 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             nodeTypes={nodeTypes}
             fitView
             fitViewOptions={{
-              padding: 0.2,
-              minZoom: 0.1,
-              maxZoom: 2
+              padding: 0.15,
+              minZoom: 0.2,
+              maxZoom: 1.5
             }}
             className="bg-gradient-to-br from-slate-50/50 to-blue-50/30"
             nodesDraggable={false}
             nodesConnectable={false}
             elementsSelectable={true}
+            attributionPosition="bottom-right"
+            proOptions={{ hideAttribution: true }}
           >
             <Background 
               color="#e2e8f0" 

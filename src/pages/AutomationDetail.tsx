@@ -535,7 +535,7 @@ const AutomationDetail = () => {
       </div>
       
       <div className="flex-1 max-w-7xl mx-auto w-full px-6 relative">        
-        {/* Main Content Area with proper height management */}
+        {/* Main Content Area with improved height management */}
         <div className="relative">
           {/* Chat Card - with proper height */}
           <div className={`transition-transform duration-500 ease-in-out ${showDashboard || showDiagram ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'} ${showDashboard || showDiagram ? 'absolute' : 'relative'} w-full`}>
@@ -565,10 +565,10 @@ const AutomationDetail = () => {
             )}
           </div>
 
-          {/* Diagram Card - with proper spacing */}
+          {/* Diagram Card - MUCH BIGGER with improved layout */}
           <div className={`transition-transform duration-500 ease-in-out ${showDiagram ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} ${showDiagram ? 'relative' : 'absolute'} w-full`}>
             {showDiagram && (
-              <div style={{ height: '65vh' }}>
+              <div style={{ height: '75vh' }}>
                 <AutomationDiagramDisplay
                   automationBlueprint={automation?.automation_blueprint}
                   automationDiagramData={automation?.automation_diagram_data}

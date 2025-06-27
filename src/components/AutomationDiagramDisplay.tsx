@@ -9,7 +9,9 @@ import {
   useEdgesState,
   Node,
   Edge,
-  ReactFlowProvider
+  ReactFlowProvider,
+  Position,
+  BackgroundVariant
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Card } from "@/components/ui/card";
@@ -121,8 +123,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           fallback: step.fallback,
           stepType: step.type
         },
-        sourcePosition: 'right' as const,
-        targetPosition: 'left' as const,
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
       };
 
       fallbackNodes.push(node);
@@ -308,7 +310,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
               color="#e2e8f0" 
               gap={20} 
               size={1}
-              variant="dots" 
+              variant={BackgroundVariant.Dots}
             />
             <Controls 
               className="bg-white/90 border border-gray-200/50 rounded-lg shadow-lg"

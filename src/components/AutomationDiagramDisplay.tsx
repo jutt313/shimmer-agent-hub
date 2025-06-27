@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ReactFlow, 
@@ -129,7 +128,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
 
       fallbackNodes.push(node);
 
-      // Create edge to next step
+      // Create edge to next step with dotted lines
       if (index < automationBlueprint.steps.length - 1) {
         const nextStepId = automationBlueprint.steps[index + 1].id || `step-${index + 1}`;
         fallbackEdges.push({
@@ -138,7 +137,11 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           target: nextStepId,
           type: 'smoothstep',
           animated: true,
-          style: { stroke: '#94a3b8', strokeWidth: 2 }
+          style: { 
+            stroke: '#94a3b8', 
+            strokeWidth: 2,
+            strokeDasharray: '5,5' // Add dotted lines to fallback edges too
+          }
         });
       }
     });

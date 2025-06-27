@@ -32,11 +32,20 @@ Each Edge object in the "edges" array MUST have these properties:
 - target (string): The ID of the target node.
 - animated (boolean): true for active flows, false for static connections.
 - type (string): Use "smoothstep" for curved edges.
-- style (object): { stroke: string, strokeWidth: number } - Define colors for branches.
+- style (object): ALWAYS include { stroke: string, strokeWidth: number, strokeDasharray: "5,5" } - Use strokeDasharray for dotted lines.
 - label (string, optional): For conditional branches, use "Success", "Error", "True", "False".
 - sourceHandle (string, optional): For condition nodes, use "success" or "error" to denote the output path.
 - labelStyle (object, optional): Style for edge labels.
 - labelBgStyle (object, optional): Background style for edge labels.
+
+**IMPORTANT EDGE STYLING RULES:**
+- ALL edges MUST have strokeDasharray: "5,5" for dotted lines
+- Use different colors for different types of connections:
+  - Sequential flow: { stroke: "#94a3b8", strokeWidth: 2, strokeDasharray: "5,5" }
+  - Success/True: { stroke: "#10b981", strokeWidth: 2, strokeDasharray: "5,5" }
+  - Error/False: { stroke: "#ef4444", strokeWidth: 2, strokeDasharray: "5,5" }
+  - Loop: { stroke: "#8b5cf6", strokeWidth: 2, strokeDasharray: "5,5" }
+  - Retry: { stroke: "#f59e0b", strokeWidth: 2, strokeDasharray: "5,5" }
 
 **VISUALIZATION RULES - MAKE.COM STYLE LAYOUT:**
 
@@ -74,15 +83,25 @@ Each Edge object in the "edges" array MUST have these properties:
    - Ensure no overlapping paths
 
 **Input:** You will receive the \`automation_blueprint\` JSON.
-**Output:** The \`nodes\` and \`edges\` JSON in the specified \`react-flow\` format.
+**Output:** The \`nodes\` and \`edges\` JSON in the specified \`react-flow\` format with dotted lines.
 
-Generate intelligent, visually appealing diagrams that clearly show the automation flow with proper branching, colors, and spacing.`;
+Generate intelligent, visually appealing diagrams that clearly show the automation flow with proper branching, colors, spacing, and dotted connection lines.`;
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
   if (req.method !== 'POST') {
     return new Response(
       JSON.stringify({ error: 'Method Not Allowed' }), 
-      { status: 405, headers: { 'Content-Type': 'application/json' } }
+      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 
@@ -92,7 +111,7 @@ serve(async (req) => {
     if (!automation_blueprint) {
       return new Response(
         JSON.stringify({ error: 'Missing automation_blueprint in request body' }), 
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -104,14 +123,20 @@ serve(async (req) => {
       },
       {
         role: "user", 
-        content: `Generate the React Flow nodes and edges for the following automation blueprint:\n\n${JSON.stringify(automation_blueprint, null, 2)}`
+        content: `Generate the React Flow nodes and edges with dotted lines for the following automation blueprint:\n\n${JSON.stringify(automation_blueprint, null, 2)}`
       }
     ];
 
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiApiKey) {
-      throw new Error('OpenAI API key not configured');
+      console.error('OpenAI API key not found in environment variables');
+      return new Response(
+        JSON.stringify({ error: 'OpenAI API key not configured' }), 
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+
+    console.log('🎨 Generating AI-powered diagram with dotted lines...');
 
     // Call OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -131,13 +156,21 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(`OpenAI API error: ${JSON.stringify(errorData)}`);
+      console.error('OpenAI API error:', errorData);
+      return new Response(
+        JSON.stringify({ error: `OpenAI API error: ${JSON.stringify(errorData)}` }), 
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const result = await response.json();
     
     if (!result.choices || result.choices.length === 0) {
-      throw new Error('No response from OpenAI');
+      console.error('No response from OpenAI');
+      return new Response(
+        JSON.stringify({ error: 'No response from OpenAI' }), 
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const diagramDataString = result.choices[0].message.content;
@@ -145,14 +178,27 @@ serve(async (req) => {
 
     // Validate the response structure
     if (!diagramData.nodes || !diagramData.edges || !Array.isArray(diagramData.nodes) || !Array.isArray(diagramData.edges)) {
-      throw new Error('Invalid diagram data structure from AI');
+      console.error('Invalid diagram data structure from AI:', diagramData);
+      return new Response(
+        JSON.stringify({ error: 'Invalid diagram data structure from AI' }), 
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    console.log(`Generated diagram with ${diagramData.nodes.length} nodes and ${diagramData.edges.length} edges`);
+    // Ensure all edges have dotted lines by adding strokeDasharray if missing
+    diagramData.edges = diagramData.edges.map(edge => ({
+      ...edge,
+      style: {
+        ...edge.style,
+        strokeDasharray: "5,5" // Force dotted lines on all edges
+      }
+    }));
+
+    console.log(`✅ Generated diagram with ${diagramData.nodes.length} nodes and ${diagramData.edges.length} edges (all with dotted lines)`);
 
     return new Response(JSON.stringify(diagramData), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
@@ -162,7 +208,7 @@ serve(async (req) => {
         error: error.message || 'Internal Server Error',
         details: error.toString()
       }), 
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

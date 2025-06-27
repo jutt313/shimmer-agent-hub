@@ -5,7 +5,7 @@ import { Node, Edge, Position } from '@xyflow/react';
 interface BlueprintStep {
   id: string;
   name: string;
-  type: 'action' | 'condition' | 'loop' | 'delay' | 'ai_agent_call';
+  type: 'action' | 'condition' | 'loop' | 'delay' | 'ai_agent_call' | 'retry' | 'fallback';
   action?: {
     integration?: string;
     method?: string;
@@ -27,6 +27,14 @@ interface BlueprintStep {
     agent_id: string;
     input_prompt: string;
     output_variable: string;
+  };
+  retry?: {
+    max_attempts: number;
+    steps: BlueprintStep[];
+  };
+  fallback?: {
+    primary_steps: BlueprintStep[];
+    fallback_steps: BlueprintStep[];
   };
   on_error?: 'continue' | 'stop' | 'retry';
 }
@@ -63,6 +71,10 @@ const getNodeType = (step: BlueprintStep): string => {
       return 'delayNode';
     case 'ai_agent_call':
       return 'aiAgentNode';
+    case 'retry':
+      return 'retryNode';
+    case 'fallback':
+      return 'fallbackNode';
     case 'action':
     default:
       return 'actionNode';
@@ -73,21 +85,25 @@ const getNodeType = (step: BlueprintStep): string => {
 const getStepExplanation = (step: BlueprintStep): string => {
   switch (step.type) {
     case 'action':
-      return `Performs ${step.action?.method || 'an action'} on ${step.action?.integration || 'a platform'}`;
+      return `${step.action?.method || 'Action'} on ${step.action?.integration || 'platform'}`;
     case 'condition':
-      return `Evaluates condition: ${step.condition?.expression || 'unknown'}`;
+      return `If ${step.condition?.expression || 'condition'}`;
     case 'loop':
-      return `Iterates over: ${step.loop?.array_source || 'data'}`;
+      return `For each in ${step.loop?.array_source || 'data'}`;
     case 'ai_agent_call':
-      return `Invokes AI agent: ${step.ai_agent_call?.agent_id || 'unknown'}`;
+      return `AI Agent: ${step.ai_agent_call?.agent_id || 'unknown'}`;
     case 'delay':
-      return `Waits for ${step.delay?.duration_seconds || 0} seconds`;
+      return `Wait ${step.delay?.duration_seconds || 0}s`;
+    case 'retry':
+      return `Retry up to ${step.retry?.max_attempts || 3} times`;
+    case 'fallback':
+      return 'Primary with fallback';
     default:
-      return 'Performs a step in the automation';
+      return 'Automation step';
   }
 };
 
-// FIXED: Main function to convert an automation blueprint into nodes and edges for React Flow
+// Main function to convert an automation blueprint into nodes and edges for React Flow
 export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Node[], edges: Edge[] } => {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
@@ -100,17 +116,23 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
 
   console.log('🔄 Processing blueprint with', blueprint.steps.length, 'steps');
 
-  // Layout constants - IMPROVED spacing and positioning
+  // Layout constants - Make.com style spacing
   const startX = 100;
-  const startY = 200;
-  const horizontalSpacing = 300; // Reduced from 350 for better fit
-  const verticalSpacing = 120; // Reduced from 150 for better fit
+  const startY = 300;
+  const horizontalSpacing = 280;
+  const verticalSpacing = 180;
+  const branchSpacing = 120;
 
   let currentColumnX = startX;
   let nodeIdCounter = 0;
 
-  // Helper function to add edges with SOFT styling
-  const addDiagramEdge = (sourceId: string, targetId: string, edgeType: 'default' | 'true' | 'false' | 'branch' = 'default', label?: string) => {
+  // Helper function to add edges with soft styling and curves
+  const addDiagramEdge = (
+    sourceId: string, 
+    targetId: string, 
+    edgeType: 'default' | 'success' | 'error' | 'branch' | 'loop' = 'default', 
+    label?: string
+  ) => {
     if (!processedNodes.has(sourceId) || !processedNodes.has(targetId)) {
       console.error('❌ Cannot create edge: node not found');
       return;
@@ -118,21 +140,25 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
 
     const edgeId = `${sourceId}-${targetId}-${edgeType}-${Date.now()}-${Math.random()}`;
     
-    // SOFT color palette for edges
-    let color = '#a78bfa'; // Soft purple
+    // Soft color palette for edges
+    let color = '#a8b5ff'; // Soft blue
     let sourceHandle: string | undefined = undefined;
-    let animated = true;
+    let animated = false;
 
-    if (edgeType === 'true') {
-      color = '#34d399'; // Soft green
-      sourceHandle = 'true';
-      label = label || 'True';
-    } else if (edgeType === 'false') {
-      color = '#f87171'; // Soft red
-      sourceHandle = 'false';
-      label = label || 'False';
+    if (edgeType === 'success') {
+      color = '#90f0a0'; // Soft green
+      sourceHandle = 'success';
+      label = label || 'Success';
+      animated = true;
+    } else if (edgeType === 'error') {
+      color = '#ffb3ba'; // Soft red
+      sourceHandle = 'error';
+      label = label || 'Error';
     } else if (edgeType === 'branch') {
-      color = '#a78bfa'; // Soft purple
+      color = '#ffd1a9'; // Soft orange
+      animated = true;
+    } else if (edgeType === 'loop') {
+      color = '#e1c7ff'; // Soft purple
       animated = true;
     }
 
@@ -143,18 +169,23 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
       sourceHandle,
       animated,
       label,
-      labelBgPadding: [4, 8],
-      labelBgBorderRadius: 4,
-      labelBgStyle: { fill: 'white', color: '#374151' },
-      labelStyle: { fontSize: '10px', fill: '#6b7280' },
-      style: { stroke: color, strokeWidth: 2 }
+      type: 'smoothstep',
+      labelBgPadding: [8, 12],
+      labelBgBorderRadius: 12,
+      labelBgStyle: { fill: '#ffffff', opacity: 0.9 },
+      labelStyle: { fontSize: '11px', fill: '#4a5568', fontWeight: '500' },
+      style: { 
+        stroke: color, 
+        strokeWidth: 2.5,
+        strokeDasharray: edgeType === 'error' ? '8,4' : undefined
+      }
     };
 
     edges.push(newEdge);
     console.log('✅ Added edge:', { sourceId, targetId, edgeType, edgeId });
   };
 
-  // Function to create a node with SOFT colors
+  // Function to create a node with soft Make.com-style design
   const createNode = (step: BlueprintStep, x: number, y: number): Node => {
     if (!step.id) {
       step.id = `step_${generateUUID()}`;
@@ -165,16 +196,19 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
       type: getNodeType(step),
       position: { x, y },
       data: {
-        label: step.name || `Step ${step.id}`,
+        label: step.name || `Step ${step.id.slice(-4)}`,
         platform: step.action?.integration,
         action: step.action,
         condition: step.condition,
         loop: step.loop,
         delay: step.delay,
         agent: step.ai_agent_call,
-        explanation: getStepExplanation(step)
+        retry: step.retry,
+        fallback: step.fallback,
+        explanation: getStepExplanation(step),
+        stepType: step.type
       },
-      sourcePosition: getNodeType(step) === 'conditionNode' ? undefined : Position.Right,
+      sourcePosition: Position.Right,
       targetPosition: Position.Left,
     };
     
@@ -184,13 +218,13 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
     return node;
   };
 
-  // FIXED: Improved step processing with better connections
+  // Enhanced step processing with Make.com-style layout
   const processStepsFlow = (
     steps: BlueprintStep[],
     startX: number,
     centerY: number,
     parentId?: string,
-    edgeType: 'default' | 'true' | 'false' = 'default'
+    edgeType: 'default' | 'success' | 'error' | 'branch' = 'default'
   ): { lastNodeId: string | null; nextX: number } => {
     let currentX = startX;
     let lastNodeId: string | null = null;
@@ -218,56 +252,90 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
       const currentNode = createNode(step, currentX, centerY);
       lastNodeId = step.id;
 
-      // FIXED: Ensure proper connections
+      // Connect to parent or previous step
       if (parentId) {
         addDiagramEdge(parentId, step.id, edgeType);
       } else if (i > 0 && steps[i - 1]) {
-        // Connect to previous step in sequence
         addDiagramEdge(steps[i - 1].id, step.id, 'default');
       }
 
-      // Handle different step types with improved layout
+      // Handle different step types with Make.com-style branching
       if (step.type === 'condition' && step.condition) {
         const branchStartX = currentX + horizontalSpacing;
-        const branches: Array<{ steps: BlueprintStep[], type: 'true' | 'false' }> = [];
         
+        // True branch (success path) - positioned above
         if (step.condition.if_true && step.condition.if_true.length > 0) {
-          branches.push({ steps: step.condition.if_true, type: 'true' });
+          const trueBranchY = centerY - branchSpacing;
+          const { nextX: trueNextX } = processStepsFlow(
+            step.condition.if_true,
+            branchStartX,
+            trueBranchY,
+            step.id,
+            'success'
+          );
+          currentX = Math.max(currentX, trueNextX);
         }
         
+        // False branch (error path) - positioned below
         if (step.condition.if_false && step.condition.if_false.length > 0) {
-          branches.push({ steps: step.condition.if_false, type: 'false' });
-        }
-
-        let maxBranchX = branchStartX;
-        branches.forEach((branch, index) => {
-          const branchY = centerY + (index === 0 ? -verticalSpacing/2 : verticalSpacing/2);
-          
-          const { nextX: branchNextX } = processStepsFlow(
-            branch.steps,
+          const falseBranchY = centerY + branchSpacing;
+          const { nextX: falseNextX } = processStepsFlow(
+            step.condition.if_false,
             branchStartX,
-            branchY,
+            falseBranchY,
             step.id,
-            branch.type
+            'error'
           );
-          
-          maxBranchX = Math.max(maxBranchX, branchNextX);
-        });
-
-        currentX = maxBranchX;
+          currentX = Math.max(currentX, falseNextX);
+        }
 
       } else if (step.type === 'loop' && step.loop) {
         const loopContentX = currentX + horizontalSpacing;
-        
         const { nextX: loopNextX } = processStepsFlow(
           step.loop.steps,
           loopContentX,
           centerY,
           step.id,
-          'default'
+          'loop'
+        );
+        currentX = loopNextX;
+
+      } else if (step.type === 'retry' && step.retry) {
+        const retryContentX = currentX + horizontalSpacing;
+        const { nextX: retryNextX } = processStepsFlow(
+          step.retry.steps,
+          retryContentX,
+          centerY,
+          step.id,
+          'branch'
+        );
+        currentX = retryNextX;
+
+      } else if (step.type === 'fallback' && step.fallback) {
+        const fallbackStartX = currentX + horizontalSpacing;
+        
+        // Primary path
+        const primaryY = centerY - branchSpacing/2;
+        const { nextX: primaryNextX } = processStepsFlow(
+          step.fallback.primary_steps,
+          fallbackStartX,
+          primaryY,
+          step.id,
+          'success'
         );
         
-        currentX = loopNextX;
+        // Fallback path
+        const fallbackY = centerY + branchSpacing/2;
+        const { nextX: fallbackNextX } = processStepsFlow(
+          step.fallback.fallback_steps,
+          fallbackStartX,
+          fallbackY,
+          step.id,
+          'error'
+        );
+        
+        currentX = Math.max(primaryNextX, fallbackNextX);
+
       } else {
         currentX += horizontalSpacing;
       }
@@ -279,8 +347,8 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
   // Start processing from the first column
   processStepsFlow(blueprint.steps, startX, startY);
 
-  // FIXED: Ensure proper node positioning without overlaps
-  const adjustNodePositions = () => {
+  // Optimize node positioning to prevent overlaps
+  const optimizeLayout = () => {
     const columns = new Map<number, Node[]>();
     
     nodes.forEach(node => {
@@ -297,7 +365,7 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
       for (let i = 1; i < columnNodes.length; i++) {
         const prevNode = columnNodes[i - 1];
         const currentNode = columnNodes[i];
-        const minDistance = 100;
+        const minDistance = 140;
         
         if (currentNode.position.y - prevNode.position.y < minDistance) {
           currentNode.position.y = prevNode.position.y + minDistance;
@@ -306,7 +374,7 @@ export const blueprintToDiagram = (blueprint: AutomationBlueprint): { nodes: Nod
     });
   };
 
-  adjustNodePositions();
+  optimizeLayout();
 
   console.log('🎯 Blueprint conversion complete:', { 
     totalNodes: nodes.length, 

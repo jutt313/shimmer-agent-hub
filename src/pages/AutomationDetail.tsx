@@ -22,6 +22,7 @@ interface Automation {
   status: string;
   created_at: string;
   automation_blueprint: AutomationBlueprint | null;
+  automation_diagram_data: { nodes: any[]; edges: any[] } | null;
 }
 
 interface ChatMessage {
@@ -49,6 +50,7 @@ const AutomationDetail = () => {
   const [showBlueprint, setShowBlueprint] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showDiagram, setShowDiagram] = useState(false);
+  const [generatingDiagram, setGeneratingDiagram] = useState(false);
 
   useEffect(() => {
     if (!user || !id) {
@@ -58,12 +60,90 @@ const AutomationDetail = () => {
     fetchAutomationAndChats();
   }, [user, id, navigate]);
 
+  const generateAndSaveDiagram = async (automationId: string, blueprint: AutomationBlueprint) => {
+    if (!blueprint || !blueprint.steps || blueprint.steps.length === 0) {
+      console.warn('No blueprint or steps to generate diagram for');
+      return;
+    }
+
+    setGeneratingDiagram(true);
+    
+    try {
+      console.log('🎨 Generating AI-powered diagram for automation:', automationId);
+      
+      // Call the new diagram-generator Edge Function
+      const { data, error } = await supabase.functions.invoke('diagram-generator', {
+        body: { automation_blueprint: blueprint },
+      });
+
+      if (error) {
+        console.error('❌ Error invoking diagram-generator:', error);
+        toast({
+          title: "Diagram Generation Failed",
+          description: "Could not generate diagram. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!data || !data.nodes || !data.edges) {
+        console.error('❌ Invalid diagram data received:', data);
+        toast({
+          title: "Invalid Diagram Data",
+          description: "Received invalid diagram data from AI.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('✅ Generated diagram with', data.nodes.length, 'nodes and', data.edges.length, 'edges');
+
+      // Save the generated diagram data back to the database
+      const { error: updateError } = await supabase
+        .from('automations')
+        .update({ automation_diagram_data: data })
+        .eq('id', automationId);
+
+      if (updateError) {
+        console.error('❌ Error saving diagram data to DB:', updateError);
+        toast({
+          title: "Save Failed",
+          description: "Could not save generated diagram.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update local state
+      setAutomation(prev => ({
+        ...prev!,
+        automation_diagram_data: data
+      }));
+
+      console.log('✅ Diagram generated and saved successfully!');
+      toast({
+        title: "Diagram Generated",
+        description: "AI has created a beautiful diagram for your automation!",
+      });
+
+    } catch (err) {
+      console.error('💥 Unexpected error in generateAndSaveDiagram:', err);
+      toast({
+        title: "Generation Error",
+        description: "An unexpected error occurred while generating the diagram.",
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingDiagram(false);
+    }
+  };
+
   const fetchAutomationAndChats = async () => {
     try {
-      // Fetch automation details
+      // Fetch automation details including the new diagram data
       const { data, error: automationError } = await supabase
         .from('automations')
-        .select('*')
+        .select('*, automation_diagram_data')
         .eq('id', id)
         .single();
 
@@ -71,10 +151,17 @@ const AutomationDetail = () => {
 
       const automationData: Automation = {
         ...data,
-        automation_blueprint: data.automation_blueprint as AutomationBlueprint | null
+        automation_blueprint: data.automation_blueprint as AutomationBlueprint | null,
+        automation_diagram_data: data.automation_diagram_data as { nodes: any[]; edges: any[] } | null
       };
 
       setAutomation(automationData);
+
+      // Generate diagram if blueprint exists but no diagram data
+      if (automationData.automation_blueprint && !automationData.automation_diagram_data) {
+        console.log('🔄 No diagram data found, generating new diagram...');
+        generateAndSaveDiagram(automationData.id, automationData.automation_blueprint);
+      }
 
       // Fetch chat messages for this automation
       const { data: chatData, error: chatError } = await supabase
@@ -256,22 +343,27 @@ const AutomationDetail = () => {
         }
       }
 
-      // Update automation blueprint if available
+      // Update automation blueprint and generate new diagram if available
       if (structuredData?.automation_blueprint) {
-        console.log('🔧 Updating automation blueprint');
+        console.log('🔧 Updating automation blueprint and generating new diagram');
         const { error: updateError } = await supabase
           .from('automations')
           .update({ automation_blueprint: structuredData.automation_blueprint })
           .eq('id', automation.id);
 
         if (!updateError) {
-          setAutomation(prev => ({
-            ...prev!,
+          const updatedAutomation = {
+            ...automation,
             automation_blueprint: structuredData.automation_blueprint
-          }));
+          };
+          setAutomation(updatedAutomation);
+          
+          // Generate new diagram for updated blueprint
+          generateAndSaveDiagram(automation.id, structuredData.automation_blueprint);
+          
           toast({
             title: "Blueprint Updated",
-            description: "Automation blueprint has been updated.",
+            description: "Automation blueprint has been updated with new AI-generated diagram.",
           });
         }
       }
@@ -432,8 +524,9 @@ const AutomationDetail = () => {
                 ? 'bg-gradient-to-r from-purple-500 to-blue-600 text-white shadow-md' 
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
+            disabled={generatingDiagram}
           >
-            <Code2 className="w-4 h-4" />
+            <Code2 className={`w-4 h-4 ${generatingDiagram ? 'animate-spin' : ''}`} />
           </Button>
         </div>
 
@@ -478,10 +571,12 @@ const AutomationDetail = () => {
               <div style={{ height: '65vh' }}>
                 <AutomationDiagramDisplay
                   automationBlueprint={automation?.automation_blueprint}
+                  automationDiagramData={automation?.automation_diagram_data}
                   messages={messages}
                   onAgentAdd={handleAgentAdd}
                   onAgentDismiss={handleAgentDismiss}
                   dismissedAgents={dismissedAgents}
+                  isGenerating={generatingDiagram}
                 />
               </div>
             )}

@@ -221,6 +221,7 @@ export type Database = {
       automations: {
         Row: {
           automation_blueprint: Json | null
+          automation_diagram_data: Json | null
           created_at: string
           description: string | null
           id: string
@@ -235,6 +236,7 @@ export type Database = {
         }
         Insert: {
           automation_blueprint?: Json | null
+          automation_diagram_data?: Json | null
           created_at?: string
           description?: string | null
           id?: string
@@ -249,6 +251,7 @@ export type Database = {
         }
         Update: {
           automation_blueprint?: Json | null
+          automation_diagram_data?: Json | null
           created_at?: string
           description?: string | null
           id?: string

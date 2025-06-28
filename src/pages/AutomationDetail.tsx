@@ -535,7 +535,7 @@ const AutomationDetail = () => {
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-r from-purple-300/20 to-blue-300/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
       
       {/* Navigation Header with better spacing */}
-      <div className="sticky top-0 z-20 flex justify-between items-center mx-6 py-4 mb-6">
+      <div className="sticky top-0 z-20 flex justify-between items-center mx-6 py-4 mb-4">
         {/* Left side - Back button and automation info */}
         <div className="flex items-center gap-3">
           <Button 
@@ -608,12 +608,12 @@ const AutomationDetail = () => {
         <div className="w-32"></div>
       </div>
       
-      <div className="flex-1 max-w-7xl mx-auto w-full px-6 relative">        
-        {/* Main Content Area with improved height management */}
-        <div className="relative">
-          {/* Chat Card - with proper height */}
+      <div className="flex-1 max-w-7xl mx-auto w-full px-6 relative pb-4">        
+        {/* Main Content Area - Fixed height management */}
+        <div className="relative h-full">
+          {/* Chat Card - Improved height calculation */}
           <div className={`transition-transform duration-500 ease-in-out ${showDashboard || showDiagram ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'} ${showDashboard || showDiagram ? 'absolute' : 'relative'} w-full`}>
-            <div style={{ height: '65vh' }}>
+            <div className="h-[calc(100vh-220px)]">
               <ChatCard 
                 messages={messages} 
                 onAgentAdd={handleAgentAdd}
@@ -625,10 +625,10 @@ const AutomationDetail = () => {
             </div>
           </div>
           
-          {/* Dashboard Card - with full height */}
+          {/* Dashboard Card - Fixed height to prevent cutting */}
           <div className={`transition-transform duration-500 ease-in-out ${showDashboard ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'} ${showDashboard ? 'relative' : 'absolute'} w-full`}>
             {showDashboard && (
-              <div style={{ height: '65vh' }}>
+              <div className="h-[calc(100vh-160px)]">
                 <AutomationDashboard
                   automationId={automation.id}
                   automationTitle={automation.title}
@@ -639,10 +639,10 @@ const AutomationDetail = () => {
             )}
           </div>
 
-          {/* Enhanced Diagram Card - EVEN BIGGER with comprehensive error handling */}
+          {/* Diagram Card - Fixed height */}
           <div className={`transition-transform duration-500 ease-in-out ${showDiagram ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} ${showDiagram ? 'relative' : 'absolute'} w-full`}>
             {showDiagram && (
-              <div style={{ height: '85vh' }}>
+              <div className="h-[calc(100vh-160px)]">
                 <AutomationDiagramDisplay
                   automationBlueprint={automation?.automation_blueprint}
                   automationDiagramData={automation?.automation_diagram_data}
@@ -657,57 +657,57 @@ const AutomationDetail = () => {
             )}
           </div>
         </div>
-        
-        {/* Platform Buttons - with proper spacing */}
-        {!showDashboard && !showDiagram && currentPlatforms && currentPlatforms.length > 0 && (
-          <div className="mt-4 mb-4">
-            <PlatformButtons platforms={currentPlatforms} />
-          </div>
-        )}
-        
-        {/* Input Section - with proper spacing */}
-        {!showDashboard && !showDiagram && (
-          <div className="mt-4 mb-6">
-            <div className="flex gap-4 items-end">
-              <Button
-                onClick={() => setShowAIAgentForm(true)}
-                className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-6 py-4 shadow-lg hover:shadow-xl transition-all duration-300 border-0 flex-shrink-0"
-                style={{
-                  boxShadow: '0 0 25px rgba(147, 51, 234, 0.3)'
-                }}
-              >
-                <Bot className="w-5 h-5 mr-2" />
-                AI Agent
-              </Button>
-              
-              <div className="flex-1 relative min-w-0">
-                <Input 
-                  value={newMessage} 
-                  onChange={e => setNewMessage(e.target.value)} 
-                  onKeyPress={handleKeyPress} 
-                  placeholder={sendingMessage ? "YusrAI is thinking with full context..." : "Ask about this automation..."} 
-                  disabled={sendingMessage}
-                  className="rounded-3xl bg-white/80 backdrop-blur-sm border-0 px-6 py-4 text-lg focus:outline-none focus:ring-0 shadow-lg w-full" 
-                  style={{
-                    boxShadow: '0 0 25px rgba(154, 94, 255, 0.2)'
-                  }} 
-                />
-              </div>
-              
-              <Button 
-                onClick={() => handleSendMessage(newMessage)}
-                disabled={sendingMessage || !newMessage.trim()}
-                className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-4 shadow-lg hover:shadow-xl transition-all duration-300 border-0 disabled:opacity-50 flex-shrink-0" 
-                style={{
-                  boxShadow: '0 0 30px rgba(92, 142, 246, 0.3)'
-                }}
-              >
-                <Send className={`w-6 h-6 ${sendingMessage ? 'animate-pulse' : ''}`} />
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
+        
+      {/* Platform Buttons - Reduced spacing */}
+      {!showDashboard && !showDiagram && currentPlatforms && currentPlatforms.length > 0 && (
+        <div className="px-6 pb-2">
+          <PlatformButtons platforms={currentPlatforms} />
+        </div>
+      )}
+      
+      {/* Input Section - Fixed positioning and reduced spacing */}
+      {!showDashboard && !showDiagram && (
+        <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent px-6 pt-2 pb-4">
+          <div className="flex gap-3 items-end">
+            <Button
+              onClick={() => setShowAIAgentForm(true)}
+              className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-5 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0 flex-shrink-0"
+              style={{
+                boxShadow: '0 0 25px rgba(147, 51, 234, 0.3)'
+              }}
+            >
+              <Bot className="w-4 h-4 mr-2" />
+              AI Agent
+            </Button>
+            
+            <div className="flex-1 relative min-w-0">
+              <Input 
+                value={newMessage} 
+                onChange={e => setNewMessage(e.target.value)} 
+                onKeyPress={handleKeyPress} 
+                placeholder={sendingMessage ? "YusrAI is thinking with full context..." : "Ask about this automation..."} 
+                disabled={sendingMessage}
+                className="rounded-3xl bg-white/90 backdrop-blur-sm border-0 px-5 py-3 text-base focus:outline-none focus:ring-0 shadow-lg w-full" 
+                style={{
+                  boxShadow: '0 0 25px rgba(154, 94, 255, 0.2)'
+                }} 
+              />
+            </div>
+            
+            <Button 
+              onClick={() => handleSendMessage(newMessage)}
+              disabled={sendingMessage || !newMessage.trim()}
+              className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0 disabled:opacity-50 flex-shrink-0" 
+              style={{
+                boxShadow: '0 0 30px rgba(92, 142, 246, 0.3)'
+              }}
+            >
+              <Send className={`w-5 h-5 ${sendingMessage ? 'animate-pulse' : ''}`} />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Blueprint Card - Right side slide-out panel */}
       {showBlueprint && automation?.automation_blueprint && (

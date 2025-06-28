@@ -1,4 +1,3 @@
-
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Bot, Plus, X } from "lucide-react";
@@ -246,16 +245,15 @@ const ChatCard = ({
 
   return (
     <div 
-      className="w-full h-full bg-white/95 backdrop-blur-md rounded-3xl p-6 shadow-2xl border-0 relative mx-auto flex flex-col"
+      className="w-full h-full bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-0 relative mx-auto flex flex-col overflow-hidden"
       style={{
         boxShadow: '0 0 60px rgba(92, 142, 246, 0.15), 0 0 120px rgba(154, 94, 255, 0.08)',
-        minHeight: '70vh'
       }}
     >
       <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/20 to-purple-100/20 pointer-events-none"></div>
       
-      <ScrollArea className="flex-1 relative z-10" ref={scrollAreaRef}>
-        <div className="space-y-6 pr-4 pb-4">
+      <ScrollArea className="flex-1 relative z-10 p-6" ref={scrollAreaRef}>
+        <div className="space-y-6 pb-4">
           {optimizedMessages.map(message => {
             let structuredData = message.structuredData;
             if (message.isBot && !structuredData) {
@@ -269,7 +267,7 @@ const ChatCard = ({
 
             return (
               <div key={message.id} className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}>
-                <div className={`max-w-5xl px-6 py-5 rounded-2xl ${
+                <div className={`max-w-4xl px-6 py-4 rounded-2xl ${
                   message.isBot 
                     ? 'bg-white border border-blue-100/50 text-gray-800 shadow-lg backdrop-blur-sm' 
                     : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
@@ -306,7 +304,7 @@ const ChatCard = ({
           {/* Loading indicator */}
           {isLoading && (
             <div className="flex justify-start">
-              <div className="max-w-5xl px-6 py-5 rounded-2xl bg-white border border-blue-100/50 text-gray-800 shadow-lg backdrop-blur-sm">
+              <div className="max-w-4xl px-6 py-4 rounded-2xl bg-white border border-blue-100/50 text-gray-800 shadow-lg backdrop-blur-sm">
                 <div className="flex items-center space-x-3">
                   <Bot className="w-5 h-5 animate-pulse text-blue-500" />
                   <span className="font-medium">YusrAI is creating your automation...</span>
@@ -324,9 +322,6 @@ const ChatCard = ({
           <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
-      
-      {/* Smooth fade effect at bottom instead of sharp cut */}
-      <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white/95 to-transparent pointer-events-none rounded-b-3xl"></div>
     </div>
   );
 };

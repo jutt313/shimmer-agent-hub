@@ -13,7 +13,7 @@ export interface DeveloperApp {
   redirect_uris: string[];
   webhook_url: string | null;
   is_active: boolean;
-  tier: string;
+  tier: 'free' | 'pro' | 'enterprise';
   rate_limit_per_hour: number;
   created_at: string;
   updated_at: string;
@@ -99,7 +99,7 @@ export const useDeveloperApps = () => {
     }
   };
 
-  const updateApp = async (appId: string, updates: Partial<DeveloperApp>) => {
+  const updateApp = async (appId: string, updates: Partial<Omit<DeveloperApp, 'id' | 'user_id' | 'client_id' | 'client_secret' | 'created_at' | 'updated_at'>>) => {
     try {
       console.log('Updating developer app:', appId, updates);
       const { data, error } = await supabase

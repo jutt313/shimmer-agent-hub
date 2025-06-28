@@ -46,7 +46,15 @@ export const useApiTokens = () => {
       }
       
       console.log('Fetched API tokens:', data);
-      setTokens(data || []);
+      // Transform the data to match our interface
+      const transformedTokens: ApiToken[] = (data || []).map(token => ({
+        ...token,
+        permissions: typeof token.permissions === 'object' && token.permissions !== null 
+          ? token.permissions as { read: boolean; write: boolean; webhook: boolean; }
+          : { read: true, write: false, webhook: false }
+      }));
+      
+      setTokens(transformedTokens);
     } catch (error) {
       console.error('Error fetching API tokens:', error);
       toast({
@@ -86,7 +94,15 @@ export const useApiTokens = () => {
 
       if (error) throw error;
 
-      setTokens(prev => [data, ...prev]);
+      // Transform the response to match our interface
+      const transformedToken: ApiToken = {
+        ...data,
+        permissions: typeof data.permissions === 'object' && data.permissions !== null 
+          ? data.permissions as { read: boolean; write: boolean; webhook: boolean; }
+          : { read: true, write: false, webhook: false }
+      };
+
+      setTokens(prev => [transformedToken, ...prev]);
       
       toast({
         title: "Success",

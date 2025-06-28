@@ -100,6 +100,57 @@ export type Database = {
           },
         ]
       }
+      api_usage_logs: {
+        Row: {
+          api_token_id: string | null
+          created_at: string
+          developer_integration_id: string | null
+          endpoint: string
+          id: string
+          method: string
+          response_time_ms: number | null
+          status_code: number
+          user_id: string | null
+        }
+        Insert: {
+          api_token_id?: string | null
+          created_at?: string
+          developer_integration_id?: string | null
+          endpoint: string
+          id?: string
+          method: string
+          response_time_ms?: number | null
+          status_code: number
+          user_id?: string | null
+        }
+        Update: {
+          api_token_id?: string | null
+          created_at?: string
+          developer_integration_id?: string | null
+          endpoint?: string
+          id?: string
+          method?: string
+          response_time_ms?: number | null
+          status_code?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_usage_logs_api_token_id_fkey"
+            columns: ["api_token_id"]
+            isOneToOne: false
+            referencedRelation: "user_api_tokens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_usage_logs_developer_integration_id_fkey"
+            columns: ["developer_integration_id"]
+            isOneToOne: false
+            referencedRelation: "developer_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_chats: {
         Row: {
           automation_id: string
@@ -218,6 +269,47 @@ export type Database = {
           },
         ]
       }
+      automation_webhooks: {
+        Row: {
+          automation_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          last_triggered_at: string | null
+          trigger_count: number
+          webhook_secret: string
+          webhook_url: string
+        }
+        Insert: {
+          automation_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_triggered_at?: string | null
+          trigger_count?: number
+          webhook_secret?: string
+          webhook_url: string
+        }
+        Update: {
+          automation_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_triggered_at?: string | null
+          trigger_count?: number
+          webhook_secret?: string
+          webhook_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_webhooks_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automations: {
         Row: {
           automation_blueprint: Json | null
@@ -304,6 +396,54 @@ export type Database = {
           },
         ]
       }
+      developer_integrations: {
+        Row: {
+          app_description: string | null
+          app_name: string
+          client_id: string
+          client_secret: string
+          created_at: string
+          id: string
+          is_active: boolean
+          rate_limit_per_hour: number
+          redirect_uris: string[]
+          tier: Database["public"]["Enums"]["developer_tier"]
+          updated_at: string
+          user_id: string
+          webhook_url: string | null
+        }
+        Insert: {
+          app_description?: string | null
+          app_name: string
+          client_id?: string
+          client_secret?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          rate_limit_per_hour?: number
+          redirect_uris?: string[]
+          tier?: Database["public"]["Enums"]["developer_tier"]
+          updated_at?: string
+          user_id: string
+          webhook_url?: string | null
+        }
+        Update: {
+          app_description?: string | null
+          app_name?: string
+          client_id?: string
+          client_secret?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          rate_limit_per_hour?: number
+          redirect_uris?: string[]
+          tier?: Database["public"]["Enums"]["developer_tier"]
+          updated_at?: string
+          user_id?: string
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
       error_conversations: {
         Row: {
           conversation_history: Json
@@ -378,6 +518,53 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      oauth_connections: {
+        Row: {
+          access_token: string
+          connected_at: string
+          developer_integration_id: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          last_used_at: string | null
+          refresh_token: string | null
+          scopes: Json
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          connected_at?: string
+          developer_integration_id: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          refresh_token?: string | null
+          scopes?: Json
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          connected_at?: string
+          developer_integration_id?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          refresh_token?: string | null
+          scopes?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oauth_connections_developer_integration_id_fkey"
+            columns: ["developer_integration_id"]
+            isOneToOne: false
+            referencedRelation: "developer_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       platform_credentials: {
         Row: {
@@ -489,6 +676,45 @@ export type Database = {
         }
         Relationships: []
       }
+      user_api_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          last_used_at: string | null
+          permissions: Json
+          token_hash: string
+          token_name: string
+          token_type: Database["public"]["Enums"]["api_token_type"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          permissions?: Json
+          token_hash: string
+          token_name: string
+          token_type?: Database["public"]["Enums"]["api_token_type"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          permissions?: Json
+          token_hash?: string
+          token_name?: string
+          token_type?: Database["public"]["Enums"]["api_token_type"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_preferences: {
         Row: {
           created_at: string | null
@@ -537,15 +763,88 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_delivery_logs: {
+        Row: {
+          automation_run_id: string | null
+          automation_webhook_id: string
+          created_at: string
+          delivered_at: string | null
+          delivery_attempts: number
+          id: string
+          payload: Json
+          response_body: string | null
+          status_code: number | null
+        }
+        Insert: {
+          automation_run_id?: string | null
+          automation_webhook_id: string
+          created_at?: string
+          delivered_at?: string | null
+          delivery_attempts?: number
+          id?: string
+          payload: Json
+          response_body?: string | null
+          status_code?: number | null
+        }
+        Update: {
+          automation_run_id?: string | null
+          automation_webhook_id?: string
+          created_at?: string
+          delivered_at?: string | null
+          delivery_attempts?: number
+          id?: string
+          payload?: Json
+          response_body?: string | null
+          status_code?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_delivery_logs_automation_run_id_fkey"
+            columns: ["automation_run_id"]
+            isOneToOne: false
+            referencedRelation: "automation_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_delivery_logs_automation_webhook_id_fkey"
+            columns: ["automation_webhook_id"]
+            isOneToOne: false
+            referencedRelation: "automation_webhooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_api_token: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_webhook_url: {
+        Args: { automation_id: string }
+        Returns: string
+      }
+      hash_api_token: {
+        Args: { token: string }
+        Returns: string
+      }
+      validate_api_token: {
+        Args: { token_hash: string }
+        Returns: {
+          user_id: string
+          token_type: Database["public"]["Enums"]["api_token_type"]
+          permissions: Json
+          is_valid: boolean
+        }[]
+      }
     }
     Enums: {
-      [_ in never]: never
+      api_token_type: "developer" | "user" | "automation"
+      developer_tier: "free" | "pro" | "enterprise"
+      integration_type: "oauth" | "api_key" | "webhook"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -660,6 +959,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      api_token_type: ["developer", "user", "automation"],
+      developer_tier: ["free", "pro", "enterprise"],
+      integration_type: ["oauth", "api_key", "webhook"],
+    },
   },
 } as const

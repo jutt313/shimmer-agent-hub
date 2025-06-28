@@ -1,17 +1,33 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, CheckCircle, XCircle, Info, Bug, RefreshCw } from 'lucide-react';
 import { globalErrorLogger } from '@/utils/errorLogger';
+import { Node, Edge } from '@xyflow/react'; // Import Node and Edge types from React Flow
 
 interface DiagramDiagnosticsProps {
   automationBlueprint?: any;
-  diagramData?: any;
+  diagramData?: { nodes: Node[]; edges: Edge[]; warning?: string } | null; // Use React Flow's Node/Edge types
   componentStats?: any;
   onRegenerateDiagram?: () => void;
 }
+
+// Helper to calculate node bounds (assuming default node size if not provided by AI)
+const getNodeBounds = (node: Node, defaultWidth = 250, defaultHeight = 100) => {
+  const width = node.width || defaultWidth;
+  const height = node.height || defaultHeight;
+  const x = node.position.x;
+  const y = node.position.y;
+  return {
+    left: x,
+    right: x + width,
+    top: y,
+    bottom: y + height,
+    width,
+    height
+  };
+};
 
 const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
   automationBlueprint,
@@ -23,19 +39,24 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
   const [issues, setIssues] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!componentStats || !diagramData) return;
+    if (!componentStats || !diagramData || !diagramData.nodes || !diagramData.edges) {
+      setDiagnostics(null);
+      setIssues([]);
+      return;
+    }
 
     const runDiagnostics = () => {
       console.log('🔬 Running comprehensive diagram diagnostics');
       
-      const nodeCount = diagramData.nodes?.length || 0;
-      const edgeCount = diagramData.edges?.length || 0;
-      const expectedNodes = componentStats.expectedMinNodes || 0;
+      const nodeCount = diagramData.nodes.length;
+      const edgeCount = diagramData.edges.length;
+      const expectedNodes = componentStats.expectedNodes || 0; // Use componentStats.expectedNodes
       
-      const platformNodes = diagramData.nodes?.filter((n: any) => n.type === 'platformNode') || [];
-      const agentNodes = diagramData.nodes?.filter((n: any) => n.type === 'aiAgentNode') || [];
-      const conditionNodes = diagramData.nodes?.filter((n: any) => n.type === 'conditionNode') || [];
-      
+      const platformNodes = diagramData.nodes.filter((n: Node) => n.type === 'platformNode');
+      const agentNodes = diagramData.nodes.filter((n: Node) => n.type === 'aiAgentNode');
+      const conditionNodes = diagramData.nodes.filter((n: Node) => n.type === 'conditionNode');
+      const triggerNodes = diagramData.nodes.filter((n: Node) => n.type === 'triggerNode');
+
       const diagnosticResults = {
         totalNodes: nodeCount,
         totalEdges: edgeCount,
@@ -44,12 +65,12 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
         platformCoverage: platformNodes.length / Math.max(componentStats.platforms.length, 1),
         agentCoverage: agentNodes.length / Math.max(componentStats.agents.length, 1),
         conditionCoverage: conditionNodes.length / Math.max(componentStats.conditions, 1),
-        nodeTypes: [...new Set(diagramData.nodes?.map((n: any) => n.type) || [])],
+        nodeTypes: [...new Set(diagramData.nodes.map((n: Node) => n.type))],
         missingPlatforms: componentStats.platforms.filter((p: string) => 
-          !platformNodes.some((n: any) => n.data?.platform === p)
+          !platformNodes.some((n: Node) => n.data?.platform === p)
         ),
         missingAgents: componentStats.agents.filter((a: string) => 
-          !agentNodes.some((n: any) => n.data?.agent?.agent_id === a)
+          !agentNodes.some((n: Node) => n.data?.agent?.agent_id === a)
         )
       };
       
@@ -58,12 +79,12 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
       // Identify issues
       const foundIssues = [];
       
-      if (diagnosticResults.completeness < 0.8) {
+      if (diagnosticResults.completeness < 0.95 && expectedNodes > 0) { // Slightly stricter completeness
         foundIssues.push({
           type: 'error',
           title: 'Incomplete Diagram',
           message: `Only ${Math.round(diagnosticResults.completeness * 100)}% of expected components are shown`,
-          details: `Generated ${nodeCount} nodes but expected ${expectedNodes}`
+          details: `Generated ${nodeCount} nodes but expected at least ${expectedNodes}`
         });
       }
       
@@ -71,7 +92,7 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
         foundIssues.push({
           type: 'warning',
           title: 'Missing Platforms',
-          message: `${diagnosticResults.missingPlatforms.length} platforms not shown`,
+          message: `${diagnosticResults.missingPlatforms.length} platform(s) not shown`,
           details: `Missing: ${diagnosticResults.missingPlatforms.join(', ')}`
         });
       }
@@ -80,19 +101,41 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
         foundIssues.push({
           type: 'warning',
           title: 'Missing AI Agents',
-          message: `${diagnosticResults.missingAgents.length} agents not shown`,
+          message: `${diagnosticResults.missingAgents.length} AI agent(s) not shown`,
           details: `Missing: ${diagnosticResults.missingAgents.join(', ')}`
         });
       }
       
-      if (edgeCount < nodeCount - 1) {
+      if (edgeCount < nodeCount - triggerNodes.length) { // At least nodeCount - triggers edges for connected graph
         foundIssues.push({
           type: 'warning',
-          title: 'Disconnected Nodes',
-          message: 'Some nodes may not be connected',
-          details: `${nodeCount} nodes but only ${edgeCount} edges`
+          title: 'Potentially Disconnected Nodes',
+          message: 'Some nodes may not be properly connected in the flow',
+          details: `${nodeCount} nodes but only ${edgeCount} edges. Expected more connections.`
         });
       }
+
+      // --- NEW LAYOUT DIAGNOSTICS ---
+      const detectedOverlaps = checkNodeOverlap(diagramData.nodes);
+      if (detectedOverlaps.length > 0) {
+        foundIssues.push({
+          type: 'error',
+          title: 'Node Overlap Detected',
+          message: `${detectedOverlaps.length} nodes are overlapping`,
+          details: `Overlapping node IDs: ${detectedOverlaps.map(issue => `${issue.node1Id} & ${issue.node2Id}`).join(', ')}. Please refine AI prompt or layout.`
+        });
+      }
+
+      const layoutQuality = checkLayoutQuality(diagramData.nodes, diagramData.edges);
+      if (!layoutQuality.isClean) {
+        foundIssues.push({
+          type: layoutQuality.severity,
+          title: layoutQuality.title,
+          message: layoutQuality.message,
+          details: layoutQuality.details
+        });
+      }
+      // --- END NEW LAYOUT DIAGNOSTICS ---
       
       setIssues(foundIssues);
       
@@ -103,8 +146,91 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
       });
     };
 
+    // --- NEW: Layout-specific Diagnostic Functions ---
+    const checkNodeOverlap = (nodes: Node[]) => {
+      const overlaps: { node1Id: string; node2Id: string }[] = [];
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const node1 = nodes[i];
+          const node2 = nodes[j];
+
+          if (!node1.position || !node2.position) continue; // Skip if position is missing
+
+          const bounds1 = getNodeBounds(node1);
+          const bounds2 = getNodeBounds(node2);
+
+          // Check for intersection
+          if (
+            bounds1.left < bounds2.right &&
+            bounds1.right > bounds2.left &&
+            bounds1.top < bounds2.bottom &&
+            bounds1.bottom > bounds2.top
+          ) {
+            overlaps.push({ node1Id: node1.id, node2Id: node2.id });
+          }
+        }
+      }
+      return overlaps;
+    };
+
+    // This is a simplified layout quality check. A full check for tangled edges is complex.
+    const checkLayoutQuality = (nodes: Node[], edges: Edge[]) => {
+      let poorLayoutCount = 0;
+      let title = 'Diagram Layout Good';
+      let message = 'The diagram layout appears organized.';
+      let severity: 'info' | 'warning' | 'error' = 'info';
+      let details = '';
+
+      // Check if nodes are generally laid out left-to-right as intended
+      const sortedNodes = [...nodes].sort((a, b) => a.position.x - b.position.x);
+      for (let i = 0; i < sortedNodes.length - 1; i++) {
+        if (sortedNodes[i+1].position.x < sortedNodes[i].position.x && // Check if x decreases unexpectedly
+            edges.some(e => e.source === sortedNodes[i].id && e.target === sortedNodes[i+1].id) // And they are connected
+        ) {
+          poorLayoutCount++;
+        }
+      }
+      
+      if (poorLayoutCount > 0) {
+        severity = 'warning';
+        title = 'Suboptimal Layout Flow';
+        message = `Detected ${poorLayoutCount} instances where nodes are not strictly left-to-right.`;
+        details += 'Ensure the AI respects the left-to-right flow constraint.';
+      }
+
+      // Check if conditional branches diverge sufficiently
+      conditionNodes.forEach(condNode => {
+        const outgoingEdges = edges.filter(e => e.source === condNode.id);
+        const yesEdge = outgoingEdges.find(e => e.label === 'Yes');
+        const noEdge = outgoingEdges.find(e => e.label === 'No');
+
+        if (yesEdge && noEdge) {
+          const targetNodeYes = nodes.find(n => n.id === yesEdge.target);
+          const targetNodeNo = nodes.find(n => n.id === noEdge.target);
+
+          if (targetNodeYes && targetNodeNo) {
+            const verticalDifference = Math.abs(targetNodeYes.position.y - targetNodeNo.position.y);
+            // Example: expect a certain vertical separation for branches
+            if (verticalDifference < (NODE_HEIGHT + VERTICAL_GAP / 2)) { // if they are too close vertically
+              poorLayoutCount++;
+              severity = 'warning';
+              title = 'Tight Conditional Branches';
+              message = `Conditional branches from node '${condNode.id}' are too close vertically.`;
+              details += 'Increase vertical spacing for conditional paths in AI prompt.';
+            }
+          }
+        }
+      });
+
+
+      const isClean = poorLayoutCount === 0;
+
+      return { isClean, severity, title, message, details };
+    };
+    // --- END NEW DIAGNOSTIC FUNCTIONS ---
+
     runDiagnostics();
-  }, [componentStats, diagramData]);
+  }, [componentStats, diagramData]); // Dependencies for useEffect
 
   if (!diagnostics) return null;
 
@@ -130,15 +256,15 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
       
       {/* Overall Health */}
       <div className="flex items-center gap-2">
-        {diagnostics.completeness >= 0.9 ? (
+        {issues.length === 0 ? (
           <CheckCircle className="w-4 h-4 text-green-500" />
-        ) : diagnostics.completeness >= 0.7 ? (
-          <AlertCircle className="w-4 h-4 text-yellow-500" />
-        ) : (
+        ) : issues.some(issue => issue.type === 'error') ? (
           <XCircle className="w-4 h-4 text-red-500" />
+        ) : (
+          <AlertCircle className="w-4 h-4 text-yellow-500" />
         )}
         <span className="text-sm font-medium">
-          Overall Completeness: {Math.round(diagnostics.completeness * 100)}%
+          Overall Diagram Health: {issues.length === 0 ? 'Good' : issues.some(issue => issue.type === 'error') ? 'Critical Issues' : 'Warnings Present'}
         </span>
       </div>
 
@@ -150,7 +276,7 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
             <span className="font-medium">{diagnostics.totalNodes}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-600">Expected Nodes:</span>
+            <span className="text-gray-600">Expected Nodes (from blueprint):</span>
             <span className="font-medium">{diagnostics.expectedNodes}</span>
           </div>
           <div className="flex justify-between">
@@ -160,6 +286,12 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
         </div>
         
         <div className="space-y-1">
+          <div className="flex justify-between">
+            <span className="text-gray-600">Completeness:</span>
+            <Badge variant={diagnostics.completeness >= 0.95 ? "default" : "destructive"} className="h-4 text-xs">
+              {Math.round(diagnostics.completeness * 100)}%
+            </Badge>
+          </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Platform Coverage:</span>
             <Badge variant={diagnostics.platformCoverage >= 1.0 ? "default" : "destructive"} className="h-4 text-xs">
@@ -171,10 +303,6 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
             <Badge variant={diagnostics.agentCoverage >= 1.0 ? "default" : "destructive"} className="h-4 text-xs">
               {Math.round(diagnostics.agentCoverage * 100)}%
             </Badge>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Node Types:</span>
-            <span className="font-medium">{diagnostics.nodeTypes.length}</span>
           </div>
         </div>
       </div>
@@ -206,16 +334,18 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
       )}
 
       {/* Node Type Breakdown */}
-      <div className="space-y-2">
-        <h4 className="text-xs font-semibold text-gray-700">Node Types Generated</h4>
-        <div className="flex flex-wrap gap-1">
-          {diagnostics.nodeTypes.map((type: string) => (
-            <Badge key={type} variant="secondary" className="text-xs h-5">
-              {type}
-            </Badge>
-          ))}
+      {diagnostics.nodeTypes.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold text-gray-700">Node Types Generated</h4>
+          <div className="flex flex-wrap gap-1">
+            {diagnostics.nodeTypes.map((type: string) => (
+              <Badge key={type} variant="secondary" className="text-xs h-5">
+                {type}
+              </Badge>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </Card>
   );
 };

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ReactFlow, 
@@ -29,7 +30,7 @@ import DelayNode from './diagram/DelayNode';
 import AIAgentNode from './diagram/AIAgentNode';
 import RetryNode from './diagram/RetryNode';
 import FallbackNode from './diagram/FallbackNode';
-import TriggerNode from './diagram/TriggerNode'; // Import the new TriggerNode
+import TriggerNode from './diagram/TriggerNode';
 import { AutomationBlueprint } from "@/types/automation";
 
 interface AutomationDiagramDisplayProps {
@@ -53,20 +54,20 @@ const nodeTypes = {
   aiAgentNode: AIAgentNode,
   retryNode: RetryNode,
   fallbackNode: FallbackNode,
-  triggerNode: TriggerNode, // Map to the new TriggerNode
+  triggerNode: TriggerNode,
 };
 
-// --- Layouting Utility (Simplified for demonstration - consider a library like ELK or Dagre for complex graphs) ---
-const NODE_WIDTH = 250; // Approximate width of a node
-const NODE_HEIGHT = 100; // Approximate height of a node
-const HORIZONTAL_GAP = 150; // Spacing between nodes horizontally
-const VERTICAL_GAP = 100; // Spacing between nodes vertically for branches
+// --- Layouting Utility ---
+const NODE_WIDTH = 250;
+const NODE_HEIGHT = 100;
+const HORIZONTAL_GAP = 150;
+const VERTICAL_GAP = 100;
 
 const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => {
   if (!nodes || nodes.length === 0) return { nodes: [], edges };
 
-  const graph = new Map<string, string[]>(); // Map: nodeId -> childrenIds
-  const inDegrees = new Map<string, number>(); // Map: nodeId -> number of incoming edges
+  const graph = new Map<string, string[]>();
+  const inDegrees = new Map<string, number>();
 
   nodes.forEach(node => {
     graph.set(node.id, []);
@@ -78,12 +79,10 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
     inDegrees.set(edge.target, (inDegrees.get(edge.target) || 0) + 1);
   });
 
-  // Simple topological sort to determine layers/depth
   const queue: string[] = [];
   const layers = new Map<string, number>();
   let currentLayer = 0;
 
-  // Find initial nodes (triggers or those with no incoming edges)
   nodes.forEach(node => {
     if (inDegrees.get(node.id) === 0) {
       queue.push(node.id);
@@ -105,62 +104,229 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
     });
   }
 
-  // Calculate positions
-  const layerNodeCounts = new Map<number, number>();
-  const layerNodeOffsets = new Map<number, number>(); // Tracks vertical offset for each layer
-
-  // Initialize layer offsets
+  const layerNodeOffsets = new Map<number, number>();
   layers.forEach(layer => layerNodeOffsets.set(layer, 0));
 
   const layoutedNodes = nodes.map(node => {
     const layer = layers.get(node.id) || 0;
-    
-    // Calculate X position based on layer
-    const x = layer * (NODE_WIDTH + HORIZONTAL_GAP) + 100; // Add some initial padding
-
-    // Calculate Y position based on vertical offset for the current layer
-    // This is a very simplified vertical positioning. For real robustness,
-    // you'd need to consider node heights and more complex packing.
-    const y = (layerNodeOffsets.get(layer) || 0) + 150; // Start each layer at a y-offset + node_height/2
-    layerNodeOffsets.set(layer, y + NODE_HEIGHT + VERTICAL_GAP); // Update offset for next node in this layer
-
-    // For branching, more complex logic is needed, but this basic one ensures
-    // left-to-right flow for sequential steps. The AI's prompt is key for Y positions here.
+    const x = layer * (NODE_WIDTH + HORIZONTAL_GAP) + 100;
+    const y = (layerNodeOffsets.get(layer) || 0) + 150;
+    layerNodeOffsets.set(layer, y + NODE_HEIGHT + VERTICAL_GAP);
     
     return { ...node, position: { x, y } };
   });
 
-  // Reset positions for condition nodes or specific types if AI has better ideas
-  // The AI's generated position are attempts at a good layout, we prioritize them if they exist
-  // but ensure no overlaps. This simple layout primarily ensures left-to-right for primary flow.
   const finalNodes = layoutedNodes.map(layoutedNode => {
     const originalNode = nodes.find(n => n.id === layoutedNode.id);
     if (originalNode && originalNode.position) {
-      // Prioritize AI's position if it exists, then slightly adjust to fit.
-      // This is where a proper layout algorithm would take over fully.
-      // For a quick fix, we just use AI's position directly.
-      // If AI's position is bad, the visual issues persist unless we force a client-side algo.
       return { ...originalNode, position: originalNode.position };
     }
-    return layoutedNode; // Fallback to our simple calculated position
+    return layoutedNode;
   });
 
-  // Re-run an actual layout if using a library like ELK.
-  // For this exercise, we are assuming the AI provides good relative positions,
-  // and we're just ensuring basic left-to-right flow and handling missing positions.
-  // The primary layout instructions are now heavily in the AI prompt.
-
-  // The below ensures edges connect properly visually if sourceHandle/targetHandle are not explicitly set by AI
   const layoutedEdges = edges.map(edge => ({
     ...edge,
-    sourceHandle: edge.sourceHandle || Position.Right, // Default for most nodes
-    targetHandle: edge.targetHandle || Position.Left,  // Default for most nodes
+    sourceHandle: edge.sourceHandle || Position.Right,
+    targetHandle: edge.targetHandle || Position.Left,
   }));
-
 
   return { nodes: finalNodes, edges: layoutedEdges };
 };
 
+// --- Internal Flow Component (needs to be inside ReactFlowProvider) ---
+const DiagramFlow: React.FC<{
+  nodes: Node[];
+  edges: Edge[];
+  onNodesChange: any;
+  onEdgesChange: any;
+  onConnect: any;
+  componentStats: any;
+  showDetails: boolean;
+  setShowDetails: (show: boolean) => void;
+  diagramError: string | null;
+  onRegenerateDiagram?: () => void;
+  onLayout: () => void;
+}> = ({
+  nodes,
+  edges,
+  onNodesChange,
+  onEdgesChange,
+  onConnect,
+  componentStats,
+  showDetails,
+  setShowDetails,
+  diagramError,
+  onRegenerateDiagram,
+  onLayout
+}) => {
+  const { fitView } = useReactFlow(); // Now this is properly inside ReactFlowProvider
+
+  // Auto-fit view when nodes change
+  useEffect(() => {
+    if (nodes.length > 0) {
+      requestAnimationFrame(() => {
+        fitView({ padding: 0.2, minZoom: 0.1, maxZoom: 1.5 });
+      });
+    }
+  }, [nodes, fitView]);
+
+  return (
+    <>
+      {/* Enhanced header with better styling */}
+      <div className="absolute top-6 left-6 right-6 z-20 flex items-start justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Badge variant="secondary" className="bg-white/90 text-gray-700 border border-gray-200/50 shadow-sm">
+            <Sparkles className="w-3 h-3 mr-1" />
+            Interactive Flow Diagram
+          </Badge>
+          
+          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 shadow-sm">
+            {nodes.length} Nodes
+          </Badge>
+          
+          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 shadow-sm">
+            {edges.length} Connections
+          </Badge>
+
+          {componentStats && (
+            <Button
+              onClick={() => setShowDetails(!showDetails)}
+              size="sm"
+              variant="outline"
+              className="h-7 px-3 text-xs bg-white/80 shadow-sm"
+            >
+              {showDetails ? <EyeOff className="w-3 h-3 mr-1" /> : <Eye className="w-3 h-3 mr-1" />}
+              Details
+            </Button>
+          )}
+        </div>
+
+        <div className="flex gap-2">
+          {onRegenerateDiagram && (
+            <Button 
+              onClick={onRegenerateDiagram}
+              size="sm"
+              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg"
+            >
+              <RefreshCw className="w-3 h-3 mr-1" />
+              Regenerate
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Details panel */}
+      {showDetails && componentStats && (
+        <div className="absolute top-20 left-6 z-20 bg-white/95 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 text-sm space-y-3 shadow-xl">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <span className="font-medium text-gray-700">Total Steps:</span>
+              <span className="ml-2 text-gray-600">{componentStats.totalSteps}</span>
+            </div>
+            <div>
+              <span className="font-medium text-gray-700">Platforms:</span>
+              <span className="ml-2 text-gray-600">{componentStats.platforms.length}</span>
+            </div>
+          </div>
+          {componentStats.platforms.length > 0 && (
+            <div>
+              <span className="font-medium text-gray-700">Integrations:</span>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {componentStats.platforms.map((platform: string) => (
+                  <Badge key={platform} variant="outline" className="text-xs">
+                    {platform}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Error message */}
+      {diagramError && (
+        <div className="absolute top-6 right-6 z-20 bg-red-50 border border-red-200 rounded-lg p-3 max-w-md shadow-lg">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-red-700">{diagramError}</p>
+          </div>
+        </div>
+      )}
+
+      {/* React Flow */}
+      <div className="w-full h-full">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          nodeTypes={nodeTypes}
+          fitView
+          fitViewOptions={{
+            padding: 0.2,
+            minZoom: 0.1,
+            maxZoom: 1.5,
+          }}
+          className="bg-gradient-to-br from-slate-50/50 to-blue-50/30"
+          nodesDraggable={true}
+          nodesConnectable={false}
+          elementsSelectable={true}
+          panOnScroll={true}
+          selectionOnDrag={true}
+          panOnDrag={[1, 2]}
+          zoomOnScroll={true}
+          zoomOnPinch={true}
+          zoomOnDoubleClick={true}
+          selectNodesOnDrag={false}
+          proOptions={{ hideAttribution: true }}
+        >
+          <Background 
+            color="#e2e8f0" 
+            gap={30} 
+            size={2}
+            variant={BackgroundVariant.Dots}
+          />
+          <Controls 
+            className="bg-white/90 backdrop-blur-sm border border-gray-200/50 rounded-xl shadow-lg"
+            position="bottom-left"
+            showZoom={true}
+            showFitView={true}
+            showInteractive={true}
+          />
+          <MiniMap 
+            style={{
+              height: 120,
+              backgroundColor: '#f8fafc',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
+            }}
+            nodeColor={(node) => {
+              switch (node.type) {
+                case 'platformNode': return '#3b82f6';
+                case 'conditionNode': return '#f97316';
+                case 'loopNode': return '#8b5cf6';
+                case 'aiAgentNode': return '#10b981';
+                case 'delayNode': return '#64748b';
+                case 'retryNode': return '#f59e0b';
+                case 'fallbackNode': return '#6366f1';
+                case 'triggerNode': return '#dc2626';
+                default: return '#6b7280';
+              }
+            }}
+            nodeStrokeColor="#374151"
+            nodeStrokeWidth={1}
+            maskColor="rgba(255, 255, 255, 0.8)"
+            position="bottom-right"
+            zoomable
+            pannable
+          />
+        </ReactFlow>
+      </div>
+    </>
+  );
+};
 
 // --- Main Component ---
 const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
@@ -179,9 +345,6 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   const [diagramError, setDiagramError] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [componentStats, setComponentStats] = useState<any>(null);
-
-  // For programmatic fitting after layout
-  const { fitView } = useReactFlow();
 
   // Extract AI agent recommendations from messages
   useEffect(() => {
@@ -230,9 +393,9 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           loops++;
           if (step.loop?.steps) processSteps(step.loop.steps);
         }
-        if (step.retry?.steps) processSteps(step.retry.steps); // Added retry
-        if (step.fallback?.primary_steps) processSteps(step.fallback.primary_steps); // Added fallback primary
-        if (step.fallback?.fallback_steps) processSteps(step.fallback.fallback_steps); // Added fallback steps
+        if (step.retry?.steps) processSteps(step.retry.steps);
+        if (step.fallback?.primary_steps) processSteps(step.fallback.primary_steps);
+        if (step.fallback?.fallback_steps) processSteps(step.fallback.fallback_steps);
       });
     };
 
@@ -244,7 +407,6 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       agents: Array.from(agents),
       conditions,
       loops,
-      // The expected nodes might need more complex calculation including nested elements
       expectedNodes: totalSteps + platforms.size + agents.size + 1 
     };
   }, []);
@@ -263,7 +425,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     if (automationDiagramData?.nodes && automationDiagramData?.edges) {
       console.log('🎨 Loading AI-generated diagram');
       
-      // Process nodes for agent recommendations (existing logic)
+      // Process nodes for agent recommendations
       const processedNodes = automationDiagramData.nodes.map(node => {
         const recommendation = aiAgentRecommendations.find(agent => 
           node.type === 'aiAgentNode' && 
@@ -289,7 +451,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         return node;
       });
       
-      // --- Apply Client-Side Layout ---
+      // Apply Client-Side Layout
       const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
         processedNodes, 
         automationDiagramData.edges
@@ -297,12 +459,6 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
-      
-      // Fit view to the new layout
-      // Use a timeout to ensure React Flow has rendered the nodes before fitting
-      requestAnimationFrame(() => {
-        fitView({ padding: 0.2, minZoom: 0.1, maxZoom: 1.5 });
-      });
       
       // Check for warnings
       if (automationDiagramData.warning) {
@@ -318,21 +474,18 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       setNodes([]);
       setEdges([]);
     }
-  }, [automationDiagramData, automationBlueprint, aiAgentRecommendations, analyzeBlueprint, fitView]); // Added fitView to dependencies
+  }, [automationDiagramData, automationBlueprint, aiAgentRecommendations, analyzeBlueprint]);
 
   const onConnect = useCallback((params: any) => {
     console.log('Connection attempt (frontend cannot connect nodes, AI does):', params);
   }, []);
 
-  // Layout button for manual re-layout (optional, for debugging/user control)
+  // Layout button for manual re-layout
   const onLayout = useCallback(() => {
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(nodes, edges);
     setNodes(layoutedNodes);
     setEdges(layoutedEdges);
-    requestAnimationFrame(() => {
-      fitView({ padding: 0.2, minZoom: 0.1, maxZoom: 1.5 });
-    });
-  }, [nodes, edges, fitView]);
+  }, [nodes, edges]);
 
   if (isGenerating) {
     return (
@@ -395,169 +548,21 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             minHeight: '600px'
           }}>
       
-      {/* Enhanced header with better styling */}
-      <div className="absolute top-6 left-6 right-6 z-20 flex items-start justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3 flex-wrap">
-          <Badge variant="secondary" className="bg-white/90 text-gray-700 border border-gray-200/50 shadow-sm">
-            <Sparkles className="w-3 h-3 mr-1" />
-            Interactive Flow Diagram
-          </Badge>
-          
-          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 shadow-sm">
-            {nodes.length} Nodes
-          </Badge>
-          
-          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 shadow-sm">
-            {edges.length} Connections
-          </Badge>
-
-          {componentStats && (
-            <Button
-              onClick={() => setShowDetails(!showDetails)}
-              size="sm"
-              variant="outline"
-              className="h-7 px-3 text-xs bg-white/80 shadow-sm"
-            >
-              {showDetails ? <EyeOff className="w-3 h-3 mr-1" /> : <Eye className="w-3 h-3 mr-1" />}
-              Details
-            </Button>
-          )}
-        </div>
-
-        <div className="flex gap-2">
-            {onRegenerateDiagram && (
-                <Button 
-                    onClick={onRegenerateDiagram}
-                    size="sm"
-                    className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg"
-                >
-                    <RefreshCw className="w-3 h-3 mr-1" />
-                    Regenerate
-                </Button>
-            )}
-            {/* Optional: Add a button to manually trigger layout if needed */}
-            {/* <Button 
-                onClick={onLayout}
-                size="sm"
-                variant="outline"
-                className="h-7 px-3 text-xs bg-white/80 shadow-sm"
-            >
-                <LayoutTemplate className="w-3 h-3 mr-1" />
-                Apply Layout
-            </Button> */}
-        </div>
-      </div>
-
-      {/* Details panel */}
-      {showDetails && componentStats && (
-        <div className="absolute top-20 left-6 z-20 bg-white/95 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 text-sm space-y-3 shadow-xl">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <span className="font-medium text-gray-700">Total Steps:</span>
-              <span className="ml-2 text-gray-600">{componentStats.totalSteps}</span>
-            </div>
-            <div>
-              <span className="font-medium text-gray-700">Platforms:</span>
-              <span className="ml-2 text-gray-600">{componentStats.platforms.length}</span>
-            </div>
-          </div>
-          {componentStats.platforms.length > 0 && (
-            <div>
-              <span className="font-medium text-gray-700">Integrations:</span>
-              <div className="mt-1 flex flex-wrap gap-1">
-                {componentStats.platforms.map((platform: string) => (
-                  <Badge key={platform} variant="outline" className="text-xs">
-                    {platform}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Error message */}
-      {diagramError && (
-        <div className="absolute top-6 right-6 z-20 bg-red-50 border border-red-200 rounded-lg p-3 max-w-md shadow-lg">
-          <div className="flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-red-700">{diagramError}</p>
-          </div>
-        </div>
-      )}
-
-      {/* React Flow with enhanced interactivity */}
+      {/* React Flow with proper provider wrapper */}
       <ReactFlowProvider>
-        <div className="w-full h-full">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            nodeTypes={nodeTypes}
-            fitView // Keep fitView enabled
-            fitViewOptions={{
-              padding: 0.2,
-              minZoom: 0.1,
-              maxZoom: 1.5,
-            }}
-            className="bg-gradient-to-br from-slate-50/50 to-blue-50/30"
-            nodesDraggable={true}
-            nodesConnectable={false}
-            elementsSelectable={true}
-            panOnScroll={true}
-            selectionOnDrag={true}
-            panOnDrag={[1, 2]}
-            zoomOnScroll={true}
-            zoomOnPinch={true}
-            zoomOnDoubleClick={true}
-            selectNodesOnDrag={false}
-            proOptions={{ hideAttribution: true }}
-          >
-            <Background 
-              color="#e2e8f0" 
-              gap={30} 
-              size={2}
-              variant={BackgroundVariant.Dots}
-            />
-            <Controls 
-              className="bg-white/90 backdrop-blur-sm border border-gray-200/50 rounded-xl shadow-lg"
-              position="bottom-left"
-              showZoom={true}
-              showFitView={true}
-              showInteractive={true}
-            />
-            <MiniMap 
-              style={{
-                height: 120,
-                backgroundColor: '#f8fafc',
-                borderRadius: '12px',
-                border: '1px solid #e2e8f0',
-                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
-              }}
-              nodeColor={(node) => {
-                switch (node.type) {
-                  case 'platformNode': return '#3b82f6';
-                  case 'conditionNode': return '#f97316';
-                  case 'loopNode': return '#8b5cf6';
-                  case 'aiAgentNode': return '#10b981';
-                  case 'delayNode': return '#64748b';
-                  case 'retryNode': return '#f59e0b';
-                  case 'fallbackNode': return '#6366f1';
-                  case 'triggerNode': return '#dc2626';
-                  default: return '#6b7280';
-                }
-              }}
-              nodeStrokeColor="#374151"
-              nodeStrokeWidth={1}
-              maskColor="rgba(255, 255, 255, 0.8)"
-              position="bottom-right"
-              zoomable
-              pannable
-            />
-          </ReactFlow>
-        </div>
+        <DiagramFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          componentStats={componentStats}
+          showDetails={showDetails}
+          setShowDetails={setShowDetails}
+          diagramError={diagramError}
+          onRegenerateDiagram={onRegenerateDiagram}
+          onLayout={onLayout}
+        />
       </ReactFlowProvider>
     </Card>
   );

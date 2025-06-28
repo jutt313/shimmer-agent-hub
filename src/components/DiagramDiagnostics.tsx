@@ -2,9 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, CheckCircle, XCircle, Info, Bug, RefreshCw } from 'lucide-react';
+import { AlertCircle, CheckCircle, XCircle, Bug, RefreshCw } from 'lucide-react';
 import { globalErrorLogger } from '@/utils/errorLogger';
-import { Node, Edge } from '@xyflow/react'; // Import Node and Edge types from React Flow
+import { Node, Edge } from '@xyflow/react'; // Import Node and Edge types
+
+// --- Constants for Layout Checks (should match AutomationDiagramDisplay.tsx's approximations) ---
+const NODE_WIDTH = 250;
+const NODE_HEIGHT = 100;
+const HORIZONTAL_GAP = 150;
+const VERTICAL_GAP = 100;
 
 interface DiagramDiagnosticsProps {
   automationBlueprint?: any;
@@ -13,8 +19,9 @@ interface DiagramDiagnosticsProps {
   onRegenerateDiagram?: () => void;
 }
 
-// Helper to calculate node bounds (assuming default node size if not provided by AI)
-const getNodeBounds = (node: Node, defaultWidth = 250, defaultHeight = 100) => {
+// Helper to calculate node bounds (assuming default node size if not provided by React Flow)
+const getNodeBounds = (node: Node, defaultWidth = NODE_WIDTH, defaultHeight = NODE_HEIGHT) => {
+  // Use node.width and node.height if available (after React Flow renders them), else use defaults
   const width = node.width || defaultWidth;
   const height = node.height || defaultHeight;
   const x = node.position.x;
@@ -39,6 +46,7 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
   const [issues, setIssues] = useState<any[]>([]);
 
   useEffect(() => {
+    // Ensure all necessary data is present before running diagnostics
     if (!componentStats || !diagramData || !diagramData.nodes || !diagramData.edges) {
       setDiagnostics(null);
       setIssues([]);
@@ -50,13 +58,14 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
       
       const nodeCount = diagramData.nodes.length;
       const edgeCount = diagramData.edges.length;
-      const expectedNodes = componentStats.expectedNodes || 0; // Use componentStats.expectedNodes
+      const expectedNodes = componentStats.expectedNodes || 0; // Correctly reference componentStats.expectedNodes
       
+      // Filter nodes by type, ensuring type safety with Node casting
       const platformNodes = diagramData.nodes.filter((n: Node) => n.type === 'platformNode');
       const agentNodes = diagramData.nodes.filter((n: Node) => n.type === 'aiAgentNode');
       const conditionNodes = diagramData.nodes.filter((n: Node) => n.type === 'conditionNode');
-      const triggerNodes = diagramData.nodes.filter((n: Node) => n.type === 'triggerNode');
-
+      const triggerNodes = diagramData.nodes.filter((n: Node) => n.type === 'triggerNode'); // Include trigger nodes in count
+      
       const diagnosticResults = {
         totalNodes: nodeCount,
         totalEdges: edgeCount,
@@ -69,9 +78,15 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
         missingPlatforms: componentStats.platforms.filter((p: string) => 
           !platformNodes.some((n: Node) => n.data?.platform === p)
         ),
-        missingAgents: componentStats.agents.filter((a: string) => 
-          !agentNodes.some((n: Node) => n.data?.agent?.agent_id === a)
-        )
+        missingAgents: componentStats.agents.filter((a: string) => {
+            // Corrected: Ensure 'agent' property exists and has 'agent_id' before accessing
+            return !agentNodes.some((n: Node) => {
+                if (n.data && typeof n.data === 'object' && 'agent' in n.data && n.data.agent && typeof n.data.agent === 'object' && 'agent_id' in n.data.agent) {
+                    return (n.data.agent as { agent_id: string }).agent_id === a;
+                }
+                return false;
+            });
+        }),
       };
       
       setDiagnostics(diagnosticResults);
@@ -106,7 +121,7 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
         });
       }
       
-      if (edgeCount < nodeCount - triggerNodes.length) { // At least nodeCount - triggers edges for connected graph
+      if (edgeCount < (nodeCount - triggerNodes.length)) { // Check for minimum edges for a connected graph
         foundIssues.push({
           type: 'warning',
           title: 'Potentially Disconnected Nodes',
@@ -119,14 +134,14 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
       const detectedOverlaps = checkNodeOverlap(diagramData.nodes);
       if (detectedOverlaps.length > 0) {
         foundIssues.push({
-          type: 'error',
+          type: 'error', // High severity for overlaps
           title: 'Node Overlap Detected',
-          message: `${detectedOverlaps.length} nodes are overlapping`,
-          details: `Overlapping node IDs: ${detectedOverlaps.map(issue => `${issue.node1Id} & ${issue.node2Id}`).join(', ')}. Please refine AI prompt or layout.`
+          message: `${detectedOverlaps.length} node(s) are overlapping`,
+          details: `Overlapping node IDs: ${detectedOverlaps.map(issue => `${issue.node1Id} & ${issue.node2Id}`).join(', ')}. Please refine AI prompt or layout algorithm.`
         });
       }
 
-      const layoutQuality = checkLayoutQuality(diagramData.nodes, diagramData.edges);
+      const layoutQuality = checkLayoutQuality(diagramData.nodes, diagramData.edges, conditionNodes); // Pass conditionNodes
       if (!layoutQuality.isClean) {
         foundIssues.push({
           type: layoutQuality.severity,
@@ -159,12 +174,13 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
           const bounds1 = getNodeBounds(node1);
           const bounds2 = getNodeBounds(node2);
 
-          // Check for intersection
+          // Check for intersection (with a small tolerance)
+          const tolerance = 5; // Pixels
           if (
-            bounds1.left < bounds2.right &&
-            bounds1.right > bounds2.left &&
-            bounds1.top < bounds2.bottom &&
-            bounds1.bottom > bounds2.top
+            bounds1.left < bounds2.right - tolerance &&
+            bounds1.right > bounds2.left + tolerance &&
+            bounds1.top < bounds2.bottom - tolerance &&
+            bounds1.bottom > bounds2.top + tolerance
           ) {
             overlaps.push({ node1Id: node1.id, node2Id: node2.id });
           }
@@ -173,36 +189,31 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
       return overlaps;
     };
 
-    // This is a simplified layout quality check. A full check for tangled edges is complex.
-    const checkLayoutQuality = (nodes: Node[], edges: Edge[]) => {
+    // Generalized layout quality check
+    const checkLayoutQuality = (nodes: Node[], edges: Edge[], conditionNodes: Node[]) => {
       let poorLayoutCount = 0;
       let title = 'Diagram Layout Good';
       let message = 'The diagram layout appears organized.';
       let severity: 'info' | 'warning' | 'error' = 'info';
-      let details = '';
+      let details = [];
 
-      // Check if nodes are generally laid out left-to-right as intended
-      const sortedNodes = [...nodes].sort((a, b) => a.position.x - b.position.x);
-      for (let i = 0; i < sortedNodes.length - 1; i++) {
-        if (sortedNodes[i+1].position.x < sortedNodes[i].position.x && // Check if x decreases unexpectedly
-            edges.some(e => e.source === sortedNodes[i].id && e.target === sortedNodes[i+1].id) // And they are connected
-        ) {
-          poorLayoutCount++;
+      // 1. Check for general left-to-right flow consistency (simplified)
+      nodes.sort((a, b) => a.position.x - b.position.x); // Sort by x-position
+      for (let i = 0; i < nodes.length - 1; i++) {
+        const node1 = nodes[i];
+        const node2 = nodes[i+1];
+        // If connected nodes unexpectedly go backwards on X
+        if (edges.some(e => e.source === node2.id && e.target === node1.id) && node2.position.x < node1.position.x) {
+            poorLayoutCount++;
+            details.push(`Backwards connection from ${node2.id} to ${node1.id}`);
         }
       }
       
-      if (poorLayoutCount > 0) {
-        severity = 'warning';
-        title = 'Suboptimal Layout Flow';
-        message = `Detected ${poorLayoutCount} instances where nodes are not strictly left-to-right.`;
-        details += 'Ensure the AI respects the left-to-right flow constraint.';
-      }
-
-      // Check if conditional branches diverge sufficiently
+      // 2. Check for sufficient vertical divergence in conditional branches
       conditionNodes.forEach(condNode => {
         const outgoingEdges = edges.filter(e => e.source === condNode.id);
-        const yesEdge = outgoingEdges.find(e => e.label === 'Yes');
-        const noEdge = outgoingEdges.find(e => e.label === 'No');
+        const yesEdge = outgoingEdges.find(e => e.label === 'Yes' || e.sourceHandle === 'success');
+        const noEdge = outgoingEdges.find(e => e.label === 'No' || e.sourceHandle === 'error');
 
         if (yesEdge && noEdge) {
           const targetNodeYes = nodes.find(n => n.id === yesEdge.target);
@@ -210,22 +221,24 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
 
           if (targetNodeYes && targetNodeNo) {
             const verticalDifference = Math.abs(targetNodeYes.position.y - targetNodeNo.position.y);
-            // Example: expect a certain vertical separation for branches
-            if (verticalDifference < (NODE_HEIGHT + VERTICAL_GAP / 2)) { // if they are too close vertically
+            // Expect a minimum vertical separation to avoid crowding
+            if (verticalDifference < (NODE_HEIGHT + VERTICAL_GAP * 0.5)) { 
               poorLayoutCount++;
-              severity = 'warning';
-              title = 'Tight Conditional Branches';
-              message = `Conditional branches from node '${condNode.id}' are too close vertically.`;
-              details += 'Increase vertical spacing for conditional paths in AI prompt.';
+              details.push(`Conditional branches from '${condNode.id}' are too close vertically.`);
             }
           }
         }
       });
 
-
+      if (poorLayoutCount > 0) {
+        severity = 'warning';
+        title = 'Suboptimal Layout Quality';
+        message = `Detected ${poorLayoutCount} potential layout inconsistencies.`;
+      }
+      
       const isClean = poorLayoutCount === 0;
 
-      return { isClean, severity, title, message, details };
+      return { isClean, severity, title, message, details: details.join('; ') };
     };
     // --- END NEW DIAGNOSTIC FUNCTIONS ---
 
@@ -287,12 +300,6 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
         
         <div className="space-y-1">
           <div className="flex justify-between">
-            <span className="text-gray-600">Completeness:</span>
-            <Badge variant={diagnostics.completeness >= 0.95 ? "default" : "destructive"} className="h-4 text-xs">
-              {Math.round(diagnostics.completeness * 100)}%
-            </Badge>
-          </div>
-          <div className="flex justify-between">
             <span className="text-gray-600">Platform Coverage:</span>
             <Badge variant={diagnostics.platformCoverage >= 1.0 ? "default" : "destructive"} className="h-4 text-xs">
               {Math.round(diagnostics.platformCoverage * 100)}%
@@ -303,6 +310,10 @@ const DiagramDiagnostics: React.FC<DiagramDiagnosticsProps> = ({
             <Badge variant={diagnostics.agentCoverage >= 1.0 ? "default" : "destructive"} className="h-4 text-xs">
               {Math.round(diagnostics.agentCoverage * 100)}%
             </Badge>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Node Types:</span>
+            <span className="font-medium">{diagnostics.nodeTypes.length}</span>
           </div>
         </div>
       </div>

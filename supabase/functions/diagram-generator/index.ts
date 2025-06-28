@@ -1,73 +1,114 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-const ENHANCED_DIAGRAM_GENERATOR_SYSTEM_PROMPT = `You are an EXPERT visual automation flow designer that creates comprehensive, professional, and intuitive React Flow diagrams, mirroring the visual quality of n8n and Make.com.
+const ENHANCED_DIAGRAM_GENERATOR_SYSTEM_PROMPT = `You are an EXPERT visual automation flow designer that creates comprehensive, professional, and highly interactive React Flow diagrams.
 
 === YOUR CORE MISSION ===
-Generate a COMPLETE, perfectly aligned, and highly readable visual diagram that shows the EXACT flow of the automation from start to finish, step by step. Prioritize absolute CLARITY, AESTHETICS, and NO VISUAL CLUTTER.
+Generate a COMPLETE, perfectly aligned, and highly interactive visual diagram that shows the EXACT flow of the automation from start to finish. Focus on MAXIMUM INTERACTIVITY, CLEAR VISUAL HIERARCHY, and PROFESSIONAL AESTHETICS.
 
-=== STRICT LAYOUT AND VISUAL REQUIREMENTS ===
-1.  Node Placement & Spacing (Grid-like Precision):
-    * Maintain strict LEFT-TO-RIGHT flow for the primary automation path.
-    * Ensure consistent horizontal spacing: A typical distance of 350-450 pixels between the centers of horizontally adjacent nodes.
-    * Ensure consistent vertical spacing for branched or parallel paths: A typical vertical offset of 150-250 pixels between the centers of vertically adjacent nodes.
-    * CRITICAL: ABSOLUTELY NO NODE OVERLAPS WHATSOEVER. Adjust x and y positions precisely to prevent any overlap.
-    * Align nodes vertically when they represent a direct continuation or a clean converging point.
-    * Nodes should generally be centered on their y coordinate for their "row" or "lane" unless explicitly branching.
-    * Group related nodes logically to form clear visual clusters or sections within the flow.
+=== CRITICAL INTERACTIVITY REQUIREMENTS ===
+1. ALL nodes MUST have:
+   - draggable: true (explicitly set)
+   - selectable: true (explicitly set)
+   - connectable: false (prevent user connections)
+   - Proper positioning with NO OVERLAPS
 
-2.  Path Drawing (Edges - Smooth and Intentional):
-    * Always use smoothstep edge type for clean, professional curves.
-    * All edges MUST be animated: true to indicate flow.
-    * Conditional Paths (Decision Nodes):
-        * For conditionNode (e.g., "Is High Priority?"), draw two distinctly labeled and colored paths:
-            * "Yes" Path (True): Clearly labeled "Yes". This path should typically go to the upper-right or straight right from the condition node. Use vibrant green (#10b981) with strokeWidth: 3. Source Handle: success.
-            * "No" Path (False): Clearly labeled "No". This path should typically go to the lower-right or straight right from the condition node. Use clear red (#ef4444) with strokeWidth: 3. Source Handle: error.
-        * Ensure conditional branches diverge cleanly and do not cross or intersect other nodes/edges unnecessarily. They should re-converge or terminate clearly.
-    * Multiple Paths Leading to Same Next Step (Convergence): When multiple paths (e.g., from different conditional branches, or parallel actions) need to connect to a single subsequent node, ensure these incoming edges converge cleanly and intuitively into that node. Avoid tangled lines at the merge point. Use clear routing.
-    * Error/Fallback Paths: If a step has on_error or is part of a retry/fallback mechanism, draw distinct paths (e.g., dashed, different color) to represent the alternative flow on failure or fallback execution. Label them appropriately (e.g., "On Error", "Fallback").
-    * Standard Flow: For all other sequential steps and general connections, use a subtle but clear stroke color (e.g., #3b82f6 or #94a3b8) and strokeWidth: 2.
+2. ALL edges MUST have:
+   - type: 'smoothstep' for professional curves
+   - animated: true for flow indication
+   - Proper source/target handles
+   - Clear visual hierarchy with colors
 
-3.  Comprehensive Component Inclusion and Details:
-    * Trigger Node: Always include a triggerNode at the very beginning (start at x: 100, y: 300).
-    * Every Automation Step: For each step in the blueprint (action, condition, loop, delay, ai_agent_call, retry, fallback), create a corresponding node.
-    * Dedicated Platform Nodes: For each unique action.integration (platform used), create a dedicated platformNode. This node visually represents the integration point.
-    * Dedicated AI Agent Nodes: For each ai_agent_call, create a dedicated aiAgentNode to highlight the AI's role.
-    * Node Data: Ensure data object for each node includes:
-        * label: Concise, descriptive name for the node.
-        * platform: The name of the integrated platform (for actionNode, platformNode).
-        * icon: A relevant icon name (e.g., 'mail', 'sheet', 'slack', 'bot', 'clock').
-        * explanation: A brief sentence describing what this step or component does.
-        * stepType: The original type from the blueprint (e.g., 'action', 'condition').
-        * Specific data for node types: condition object for conditionNode, loop object for loopNode, agent object for aiAgentNode, delay object for delayNode, retry object for retryNode, fallback object for fallbackNode.
+=== ENHANCED LAYOUT REQUIREMENTS ===
+1. Node Placement (NO OVERLAPS):
+   - Start with trigger at (50, 100)
+   - Horizontal spacing: 300px minimum between node centers
+   - Vertical spacing: 200px minimum for branches
+   - Each node needs unique, non-overlapping position
 
-4.  Node/Edge Color Palette Guidance (Use these colors consistently):
-    * triggerNode: Red (#dc2626)
-    * platformNode: Blue (#3b82f6)
-    * actionNode: Neutral Blue (#60a5fa)
-    * conditionNode: Orange (#f97316)
-    * loopNode: Purple (#8b5cf6)
-    * aiAgentNode: Emerald Green (#10b981)
-    * delayNode: Slate Gray (#64748b)
-    * retryNode: Amber (#f59e0b)
-    * fallbackNode: Indigo (#6366f1)
-    * Standard Edge: #3b82f6 or #94a3b8
-    * Yes Edge: #10b981
-    * No Edge: #ef4444
+2. Professional Styling:
+   - Use consistent color scheme per node type
+   - Ensure proper handle positioning
+   - Add meaningful labels and descriptions
+   - Include platform/integration details
 
-=== VALIDATION REQUIREMENTS (Reiterate and Strengthen) ===
-✓ Every platform mentioned in the blueprint has a corresponding platformNode.
-✓ Every AI agent mentioned has an aiAgentNode.
-✓ All conditionNodes have clearly drawn and labeled "Yes" and "No" branching paths.
-✓ The overall flow is strictly LEFT TO RIGHT and intuitive.
-✓ All nodes are logically connected, and there are NO missing or broken connections.
-✓ Nodes and edges DO NOT OVERLAP each other.
-✓ The diagram is visually clean, professional, and easy to understand at a glance.
+3. Edge Routing:
+   - Use proper sourceHandle/targetHandle
+   - Color-code conditional paths (green=Yes, red=No)
+   - Animate all connections
+   - Ensure smooth curves without intersections
 
-=== OUTPUT FORMAT ===
-Return ONLY valid JSON with "nodes" and "edges" arrays.
-The output should be a complete and highly polished visual representation of the automation workflow.
-REMEMBER: You're creating the blueprint for a professional diagram that a user would instantly understand and trust.`
+=== NODE TYPE SPECIFICATIONS ===
+
+triggerNode: 
+- Color: Red theme (#dc2626)
+- Always first node at (50, 100)
+- Include trigger type, schedule, platform details
+- Must have RIGHT output handle
+
+platformNode:
+- Color: Blue theme (#3b82f6) 
+- Include platform name, connection details
+- Clear integration information
+
+actionNode:
+- Color: Neutral Blue (#60a5fa)
+- Include action description, parameters
+- Show what the step accomplishes
+
+conditionNode:
+- Color: Orange theme (#f97316)
+- MUST have TWO output paths:
+  - sourceHandle: "success" → Green edge (#10b981)
+  - sourceHandle: "error" → Red edge (#ef4444)
+- Label paths clearly as "Yes" and "No"
+
+aiAgentNode:
+- Color: Emerald Green (#10b981)
+- Include agent name, purpose, model details
+- Show AI integration clearly
+
+loopNode:
+- Color: Purple theme (#8b5cf6)
+- Show iteration details, conditions
+- Include loop scope and limits
+
+delayNode:
+- Color: Slate Gray (#64748b)
+- Include timing information
+- Show delay duration clearly
+
+retryNode:
+- Color: Amber (#f59e0b)
+- Include retry count, conditions
+- Show error handling strategy
+
+fallbackNode:
+- Color: Indigo (#6366f1)
+- Include fallback strategy details
+- Show alternative path clearly
+
+=== ENHANCED DATA STRUCTURE ===
+Each node data object MUST include:
+- label: Clear, descriptive name
+- explanation: Brief description of function
+- stepType: Original blueprint type
+- platform/agent/condition/etc: Relevant specific data
+- icon: Appropriate icon name
+- Interactive properties for UI enhancement
+
+=== VALIDATION CHECKLIST ===
+✓ Every node has unique, non-overlapping position
+✓ All nodes are draggable and selectable
+✓ All edges are animated smoothstep type
+✓ Conditional nodes have proper branching
+✓ Professional color scheme throughout
+✓ Complete flow from trigger to end
+✓ All integrations represented as nodes
+✓ Clear visual hierarchy and spacing
+✓ Proper handle positioning and IDs
+
+RETURN: Complete JSON with "nodes" and "edges" arrays optimized for maximum interactivity and professional appearance.`
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -75,7 +116,7 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-    console.log('🚀 Enhanced Visual Flow Generator - Request received');
+    console.log('🚀 Enhanced Interactive Diagram Generator - Request received');
     
     if (req.method === 'OPTIONS') {
         return new Response(null, { headers: corsHeaders });
@@ -99,7 +140,7 @@ serve(async (req) => {
             console.error('❌ Missing automation blueprint');
             return new Response(
                 JSON.stringify({ 
-                    error: 'Missing automation blueprint - cannot create visual flow'
+                    error: 'Missing automation blueprint - cannot create interactive diagram'
                 }),
                 { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
@@ -111,6 +152,7 @@ serve(async (req) => {
             const platforms = new Set();
             const agents = new Set();
             const stepTypes = new Set();
+            let conditionalBranches = 0;
             
             const processSteps = (steps) => {
                 steps.forEach((step) => {
@@ -123,6 +165,10 @@ serve(async (req) => {
                     
                     if (step.ai_agent_call?.agent_id) {
                         agents.add(step.ai_agent_call.agent_id);
+                    }
+                    
+                    if (step.type === 'condition') {
+                        conditionalBranches++;
                     }
                     
                     // Process nested steps
@@ -142,12 +188,15 @@ serve(async (req) => {
                 platforms: Array.from(platforms),
                 agents: Array.from(agents),
                 stepTypes: Array.from(stepTypes),
-                trigger: blueprint.trigger
+                conditionalBranches,
+                trigger: blueprint.trigger,
+                expectedNodes: totalSteps + platforms.size + agents.size + 1,
+                complexity: conditionalBranches > 0 ? 'high' : totalSteps > 5 ? 'medium' : 'simple'
             };
         };
 
         const analysis = analyzeBlueprint(automation_blueprint);
-        console.log('📊 Flow analysis:', analysis);
+        console.log('📊 Enhanced flow analysis:', analysis);
 
         // Check OpenAI API key
         const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
@@ -159,37 +208,56 @@ serve(async (req) => {
             );
         }
 
-        // Enhanced user prompt focusing on visual flow
-        const userPrompt = `CREATE A VISUAL AUTOMATION FLOW DIAGRAM
+        // Enhanced user prompt focusing on interactivity
+        const userPrompt = `CREATE AN INTERACTIVE AUTOMATION FLOW DIAGRAM
 
-AUTOMATION BLUEPRINT TITLE: ${automation_blueprint.description || 'Automation Flow'}
-TOTAL STEPS IN BLUEPRINT: ${analysis.totalSteps}
-UNIQUE PLATFORMS USED: ${analysis.platforms.join(', ')} (${analysis.platforms.length} total)
-UNIQUE AI AGENTS USED: ${analysis.agents.join(', ')} (${analysis.agents.length} total)
-TYPES OF STEPS IN BLUEPRINT: ${analysis.stepTypes.join(', ')}
-AUTOMATION TRIGGER TYPE: ${analysis.trigger?.type || 'manual'}
+AUTOMATION TITLE: ${automation_blueprint.description || 'Automation Flow'}
+COMPLEXITY LEVEL: ${analysis.complexity.toUpperCase()}
+EXPECTED NODES: ${analysis.expectedNodes}
+TOTAL STEPS: ${analysis.totalSteps}
+CONDITIONAL BRANCHES: ${analysis.conditionalBranches}
+PLATFORMS: ${analysis.platforms.join(', ')} (${analysis.platforms.length} total)
+AI AGENTS: ${analysis.agents.join(', ')} (${analysis.agents.length} total)
+STEP TYPES: ${analysis.stepTypes.join(', ')}
+TRIGGER TYPE: ${analysis.trigger?.type || 'manual'}
 
-FULL AUTOMATION BLUEPRINT JSON (for precise parsing of details):
+AUTOMATION BLUEPRINT (for precise parsing):
 ${JSON.stringify(automation_blueprint, null, 2)}
 
 ---
-CRITICAL INSTRUCTIONS FOR DIAGRAM GENERATION:
-Based on the FULL AUTOMATION BLUEPRINT JSON provided above, meticulously generate the "nodes" and "edges" arrays for a React Flow diagram.
+CRITICAL INTERACTIVE DIAGRAM REQUIREMENTS:
 
-Adhere strictly to ALL "STRICT LAYOUT AND VISUAL REQUIREMENTS", "NODE STRUCTURE", "EDGE CONNECTIONS", "Node/Edge Color Palette Guidance", and "VALIDATION REQUIREMENTS" defined in the SYSTEM PROMPT.
+1. MAXIMUM INTERACTIVITY:
+   - Every node MUST be draggable: true and selectable: true
+   - NO overlapping positions - calculate exact coordinates
+   - Smooth responsive interactions with proper hover states
 
-PAY EXTREME ATTENTION TO:
-1.  NO OVERLAPS: Ensure no nodes overlap at all. Adjust positions if needed.
-2.  CLEAN BRANCHING: For conditional nodes, ensure "Yes" and "No" paths diverge clearly and merge cleanly if they lead to a common next step.
-3.  CONVERGING PATHS: If multiple paths lead to a single node, ensure the incoming edges merge smoothly and intuitively without tangles.
-4.  CONSISTENT SPACING: Maintain the specified horizontal and vertical spacing guidelines.
-5.  COMPREHENSIVE DETAIL: Include all platforms, agents, step details, and rules as labels and explanations in the node's data.
-6.  AESTHETICS: Make it look professional and easy to follow, like a top-tier automation builder.
+2. PROFESSIONAL LAYOUT:
+   - Start trigger at (50, 100)
+   - Horizontal spacing: 300px minimum between centers
+   - Vertical spacing: 200px for branches
+   - Calculate positions to prevent ANY overlaps
 
-Your response MUST be ONLY a JSON object containing the nodes and edges arrays.
-`;
+3. ENHANCED VISUAL HIERARCHY:
+   - Use specified color schemes for each node type
+   - Animate ALL edges with smoothstep curves
+   - Color-code conditional paths (green/red)
+   - Professional typography and spacing
 
-        console.log('🤖 Generating visual flow with enhanced prompt');
+4. COMPLETE FLOW REPRESENTATION:
+   - Include ALL platforms as dedicated platformNodes
+   - Include ALL AI agents as aiAgentNodes
+   - Represent ALL step types from blueprint
+   - Ensure logical flow from trigger to completion
+
+5. ROBUST ERROR HANDLING:
+   - Clear conditional branching with labeled paths
+   - Proper retry/fallback node representation
+   - Comprehensive edge routing without intersections
+
+Your response MUST be ONLY a JSON object with "nodes" and "edges" arrays optimized for maximum interactivity and professional appearance. Focus on creating a diagram that users can immediately interact with through dragging, selecting, and exploring.`;
+
+        console.log('🤖 Generating enhanced interactive diagram');
 
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -198,14 +266,14 @@ Your response MUST be ONLY a JSON object containing the nodes and edges arrays.
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: 'gpt-4.1-2025-04-14', // Updated to use the flagship model
+                model: 'gpt-4.1-2025-04-14',
                 messages: [
                     { role: "system", content: ENHANCED_DIAGRAM_GENERATOR_SYSTEM_PROMPT },
                     { role: "user", content: userPrompt }
                 ],
                 response_format: { type: "json_object" },
-                temperature: 0.2, // Keep temperature low for deterministic layout
-                max_tokens: 4000 // Increased tokens for complex blueprints
+                temperature: 0.1, // Very low for consistent layouts
+                max_tokens: 4500 // Increased for complex diagrams
             }),
         });
 
@@ -219,7 +287,7 @@ Your response MUST be ONLY a JSON object containing the nodes and edges arrays.
         }
 
         const result = await response.json();
-        console.log('✅ OpenAI response received');
+        console.log('✅ OpenAI response received for interactive diagram');
 
         if (!result.choices || result.choices.length === 0) {
             console.error('❌ No response from OpenAI');
@@ -255,30 +323,53 @@ Your response MUST be ONLY a JSON object containing the nodes and edges arrays.
             );
         }
 
-        // Apply default styles and ensure interactivity (as per previous logic)
+        // Enhanced post-processing for maximum interactivity
+        diagramData.nodes = diagramData.nodes.map(node => ({
+            ...node,
+            draggable: true,
+            selectable: true,
+            connectable: false,
+            // Ensure positions are numbers and non-overlapping
+            position: {
+                x: typeof node.position?.x === 'number' ? node.position.x : 50,
+                y: typeof node.position?.y === 'number' ? node.position.y : 100
+            }
+        }));
+
         diagramData.edges = diagramData.edges.map(edge => ({
             ...edge,
-            type: edge.type || 'smoothstep',
-            animated: edge.animated !== undefined ? edge.animated : true,
+            type: 'smoothstep',
+            animated: true,
             style: {
                 stroke: edge.style?.stroke || '#3b82f6',
                 strokeWidth: edge.style?.strokeWidth || 2,
                 ...edge.style
             },
-            sourceHandle: edge.sourceHandle // Ensure sourceHandle is preserved for conditionals
+            // Ensure proper handle connections
+            sourceHandle: edge.sourceHandle || 'right',
+            targetHandle: edge.targetHandle || 'left'
         }));
 
-        diagramData.nodes = diagramData.nodes.map(node => ({
-            ...node,
-            draggable: true,
-            selectable: true,
-            connectable: false // Connections should be from AI-generated edges
-        }));
+        // Validation checks
+        const nodePositions = new Set();
+        const hasOverlaps = diagramData.nodes.some(node => {
+            const key = `${Math.round(node.position.x/50)}-${Math.round(node.position.y/50)}`;
+            if (nodePositions.has(key)) {
+                console.warn('⚠️ Potential node overlap detected');
+                return true;
+            }
+            nodePositions.add(key);
+            return false;
+        });
 
-        console.log('✅ Generated interactive visual flow:', {
+        console.log('✅ Generated enhanced interactive diagram:', {
             nodes: diagramData.nodes.length,
             edges: diagramData.edges.length,
-            nodeTypes: [...new Set(diagramData.nodes.map(n => n.type))]
+            nodeTypes: [...new Set(diagramData.nodes.map(n => n.type))],
+            hasOverlaps,
+            expectedNodes: analysis.expectedNodes,
+            actualNodes: diagramData.nodes.length,
+            completeness: Math.round((diagramData.nodes.length / analysis.expectedNodes) * 100) + '%'
         });
 
         return new Response(JSON.stringify(diagramData), {
@@ -287,11 +378,11 @@ Your response MUST be ONLY a JSON object containing the nodes and edges arrays.
         });
 
     } catch (error) {
-        console.error('💥 Error in visual flow generator:', error);
+        console.error('💥 Error in interactive diagram generator:', error);
         
         return new Response(
             JSON.stringify({
-                error: error.message || 'Visual flow generation failed',
+                error: error.message || 'Interactive diagram generation failed',
                 details: error.toString()
             }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

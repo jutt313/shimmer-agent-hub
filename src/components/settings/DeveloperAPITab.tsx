@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -426,7 +427,7 @@ const DeveloperAPITab = () => {
                     </Button>
                   </div>
                   <p className="text-sm text-yellow-700 mt-2">
-                    ⚠️ Make sure to copy this token now. You won't be able to see it again!
+                    Make sure to copy this token now. You won't be able to see it again!
                   </p>
                 </div>
               )}

@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Settings, User, Bot, Shield, ChevronDown, Upload, Save, X } from 'lucide-react';
+import { Settings, User, Bot, Shield, Code, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ProfileTab from './settings/ProfileTab';
 import AutomationsTab from './settings/AutomationsTab';
 import PrivacyTab from './settings/PrivacyTab';
+import DeveloperAPITab from './settings/DeveloperAPITab';
 
 const SettingsDropdown = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -26,7 +27,7 @@ const SettingsDropdown = () => {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent 
-        className="w-[600px] h-[500px] overflow-hidden bg-white/95 backdrop-blur-md border-0 shadow-2xl rounded-2xl p-0"
+        className="w-[700px] h-[600px] overflow-hidden bg-white/95 backdrop-blur-md border-0 shadow-2xl rounded-2xl p-0"
         align="end"
         style={{
           boxShadow: '0 0 50px rgba(59, 130, 246, 0.3), 0 0 100px rgba(147, 51, 234, 0.2)'
@@ -53,7 +54,7 @@ const SettingsDropdown = () => {
 
           <div className="h-[calc(100%-80px)] overflow-hidden">
             <Tabs defaultValue="profile" className="h-full flex flex-col">
-              <TabsList className="grid w-full grid-cols-3 bg-blue-50/50 rounded-none border-b border-blue-200/50">
+              <TabsList className="grid w-full grid-cols-4 bg-blue-50/50 rounded-none border-b border-blue-200/50">
                 <TabsTrigger 
                   value="profile" 
                   className="data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600"
@@ -67,6 +68,13 @@ const SettingsDropdown = () => {
                 >
                   <Bot className="w-4 h-4 mr-2" />
                   Automations
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="developer"
+                  className="data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600"
+                >
+                  <Code className="w-4 h-4 mr-2" />
+                  Developer API
                 </TabsTrigger>
                 <TabsTrigger 
                   value="privacy"
@@ -83,6 +91,9 @@ const SettingsDropdown = () => {
                 </TabsContent>
                 <TabsContent value="automations" className="h-full overflow-y-auto custom-scrollbar">
                   <AutomationsTab />
+                </TabsContent>
+                <TabsContent value="developer" className="h-full overflow-y-auto custom-scrollbar">
+                  <DeveloperAPITab />
                 </TabsContent>
                 <TabsContent value="privacy" className="h-full overflow-y-auto custom-scrollbar">
                   <PrivacyTab />

@@ -30,8 +30,8 @@ export class PlatformConnectionService {
   async getConnectionStatus(userId: string): Promise<PlatformConnection[]> {
     try {
       const { data, error } = await supabase
-        .from('user_platform_credentials')
-        .select('platform_name, credentials, last_sync_at')
+        .from('platform_credentials')
+        .select('platform_name, credentials, updated_at')
         .eq('user_id', userId);
 
       if (error) throw error;
@@ -40,7 +40,7 @@ export class PlatformConnectionService {
         platform: item.platform_name,
         status: 'connected' as const,
         credentials: item.credentials,
-        lastSync: item.last_sync_at
+        lastSync: item.updated_at
       }));
     } catch (error) {
       console.error('Error fetching platform connections:', error);
@@ -143,7 +143,7 @@ export class PlatformConnectionService {
   private async disconnectPlatform(userId: string, platform: string): Promise<void> {
     try {
       const { error } = await supabase
-        .from('user_platform_credentials')
+        .from('platform_credentials')
         .delete()
         .eq('user_id', userId)
         .eq('platform_name', platform);

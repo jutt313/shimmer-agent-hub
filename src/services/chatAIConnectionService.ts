@@ -140,7 +140,7 @@ export class ChatAIConnectionService {
       } else {
         // Disconnect
         const { error } = await supabase
-          .from('user_platform_credentials')
+          .from('platform_credentials')
           .delete()
           .eq('user_id', userId)
           .eq('platform_name', platform);

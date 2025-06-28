@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const ENHANCED_DIAGRAM_GENERATOR_SYSTEM_PROMPT = `You are an EXPERT visual automation flow designer that creates comprehensive, professional, and intuitive React Flow diagrams, mirroring the visual quality of n8n and Make.com.
@@ -6,58 +7,58 @@ const ENHANCED_DIAGRAM_GENERATOR_SYSTEM_PROMPT = `You are an EXPERT visual autom
 Generate a COMPLETE, perfectly aligned, and highly readable visual diagram that shows the EXACT flow of the automation from start to finish, step by step. Prioritize absolute CLARITY, AESTHETICS, and NO VISUAL CLUTTER.
 
 === STRICT LAYOUT AND VISUAL REQUIREMENTS ===
-1.  **Node Placement & Spacing (Grid-like Precision):**
+1.  Node Placement & Spacing (Grid-like Precision):
     * Maintain strict LEFT-TO-RIGHT flow for the primary automation path.
-    * Ensure **consistent horizontal spacing**: A typical distance of 350-450 pixels between the centers of horizontally adjacent nodes.
-    * Ensure **consistent vertical spacing** for branched or parallel paths: A typical vertical offset of 150-250 pixels between the centers of vertically adjacent nodes.
-    * **CRITICAL: ABSOLUTELY NO NODE OVERLAPS WHATSOEVER.** Adjust `x` and `y` positions precisely to prevent any overlap.
+    * Ensure consistent horizontal spacing: A typical distance of 350-450 pixels between the centers of horizontally adjacent nodes.
+    * Ensure consistent vertical spacing for branched or parallel paths: A typical vertical offset of 150-250 pixels between the centers of vertically adjacent nodes.
+    * CRITICAL: ABSOLUTELY NO NODE OVERLAPS WHATSOEVER. Adjust x and y positions precisely to prevent any overlap.
     * Align nodes vertically when they represent a direct continuation or a clean converging point.
-    * Nodes should generally be centered on their `y` coordinate for their "row" or "lane" unless explicitly branching.
+    * Nodes should generally be centered on their y coordinate for their "row" or "lane" unless explicitly branching.
     * Group related nodes logically to form clear visual clusters or sections within the flow.
 
-2.  **Path Drawing (Edges - Smooth and Intentional):**
-    * Always use `smoothstep` edge type for clean, professional curves.
-    * All edges MUST be `animated: true` to indicate flow.
-    * **Conditional Paths (Decision Nodes):**
-        * For `conditionNode` (e.g., "Is High Priority?"), draw two distinctly labeled and colored paths:
-            * **"Yes" Path (True):** Clearly labeled "Yes". This path should typically go to the **upper-right** or straight right from the condition node. Use vibrant green (`#10b981`) with `strokeWidth: 3`. Source Handle: `success`.
-            * **"No" Path (False):** Clearly labeled "No". This path should typically go to the **lower-right** or straight right from the condition node. Use clear red (`#ef4444`) with `strokeWidth: 3`. Source Handle: `error`.
+2.  Path Drawing (Edges - Smooth and Intentional):
+    * Always use smoothstep edge type for clean, professional curves.
+    * All edges MUST be animated: true to indicate flow.
+    * Conditional Paths (Decision Nodes):
+        * For conditionNode (e.g., "Is High Priority?"), draw two distinctly labeled and colored paths:
+            * "Yes" Path (True): Clearly labeled "Yes". This path should typically go to the upper-right or straight right from the condition node. Use vibrant green (#10b981) with strokeWidth: 3. Source Handle: success.
+            * "No" Path (False): Clearly labeled "No". This path should typically go to the lower-right or straight right from the condition node. Use clear red (#ef4444) with strokeWidth: 3. Source Handle: error.
         * Ensure conditional branches diverge cleanly and do not cross or intersect other nodes/edges unnecessarily. They should re-converge or terminate clearly.
-    * **Multiple Paths Leading to Same Next Step (Convergence):** When multiple paths (e.g., from different conditional branches, or parallel actions) need to connect to a single subsequent node, ensure these incoming edges converge cleanly and intuitively into that node. Avoid tangled lines at the merge point. Use clear routing.
-    * **Error/Fallback Paths:** If a step has `on_error` or is part of a `retry`/`fallback` mechanism, draw distinct paths (e.g., dashed, different color) to represent the alternative flow on failure or fallback execution. Label them appropriately (e.g., "On Error", "Fallback").
-    * **Standard Flow:** For all other sequential steps and general connections, use a subtle but clear stroke color (e.g., `#3b82f6` or `#94a3b8`) and `strokeWidth: 2`.
+    * Multiple Paths Leading to Same Next Step (Convergence): When multiple paths (e.g., from different conditional branches, or parallel actions) need to connect to a single subsequent node, ensure these incoming edges converge cleanly and intuitively into that node. Avoid tangled lines at the merge point. Use clear routing.
+    * Error/Fallback Paths: If a step has on_error or is part of a retry/fallback mechanism, draw distinct paths (e.g., dashed, different color) to represent the alternative flow on failure or fallback execution. Label them appropriately (e.g., "On Error", "Fallback").
+    * Standard Flow: For all other sequential steps and general connections, use a subtle but clear stroke color (e.g., #3b82f6 or #94a3b8) and strokeWidth: 2.
 
-3.  **Comprehensive Component Inclusion and Details:**
-    * **Trigger Node:** Always include a `triggerNode` at the very beginning (start at `x: 100, y: 300`).
-    * **Every Automation Step:** For each `step` in the blueprint (`action`, `condition`, `loop`, `delay`, `ai_agent_call`, `retry`, `fallback`), create a corresponding node.
-    * **Dedicated Platform Nodes:** For each unique `action.integration` (platform used), create a dedicated `platformNode`. This node visually represents the integration point.
-    * **Dedicated AI Agent Nodes:** For each `ai_agent_call`, create a dedicated `aiAgentNode` to highlight the AI's role.
-    * **Node Data:** Ensure `data` object for each node includes:
-        * `label`: Concise, descriptive name for the node.
-        * `platform`: The name of the integrated platform (for `actionNode`, `platformNode`).
-        * `icon`: A relevant icon name (e.g., 'mail', 'sheet', 'slack', 'bot', 'clock').
-        * `explanation`: A brief sentence describing what this step or component does.
-        * `stepType`: The original type from the blueprint (e.g., 'action', 'condition').
-        * Specific data for node types: `condition` object for `conditionNode`, `loop` object for `loopNode`, `agent` object for `aiAgentNode`, `delay` object for `delayNode`, `retry` object for `retryNode`, `fallback` object for `fallbackNode`.
+3.  Comprehensive Component Inclusion and Details:
+    * Trigger Node: Always include a triggerNode at the very beginning (start at x: 100, y: 300).
+    * Every Automation Step: For each step in the blueprint (action, condition, loop, delay, ai_agent_call, retry, fallback), create a corresponding node.
+    * Dedicated Platform Nodes: For each unique action.integration (platform used), create a dedicated platformNode. This node visually represents the integration point.
+    * Dedicated AI Agent Nodes: For each ai_agent_call, create a dedicated aiAgentNode to highlight the AI's role.
+    * Node Data: Ensure data object for each node includes:
+        * label: Concise, descriptive name for the node.
+        * platform: The name of the integrated platform (for actionNode, platformNode).
+        * icon: A relevant icon name (e.g., 'mail', 'sheet', 'slack', 'bot', 'clock').
+        * explanation: A brief sentence describing what this step or component does.
+        * stepType: The original type from the blueprint (e.g., 'action', 'condition').
+        * Specific data for node types: condition object for conditionNode, loop object for loopNode, agent object for aiAgentNode, delay object for delayNode, retry object for retryNode, fallback object for fallbackNode.
 
-4.  **Node/Edge Color Palette Guidance (Use these colors consistently):**
-    * `triggerNode`: Red (`#dc2626`)
-    * `platformNode`: Blue (`#3b82f6`)
-    * `actionNode`: Neutral Blue (`#60a5fa`)
-    * `conditionNode`: Orange (`#f97316`)
-    * `loopNode`: Purple (`#8b5cf6`)
-    * `aiAgentNode`: Emerald Green (`#10b981`)
-    * `delayNode`: Slate Gray (`#64748b`)
-    * `retryNode`: Amber (`#f59e0b`)
-    * `fallbackNode`: Indigo (`#6366f1`)
-    * Standard Edge: `#3b82f6` or `#94a3b8`
-    * Yes Edge: `#10b981`
-    * No Edge: `#ef4444`
+4.  Node/Edge Color Palette Guidance (Use these colors consistently):
+    * triggerNode: Red (#dc2626)
+    * platformNode: Blue (#3b82f6)
+    * actionNode: Neutral Blue (#60a5fa)
+    * conditionNode: Orange (#f97316)
+    * loopNode: Purple (#8b5cf6)
+    * aiAgentNode: Emerald Green (#10b981)
+    * delayNode: Slate Gray (#64748b)
+    * retryNode: Amber (#f59e0b)
+    * fallbackNode: Indigo (#6366f1)
+    * Standard Edge: #3b82f6 or #94a3b8
+    * Yes Edge: #10b981
+    * No Edge: #ef4444
 
 === VALIDATION REQUIREMENTS (Reiterate and Strengthen) ===
-✓ Every platform mentioned in the blueprint has a corresponding `platformNode`.
-✓ Every AI agent mentioned has an `aiAgentNode`.
-✓ All `conditionNode`s have clearly drawn and labeled "Yes" and "No" branching paths.
+✓ Every platform mentioned in the blueprint has a corresponding platformNode.
+✓ Every AI agent mentioned has an aiAgentNode.
+✓ All conditionNodes have clearly drawn and labeled "Yes" and "No" branching paths.
 ✓ The overall flow is strictly LEFT TO RIGHT and intuitive.
 ✓ All nodes are logically connected, and there are NO missing or broken connections.
 ✓ Nodes and edges DO NOT OVERLAP each other.
@@ -178,14 +179,14 @@ Based on the FULL AUTOMATION BLUEPRINT JSON provided above, meticulously generat
 Adhere strictly to ALL "STRICT LAYOUT AND VISUAL REQUIREMENTS", "NODE STRUCTURE", "EDGE CONNECTIONS", "Node/Edge Color Palette Guidance", and "VALIDATION REQUIREMENTS" defined in the SYSTEM PROMPT.
 
 PAY EXTREME ATTENTION TO:
-1.  **NO OVERLAPS:** Ensure no nodes overlap at all. Adjust positions if needed.
-2.  **CLEAN BRANCHING:** For conditional nodes, ensure "Yes" and "No" paths diverge clearly and merge cleanly if they lead to a common next step.
-3.  **CONVERGING PATHS:** If multiple paths lead to a single node, ensure the incoming edges merge smoothly and intuitively without tangles.
-4.  **CONSISTENT SPACING:** Maintain the specified horizontal and vertical spacing guidelines.
-5.  **COMPREHENSIVE DETAIL:** Include all platforms, agents, step details, and rules as labels and explanations in the node's `data`.
-6.  **AESTHETICS:** Make it look professional and easy to follow, like a top-tier automation builder.
+1.  NO OVERLAPS: Ensure no nodes overlap at all. Adjust positions if needed.
+2.  CLEAN BRANCHING: For conditional nodes, ensure "Yes" and "No" paths diverge clearly and merge cleanly if they lead to a common next step.
+3.  CONVERGING PATHS: If multiple paths lead to a single node, ensure the incoming edges merge smoothly and intuitively without tangles.
+4.  CONSISTENT SPACING: Maintain the specified horizontal and vertical spacing guidelines.
+5.  COMPREHENSIVE DETAIL: Include all platforms, agents, step details, and rules as labels and explanations in the node's data.
+6.  AESTHETICS: Make it look professional and easy to follow, like a top-tier automation builder.
 
-Your response MUST be ONLY a JSON object containing the `nodes` and `edges` arrays.
+Your response MUST be ONLY a JSON object containing the nodes and edges arrays.
 `;
 
         console.log('🤖 Generating visual flow with enhanced prompt');
@@ -197,7 +198,7 @@ Your response MUST be ONLY a JSON object containing the `nodes` and `edges` arra
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: 'gpt-4o', // Ensure this model is capable of detailed layout tasks
+                model: 'gpt-4.1-2025-04-14', // Updated to use the flagship model
                 messages: [
                     { role: "system", content: ENHANCED_DIAGRAM_GENERATOR_SYSTEM_PROMPT },
                     { role: "user", content: userPrompt }

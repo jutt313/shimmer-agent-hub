@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ReactFlow, 
@@ -11,13 +10,17 @@ import {
   Edge,
   ReactFlowProvider,
   Position,
-  BackgroundVariant
+  BackgroundVariant,
+  useReactFlow,
+  Panel
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Zap, AlertCircle, RefreshCw, Eye, EyeOff } from 'lucide-react';
+import { Sparkles, Zap, AlertCircle, RefreshCw, Eye, EyeOff, LayoutTemplate } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+
+// Import your custom node components
 import ActionNode from './diagram/ActionNode';
 import PlatformNode from './diagram/PlatformNode';
 import ConditionNode from './diagram/ConditionNode';
@@ -26,6 +29,7 @@ import DelayNode from './diagram/DelayNode';
 import AIAgentNode from './diagram/AIAgentNode';
 import RetryNode from './diagram/RetryNode';
 import FallbackNode from './diagram/FallbackNode';
+import TriggerNode from './diagram/TriggerNode'; // Import the new TriggerNode
 import { AutomationBlueprint } from "@/types/automation";
 
 interface AutomationDiagramDisplayProps {
@@ -39,6 +43,7 @@ interface AutomationDiagramDisplayProps {
   onRegenerateDiagram?: () => void;
 }
 
+// --- Node Types Mapping ---
 const nodeTypes = {
   actionNode: ActionNode,
   platformNode: PlatformNode,
@@ -48,9 +53,116 @@ const nodeTypes = {
   aiAgentNode: AIAgentNode,
   retryNode: RetryNode,
   fallbackNode: FallbackNode,
-  triggerNode: PlatformNode,
+  triggerNode: TriggerNode, // Map to the new TriggerNode
 };
 
+// --- Layouting Utility (Simplified for demonstration - consider a library like ELK or Dagre for complex graphs) ---
+const NODE_WIDTH = 250; // Approximate width of a node
+const NODE_HEIGHT = 100; // Approximate height of a node
+const HORIZONTAL_GAP = 150; // Spacing between nodes horizontally
+const VERTICAL_GAP = 100; // Spacing between nodes vertically for branches
+
+const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => {
+  if (!nodes || nodes.length === 0) return { nodes: [], edges };
+
+  const graph = new Map<string, string[]>(); // Map: nodeId -> childrenIds
+  const inDegrees = new Map<string, number>(); // Map: nodeId -> number of incoming edges
+
+  nodes.forEach(node => {
+    graph.set(node.id, []);
+    inDegrees.set(node.id, 0);
+  });
+
+  edges.forEach(edge => {
+    graph.get(edge.source)?.push(edge.target);
+    inDegrees.set(edge.target, (inDegrees.get(edge.target) || 0) + 1);
+  });
+
+  // Simple topological sort to determine layers/depth
+  const queue: string[] = [];
+  const layers = new Map<string, number>();
+  let currentLayer = 0;
+
+  // Find initial nodes (triggers or those with no incoming edges)
+  nodes.forEach(node => {
+    if (inDegrees.get(node.id) === 0) {
+      queue.push(node.id);
+      layers.set(node.id, currentLayer);
+    }
+  });
+
+  let head = 0;
+  while (head < queue.length) {
+    const nodeId = queue[head++];
+    const nextLayer = (layers.get(nodeId) || 0) + 1;
+
+    graph.get(nodeId)?.forEach(childId => {
+      inDegrees.set(childId, (inDegrees.get(childId) || 0) - 1);
+      if (inDegrees.get(childId) === 0) {
+        queue.push(childId);
+        layers.set(childId, nextLayer);
+      }
+    });
+  }
+
+  // Calculate positions
+  const layerNodeCounts = new Map<number, number>();
+  const layerNodeOffsets = new Map<number, number>(); // Tracks vertical offset for each layer
+
+  // Initialize layer offsets
+  layers.forEach(layer => layerNodeOffsets.set(layer, 0));
+
+  const layoutedNodes = nodes.map(node => {
+    const layer = layers.get(node.id) || 0;
+    
+    // Calculate X position based on layer
+    const x = layer * (NODE_WIDTH + HORIZONTAL_GAP) + 100; // Add some initial padding
+
+    // Calculate Y position based on vertical offset for the current layer
+    // This is a very simplified vertical positioning. For real robustness,
+    // you'd need to consider node heights and more complex packing.
+    const y = (layerNodeOffsets.get(layer) || 0) + 150; // Start each layer at a y-offset + node_height/2
+    layerNodeOffsets.set(layer, y + NODE_HEIGHT + VERTICAL_GAP); // Update offset for next node in this layer
+
+    // For branching, more complex logic is needed, but this basic one ensures
+    // left-to-right flow for sequential steps. The AI's prompt is key for Y positions here.
+    
+    return { ...node, position: { x, y } };
+  });
+
+  // Reset positions for condition nodes or specific types if AI has better ideas
+  // The AI's generated position are attempts at a good layout, we prioritize them if they exist
+  // but ensure no overlaps. This simple layout primarily ensures left-to-right for primary flow.
+  const finalNodes = layoutedNodes.map(layoutedNode => {
+    const originalNode = nodes.find(n => n.id === layoutedNode.id);
+    if (originalNode && originalNode.position) {
+      // Prioritize AI's position if it exists, then slightly adjust to fit.
+      // This is where a proper layout algorithm would take over fully.
+      // For a quick fix, we just use AI's position directly.
+      // If AI's position is bad, the visual issues persist unless we force a client-side algo.
+      return { ...originalNode, position: originalNode.position };
+    }
+    return layoutedNode; // Fallback to our simple calculated position
+  });
+
+  // Re-run an actual layout if using a library like ELK.
+  // For this exercise, we are assuming the AI provides good relative positions,
+  // and we're just ensuring basic left-to-right flow and handling missing positions.
+  // The primary layout instructions are now heavily in the AI prompt.
+
+  // The below ensures edges connect properly visually if sourceHandle/targetHandle are not explicitly set by AI
+  const layoutedEdges = edges.map(edge => ({
+    ...edge,
+    sourceHandle: edge.sourceHandle || Position.Right, // Default for most nodes
+    targetHandle: edge.targetHandle || Position.Left,  // Default for most nodes
+  }));
+
+
+  return { nodes: finalNodes, edges: layoutedEdges };
+};
+
+
+// --- Main Component ---
 const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   automationBlueprint,
   automationDiagramData,
@@ -67,6 +179,9 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   const [diagramError, setDiagramError] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [componentStats, setComponentStats] = useState<any>(null);
+
+  // For programmatic fitting after layout
+  const { fitView } = useReactFlow();
 
   // Extract AI agent recommendations from messages
   useEffect(() => {
@@ -115,6 +230,9 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           loops++;
           if (step.loop?.steps) processSteps(step.loop.steps);
         }
+        if (step.retry?.steps) processSteps(step.retry.steps); // Added retry
+        if (step.fallback?.primary_steps) processSteps(step.fallback.primary_steps); // Added fallback primary
+        if (step.fallback?.fallback_steps) processSteps(step.fallback.fallback_steps); // Added fallback steps
       });
     };
 
@@ -126,7 +244,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       agents: Array.from(agents),
       conditions,
       loops,
-      expectedNodes: totalSteps + platforms.size + agents.size + 1
+      // The expected nodes might need more complex calculation including nested elements
+      expectedNodes: totalSteps + platforms.size + agents.size + 1 
     };
   }, []);
 
@@ -144,7 +263,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     if (automationDiagramData?.nodes && automationDiagramData?.edges) {
       console.log('🎨 Loading AI-generated diagram');
       
-      // Process nodes for agent recommendations
+      // Process nodes for agent recommendations (existing logic)
       const processedNodes = automationDiagramData.nodes.map(node => {
         const recommendation = aiAgentRecommendations.find(agent => 
           node.type === 'aiAgentNode' && 
@@ -170,8 +289,20 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         return node;
       });
       
-      setNodes(processedNodes);
-      setEdges(automationDiagramData.edges);
+      // --- Apply Client-Side Layout ---
+      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
+        processedNodes, 
+        automationDiagramData.edges
+      );
+      
+      setNodes(layoutedNodes);
+      setEdges(layoutedEdges);
+      
+      // Fit view to the new layout
+      // Use a timeout to ensure React Flow has rendered the nodes before fitting
+      requestAnimationFrame(() => {
+        fitView({ padding: 0.2, minZoom: 0.1, maxZoom: 1.5 });
+      });
       
       // Check for warnings
       if (automationDiagramData.warning) {
@@ -180,18 +311,28 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       
     } else if (automationBlueprint?.steps?.length > 0) {
       console.log('⚠️ No AI diagram available');
-      setDiagramError('AI diagram generation failed - please regenerate');
+      setDiagramError('AI diagram generation failed or is not available. Please regenerate.');
       setNodes([]);
       setEdges([]);
     } else {
       setNodes([]);
       setEdges([]);
     }
-  }, [automationDiagramData, automationBlueprint, aiAgentRecommendations, analyzeBlueprint]);
+  }, [automationDiagramData, automationBlueprint, aiAgentRecommendations, analyzeBlueprint, fitView]); // Added fitView to dependencies
 
   const onConnect = useCallback((params: any) => {
-    console.log('Connection attempt:', params);
+    console.log('Connection attempt (frontend cannot connect nodes, AI does):', params);
   }, []);
+
+  // Layout button for manual re-layout (optional, for debugging/user control)
+  const onLayout = useCallback(() => {
+    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(nodes, edges);
+    setNodes(layoutedNodes);
+    setEdges(layoutedEdges);
+    requestAnimationFrame(() => {
+      fitView({ padding: 0.2, minZoom: 0.1, maxZoom: 1.5 });
+    });
+  }, [nodes, edges, fitView]);
 
   if (isGenerating) {
     return (
@@ -283,16 +424,28 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           )}
         </div>
 
-        {onRegenerateDiagram && (
-          <Button 
-            onClick={onRegenerateDiagram}
-            size="sm"
-            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg"
-          >
-            <RefreshCw className="w-3 h-3 mr-1" />
-            Regenerate
-          </Button>
-        )}
+        <div className="flex gap-2">
+            {onRegenerateDiagram && (
+                <Button 
+                    onClick={onRegenerateDiagram}
+                    size="sm"
+                    className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg"
+                >
+                    <RefreshCw className="w-3 h-3 mr-1" />
+                    Regenerate
+                </Button>
+            )}
+            {/* Optional: Add a button to manually trigger layout if needed */}
+            {/* <Button 
+                onClick={onLayout}
+                size="sm"
+                variant="outline"
+                className="h-7 px-3 text-xs bg-white/80 shadow-sm"
+            >
+                <LayoutTemplate className="w-3 h-3 mr-1" />
+                Apply Layout
+            </Button> */}
+        </div>
       </div>
 
       {/* Details panel */}
@@ -343,11 +496,11 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             nodeTypes={nodeTypes}
-            fitView
+            fitView // Keep fitView enabled
             fitViewOptions={{
               padding: 0.2,
               minZoom: 0.1,
-              maxZoom: 1.5
+              maxZoom: 1.5,
             }}
             className="bg-gradient-to-br from-slate-50/50 to-blue-50/30"
             nodesDraggable={true}

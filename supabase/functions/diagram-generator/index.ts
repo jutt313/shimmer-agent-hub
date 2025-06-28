@@ -1,133 +1,72 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-const ENHANCED_DIAGRAM_GENERATOR_SYSTEM_PROMPT = `You are an EXPERT visual automation flow designer that creates comprehensive React Flow diagrams similar to Make.com and Zapier.
+const ENHANCED_DIAGRAM_GENERATOR_SYSTEM_PROMPT = `You are an EXPERT visual automation flow designer that creates comprehensive, professional, and intuitive React Flow diagrams, mirroring the visual quality of n8n and Make.com.
 
-=== YOUR MISSION ===
-Create a VISUAL AUTOMATION FLOW that shows exactly how the automation works from start to finish, step by step.
+=== YOUR CORE MISSION ===
+Generate a COMPLETE, perfectly aligned, and highly readable visual diagram that shows the EXACT flow of the automation from start to finish, step by step. Prioritize absolute CLARITY, AESTHETICS, and NO VISUAL CLUTTER.
 
-=== CORE PRINCIPLES ===
-1. Think like Make.com or Zapier - show the ACTUAL FLOW of data and actions
-2. Every platform integration gets its own node
-3. Every AI agent gets its own node  
-4. Every condition creates branching paths (Yes/No)
-5. Every loop shows iteration clearly
-6. Show the REAL WORKFLOW - how data flows from one step to the next
+=== STRICT LAYOUT AND VISUAL REQUIREMENTS ===
+1.  **Node Placement & Spacing (Grid-like Precision):**
+    * Maintain strict LEFT-TO-RIGHT flow for the primary automation path.
+    * Ensure **consistent horizontal spacing**: A typical distance of 350-450 pixels between the centers of horizontally adjacent nodes.
+    * Ensure **consistent vertical spacing** for branched or parallel paths: A typical vertical offset of 150-250 pixels between the centers of vertically adjacent nodes.
+    * **CRITICAL: ABSOLUTELY NO NODE OVERLAPS WHATSOEVER.** Adjust `x` and `y` positions precisely to prevent any overlap.
+    * Align nodes vertically when they represent a direct continuation or a clean converging point.
+    * Nodes should generally be centered on their `y` coordinate for their "row" or "lane" unless explicitly branching.
+    * Group related nodes logically to form clear visual clusters or sections within the flow.
 
-=== REQUIRED NODE TYPES ===
-- "triggerNode" - How the automation starts
-- "platformNode" - Platform integrations (Google Sheets, Slack, etc.)
-- "actionNode" - General actions and processing
-- "conditionNode" - Decision points with Yes/No branches
-- "loopNode" - Iterations and repeating actions
-- "delayNode" - Wait periods
-- "aiAgentNode" - AI agent calls
-- "retryNode" - Retry mechanisms
-- "fallbackNode" - Error handling
+2.  **Path Drawing (Edges - Smooth and Intentional):**
+    * Always use `smoothstep` edge type for clean, professional curves.
+    * All edges MUST be `animated: true` to indicate flow.
+    * **Conditional Paths (Decision Nodes):**
+        * For `conditionNode` (e.g., "Is High Priority?"), draw two distinctly labeled and colored paths:
+            * **"Yes" Path (True):** Clearly labeled "Yes". This path should typically go to the **upper-right** or straight right from the condition node. Use vibrant green (`#10b981`) with `strokeWidth: 3`. Source Handle: `success`.
+            * **"No" Path (False):** Clearly labeled "No". This path should typically go to the **lower-right** or straight right from the condition node. Use clear red (`#ef4444`) with `strokeWidth: 3`. Source Handle: `error`.
+        * Ensure conditional branches diverge cleanly and do not cross or intersect other nodes/edges unnecessarily. They should re-converge or terminate clearly.
+    * **Multiple Paths Leading to Same Next Step (Convergence):** When multiple paths (e.g., from different conditional branches, or parallel actions) need to connect to a single subsequent node, ensure these incoming edges converge cleanly and intuitively into that node. Avoid tangled lines at the merge point. Use clear routing.
+    * **Error/Fallback Paths:** If a step has `on_error` or is part of a `retry`/`fallback` mechanism, draw distinct paths (e.g., dashed, different color) to represent the alternative flow on failure or fallback execution. Label them appropriately (e.g., "On Error", "Fallback").
+    * **Standard Flow:** For all other sequential steps and general connections, use a subtle but clear stroke color (e.g., `#3b82f6` or `#94a3b8`) and `strokeWidth: 2`.
 
-=== LAYOUT RULES ===
-- Start at x: 100, y: 300
-- Flow LEFT TO RIGHT
-- Horizontal spacing: +350 between main steps
-- Vertical branching: ±150 for conditions
-- Keep nodes organized and readable
-- NO overlapping nodes
+3.  **Comprehensive Component Inclusion and Details:**
+    * **Trigger Node:** Always include a `triggerNode` at the very beginning (start at `x: 100, y: 300`).
+    * **Every Automation Step:** For each `step` in the blueprint (`action`, `condition`, `loop`, `delay`, `ai_agent_call`, `retry`, `fallback`), create a corresponding node.
+    * **Dedicated Platform Nodes:** For each unique `action.integration` (platform used), create a dedicated `platformNode`. This node visually represents the integration point.
+    * **Dedicated AI Agent Nodes:** For each `ai_agent_call`, create a dedicated `aiAgentNode` to highlight the AI's role.
+    * **Node Data:** Ensure `data` object for each node includes:
+        * `label`: Concise, descriptive name for the node.
+        * `platform`: The name of the integrated platform (for `actionNode`, `platformNode`).
+        * `icon`: A relevant icon name (e.g., 'mail', 'sheet', 'slack', 'bot', 'clock').
+        * `explanation`: A brief sentence describing what this step or component does.
+        * `stepType`: The original type from the blueprint (e.g., 'action', 'condition').
+        * Specific data for node types: `condition` object for `conditionNode`, `loop` object for `loopNode`, `agent` object for `aiAgentNode`, `delay` object for `delayNode`, `retry` object for `retryNode`, `fallback` object for `fallbackNode`.
 
-=== NODE STRUCTURE (EXACT FORMAT) ===
-{
-  "id": "unique-descriptive-id",
-  "type": "nodeType",
-  "position": {"x": number, "y": number},
-  "data": {
-    "label": "Clear, descriptive label",
-    "platform": "platform-name",
-    "icon": "icon-name",
-    "explanation": "What this step does",
-    "stepType": "step-type"
-  }
-}
+4.  **Node/Edge Color Palette Guidance (Use these colors consistently):**
+    * `triggerNode`: Red (`#dc2626`)
+    * `platformNode`: Blue (`#3b82f6`)
+    * `actionNode`: Neutral Blue (`#60a5fa`)
+    * `conditionNode`: Orange (`#f97316`)
+    * `loopNode`: Purple (`#8b5cf6`)
+    * `aiAgentNode`: Emerald Green (`#10b981`)
+    * `delayNode`: Slate Gray (`#64748b`)
+    * `retryNode`: Amber (`#f59e0b`)
+    * `fallbackNode`: Indigo (`#6366f1`)
+    * Standard Edge: `#3b82f6` or `#94a3b8`
+    * Yes Edge: `#10b981`
+    * No Edge: `#ef4444`
 
-=== EDGE CONNECTIONS ===
-- Standard flow: {"stroke": "#3b82f6", "strokeWidth": 2, "animated": true}
-- Condition YES: {"stroke": "#10b981", "strokeWidth": 3, "label": "Yes", "animated": true}
-- Condition NO: {"stroke": "#ef4444", "strokeWidth": 3, "label": "No", "animated": true}
-- Loop flow: {"stroke": "#8b5cf6", "strokeWidth": 2, "animated": true}
-
-=== EXAMPLES ===
-Trigger Node:
-{
-  "id": "trigger-start",
-  "type": "triggerNode",
-  "position": {"x": 100, "y": 300},
-  "data": {
-    "label": "New Email Received",
-    "platform": "Email",
-    "icon": "mail",
-    "explanation": "Automation starts when new email arrives",
-    "stepType": "trigger"
-  }
-}
-
-Platform Node:
-{
-  "id": "platform-sheets",
-  "type": "platformNode", 
-  "position": {"x": 450, "y": 300},
-  "data": {
-    "label": "Update Google Sheets",
-    "platform": "Google Sheets",
-    "icon": "sheet",
-    "explanation": "Add new row with email data",
-    "stepType": "platform"
-  }
-}
-
-Condition Node (creates branching):
-{
-  "id": "condition-priority",
-  "type": "conditionNode",
-  "position": {"x": 800, "y": 300},
-  "data": {
-    "label": "Is High Priority?",
-    "explanation": "Check if email is marked urgent",
-    "stepType": "condition"
-  }
-}
-
-=== CONDITION BRANCHING ===
-When you create a condition node, you MUST create separate paths:
-- YES path: continues at same Y level or Y-150
-- NO path: continues at Y+150
-- Connect with appropriate edge labels
-
-=== AI AGENT INTEGRATION ===
-Every AI agent call gets its own aiAgentNode:
-{
-  "id": "agent-analyzer",
-  "type": "aiAgentNode",
-  "position": {"x": 1150, "y": 200},
-  "data": {
-    "label": "AI Content Analyzer",
-    "agent": {"agent_id": "content-analyzer"},
-    "explanation": "AI processes and categorizes the content",
-    "stepType": "ai_agent_call"
-  }
-}
-
-=== VALIDATION REQUIREMENTS ===
-Before returning, ensure:
-✓ Every platform mentioned has a platformNode
-✓ Every AI agent has an aiAgentNode
-✓ All conditions have proper YES/NO branching
-✓ Flow goes LEFT TO RIGHT logically
-✓ All nodes are properly connected
-✓ No missing or broken connections
+=== VALIDATION REQUIREMENTS (Reiterate and Strengthen) ===
+✓ Every platform mentioned in the blueprint has a corresponding `platformNode`.
+✓ Every AI agent mentioned has an `aiAgentNode`.
+✓ All `conditionNode`s have clearly drawn and labeled "Yes" and "No" branching paths.
+✓ The overall flow is strictly LEFT TO RIGHT and intuitive.
+✓ All nodes are logically connected, and there are NO missing or broken connections.
+✓ Nodes and edges DO NOT OVERLAP each other.
+✓ The diagram is visually clean, professional, and easy to understand at a glance.
 
 === OUTPUT FORMAT ===
 Return ONLY valid JSON with "nodes" and "edges" arrays.
-Make the flow VISUAL and LOGICAL - like a real automation builder tool.
-
-REMEMBER: You're creating a VISUAL REPRESENTATION of how the automation actually works, not just a list of components!`
+The output should be a complete and highly polished visual representation of the automation workflow.
+REMEMBER: You're creating the blueprint for a professional diagram that a user would instantly understand and trust.`
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -222,35 +161,32 @@ serve(async (req) => {
         // Enhanced user prompt focusing on visual flow
         const userPrompt = `CREATE A VISUAL AUTOMATION FLOW DIAGRAM
 
-AUTOMATION OVERVIEW:
-- Title: ${automation_blueprint.description || 'Automation Flow'}
-- Total Steps: ${analysis.totalSteps}
-- Platforms: ${analysis.platforms.join(', ')} (${analysis.platforms.length} total)
-- AI Agents: ${analysis.agents.join(', ')} (${analysis.agents.length} total)
-- Step Types: ${analysis.stepTypes.join(', ')}
-- Trigger: ${analysis.trigger?.type || 'manual'}
+AUTOMATION BLUEPRINT TITLE: ${automation_blueprint.description || 'Automation Flow'}
+TOTAL STEPS IN BLUEPRINT: ${analysis.totalSteps}
+UNIQUE PLATFORMS USED: ${analysis.platforms.join(', ')} (${analysis.platforms.length} total)
+UNIQUE AI AGENTS USED: ${analysis.agents.join(', ')} (${analysis.agents.length} total)
+TYPES OF STEPS IN BLUEPRINT: ${analysis.stepTypes.join(', ')}
+AUTOMATION TRIGGER TYPE: ${analysis.trigger?.type || 'manual'}
 
-VISUAL FLOW REQUIREMENTS:
-1. Start with a trigger node showing how this automation begins
-2. Create a platformNode for each platform: ${analysis.platforms.join(', ')}
-3. Create an aiAgentNode for each agent: ${analysis.agents.join(', ')}
-4. Show the ACTUAL FLOW - how data moves from step to step
-5. For conditions: create YES/NO branching paths
-6. For loops: show the iteration clearly
-7. Make it look like Make.com or Zapier - visual and logical
-
-AUTOMATION BLUEPRINT:
+FULL AUTOMATION BLUEPRINT JSON (for precise parsing of details):
 ${JSON.stringify(automation_blueprint, null, 2)}
 
-INSTRUCTIONS:
-- Think of this as a VISUAL WORKFLOW BUILDER
-- Every step should be connected logically
-- Show the user exactly how their automation will execute
-- Make branching paths clear for conditions
-- Position nodes so they don't overlap
-- Use descriptive labels that explain what each step does
+---
+CRITICAL INSTRUCTIONS FOR DIAGRAM GENERATION:
+Based on the FULL AUTOMATION BLUEPRINT JSON provided above, meticulously generate the "nodes" and "edges" arrays for a React Flow diagram.
 
-Create a comprehensive visual flow that shows exactly how this automation works from start to finish!`;
+Adhere strictly to ALL "STRICT LAYOUT AND VISUAL REQUIREMENTS", "NODE STRUCTURE", "EDGE CONNECTIONS", "Node/Edge Color Palette Guidance", and "VALIDATION REQUIREMENTS" defined in the SYSTEM PROMPT.
+
+PAY EXTREME ATTENTION TO:
+1.  **NO OVERLAPS:** Ensure no nodes overlap at all. Adjust positions if needed.
+2.  **CLEAN BRANCHING:** For conditional nodes, ensure "Yes" and "No" paths diverge clearly and merge cleanly if they lead to a common next step.
+3.  **CONVERGING PATHS:** If multiple paths lead to a single node, ensure the incoming edges merge smoothly and intuitively without tangles.
+4.  **CONSISTENT SPACING:** Maintain the specified horizontal and vertical spacing guidelines.
+5.  **COMPREHENSIVE DETAIL:** Include all platforms, agents, step details, and rules as labels and explanations in the node's `data`.
+6.  **AESTHETICS:** Make it look professional and easy to follow, like a top-tier automation builder.
+
+Your response MUST be ONLY a JSON object containing the `nodes` and `edges` arrays.
+`;
 
         console.log('🤖 Generating visual flow with enhanced prompt');
 
@@ -261,14 +197,14 @@ Create a comprehensive visual flow that shows exactly how this automation works 
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: 'gpt-4o',
+                model: 'gpt-4o', // Ensure this model is capable of detailed layout tasks
                 messages: [
                     { role: "system", content: ENHANCED_DIAGRAM_GENERATOR_SYSTEM_PROMPT },
                     { role: "user", content: userPrompt }
                 ],
                 response_format: { type: "json_object" },
-                temperature: 0.2,
-                max_tokens: 16000
+                temperature: 0.2, // Keep temperature low for deterministic layout
+                max_tokens: 4000 // Increased tokens for complex blueprints
             }),
         });
 
@@ -318,24 +254,24 @@ Create a comprehensive visual flow that shows exactly how this automation works 
             );
         }
 
-        // Enhance edges with proper styling and interactivity
+        // Apply default styles and ensure interactivity (as per previous logic)
         diagramData.edges = diagramData.edges.map(edge => ({
             ...edge,
-            type: 'smoothstep',
-            animated: true,
+            type: edge.type || 'smoothstep',
+            animated: edge.animated !== undefined ? edge.animated : true,
             style: {
                 stroke: edge.style?.stroke || '#3b82f6',
                 strokeWidth: edge.style?.strokeWidth || 2,
                 ...edge.style
-            }
+            },
+            sourceHandle: edge.sourceHandle // Ensure sourceHandle is preserved for conditionals
         }));
 
-        // Enhance nodes for better interactivity
         diagramData.nodes = diagramData.nodes.map(node => ({
             ...node,
             draggable: true,
             selectable: true,
-            connectable: false
+            connectable: false // Connections should be from AI-generated edges
         }));
 
         console.log('✅ Generated interactive visual flow:', {

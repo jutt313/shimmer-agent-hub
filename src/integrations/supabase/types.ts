@@ -405,6 +405,7 @@ export type Database = {
           client_secret: string
           created_at: string
           developer_email: string | null
+          environment: string | null
           event_descriptions: Json | null
           homepage_url: string | null
           id: string
@@ -414,6 +415,8 @@ export type Database = {
           redirect_uris: string[]
           supported_events: Json | null
           terms_of_service_url: string | null
+          test_client_id: string | null
+          test_client_secret: string | null
           tier: Database["public"]["Enums"]["developer_tier"]
           tool_description: string | null
           updated_at: string
@@ -429,6 +432,7 @@ export type Database = {
           client_secret?: string
           created_at?: string
           developer_email?: string | null
+          environment?: string | null
           event_descriptions?: Json | null
           homepage_url?: string | null
           id?: string
@@ -438,6 +442,8 @@ export type Database = {
           redirect_uris?: string[]
           supported_events?: Json | null
           terms_of_service_url?: string | null
+          test_client_id?: string | null
+          test_client_secret?: string | null
           tier?: Database["public"]["Enums"]["developer_tier"]
           tool_description?: string | null
           updated_at?: string
@@ -453,6 +459,7 @@ export type Database = {
           client_secret?: string
           created_at?: string
           developer_email?: string | null
+          environment?: string | null
           event_descriptions?: Json | null
           homepage_url?: string | null
           id?: string
@@ -462,6 +469,8 @@ export type Database = {
           redirect_uris?: string[]
           supported_events?: Json | null
           terms_of_service_url?: string | null
+          test_client_id?: string | null
+          test_client_secret?: string | null
           tier?: Database["public"]["Enums"]["developer_tier"]
           tool_description?: string | null
           updated_at?: string

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -56,9 +55,9 @@ export const useEnhancedDeveloperApps = () => {
       // Transform data to include environment settings
       const transformedApps = (data || []).map(app => ({
         ...app,
-        environment: app.environment || 'test' as 'test' | 'production',
-        test_client_id: app.test_client_id || `test_${app.client_id}`,
-        test_client_secret: app.test_client_secret || `test_${app.client_secret}`
+        environment: (app as any).environment || 'test' as 'test' | 'production',
+        test_client_id: (app as any).test_client_id || `test_${app.client_id}`,
+        test_client_secret: (app as any).test_client_secret || `test_${app.client_secret}`
       }));
       
       setApps(transformedApps);
@@ -107,7 +106,7 @@ export const useEnhancedDeveloperApps = () => {
           environment: appData.environment || 'test',
           test_client_id: testClientId,
           test_client_secret: testClientSecret,
-        })
+        } as any)
         .select()
         .single();
 
@@ -115,7 +114,7 @@ export const useEnhancedDeveloperApps = () => {
 
       const transformedApp = {
         ...data,
-        environment: data.environment || 'test' as 'test' | 'production',
+        environment: (data as any).environment || 'test' as 'test' | 'production',
         test_client_id: testClientId,
         test_client_secret: testClientSecret
       };
@@ -143,7 +142,7 @@ export const useEnhancedDeveloperApps = () => {
     try {
       const { data, error } = await supabase
         .from('developer_integrations')
-        .update(updates)
+        .update(updates as any)
         .eq('id', appId)
         .eq('user_id', user?.id)
         .select()
@@ -153,9 +152,9 @@ export const useEnhancedDeveloperApps = () => {
 
       const transformedApp = {
         ...data,
-        environment: data.environment || 'test' as 'test' | 'production',
-        test_client_id: data.test_client_id,
-        test_client_secret: data.test_client_secret
+        environment: (data as any).environment || 'test' as 'test' | 'production',
+        test_client_id: (data as any).test_client_id,
+        test_client_secret: (data as any).test_client_secret
       };
 
       setApps(prev => 
@@ -185,7 +184,7 @@ export const useEnhancedDeveloperApps = () => {
     try {
       const { error } = await supabase
         .from('developer_integrations')
-        .update({ environment: newEnvironment })
+        .update({ environment: newEnvironment } as any)
         .eq('id', appId)
         .eq('user_id', user?.id);
 

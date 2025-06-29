@@ -1,180 +1,159 @@
 
+import { supabase } from '@/integrations/supabase/client';
 import { globalErrorLogger } from '@/utils/errorLogger';
 
-// Rate limiting system for API calls
-export interface RateLimitConfig {
-  maxRequests: number;
-  windowMs: number;
-  platform: string;
+interface RateLimitConfig {
+  requests: number;
+  window: number; // in seconds
+  tier: 'free' | 'pro' | 'enterprise';
+}
+
+interface RateLimitResult {
+  allowed: boolean;
+  remaining: number;
+  resetTime: number;
+  retryAfter?: number;
 }
 
 export class RateLimiter {
-  private buckets = new Map<string, TokenBucket>();
-  private configs = new Map<string, RateLimitConfig>();
-  private abuseTracking = new Map<string, number[]>();
+  private static readonly RATE_LIMITS: Record<string, RateLimitConfig> = {
+    free: { requests: 100, window: 3600, tier: 'free' }, // 100/hour
+    pro: { requests: 1000, window: 3600, tier: 'pro' }, // 1000/hour
+    enterprise: { requests: 10000, window: 3600, tier: 'enterprise' } // 10k/hour
+  };
 
-  constructor() {
-    // Default rate limits for common platforms
-    this.setRateLimit('slack', { maxRequests: 50, windowMs: 60000, platform: 'slack' });
-    this.setRateLimit('gmail', { maxRequests: 100, windowMs: 60000, platform: 'gmail' });
-    this.setRateLimit('trello', { maxRequests: 100, windowMs: 10000, platform: 'trello' });
-    this.setRateLimit('openai', { maxRequests: 60, windowMs: 60000, platform: 'openai' });
-    this.setRateLimit('default', { maxRequests: 30, windowMs: 60000, platform: 'default' });
-  }
+  /**
+   * Check if request is within rate limits
+   */
+  static async checkRateLimit(
+    identifier: string, // user_id or api_token_id
+    endpoint: string,
+    tier: 'free' | 'pro' | 'enterprise' = 'free'
+  ): Promise<RateLimitResult> {
+    try {
+      const config = this.RATE_LIMITS[tier];
+      const windowStart = Math.floor(Date.now() / 1000) - config.window;
+      const key = `${identifier}:${endpoint}`;
 
-  setRateLimit(platform: string, config: RateLimitConfig): void {
-    this.configs.set(platform, config);
-    this.buckets.set(platform, new TokenBucket(config.maxRequests, config.windowMs));
-  }
+      // Get recent usage
+      const { data: usage, error } = await supabase
+        .from('api_usage_logs')
+        .select('created_at')
+        .eq('user_id', identifier)
+        .eq('endpoint', endpoint)
+        .gte('created_at', new Date(windowStart * 1000).toISOString());
 
-  async checkRateLimit(platform: string, userId?: string): Promise<{ allowed: boolean; resetTime?: number; reason?: string }> {
-    const normalizedPlatform = platform.toLowerCase();
-    let bucket = this.buckets.get(normalizedPlatform);
-    
-    if (!bucket) {
-      // Use default rate limit if platform not configured
-      const defaultConfig = this.configs.get('default')!;
-      bucket = new TokenBucket(defaultConfig.maxRequests, defaultConfig.windowMs);
-      this.buckets.set(normalizedPlatform, bucket);
+      if (error) throw error;
+
+      const currentUsage = usage?.length || 0;
+      const remaining = Math.max(0, config.requests - currentUsage);
+      const resetTime = Math.floor(Date.now() / 1000) + config.window;
+
+      if (currentUsage >= config.requests) {
+        const retryAfter = config.window - (Math.floor(Date.now() / 1000) - windowStart);
+        
+        globalErrorLogger.log('WARN', 'Rate limit exceeded', {
+          identifier,
+          endpoint,
+          currentUsage,
+          limit: config.requests,
+          tier
+        });
+
+        return {
+          allowed: false,
+          remaining: 0,
+          resetTime,
+          retryAfter: Math.max(1, retryAfter)
+        };
+      }
+
+      return {
+        allowed: true,
+        remaining,
+        resetTime
+      };
+    } catch (error: any) {
+      globalErrorLogger.log('ERROR', 'Rate limit check failed', {
+        identifier,
+        endpoint,
+        error: error.message
+      });
+
+      // Allow request on error to avoid blocking users
+      return {
+        allowed: true,
+        remaining: 100,
+        resetTime: Math.floor(Date.now() / 1000) + 3600
+      };
     }
-    
-    const allowed = bucket.consume();
-    
-    // Log suspicious activity
-    if (!allowed && userId) {
-      globalErrorLogger.log('WARN', 'Rate limit exceeded', {
-        platform,
+  }
+
+  /**
+   * Record API usage for rate limiting
+   */
+  static async recordUsage(
+    userId: string,
+    endpoint: string,
+    method: string,
+    statusCode: number,
+    responseTime?: number,
+    apiTokenId?: string,
+    developerIntegrationId?: string
+  ): Promise<void> {
+    try {
+      await supabase
+        .from('api_usage_logs')
+        .insert({
+          user_id: userId,
+          endpoint,
+          method,
+          status_code: statusCode,
+          response_time_ms: responseTime,
+          api_token_id: apiTokenId,
+          developer_integration_id: developerIntegrationId
+        });
+    } catch (error: any) {
+      globalErrorLogger.log('ERROR', 'Failed to record API usage', {
         userId,
-        available: bucket.getAvailableTokens(),
-        resetTime: bucket.getResetTime(),
-        suspiciousActivity: true
+        endpoint,
+        method,
+        error: error.message
       });
     }
-    
+  }
+
+  /**
+   * Get rate limit headers for response
+   */
+  static getRateLimitHeaders(result: RateLimitResult): Record<string, string> {
     return {
-      allowed,
-      resetTime: allowed ? undefined : bucket.getResetTime(),
-      reason: allowed ? undefined : `Rate limit exceeded for ${platform}`
+      'X-RateLimit-Limit': '100', // Will be dynamic based on tier
+      'X-RateLimit-Remaining': result.remaining.toString(),
+      'X-RateLimit-Reset': result.resetTime.toString(),
+      ...(result.retryAfter ? { 'Retry-After': result.retryAfter.toString() } : {})
     };
   }
 
-  async waitForRateLimit(platform: string): Promise<void> {
-    const normalizedPlatform = platform.toLowerCase();
-    const bucket = this.buckets.get(normalizedPlatform);
-    
-    if (!bucket) {
-      return; // No rate limit configured
-    }
-    
-    const waitTime = bucket.getWaitTime();
-    if (waitTime > 0) {
-      console.log(`⏳ Rate limit reached for ${platform}, waiting ${waitTime}ms`);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-    }
-  }
+  /**
+   * Clean old usage logs (should be run periodically)
+   */
+  static async cleanOldLogs(): Promise<void> {
+    try {
+      const cutoffDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
 
-  getRateLimitStatus(platform: string): { available: number; resetTime: number } {
-    const normalizedPlatform = platform.toLowerCase();
-    const bucket = this.buckets.get(normalizedPlatform);
-    
-    if (!bucket) {
-      return { available: 0, resetTime: 0 };
-    }
-    
-    return {
-      available: bucket.getAvailableTokens(),
-      resetTime: bucket.getResetTime()
-    };
-  }
+      await supabase
+        .from('api_usage_logs')
+        .delete()
+        .lt('created_at', cutoffDate.toISOString());
 
-  checkAbusePattern(userId: string, action: string): { isAbusive: boolean; severity: 'low' | 'medium' | 'high' | 'critical' } {
-    const userKey = `${userId}-${action}`;
-    const now = Date.now();
-    const window = 60000; // 1 minute window
-    
-    if (!this.abuseTracking.has(userKey)) {
-      this.abuseTracking.set(userKey, []);
+      globalErrorLogger.log('INFO', 'Cleaned old usage logs', {
+        cutoffDate: cutoffDate.toISOString()
+      });
+    } catch (error: any) {
+      globalErrorLogger.log('ERROR', 'Failed to clean old logs', {
+        error: error.message
+      });
     }
-    
-    const actions = this.abuseTracking.get(userKey)!;
-    
-    // Clean old entries
-    const recentActions = actions.filter(timestamp => now - timestamp < window);
-    this.abuseTracking.set(userKey, recentActions);
-    
-    // Add current action
-    recentActions.push(now);
-    
-    // Determine abuse severity
-    if (recentActions.length > 100) {
-      return { isAbusive: true, severity: 'critical' };
-    } else if (recentActions.length > 50) {
-      return { isAbusive: true, severity: 'high' };
-    } else if (recentActions.length > 25) {
-      return { isAbusive: true, severity: 'medium' };
-    } else if (recentActions.length > 15) {
-      return { isAbusive: true, severity: 'low' };
-    }
-    
-    return { isAbusive: false, severity: 'low' };
   }
 }
-
-class TokenBucket {
-  private tokens: number;
-  private lastRefill: number;
-  private refillRate: number;
-
-  constructor(
-    private capacity: number,
-    private windowMs: number
-  ) {
-    this.tokens = capacity;
-    this.lastRefill = Date.now();
-    this.refillRate = capacity / windowMs; // tokens per millisecond
-  }
-
-  consume(): boolean {
-    this.refill();
-    
-    if (this.tokens >= 1) {
-      this.tokens -= 1;
-      return true;
-    }
-    
-    return false;
-  }
-
-  private refill(): void {
-    const now = Date.now();
-    const timePassed = now - this.lastRefill;
-    const tokensToAdd = timePassed * this.refillRate;
-    
-    this.tokens = Math.min(this.capacity, this.tokens + tokensToAdd);
-    this.lastRefill = now;
-  }
-
-  getAvailableTokens(): number {
-    this.refill();
-    return Math.floor(this.tokens);
-  }
-
-  getWaitTime(): number {
-    this.refill();
-    
-    if (this.tokens >= 1) {
-      return 0;
-    }
-    
-    const tokensNeeded = 1 - this.tokens;
-    return Math.ceil(tokensNeeded / this.refillRate);
-  }
-
-  getResetTime(): number {
-    const tokensNeeded = this.capacity - this.tokens;
-    return Date.now() + Math.ceil(tokensNeeded / this.refillRate);
-  }
-}
-
-// Global rate limiter instance
-export const globalRateLimiter = new RateLimiter();

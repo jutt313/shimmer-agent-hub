@@ -1,12 +1,15 @@
-
 import { useState, useEffect, useRef } from "react";
 import { AlertTriangle, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
 import ErrorAnalysisModal from "./ErrorAnalysisModal";
+import { useProductionErrorHandler } from '@/utils/productionErrorHandler';
+import { OAuthTokenManager } from '@/utils/oauthTokenManager';
+import { WebhookDeliverySystem } from '@/utils/webhookDeliverySystem';
 
 const ErrorIndicator = () => {
-  const { currentError, showErrorModal, setShowErrorModal, clearError, handleError } = useErrorHandler();
+  const { currentError, showErrorModal, setShowErrorModal, clearError } = useErrorHandler();
+  const { handleError: handleProductionError } = useProductionErrorHandler();
   const [hasError, setHasError] = useState(false);
   const [position, setPosition] = useState({ x: window.innerWidth - 80, y: window.innerHeight - 120 });
   const [isDragging, setIsDragging] = useState(false);
@@ -15,62 +18,99 @@ const ErrorIndicator = () => {
 
   // Listen for React Error Boundary errors
   useEffect(() => {
-    const handleReactError = (event: CustomEvent) => {
+    const handleReactError = async (event: CustomEvent) => {
       console.log('🚨 React error caught by ErrorIndicator:', event.detail);
       setHasError(true);
-      handleError(event.detail.error, {
+      
+      // Handle with production error handler
+      await handleProductionError(event.detail.error, {
+        type: 'system',
         fileName: event.detail.fileName || 'React Component',
-        userAction: event.detail.userAction || 'Component Rendering'
+        additionalContext: {
+          componentStack: event.detail.errorInfo?.componentStack,
+          userAction: event.detail.userAction || 'Component Rendering'
+        },
+        showToast: false // We'll handle the toast manually
       });
     };
 
-    window.addEventListener('react-error', handleReactError as EventListener);
-    return () => window.removeEventListener('react-error', handleReactError as EventListener);
-  }, [handleError]);
-
-  // Global error listeners
-  useEffect(() => {
-    const handleGlobalError = (event: ErrorEvent) => {
+    const handleGlobalError = async (event: ErrorEvent) => {
       console.log('🚨 Global error caught:', event.error);
       setHasError(true);
-      handleError(event.error, {
+      
+      await handleProductionError(event.error, {
+        type: 'system',
         fileName: event.filename || 'Unknown file',
-        userAction: 'Page interaction'
+        additionalContext: {
+          lineno: event.lineno,
+          colno: event.colno,
+          userAction: 'Page interaction'
+        },
+        showToast: false
       });
     };
 
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+    const handleUnhandledRejection = async (event: PromiseRejectionEvent) => {
       console.log('🚨 Promise rejection caught:', event.reason);
       setHasError(true);
-      handleError(event.reason, {
-        fileName: 'Promise rejection',
-        userAction: 'Async operation'
+      
+      await handleProductionError(event.reason, {
+        type: 'api',
+        additionalContext: {
+          userAction: 'Async operation',
+          promiseRejection: true
+        },
+        showToast: false
       });
     };
 
-    // Console error listener
+    // Enhanced console error listener
     const originalConsoleError = console.error;
-    console.error = (...args) => {
+    console.error = async (...args) => {
       originalConsoleError.apply(console, args);
-      if (args.length > 0 && typeof args[0] === 'string' && args[0].toLowerCase().includes('error')) {
-        console.log('🚨 Console error detected:', args.join(' '));
+      
+      const errorMessage = args.join(' ');
+      if (errorMessage.toLowerCase().includes('error') && 
+          !errorMessage.includes('Warning') && 
+          !errorMessage.includes('DevTools')) {
+        
+        console.log('🚨 Console error detected:', errorMessage);
         setHasError(true);
-        handleError(args.join(' '), {
-          fileName: 'Console error',
-          userAction: 'Application runtime'
+        
+        // Classify error type based on message
+        let errorType: 'oauth' | 'webhook' | 'api' | 'system' | 'validation' = 'system';
+        if (errorMessage.toLowerCase().includes('oauth') || errorMessage.toLowerCase().includes('token')) {
+          errorType = 'oauth';
+        } else if (errorMessage.toLowerCase().includes('webhook')) {
+          errorType = 'webhook';
+        } else if (errorMessage.toLowerCase().includes('api') || errorMessage.toLowerCase().includes('fetch')) {
+          errorType = 'api';
+        } else if (errorMessage.toLowerCase().includes('validation')) {
+          errorType = 'validation';
+        }
+        
+        await handleProductionError(errorMessage, {
+          type: errorType,
+          additionalContext: {
+            source: 'console',
+            userAction: 'Application runtime'
+          },
+          showToast: false
         });
       }
     };
 
     window.addEventListener('error', handleGlobalError);
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    window.addEventListener('react-error', handleReactError as EventListener);
 
     return () => {
       window.removeEventListener('error', handleGlobalError);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      window.removeEventListener('react-error', handleReactError as EventListener);
       console.error = originalConsoleError;
     };
-  }, [handleError]);
+  }, [handleProductionError]);
 
   // Update position when window resizes
   useEffect(() => {
@@ -130,7 +170,7 @@ const ErrorIndicator = () => {
     };
   }, [isDragging, dragOffset]);
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = async (e: React.MouseEvent) => {
     // Prevent click if we were dragging
     if (isDragging) {
       e.preventDefault();
@@ -140,13 +180,17 @@ const ErrorIndicator = () => {
     if (currentError || hasError) {
       setShowErrorModal(true);
     } else {
-      // For testing - simulate an error
-      console.log('🧪 Testing error system...');
+      // Enhanced testing - test all production systems
+      console.log('🧪 Testing production error systems...');
       setHasError(true);
-      handleError("Test error: System check initiated", {
-        fileName: "ErrorIndicator.tsx",
-        userAction: "Testing error analysis system"
+      
+      // Test different error types
+      await handleProductionError("Test OAuth error: Token validation failed", {
+        type: 'oauth',
+        additionalContext: { test: true },
+        showToast: false
       });
+      
       setShowErrorModal(true);
     }
   };

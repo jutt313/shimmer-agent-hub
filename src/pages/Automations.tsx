@@ -14,8 +14,6 @@ import ChatCard from '@/components/ChatCard';
 import HelpChatModal from '@/components/HelpChatModal';
 import NotificationDropdown from '@/components/NotificationDropdown';
 import SettingsDropdown from '@/components/SettingsDropdown';
-import SystemOverview from '@/components/SystemOverview';
-import DeveloperDashboard from '@/components/DeveloperDashboard';
 
 interface Agent {
   name: string;
@@ -63,7 +61,6 @@ const Automations = () => {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [helpInitialMessage, setHelpInitialMessage] = useState<string>('');
   const [helpInitialContext, setHelpInitialContext] = useState<string>('');
-  const [showDevDashboard, setShowDevDashboard] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -212,14 +209,6 @@ const Automations = () => {
               <MessageCircle className="w-5 h-5 mr-2" />
               Help
             </Button>
-            <Button
-              onClick={() => setShowDevDashboard(!showDevDashboard)}
-              variant="outline"
-              className="rounded-xl border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-200"
-            >
-              <Settings className="w-5 h-5 mr-2" />
-              Dev Dashboard
-            </Button>
             <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
               <DialogTrigger asChild>
                 <Button
@@ -286,16 +275,6 @@ const Automations = () => {
             </Dialog>
           </div>
         </div>
-
-        {/* Developer Dashboard */}
-        {showDevDashboard && (
-          <div className="mb-8">
-            <DeveloperDashboard />
-          </div>
-        )}
-
-        {/* System Overview */}
-        <SystemOverview />
 
         {/* Automations List */}
         {automations.length === 0 ? (

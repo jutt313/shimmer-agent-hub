@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
@@ -48,10 +47,19 @@ serve(async (req) => {
       )
     }
 
-    // Update last used timestamp
+    // Update last used timestamp and usage count
     await supabase
       .from('user_api_tokens')
-      .update({ last_used_at: new Date().toISOString() })
+      .update({ 
+        last_used_at: new Date().toISOString(),
+        usage_count: supabase.sql`usage_count + 1`,
+        last_usage_details: {
+          endpoint: url.pathname,
+          method: method,
+          timestamp: new Date().toISOString(),
+          user_agent: req.headers.get('User-Agent')
+        }
+      })
       .eq('token_hash', await hashToken(token))
 
     // Log API usage
@@ -76,10 +84,15 @@ serve(async (req) => {
       return await handleWebhooksAPI(userSupabase, tokenData, method, path, req)
     } else if (path[0] === 'execute') {
       return await handleExecuteAPI(userSupabase, tokenData, method, path, req)
+    } else if (path[0] === 'events') {
+      return await handleEventsAPI(userSupabase, tokenData, method, path, req)
     } else {
       return new Response(
         JSON.stringify({ 
           error: 'Not Found',
+          message: 'Welcome to YusrAI API v1.0',
+          base_url: 'https://api.yusrai.com',
+          documentation: 'https://docs.yusrai.com/api',
           available_endpoints: [
             'GET /automations - List user automations',
             'GET /automations/{id} - Get automation details',
@@ -88,18 +101,21 @@ serve(async (req) => {
             'DELETE /automations/{id} - Delete automation',
             'GET /automations/{id}/webhooks - Get automation webhooks',
             'POST /automations/{id}/webhooks - Create webhook',
-            'POST /execute/{id} - Execute automation'
+            'GET /webhooks - List all webhooks',
+            'POST /execute/{id} - Execute automation',
+            'GET /events - List webhook events',
+            'POST /events - Create webhook event'
           ]
         }),
         { 
-          status: 404, 
+          status: path.length === 0 ? 200 : 404, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       )
     }
 
   } catch (error) {
-    console.error('API Error:', error)
+    console.error('YusrAI API Error:', error)
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
       { 
@@ -327,7 +343,7 @@ async function handleWebhooksAPI(supabase: any, tokenData: any, method: string, 
     if (method === 'GET' && path.length === 1) {
       // GET /webhooks - List all user webhooks
       const { data, error } = await supabase
-        .from('automation_webhooks')
+        .from('webhook_events')
         .select(`
           *,
           automations!inner(title, description)
@@ -398,4 +414,69 @@ async function handleExecuteAPI(supabase: any, tokenData: any, method: string, p
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
+}
+
+async function handleEventsAPI(supabase: any, tokenData: any, method: string, path: string[], req: Request) {
+  const userId = tokenData.user_id
+
+  try {
+    if (method === 'GET' && path.length === 1) {
+      // GET /events - List webhook events
+      const { data, error } = await supabase
+        .from('webhook_events')
+        .select(`
+          *,
+          automations!inner(title, description, user_id)
+        `)
+        .eq('automations.user_id', userId)
+
+      if (error) throw error
+
+      return new Response(
+        JSON.stringify({ data }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (method === 'POST' && path.length === 1) {
+      // POST /events - Create webhook event
+      if (!tokenData.permissions.webhook) {
+        return new Response(
+          JSON.stringify({ error: 'Insufficient webhook permissions' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const body = await req.json()
+      const webhookUrl = `https://api.yusrai.com/webhooks/${crypto.randomUUID()}`
+      
+      const { data, error } = await supabase
+        .from('webhook_events')
+        .insert({
+          ...body,
+          webhook_url: webhookUrl
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      return new Response(
+        JSON.stringify({ data }),
+        { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+  } catch (error) {
+    console.error('Events API Error:', error)
+    return new Response(
+      JSON.stringify({ error: error.message || 'Internal server error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
+
+  return new Response(
+    JSON.stringify({ error: 'Method not allowed' }),
+    { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  )
 }

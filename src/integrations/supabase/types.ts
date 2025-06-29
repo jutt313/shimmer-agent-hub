@@ -399,46 +399,73 @@ export type Database = {
       developer_integrations: {
         Row: {
           app_description: string | null
+          app_logo_url: string | null
           app_name: string
           client_id: string
           client_secret: string
           created_at: string
+          developer_email: string | null
+          event_descriptions: Json | null
+          homepage_url: string | null
           id: string
           is_active: boolean
+          privacy_policy_url: string | null
           rate_limit_per_hour: number
           redirect_uris: string[]
+          supported_events: Json | null
+          terms_of_service_url: string | null
           tier: Database["public"]["Enums"]["developer_tier"]
+          tool_description: string | null
           updated_at: string
+          use_cases: string[] | null
           user_id: string
           webhook_url: string | null
         }
         Insert: {
           app_description?: string | null
+          app_logo_url?: string | null
           app_name: string
           client_id?: string
           client_secret?: string
           created_at?: string
+          developer_email?: string | null
+          event_descriptions?: Json | null
+          homepage_url?: string | null
           id?: string
           is_active?: boolean
+          privacy_policy_url?: string | null
           rate_limit_per_hour?: number
           redirect_uris?: string[]
+          supported_events?: Json | null
+          terms_of_service_url?: string | null
           tier?: Database["public"]["Enums"]["developer_tier"]
+          tool_description?: string | null
           updated_at?: string
+          use_cases?: string[] | null
           user_id: string
           webhook_url?: string | null
         }
         Update: {
           app_description?: string | null
+          app_logo_url?: string | null
           app_name?: string
           client_id?: string
           client_secret?: string
           created_at?: string
+          developer_email?: string | null
+          event_descriptions?: Json | null
+          homepage_url?: string | null
           id?: string
           is_active?: boolean
+          privacy_policy_url?: string | null
           rate_limit_per_hour?: number
           redirect_uris?: string[]
+          supported_events?: Json | null
+          terms_of_service_url?: string | null
           tier?: Database["public"]["Enums"]["developer_tier"]
+          tool_description?: string | null
           updated_at?: string
+          use_cases?: string[] | null
           user_id?: string
           webhook_url?: string | null
         }
@@ -678,39 +705,51 @@ export type Database = {
       }
       user_api_tokens: {
         Row: {
+          connection_purpose: string | null
           created_at: string
           expires_at: string | null
           id: string
           is_active: boolean
+          last_usage_details: Json | null
           last_used_at: string | null
           permissions: Json
+          token_description: string | null
           token_hash: string
           token_name: string
           token_type: Database["public"]["Enums"]["api_token_type"]
+          usage_count: number | null
           user_id: string
         }
         Insert: {
+          connection_purpose?: string | null
           created_at?: string
           expires_at?: string | null
           id?: string
           is_active?: boolean
+          last_usage_details?: Json | null
           last_used_at?: string | null
           permissions?: Json
+          token_description?: string | null
           token_hash: string
           token_name: string
           token_type?: Database["public"]["Enums"]["api_token_type"]
+          usage_count?: number | null
           user_id: string
         }
         Update: {
+          connection_purpose?: string | null
           created_at?: string
           expires_at?: string | null
           id?: string
           is_active?: boolean
+          last_usage_details?: Json | null
           last_used_at?: string | null
           permissions?: Json
+          token_description?: string | null
           token_hash?: string
           token_name?: string
           token_type?: Database["public"]["Enums"]["api_token_type"]
+          usage_count?: number | null
           user_id?: string
         }
         Relationships: []
@@ -810,6 +849,53 @@ export type Database = {
             columns: ["automation_webhook_id"]
             isOneToOne: false
             referencedRelation: "automation_webhooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_events: {
+        Row: {
+          automation_id: string | null
+          created_at: string | null
+          event_description: string | null
+          event_type: string
+          id: string
+          is_active: boolean | null
+          last_triggered_at: string | null
+          trigger_count: number | null
+          updated_at: string | null
+          webhook_url: string
+        }
+        Insert: {
+          automation_id?: string | null
+          created_at?: string | null
+          event_description?: string | null
+          event_type: string
+          id?: string
+          is_active?: boolean | null
+          last_triggered_at?: string | null
+          trigger_count?: number | null
+          updated_at?: string | null
+          webhook_url: string
+        }
+        Update: {
+          automation_id?: string | null
+          created_at?: string | null
+          event_description?: string | null
+          event_type?: string
+          id?: string
+          is_active?: boolean | null
+          last_triggered_at?: string | null
+          trigger_count?: number | null
+          updated_at?: string | null
+          webhook_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_events_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
             referencedColumns: ["id"]
           },
         ]

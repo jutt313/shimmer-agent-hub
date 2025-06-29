@@ -1,9 +1,10 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Webhook, Key, Globe } from 'lucide-react';
+import { Webhook, Key, Globe, Play } from 'lucide-react';
 import WebhooksSection from '@/components/developer/WebhooksSection';
 import PersonalApiTokensSection from '@/components/developer/PersonalApiTokensSection';
 import OAuthAppsSection from '@/components/developer/OAuthAppsSection';
+import APITestingConsole from '@/components/developer/APITestingConsole';
 
 const DeveloperAPITab = () => {
   return (
@@ -19,15 +20,22 @@ const DeveloperAPITab = () => {
           </h2>
         </div>
         <p className="text-gray-600">
-          Build powerful integrations with the YusrAI platform using our APIs, webhooks, and OAuth system
+          Build powerful integrations with the YusrAI platform using our APIs, webhooks, OAuth system, and real-time connections
         </p>
       </div>
 
       {/* Content - Full height with proper scrolling */}
       <div className="flex-1 min-h-0 overflow-hidden">
-        <Tabs defaultValue="webhooks" className="h-full flex flex-col">
+        <Tabs defaultValue="console" className="h-full flex flex-col">
           <div className="flex-shrink-0 px-6 pt-4">
-            <TabsList className="grid w-full grid-cols-3 bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200 shadow-sm">
+            <TabsList className="grid w-full grid-cols-4 bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200 shadow-sm">
+              <TabsTrigger 
+                value="console" 
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-green-600 data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-all duration-200"
+              >
+                <Play className="w-4 h-4 mr-2" />
+                API Console
+              </TabsTrigger>
               <TabsTrigger 
                 value="webhooks" 
                 className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-all duration-200"
@@ -44,7 +52,7 @@ const DeveloperAPITab = () => {
               </TabsTrigger>
               <TabsTrigger 
                 value="oauth"
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-green-600 data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-all duration-200"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-orange-600 data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-all duration-200"
               >
                 <Globe className="w-4 h-4 mr-2" />
                 OAuth Apps
@@ -53,6 +61,11 @@ const DeveloperAPITab = () => {
           </div>
           
           <div className="flex-1 min-h-0 overflow-hidden">
+            <TabsContent value="console" className="h-full m-0 data-[state=active]:flex data-[state=active]:flex-col">
+              <div className="flex-1 overflow-y-auto p-6 pt-4">
+                <APITestingConsole />
+              </div>
+            </TabsContent>
             <TabsContent value="webhooks" className="h-full m-0 data-[state=active]:flex data-[state=active]:flex-col">
               <div className="flex-1 overflow-y-auto p-6 pt-4">
                 <WebhooksSection />

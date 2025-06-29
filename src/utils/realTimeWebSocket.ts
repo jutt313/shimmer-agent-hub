@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 
 export interface RealTimeEvent {
   type: 'automation_run_update' | 'webhook_delivery_update' | 'api_usage_update' | 'connection_ack' | 'authenticated' | 'subscribed' | 'error' | 'pong';

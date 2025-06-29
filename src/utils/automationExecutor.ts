@@ -9,7 +9,7 @@ import {
   DEFAULT_RETRY_CONFIG, 
   DEFAULT_CIRCUIT_BREAKER_CONFIG 
 } from './errorHandler';
-import { globalRateLimiter } from './rateLimiter';
+import { RateLimiter } from './rateLimiter';
 
 export interface ExecutionContext {
   variables: Record<string, any>;
@@ -191,10 +191,10 @@ export class AutomationExecutor {
       parameters
     }, step.id, this.context.automationId, this.context.runId);
 
-    // Check rate limit
-    const canProceed = await globalRateLimiter.checkRateLimit(platformName);
-    if (!canProceed) {
-      await globalRateLimiter.waitForRateLimit(platformName);
+    // Check rate limit using static method
+    const rateLimitResult = await RateLimiter.checkRateLimit(this.context.userId, platformName);
+    if (!rateLimitResult.allowed) {
+      throw new Error(`Rate limit exceeded for ${platformName}. Please try again later.`);
     }
 
     const platformCreds = this.credentials[platformName];
@@ -248,6 +248,17 @@ export class AutomationExecutor {
       if (action.output_variable) {
         this.context.variables[action.output_variable] = result;
       }
+
+      // Record successful usage
+      await RateLimiter.recordUsage(
+        this.context.userId,
+        `${platformName}.${method}`,
+        'POST',
+        200,
+        undefined,
+        undefined,
+        this.context.automationId
+      );
 
       globalErrorLogger.log('INFO', `✅ Action completed successfully`, {
         result

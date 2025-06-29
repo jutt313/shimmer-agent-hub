@@ -8,18 +8,21 @@ export const ensureProductionTables = async () => {
     
     // Check if error_logs table is accessible
     const { error: errorLogsCheck } = await supabase
-      .rpc('pg_table_exists', { schema: 'public', table_name: 'error_logs' })
-      .single();
+      .from('error_logs')
+      .select('id')
+      .limit(1);
 
     // Check if monitoring_events table is accessible  
     const { error: monitoringCheck } = await supabase
-      .rpc('pg_table_exists', { schema: 'public', table_name: 'monitoring_events' })
-      .single();
+      .from('monitoring_events')
+      .select('id')
+      .limit(1);
 
     // Check if webhook_delivery_logs is accessible
     const { error: webhookLogsCheck } = await supabase
-      .rpc('pg_table_exists', { schema: 'public', table_name: 'webhook_delivery_logs' })
-      .single();
+      .from('webhook_delivery_logs')
+      .select('id')
+      .limit(1);
 
     console.log('Production tables status:', {
       error_logs: !errorLogsCheck,

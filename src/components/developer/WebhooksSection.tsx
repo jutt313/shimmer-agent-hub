@@ -2,21 +2,18 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Copy, Trash2, Plus, Webhook, ExternalLink, Activity } from 'lucide-react';
+import { Copy, Trash2, Plus, Webhook, ExternalLink, Activity, Zap, Globe } from 'lucide-react';
 import { useWebhookEvents } from '@/hooks/useWebhookEvents';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 
 const WebhooksSection = () => {
-  const { webhookEvents, loading, createWebhookEvent, toggleWebhookStatus, deleteWebhookEvent } = useWebhookEvents();
+  const { webhookEvents, automations, eventTypes, loading, createWebhookEvent, toggleWebhookStatus, deleteWebhookEvent } = useWebhookEvents();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [automations, setAutomations] = useState<any[]>([]);
   const [newWebhook, setNewWebhook] = useState({
     automation_id: '',
     event_type: '',
@@ -49,21 +46,6 @@ const WebhooksSection = () => {
     });
   };
 
-  // Fetch automations when dialog opens
-  const fetchAutomations = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('automations')
-        .select('id, title')
-        .eq('status', 'active');
-      
-      if (error) throw error;
-      setAutomations(data || []);
-    } catch (error) {
-      console.error('Error fetching automations:', error);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -77,17 +59,16 @@ const WebhooksSection = () => {
         </div>
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogTrigger asChild>
-            <Button 
-              onClick={fetchAutomations}
-              className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl"
-            >
+            <Button className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200">
               <Plus className="w-4 h-4 mr-2" />
               Create Webhook
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md rounded-2xl">
+          <DialogContent className="max-w-md rounded-2xl border-0 shadow-2xl">
             <DialogHeader>
-              <DialogTitle className="text-center text-xl">Create New Webhook</DialogTitle>
+              <DialogTitle className="text-center text-xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Create New Webhook
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div>
@@ -97,13 +78,19 @@ const WebhooksSection = () => {
                 <Select value={newWebhook.automation_id} onValueChange={(value) => 
                   setNewWebhook(prev => ({ ...prev, automation_id: value }))
                 }>
-                  <SelectTrigger className="rounded-xl">
+                  <SelectTrigger className="rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500">
                     <SelectValue placeholder="Choose an automation" />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl">
+                  <SelectContent className="rounded-xl border-0 shadow-xl">
                     {automations.map(automation => (
-                      <SelectItem key={automation.id} value={automation.id}>
-                        {automation.title}
+                      <SelectItem key={automation.id} value={automation.id} className="rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${automation.status === 'active' ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                          {automation.title}
+                          <Badge variant={automation.status === 'active' ? 'default' : 'secondary'} className="text-xs">
+                            {automation.status}
+                          </Badge>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -114,12 +101,23 @@ const WebhooksSection = () => {
                 <label className="text-sm font-medium text-gray-700 mb-2 block">
                   Event Type *
                 </label>
-                <Input
-                  placeholder="e.g., payment_completed, user_registered"
-                  value={newWebhook.event_type}
-                  onChange={(e) => setNewWebhook(prev => ({ ...prev, event_type: e.target.value }))}
-                  className="rounded-xl"
-                />
+                <Select value={newWebhook.event_type} onValueChange={(value) => 
+                  setNewWebhook(prev => ({ ...prev, event_type: value }))
+                }>
+                  <SelectTrigger className="rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                    <SelectValue placeholder="Select event type" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-0 shadow-xl">
+                    {eventTypes.map(eventType => (
+                      <SelectItem key={eventType} value={eventType} className="rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Zap className="w-3 h-3 text-blue-500" />
+                          {eventType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               
               <div>
@@ -130,14 +128,14 @@ const WebhooksSection = () => {
                   placeholder="Describe what this webhook is used for..."
                   value={newWebhook.event_description}
                   onChange={(e) => setNewWebhook(prev => ({ ...prev, event_description: e.target.value }))}
-                  className="rounded-xl"
+                  className="rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                   rows={3}
                 />
               </div>
               
               <Button 
                 onClick={handleCreateWebhook} 
-                className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl"
+                className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
               >
                 Create Webhook
               </Button>
@@ -147,11 +145,16 @@ const WebhooksSection = () => {
       </div>
 
       {loading ? (
-        <div className="text-center py-8">Loading webhooks...</div>
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="text-gray-600 mt-2">Loading webhooks...</p>
+        </div>
       ) : webhookEvents.length === 0 ? (
-        <Card className="border-dashed border-2 border-gray-300 rounded-2xl">
+        <Card className="border-dashed border-2 border-gray-300 rounded-2xl bg-gradient-to-br from-blue-50/50 to-purple-50/50">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <Webhook className="h-12 w-12 text-gray-400 mb-4" />
+            <div className="p-4 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full mb-4">
+              <Webhook className="h-12 w-12 text-blue-600" />
+            </div>
             <h3 className="text-lg font-medium text-gray-600 mb-2">No webhooks created yet</h3>
             <p className="text-gray-500 text-center mb-6">
               Create your first webhook to start receiving external triggers for your automations
@@ -161,7 +164,7 @@ const WebhooksSection = () => {
       ) : (
         <div className="grid gap-4">
           {webhookEvents.map((webhook) => (
-            <Card key={webhook.id} className="rounded-2xl border border-gray-200 hover:shadow-lg transition-all">
+            <Card key={webhook.id} className="rounded-2xl border border-gray-200 hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-white to-blue-50/30">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -169,10 +172,17 @@ const WebhooksSection = () => {
                       <Webhook className="h-5 w-5 text-blue-600" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg">{webhook.event_type}</CardTitle>
+                      <CardTitle className="text-lg text-gray-800">{webhook.event_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</CardTitle>
                       <p className="text-sm text-gray-500">
                         {webhook.event_description || 'No description provided'}
                       </p>
+                      {webhook.automation && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="outline" className="text-xs">
+                            {webhook.automation.title}
+                          </Badge>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -193,15 +203,15 @@ const WebhooksSection = () => {
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                    <code className="text-sm font-mono text-gray-700 break-all">
+                  <div className="flex items-center justify-between p-3 bg-gradient-to-r from-gray-50 to-blue-50/50 rounded-xl border border-gray-100">
+                    <code className="text-sm font-mono text-gray-700 break-all flex-1 mr-2">
                       {webhook.webhook_url}
                     </code>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => copyWebhookUrl(webhook.webhook_url)}
-                      className="ml-2 hover:bg-white rounded-lg"
+                      className="hover:bg-white rounded-lg flex-shrink-0"
                     >
                       <Copy className="h-4 w-4" />
                     </Button>
@@ -228,10 +238,12 @@ const WebhooksSection = () => {
         </div>
       )}
 
-      <Card className="border border-blue-200 bg-blue-50/30 rounded-2xl">
+      <Card className="border border-blue-200 bg-gradient-to-r from-blue-50/50 to-purple-50/50 rounded-2xl">
         <CardContent className="p-4">
           <div className="flex items-center gap-3">
-            <ExternalLink className="h-5 w-5 text-blue-600" />
+            <div className="p-2 bg-gradient-to-r from-blue-100 to-purple-100 rounded-lg">
+              <ExternalLink className="h-5 w-5 text-blue-600" />
+            </div>
             <div>
               <h4 className="font-medium text-blue-900">Need help with webhooks?</h4>
               <p className="text-sm text-blue-700">
@@ -240,7 +252,7 @@ const WebhooksSection = () => {
                   href="https://docs.yusrai.com/webhooks" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="underline hover:text-blue-800"
+                  className="underline hover:text-blue-800 font-medium"
                 >
                   webhook documentation
                 </a>

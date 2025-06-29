@@ -15,19 +15,65 @@ export interface WebhookEvent {
   last_triggered_at: string | null;
   created_at: string;
   updated_at: string;
+  automation?: {
+    title: string;
+    status: string;
+  };
+}
+
+export interface Automation {
+  id: string;
+  title: string;
+  status: string;
 }
 
 export const useWebhookEvents = () => {
   const [webhookEvents, setWebhookEvents] = useState<WebhookEvent[]>([]);
+  const [automations, setAutomations] = useState<Automation[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
 
+  // Predefined event types for dropdown
+  const eventTypes = [
+    'payment_completed',
+    'user_registered',
+    'order_created',
+    'subscription_cancelled',
+    'form_submitted',
+    'email_opened',
+    'link_clicked',
+    'file_uploaded',
+    'task_completed',
+    'notification_sent'
+  ];
+
   useEffect(() => {
     if (user) {
       fetchWebhookEvents();
+      fetchAutomations();
     }
   }, [user]);
+
+  const fetchAutomations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('automations')
+        .select('id, title, status')
+        .eq('user_id', user?.id)
+        .order('title');
+
+      if (error) throw error;
+      setAutomations(data || []);
+    } catch (error) {
+      console.error('Error fetching automations:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load automations",
+        variant: "destructive",
+      });
+    }
+  };
 
   const fetchWebhookEvents = async () => {
     try {
@@ -35,7 +81,7 @@ export const useWebhookEvents = () => {
         .from('webhook_events')
         .select(`
           *,
-          automations!inner(title)
+          automations!inner(title, status)
         `)
         .order('created_at', { ascending: false });
 
@@ -67,7 +113,10 @@ export const useWebhookEvents = () => {
           ...webhookData,
           webhook_url: webhookUrl,
         })
-        .select()
+        .select(`
+          *,
+          automations!inner(title, status)
+        `)
         .single();
 
       if (error) throw error;
@@ -147,6 +196,8 @@ export const useWebhookEvents = () => {
 
   return {
     webhookEvents,
+    automations,
+    eventTypes,
     loading,
     createWebhookEvent,
     toggleWebhookStatus,

@@ -26,6 +26,30 @@ export interface EnhancedApiToken {
   created_at: string;
 }
 
+const parsePermissions = (permissions: any) => {
+  // Type guard to check if permissions is an object and not an array
+  if (typeof permissions === 'object' && permissions !== null && !Array.isArray(permissions)) {
+    return {
+      read: Boolean(permissions.read || false),
+      write: Boolean(permissions.write || false),
+      webhook: Boolean(permissions.webhook || false),
+      notifications: Boolean(permissions.notifications || false),
+      full_control: Boolean(permissions.full_control || false),
+      platform_connections: Boolean(permissions.platform_connections || false),
+    };
+  }
+  
+  // Default permissions if parsing fails
+  return {
+    read: true,
+    write: false,
+    webhook: false,
+    notifications: false,
+    full_control: false,
+    platform_connections: false,
+  };
+};
+
 export const useEnhancedApiTokens = () => {
   const [tokens, setTokens] = useState<EnhancedApiToken[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,23 +74,7 @@ export const useEnhancedApiTokens = () => {
       
       const transformedTokens: EnhancedApiToken[] = (data || []).map(token => ({
         ...token,
-        permissions: typeof token.permissions === 'object' && token.permissions !== null 
-          ? {
-              read: token.permissions.read || false,
-              write: token.permissions.write || false,
-              webhook: token.permissions.webhook || false,
-              notifications: token.permissions.notifications || false,
-              full_control: token.permissions.full_control || false,
-              platform_connections: token.permissions.platform_connections || false,
-            }
-          : {
-              read: true,
-              write: false,
-              webhook: false,
-              notifications: false,
-              full_control: false,
-              platform_connections: false,
-            },
+        permissions: parsePermissions(token.permissions),
         usage_count: token.usage_count || 0,
       }));
       
@@ -115,9 +123,7 @@ export const useEnhancedApiTokens = () => {
 
       const transformedToken: EnhancedApiToken = {
         ...data,
-        permissions: typeof data.permissions === 'object' && data.permissions !== null 
-          ? data.permissions as any
-          : { read: true, write: false, webhook: false, notifications: false, full_control: false, platform_connections: false },
+        permissions: parsePermissions(data.permissions),
         usage_count: data.usage_count || 0,
       };
 

@@ -24,6 +24,9 @@ export interface EnhancedDeveloperApp {
   is_active: boolean;
   tier: 'free' | 'pro' | 'enterprise';
   rate_limit_per_hour: number;
+  environment: 'test' | 'production';
+  test_client_id?: string;
+  test_client_secret?: string;
   created_at: string;
   updated_at: string;
 }
@@ -50,7 +53,15 @@ export const useEnhancedDeveloperApps = () => {
 
       if (error) throw error;
       
-      setApps(data || []);
+      // Transform data to include environment settings
+      const transformedApps = (data || []).map(app => ({
+        ...app,
+        environment: app.environment || 'test' as 'test' | 'production',
+        test_client_id: app.test_client_id || `test_${app.client_id}`,
+        test_client_secret: app.test_client_secret || `test_${app.client_secret}`
+      }));
+      
+      setApps(transformedApps);
     } catch (error) {
       console.error('Error fetching developer apps:', error);
       toast({
@@ -77,8 +88,13 @@ export const useEnhancedDeveloperApps = () => {
     use_cases?: string[];
     supported_events?: any;
     event_descriptions?: any;
+    environment?: 'test' | 'production';
   }) => {
     try {
+      // Generate test credentials
+      const testClientId = `test_${crypto.randomUUID().replace(/-/g, '').substring(0, 16)}`;
+      const testClientSecret = `test_secret_${crypto.randomUUID().replace(/-/g, '').substring(0, 32)}`;
+
       const { data, error } = await supabase
         .from('developer_integrations')
         .insert({
@@ -88,20 +104,30 @@ export const useEnhancedDeveloperApps = () => {
           use_cases: appData.use_cases || [],
           supported_events: appData.supported_events || [],
           event_descriptions: appData.event_descriptions || {},
+          environment: appData.environment || 'test',
+          test_client_id: testClientId,
+          test_client_secret: testClientSecret,
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      setApps(prev => [data, ...prev]);
+      const transformedApp = {
+        ...data,
+        environment: data.environment || 'test' as 'test' | 'production',
+        test_client_id: testClientId,
+        test_client_secret: testClientSecret
+      };
+
+      setApps(prev => [transformedApp, ...prev]);
       
       toast({
         title: "Success",
-        description: "Developer application created successfully",
+        description: `Developer application created in ${transformedApp.environment} mode`,
       });
 
-      return data;
+      return transformedApp;
     } catch (error) {
       console.error('Error creating developer app:', error);
       toast({
@@ -125,9 +151,16 @@ export const useEnhancedDeveloperApps = () => {
 
       if (error) throw error;
 
+      const transformedApp = {
+        ...data,
+        environment: data.environment || 'test' as 'test' | 'production',
+        test_client_id: data.test_client_id,
+        test_client_secret: data.test_client_secret
+      };
+
       setApps(prev => 
         prev.map(app => 
-          app.id === appId ? { ...app, ...data } : app
+          app.id === appId ? { ...app, ...transformedApp } : app
         )
       );
       
@@ -136,7 +169,7 @@ export const useEnhancedDeveloperApps = () => {
         description: "Developer application updated successfully",
       });
 
-      return data;
+      return transformedApp;
     } catch (error) {
       console.error('Error updating developer app:', error);
       toast({
@@ -145,6 +178,36 @@ export const useEnhancedDeveloperApps = () => {
         variant: "destructive",
       });
       return null;
+    }
+  };
+
+  const switchEnvironment = async (appId: string, newEnvironment: 'test' | 'production') => {
+    try {
+      const { error } = await supabase
+        .from('developer_integrations')
+        .update({ environment: newEnvironment })
+        .eq('id', appId)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      setApps(prev => 
+        prev.map(app => 
+          app.id === appId ? { ...app, environment: newEnvironment } : app
+        )
+      );
+      
+      toast({
+        title: "Success",
+        description: `Switched to ${newEnvironment} mode`,
+      });
+    } catch (error) {
+      console.error('Error switching environment:', error);
+      toast({
+        title: "Error",
+        description: "Failed to switch environment",
+        variant: "destructive",
+      });
     }
   };
 
@@ -211,6 +274,7 @@ export const useEnhancedDeveloperApps = () => {
     updateApp,
     deleteApp,
     toggleAppStatus,
+    switchEnvironment,
     refetch: fetchApps
   };
 };

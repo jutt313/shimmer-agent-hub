@@ -1,83 +1,103 @@
+
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
-import { useToast } from '@/components/ui/use-toast';
+import { Copy, Trash2, Plus, Globe, Shield, ExternalLink, Settings, Eye, EyeOff } from 'lucide-react';
 import { useEnhancedDeveloperApps } from '@/hooks/useEnhancedDeveloperApps';
-import { Globe, Plus, Settings, Copy, Eye, EyeOff, Trash2, Image, Link, TestTube, Zap } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+import ImageUpload from '@/components/ui/image-upload';
+import PermissionsDropdown from './PermissionsDropdown';
 
 const OAuthAppsSection = () => {
   const { apps, loading, createApp, updateApp, deleteApp, toggleAppStatus, switchEnvironment } = useEnhancedDeveloperApps();
-  const { toast } = useToast();
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [selectedApp, setSelectedApp] = useState<any>(null);
-  const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
-
-  const [formData, setFormData] = useState({
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showSecrets, setShowSecrets] = useState<string | null>(null);
+  const [newApp, setNewApp] = useState({
     app_name: '',
     app_description: '',
     redirect_uris: [''],
     webhook_url: '',
     app_logo_url: '',
+    homepage_url: '',
     privacy_policy_url: '',
     terms_of_service_url: '',
-    homepage_url: '',
     developer_email: '',
     tool_description: '',
-    use_cases: [''],
+    use_cases: [] as string[],
+    supported_events: {} as any,
+    event_descriptions: {} as any,
     environment: 'test' as 'test' | 'production'
   });
+  const { toast } = useToast();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.app_name.trim()) {
+  const availableEvents = [
+    { key: 'automation.created', label: 'Automation Created', description: 'Triggered when a new automation is created' },
+    { key: 'automation.updated', label: 'Automation Updated', description: 'Triggered when an automation is modified' },
+    { key: 'automation.deleted', label: 'Automation Deleted', description: 'Triggered when an automation is removed' },
+    { key: 'automation.started', label: 'Automation Started', description: 'Triggered when an automation begins execution' },
+    { key: 'automation.completed', label: 'Automation Completed', description: 'Triggered when an automation finishes successfully' },
+    { key: 'automation.failed', label: 'Automation Failed', description: 'Triggered when an automation encounters an error' },
+    { key: 'user.profile_updated', label: 'Profile Updated', description: 'Triggered when user profile information changes' },
+    { key: 'platform.connected', label: 'Platform Connected', description: 'Triggered when a new platform is connected' },
+    { key: 'platform.disconnected', label: 'Platform Disconnected', description: 'Triggered when a platform is disconnected' }
+  ];
+
+  const handleCreateApp = async () => {
+    if (!newApp.app_name || !newApp.app_description || newApp.redirect_uris.filter(uri => uri.trim()).length === 0) {
       toast({
         title: "Error",
-        description: "App name is required",
+        description: "Please fill in all required fields including at least one redirect URI",
         variant: "destructive",
       });
       return;
     }
 
-    const appData = {
-      ...formData,
-      redirect_uris: formData.redirect_uris.filter(uri => uri.trim()),
-      use_cases: formData.use_cases.filter(uc => uc.trim()),
-      webhook_url: formData.webhook_url || undefined,
-      app_logo_url: formData.app_logo_url || undefined,
-      privacy_policy_url: formData.privacy_policy_url || undefined,
-      terms_of_service_url: formData.terms_of_service_url || undefined,
-      homepage_url: formData.homepage_url || undefined,
-      developer_email: formData.developer_email || undefined,
-      tool_description: formData.tool_description || undefined,
-    };
-
-    const result = await createApp(appData);
+    const result = await createApp(newApp);
     if (result) {
-      setIsCreateDialogOpen(false);
-      setFormData({
+      setNewApp({
         app_name: '',
         app_description: '',
         redirect_uris: [''],
         webhook_url: '',
         app_logo_url: '',
+        homepage_url: '',
         privacy_policy_url: '',
         terms_of_service_url: '',
-        homepage_url: '',
         developer_email: '',
         tool_description: '',
-        use_cases: [''],
+        use_cases: [],
+        supported_events: {},
+        event_descriptions: {},
         environment: 'test'
       });
+      setShowCreateDialog(false);
     }
+  };
+
+  const addRedirectUri = () => {
+    setNewApp(prev => ({
+      ...prev,
+      redirect_uris: [...prev.redirect_uris, '']
+    }));
+  };
+
+  const updateRedirectUri = (index: number, value: string) => {
+    setNewApp(prev => ({
+      ...prev,
+      redirect_uris: prev.redirect_uris.map((uri, i) => i === index ? value : uri)
+    }));
+  };
+
+  const removeRedirectUri = (index: number) => {
+    setNewApp(prev => ({
+      ...prev,
+      redirect_uris: prev.redirect_uris.filter((_, i) => i !== index)
+    }));
   };
 
   const copyToClipboard = (text: string, label: string) => {
@@ -88,471 +108,398 @@ const OAuthAppsSection = () => {
     });
   };
 
-  const toggleSecretVisibility = (appId: string) => {
-    setShowSecrets(prev => ({
+  const handleEventPermissionChange = (eventKey: string, checked: boolean) => {
+    setNewApp(prev => ({
       ...prev,
-      [appId]: !prev[appId]
+      supported_events: {
+        ...prev.supported_events,
+        [eventKey]: checked
+      },
+      event_descriptions: {
+        ...prev.event_descriptions,
+        [eventKey]: availableEvents.find(e => e.key === eventKey)?.description || ''
+      }
     }));
   };
-
-  const addRedirectUri = () => {
-    setFormData(prev => ({
-      ...prev,
-      redirect_uris: [...prev.redirect_uris, '']
-    }));
-  };
-
-  const updateRedirectUri = (index: number, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      redirect_uris: prev.redirect_uris.map((uri, i) => i === index ? value : uri)
-    }));
-  };
-
-  const removeRedirectUri = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      redirect_uris: prev.redirect_uris.filter((_, i) => i !== index)
-    }));
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-xl font-semibold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+          <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             OAuth Applications
           </h3>
-          <p className="text-gray-600 mt-1">
-            Create OAuth apps for third-party integrations with YusrAI
+          <p className="text-gray-600 mt-2">
+            Create OAuth applications to enable third-party integrations with YusrAI
           </p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white shadow-lg">
+            <Button className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl">
               <Plus className="w-4 h-4 mr-2" />
-              Create OAuth App
+              Create Your First App
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-xl bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
-                Create New OAuth Application
-              </DialogTitle>
+              <DialogTitle className="text-center text-xl">Create OAuth Application</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Environment Selection */}
-              <div className="bg-gradient-to-r from-blue-50 to-green-50 p-4 rounded-xl border border-blue-200">
-                <Label className="text-sm font-medium text-blue-800">Environment</Label>
-                <Select 
-                  value={formData.environment} 
-                  onValueChange={(value: 'test' | 'production') => 
-                    setFormData(prev => ({ ...prev, environment: value }))
-                  }
-                >
-                  <SelectTrigger className="mt-2 bg-white border-blue-300">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="test">
-                      <div className="flex items-center gap-2">
-                        <TestTube className="h-4 w-4 text-orange-500" />
-                        Test Mode
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="production">
-                      <div className="flex items-center gap-2">
-                        <Zap className="h-4 w-4 text-green-500" />
-                        Production Mode
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-blue-600 mt-1">
-                  {formData.environment === 'test' 
-                    ? 'Perfect for development and testing your integration'
-                    : 'Live environment for production applications'
-                  }
-                </p>
-              </div>
-
-              {/* Basic Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="app_name">Application Name *</Label>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">
+                    Application Name *
+                  </label>
                   <Input
-                    id="app_name"
-                    value={formData.app_name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, app_name: e.target.value }))}
                     placeholder="My Awesome App"
-                    className="mt-1"
-                    required
+                    value={newApp.app_name}
+                    onChange={(e) => setNewApp(prev => ({ ...prev, app_name: e.target.value }))}
+                    className="rounded-xl"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="developer_email">Developer Email</Label>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">
+                    Developer Email
+                  </label>
                   <Input
-                    id="developer_email"
                     type="email"
-                    value={formData.developer_email}
-                    onChange={(e) => setFormData(prev => ({ ...prev, developer_email: e.target.value }))}
                     placeholder="developer@example.com"
-                    className="mt-1"
+                    value={newApp.developer_email}
+                    onChange={(e) => setNewApp(prev => ({ ...prev, developer_email: e.target.value }))}
+                    className="rounded-xl"
                   />
                 </div>
               </div>
 
               <div>
-                <Label htmlFor="app_description">Application Description</Label>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  Application Description *
+                </label>
                 <Textarea
-                  id="app_description"
-                  value={formData.app_description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, app_description: e.target.value }))}
-                  placeholder="Describe what your application does..."
-                  className="mt-1"
+                  placeholder="Describe what your application does and how it will use YusrAI"
+                  value={newApp.app_description}
+                  onChange={(e) => setNewApp(prev => ({ ...prev, app_description: e.target.value }))}
+                  className="rounded-xl"
                   rows={3}
                 />
               </div>
 
-              {/* App Logo */}
               <div>
-                <Label htmlFor="app_logo_url">App Logo URL</Label>
-                <div className="flex gap-2 mt-1">
-                  <Input
-                    id="app_logo_url"
-                    value={formData.app_logo_url}
-                    onChange={(e) => setFormData(prev => ({ ...prev, app_logo_url: e.target.value }))}
-                    placeholder="https://example.com/logo.png"
-                    className="flex-1"
-                  />
-                  <Button type="button" variant="outline" size="sm">
-                    <Image className="w-4 h-4" />
-                  </Button>
-                </div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  App Logo
+                </label>
+                <ImageUpload
+                  value={newApp.app_logo_url}
+                  onChange={(url) => setNewApp(prev => ({ ...prev, app_logo_url: url }))}
+                  placeholder="Upload Logo"
+                />
                 <p className="text-xs text-gray-500 mt-1">
                   Upload an image or provide a URL to your app logo (PNG, JPG, or SVG)
                 </p>
               </div>
 
-              {/* URLs */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="homepage_url">Homepage URL</Label>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">
+                    Homepage URL
+                  </label>
                   <Input
-                    id="homepage_url"
-                    value={formData.homepage_url}
-                    onChange={(e) => setFormData(prev => ({ ...prev, homepage_url: e.target.value }))}
                     placeholder="https://myapp.com"
-                    className="mt-1"
+                    value={newApp.homepage_url}
+                    onChange={(e) => setNewApp(prev => ({ ...prev, homepage_url: e.target.value }))}
+                    className="rounded-xl"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="webhook_url">Webhook URL</Label>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">
+                    Webhook URL
+                  </label>
                   <Input
-                    id="webhook_url"
-                    value={formData.webhook_url}
-                    onChange={(e) => setFormData(prev => ({ ...prev, webhook_url: e.target.value }))}
                     placeholder="https://myapp.com/webhooks"
-                    className="mt-1"
+                    value={newApp.webhook_url}
+                    onChange={(e) => setNewApp(prev => ({ ...prev, webhook_url: e.target.value }))}
+                    className="rounded-xl"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="privacy_policy_url">Privacy Policy URL</Label>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">
+                    Privacy Policy URL
+                  </label>
                   <Input
-                    id="privacy_policy_url"
-                    value={formData.privacy_policy_url}
-                    onChange={(e) => setFormData(prev => ({ ...prev, privacy_policy_url: e.target.value }))}
                     placeholder="https://myapp.com/privacy"
-                    className="mt-1"
+                    value={newApp.privacy_policy_url}
+                    onChange={(e) => setNewApp(prev => ({ ...prev, privacy_policy_url: e.target.value }))}
+                    className="rounded-xl"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="terms_of_service_url">Terms of Service URL</Label>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">
+                    Terms of Service URL
+                  </label>
                   <Input
-                    id="terms_of_service_url"
-                    value={formData.terms_of_service_url}
-                    onChange={(e) => setFormData(prev => ({ ...prev, terms_of_service_url: e.target.value }))}
                     placeholder="https://myapp.com/terms"
-                    className="mt-1"
+                    value={newApp.terms_of_service_url}
+                    onChange={(e) => setNewApp(prev => ({ ...prev, terms_of_service_url: e.target.value }))}
+                    className="rounded-xl"
                   />
                 </div>
               </div>
 
-              {/* Redirect URIs */}
               <div>
-                <Label>Redirect URIs *</Label>
-                <div className="space-y-2 mt-1">
-                  {formData.redirect_uris.map((uri, index) => (
-                    <div key={index} className="flex gap-2">
-                      <Input
-                        value={uri}
-                        onChange={(e) => updateRedirectUri(index, e.target.value)}
-                        placeholder="https://myapp.com/auth/callback"
-                        className="flex-1"
-                      />
-                      {formData.redirect_uris.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeRedirectUri(index)}
-                        >
-                          Remove
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addRedirectUri}
-                    className="w-full"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Redirect URI
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  Redirect URIs *
+                </label>
+                {newApp.redirect_uris.map((uri, index) => (
+                  <div key={index} className="flex gap-2 mb-2">
+                    <Input
+                      placeholder="https://myapp.com/auth/callback"
+                      value={uri}
+                      onChange={(e) => updateRedirectUri(index, e.target.value)}
+                      className="rounded-xl"
+                    />
+                    {newApp.redirect_uris.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removeRedirectUri(index)}
+                        className="rounded-xl"
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                ))}
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setIsCreateDialogOpen(false)}
+                  size="sm"
+                  onClick={addRedirectUri}
+                  className="rounded-xl"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Redirect URI
+                </Button>
+              </div>
+
+              <PermissionsDropdown
+                permissions={newApp.supported_events}
+                onPermissionChange={handleEventPermissionChange}
+                availablePermissions={availableEvents}
+              />
+
+              <div className="flex gap-4 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowCreateDialog(false)}
+                  className="flex-1 rounded-xl"
                 >
                   Cancel
                 </Button>
                 <Button
-                  type="submit"
-                  className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600"
+                  onClick={handleCreateApp}
+                  className="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl"
                 >
                   Create Application
                 </Button>
               </div>
-            </form>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      {apps.length === 0 ? (
-        <Card className="text-center py-12 bg-gradient-to-br from-gray-50 to-blue-50/30 border-dashed border-2 border-gray-300">
-          <CardContent>
-            <Globe className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">No OAuth Applications</h3>
-            <p className="text-gray-500 mb-6">
+      {loading ? (
+        <div className="text-center py-8">Loading OAuth applications...</div>
+      ) : apps.length === 0 ? (
+        <Card className="border-dashed border-2 border-gray-300 rounded-2xl">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Globe className="h-12 w-12 text-gray-400 mb-4" />
+            <h3 className="text-lg font-medium text-gray-600 mb-2">No OAuth Applications</h3>
+            <p className="text-gray-500 text-center mb-6">
               Create your first OAuth application to enable third-party integrations with YusrAI
             </p>
-            <Button
-              onClick={() => setIsCreateDialogOpen(true)}
-              className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Create Your First App
-            </Button>
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-6">
           {apps.map((app) => (
-            <Card key={app.id} className="border-l-4 border-l-blue-500 shadow-lg hover:shadow-xl transition-all duration-200">
+            <Card key={app.id} className="rounded-2xl border border-gray-200 hover:shadow-lg transition-all">
               <CardHeader className="pb-4">
-                <div className="flex items-start justify-between">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     {app.app_logo_url ? (
                       <img 
                         src={app.app_logo_url} 
                         alt={app.app_name}
-                        className="w-12 h-12 rounded-lg object-cover border"
+                        className="w-12 h-12 rounded-xl object-cover border border-gray-200"
                       />
                     ) : (
-                      <div className="p-3 bg-gradient-to-r from-green-100 to-blue-100 rounded-lg">
+                      <div className="p-3 bg-gradient-to-r from-blue-100 to-purple-100 rounded-xl">
                         <Globe className="h-6 w-6 text-blue-600" />
                       </div>
                     )}
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-3">
                         <CardTitle className="text-xl">{app.app_name}</CardTitle>
                         <Badge 
                           variant={app.environment === 'production' ? 'default' : 'secondary'}
-                          className={app.environment === 'production' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-orange-100 text-orange-800'
-                          }
+                          className="rounded-full"
                         >
-                          {app.environment === 'production' ? (
-                            <>
-                              <Zap className="w-3 h-3 mr-1" />
-                              Production
-                            </>
-                          ) : (
-                            <>
-                              <TestTube className="w-3 h-3 mr-1" />
-                              Test
-                            </>
-                          )}
-                        </Badge>
-                        <Badge variant={app.is_active ? 'default' : 'secondary'}>
-                          {app.is_active ? 'Active' : 'Inactive'}
+                          {app.environment}
                         </Badge>
                       </div>
-                      <p className="text-gray-600">
-                        {app.app_description || 'No description provided'}
-                      </p>
-                      {app.homepage_url && (
-                        <a 
-                          href={app.homepage_url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1 mt-1"
-                        >
-                          <Link className="w-3 h-3" />
-                          Visit Website
-                        </a>
-                      )}
+                      <p className="text-sm text-gray-600 mt-1">{app.app_description}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Select
-                      value={app.environment}
-                      onValueChange={(value: 'test' | 'production') => switchEnvironment(app.id, value)}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => switchEnvironment(app.id, app.environment === 'test' ? 'production' : 'test')}
+                      className="rounded-lg"
                     >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="test">Test</SelectItem>
-                        <SelectItem value="production">Production</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      Switch to {app.environment === 'test' ? 'Production' : 'Test'}
+                    </Button>
                     <Switch
                       checked={app.is_active}
                       onCheckedChange={() => toggleAppStatus(app.id, app.is_active)}
                     />
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
                       onClick={() => deleteApp(app.id)}
-                      className="text-red-600 hover:text-red-800"
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Client Credentials */}
-                <div className="bg-gradient-to-r from-gray-50 to-blue-50/30 p-4 rounded-xl border">
-                  <h4 className="font-medium text-gray-800 mb-3 flex items-center gap-2">
-                    <Settings className="w-4 h-4" />
-                    {app.environment === 'production' ? 'Production' : 'Test'} Credentials
-                  </h4>
-                  <div className="grid gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
                     <div>
-                      <Label className="text-xs text-gray-500">Client ID</Label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <code className="bg-gray-100 px-3 py-2 rounded text-sm flex-1 font-mono">
-                          {app.environment === 'production' ? app.client_id : (app.test_client_id || app.client_id)}
+                      <label className="text-sm font-medium text-gray-700">Client ID</label>
+                      <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg mt-1">
+                        <code className="text-sm font-mono flex-1 truncate">
+                          {app.environment === 'test' ? app.test_client_id : app.client_id}
                         </code>
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
                           onClick={() => copyToClipboard(
-                            app.environment === 'production' ? app.client_id : (app.test_client_id || app.client_id), 
+                            app.environment === 'test' ? app.test_client_id || '' : app.client_id, 
                             'Client ID'
                           )}
+                          className="rounded-lg"
                         >
-                          <Copy className="w-4 h-4" />
+                          <Copy className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
+                    
                     <div>
-                      <Label className="text-xs text-gray-500">Client Secret</Label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <code className="bg-gray-100 px-3 py-2 rounded text-sm flex-1 font-mono">
-                          {showSecrets[app.id] 
-                            ? (app.environment === 'production' ? app.client_secret : (app.test_client_secret || app.client_secret))
+                      <label className="text-sm font-medium text-gray-700">Client Secret</label>
+                      <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg mt-1">
+                        <code className="text-sm font-mono flex-1 truncate">
+                          {showSecrets === app.id 
+                            ? (app.environment === 'test' ? app.test_client_secret : app.client_secret)
                             : '••••••••••••••••••••••••••••••••'
                           }
                         </code>
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          onClick={() => toggleSecretVisibility(app.id)}
+                          onClick={() => setShowSecrets(showSecrets === app.id ? null : app.id)}
+                          className="rounded-lg"
                         >
-                          {showSecrets[app.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          {showSecrets === app.id ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </Button>
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
                           onClick={() => copyToClipboard(
-                            app.environment === 'production' ? app.client_secret : (app.test_client_secret || app.client_secret), 
+                            app.environment === 'test' ? app.test_client_secret || '' : app.client_secret, 
                             'Client Secret'
                           )}
+                          className="rounded-lg"
                         >
-                          <Copy className="w-4 h-4" />
+                          <Copy className="h-4 w-4" />
                         </Button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Redirect URIs</label>
+                      <div className="mt-1 space-y-1">
+                        {app.redirect_uris.map((uri, index) => (
+                          <div key={index} className="text-sm font-mono p-2 bg-gray-50 rounded-lg truncate">
+                            {uri}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Authorization URL */}
-                <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-xl border border-green-200">
-                  <h4 className="font-medium text-green-800 mb-2">OAuth Authorization URL</h4>
-                  <div className="flex items-center gap-2">
-                    <code className="bg-white px-3 py-2 rounded text-sm flex-1 font-mono text-green-700 border border-green-300">
-                      {window.location.origin}/oauth/authorize?client_id={app.environment === 'production' ? app.client_id : (app.test_client_id || app.client_id)}
-                    </code>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyToClipboard(
-                        `${window.location.origin}/oauth/authorize?client_id=${app.environment === 'production' ? app.client_id : (app.test_client_id || app.client_id)}`,
-                        'Authorization URL'
-                      )}
-                      className="border-green-300 text-green-700 hover:bg-green-50"
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Redirect URIs */}
-                {app.redirect_uris && app.redirect_uris.length > 0 && (
+                {app.supported_events && Object.keys(app.supported_events).length > 0 && (
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">Authorized Redirect URIs</Label>
-                    <div className="mt-2 space-y-1">
-                      {app.redirect_uris.map((uri, index) => (
-                        <code key={index} className="block bg-gray-100 px-3 py-2 rounded text-sm font-mono">
-                          {uri}
-                        </code>
-                      ))}
+                    <label className="text-sm font-medium text-gray-700 mb-2 block">Supported Events</label>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(app.supported_events)
+                        .filter(([_, enabled]) => enabled)
+                        .map(([event]) => (
+                          <Badge key={event} variant="outline" className="text-xs rounded-full">
+                            {event.replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </Badge>
+                        ))
+                      }
                     </div>
                   </div>
                 )}
 
-                <div className="text-xs text-gray-500 pt-2 border-t">
-                  Created: {new Date(app.created_at).toLocaleDateString()} • 
-                  Rate limit: {app.rate_limit_per_hour}/hour • 
-                  Tier: {app.tier}
+                <div className="flex items-center justify-between pt-2">
+                  <Badge variant={app.is_active ? "default" : "secondary"} className="rounded-full">
+                    {app.is_active ? "Active" : "Inactive"}
+                  </Badge>
+                  <div className="text-sm text-gray-500">
+                    Created {new Date(app.created_at).toLocaleDateString()}
+                  </div>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      <Card className="border border-blue-200 bg-blue-50/30 rounded-2xl">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3">
+            <ExternalLink className="h-5 w-5 text-blue-600" />
+            <div>
+              <h4 className="font-medium text-blue-900">OAuth Documentation</h4>
+              <p className="text-sm text-blue-700">
+                Learn how to implement OAuth 2.0 with YusrAI in our{' '}
+                <a 
+                  href="https://docs.yusrai.com/oauth" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="underline hover:text-blue-800"
+                >
+                  OAuth documentation
+                </a>
+                .
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

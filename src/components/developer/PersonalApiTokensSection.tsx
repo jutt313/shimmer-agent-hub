@@ -4,18 +4,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Copy, Trash2, Plus, Key, Eye, EyeOff, Shield, ExternalLink, BarChart3 } from 'lucide-react';
+import { Copy, Trash2, Plus, Key, Shield, ExternalLink, BarChart3 } from 'lucide-react';
 import { useEnhancedApiTokens } from '@/hooks/useEnhancedApiTokens';
 import { useToast } from '@/components/ui/use-toast';
+import PermissionsDropdown from './PermissionsDropdown';
 
 const PersonalApiTokensSection = () => {
   const { tokens, loading, createToken, deleteToken, toggleToken } = useEnhancedApiTokens();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showToken, setShowToken] = useState<string | null>(null);
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
   const [newToken, setNewToken] = useState({
     token_name: '',
@@ -31,6 +30,15 @@ const PersonalApiTokensSection = () => {
     }
   });
   const { toast } = useToast();
+
+  const availablePermissions = [
+    { key: 'read', label: 'Read Access', description: 'View automations and data' },
+    { key: 'write', label: 'Write Access', description: 'Create and modify automations' },
+    { key: 'webhook', label: 'Webhook Management', description: 'Manage webhook endpoints' },
+    { key: 'notifications', label: 'Notifications', description: 'Send and manage notifications' },
+    { key: 'platform_connections', label: 'Platform Connections', description: 'Manage platform integrations' },
+    { key: 'full_control', label: 'Full Account Control', description: 'Complete account access' },
+  ];
 
   const handleCreateToken = async () => {
     if (!newToken.token_name || !newToken.connection_purpose) {
@@ -137,7 +145,7 @@ const PersonalApiTokensSection = () => {
                     setGeneratedToken(null);
                     setShowCreateDialog(false);
                   }}
-                  className="w-full rounded-xl"
+                  className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
                 >
                   Done
                 </Button>
@@ -181,36 +189,11 @@ const PersonalApiTokensSection = () => {
                   />
                 </div>
                 
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-3 block">
-                    Permissions
-                  </label>
-                  <div className="space-y-3">
-                    {[
-                      { key: 'read', label: 'Read Access', desc: 'View automations and data' },
-                      { key: 'write', label: 'Write Access', desc: 'Create and modify automations' },
-                      { key: 'webhook', label: 'Webhook Management', desc: 'Manage webhook endpoints' },
-                      { key: 'notifications', label: 'Notifications', desc: 'Send and manage notifications' },
-                      { key: 'platform_connections', label: 'Platform Connections', desc: 'Manage platform integrations' },
-                      { key: 'full_control', label: 'Full Account Control', desc: 'Complete account access' },
-                    ].map(({ key, label, desc }) => (
-                      <div key={key} className="flex items-start space-x-3">
-                        <Checkbox
-                          id={key}
-                          checked={newToken.permissions[key as keyof typeof newToken.permissions]}
-                          onCheckedChange={(checked) => handlePermissionChange(key, checked as boolean)}
-                          className="mt-1"
-                        />
-                        <div className="flex-1">
-                          <label htmlFor={key} className="text-sm font-medium text-gray-700 cursor-pointer">
-                            {label}
-                          </label>
-                          <p className="text-xs text-gray-500">{desc}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <PermissionsDropdown
+                  permissions={newToken.permissions}
+                  onPermissionChange={handlePermissionChange}
+                  availablePermissions={availablePermissions}
+                />
                 
                 <Button 
                   onClick={handleCreateToken} 
@@ -279,7 +262,7 @@ const PersonalApiTokensSection = () => {
                     <div className="flex items-center gap-2">
                       <Shield className="h-4 w-4 text-gray-500" />
                       <span className="text-sm font-mono text-gray-700">
-                        {showToken === token.id ? `ysr_${'*'.repeat(32)}` : `ysr_${'*'.repeat(32)}`}
+                        ysr_{'*'.repeat(32)}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">

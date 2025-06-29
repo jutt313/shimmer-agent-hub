@@ -516,6 +516,86 @@ export type Database = {
         }
         Relationships: []
       }
+      error_logs: {
+        Row: {
+          automation_id: string | null
+          context: Json | null
+          created_at: string
+          error_code: string
+          error_message: string
+          error_type: string
+          id: string
+          resolved: boolean
+          severity: string
+          stack_trace: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          automation_id?: string | null
+          context?: Json | null
+          created_at?: string
+          error_code: string
+          error_message: string
+          error_type: string
+          id?: string
+          resolved?: boolean
+          severity: string
+          stack_trace?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          automation_id?: string | null
+          context?: Json | null
+          created_at?: string
+          error_code?: string
+          error_message?: string
+          error_type?: string
+          id?: string
+          resolved?: boolean
+          severity?: string
+          stack_trace?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "error_logs_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monitoring_events: {
+        Row: {
+          created_at: string
+          event_data: Json
+          event_type: string
+          id: string
+          severity: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_data?: Json
+          event_type: string
+          id?: string
+          severity: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_data?: Json
+          event_type?: string
+          id?: string
+          severity?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           category: string | null

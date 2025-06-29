@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { AlertTriangle, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,10 +26,10 @@ const ErrorIndicator = () => {
       // Handle with production error handler
       await handleProductionError(event.detail.error, {
         type: 'system',
-        fileName: event.detail.fileName || 'React Component',
         additionalContext: {
           componentStack: event.detail.errorInfo?.componentStack,
-          userAction: event.detail.userAction || 'Component Rendering'
+          userAction: event.detail.userAction || 'Component Rendering',
+          fileName: event.detail.fileName || 'React Component'
         },
         showToast: false // We'll handle the toast manually
       });
@@ -40,11 +41,11 @@ const ErrorIndicator = () => {
       
       await handleProductionError(event.error, {
         type: 'system',
-        fileName: event.filename || 'Unknown file',
         additionalContext: {
           lineno: event.lineno,
           colno: event.colno,
-          userAction: 'Page interaction'
+          userAction: 'Page interaction',
+          fileName: event.filename || 'Unknown file'
         },
         showToast: false
       });

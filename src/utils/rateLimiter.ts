@@ -156,4 +156,17 @@ export class RateLimiter {
       });
     }
   }
+
+  /**
+   * Check for abuse patterns
+   */
+  checkAbusePattern(identifier: string, endpoint: string): boolean {
+    // Simple abuse detection logic
+    // In production, this would be more sophisticated
+    console.log(`Checking abuse pattern for ${identifier} on ${endpoint}`);
+    return false; // No abuse detected for now
+  }
 }
+
+// Export global instance for backwards compatibility
+export const globalRateLimiter = new RateLimiter();

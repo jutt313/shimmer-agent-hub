@@ -7,8 +7,11 @@ import { useToast } from '@/components/ui/use-toast';
 export interface AutomationWebhook {
   id: string;
   automation_id: string;
+  webhook_name: string;
+  webhook_description?: string;
   webhook_url: string;
   webhook_secret: string;
+  expected_events: string[];
   is_active: boolean;
   trigger_count: number;
   last_triggered_at: string | null;

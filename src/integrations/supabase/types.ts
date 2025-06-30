@@ -273,30 +273,39 @@ export type Database = {
         Row: {
           automation_id: string
           created_at: string
+          expected_events: string[] | null
           id: string
           is_active: boolean
           last_triggered_at: string | null
           trigger_count: number
+          webhook_description: string | null
+          webhook_name: string
           webhook_secret: string
           webhook_url: string
         }
         Insert: {
           automation_id: string
           created_at?: string
+          expected_events?: string[] | null
           id?: string
           is_active?: boolean
           last_triggered_at?: string | null
           trigger_count?: number
+          webhook_description?: string | null
+          webhook_name: string
           webhook_secret?: string
           webhook_url: string
         }
         Update: {
           automation_id?: string
           created_at?: string
+          expected_events?: string[] | null
           id?: string
           is_active?: boolean
           last_triggered_at?: string | null
           trigger_count?: number
+          webhook_description?: string | null
+          webhook_name?: string
           webhook_secret?: string
           webhook_url?: string
         }

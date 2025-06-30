@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from 'react';
-import { Bot, Trash2, Eye, Calendar, Zap, Key, AlertTriangle, Settings as SettingsIcon, ChevronDown, ChevronRight, Shield, Webhook } from 'lucide-react';
+import { Bot, Trash2, Eye, Calendar, Zap, Key, AlertTriangle, Settings as SettingsIcon, ChevronDown, ChevronRight, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,7 +12,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import WebhookSection from './WebhookSection';
 
 interface Automation {
   id: string;
@@ -490,17 +490,6 @@ const AutomationSettingsTab = () => {
                                   </Label>
                                 </div>
                               </div>
-                            </div>
-                          </div>
-
-                          {/* Webhooks Section - NEW */}
-                          <div className="lg:col-span-2 space-y-4">
-                            <h4 className="font-semibold text-gray-900 flex items-center gap-2">
-                              <Webhook className="w-4 h-4 text-blue-600" />
-                              Webhooks
-                            </h4>
-                            <div className="bg-white/70 p-4 rounded-xl border border-green-100">
-                              <WebhookSection automationId={automation.id} />
                             </div>
                           </div>
                         </div>

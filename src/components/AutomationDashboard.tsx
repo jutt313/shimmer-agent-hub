@@ -22,14 +22,18 @@ interface AutomationDashboardProps {
 }
 
 interface WebhookLog {
+  id: string;
   webhook_name: string;
   event_type: string;
   status: string;
   status_code: number;
   timestamp: string;
+  response_body?: string;
+  delivery_attempts: number;
 }
 
 interface WebhookError {
+  id: string;
   webhook_name: string;
   error_code: string;
   error_message: string;
@@ -99,13 +103,29 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
     try {
       const { data, error } = await supabase
         .from('webhook_delivery_logs')
-        .select('*')
-        .eq('automation_id', automationId)
-        .order('timestamp', { ascending: false })
+        .select(`
+          *,
+          automation_webhooks!inner(webhook_name)
+        `)
+        .eq('automation_webhooks.automation_id', automationId)
+        .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) throw error;
-      setWebhookLogs(data || []);
+      
+      // Transform the data to match WebhookLog interface
+      const transformedLogs: WebhookLog[] = (data || []).map((log: any) => ({
+        id: log.id,
+        webhook_name: log.automation_webhooks?.webhook_name || 'Unknown Webhook',
+        event_type: 'webhook_delivery',
+        status: log.delivered_at ? 'success' : 'failed',
+        status_code: log.status_code || 0,
+        timestamp: log.created_at,
+        response_body: log.response_body,
+        delivery_attempts: log.delivery_attempts,
+      }));
+      
+      setWebhookLogs(transformedLogs);
     } catch (error) {
       console.error('Error fetching webhook logs:', error);
       toast({
@@ -118,15 +138,30 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
 
   const fetchWebhookErrors = async () => {
     try {
+      // Since webhook_errors table doesn't exist, we'll simulate errors from failed deliveries
       const { data, error } = await supabase
-        .from('webhook_errors')
-        .select('*')
-        .eq('automation_id', automationId)
-        .order('timestamp', { ascending: false })
+        .from('webhook_delivery_logs')
+        .select(`
+          *,
+          automation_webhooks!inner(webhook_name)
+        `)
+        .eq('automation_webhooks.automation_id', automationId)
+        .is('delivered_at', null)
+        .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) throw error;
-      setWebhookErrors(data || []);
+      
+      // Transform failed deliveries into webhook errors
+      const transformedErrors: WebhookError[] = (data || []).map((log: any) => ({
+        id: log.id,
+        webhook_name: log.automation_webhooks?.webhook_name || 'Unknown Webhook',
+        error_code: `HTTP_${log.status_code || 'UNKNOWN'}`,
+        error_message: log.response_body || 'Delivery failed',
+        timestamp: log.created_at,
+      }));
+      
+      setWebhookErrors(transformedErrors);
     } catch (error) {
       console.error('Error fetching webhook errors:', error);
       toast({
@@ -625,8 +660,8 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3 max-h-96 overflow-y-auto">
-                      {webhookLogs.map((log, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      {webhookLogs.map((log) => (
+                        <div key={log.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <div className="flex items-center gap-3">
                             <div className={`w-2 h-2 rounded-full ${log.status === 'success' ? 'bg-green-500' : 'bg-red-500'}`}></div>
                             <div>
@@ -640,6 +675,11 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                           </div>
                         </div>
                       ))}
+                      {webhookLogs.length === 0 && (
+                        <div className="text-center py-8">
+                          <p className="text-gray-600">No webhook logs found.</p>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -655,8 +695,8 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3 max-h-96 overflow-y-auto">
-                      {webhookErrors.map((error, index) => (
-                        <div key={index} className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                      {webhookErrors.map((error) => (
+                        <div key={error.id} className="p-4 bg-red-50 border border-red-200 rounded-lg">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
@@ -764,6 +804,7 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
       {/* Create Webhook Modal */}
       {showCreateWebhook && (
         <WebhookCreateModal
+          isOpen={showCreateWebhook}
           automationId={automationId}
           onClose={() => setShowCreateWebhook(false)}
           onWebhookCreated={() => {

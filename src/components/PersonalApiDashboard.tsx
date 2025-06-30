@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -890,7 +891,7 @@ const PersonalApiDashboard = ({ isOpen, onClose }: PersonalApiDashboardProps) =>
                                       {error.error_type === 'VALIDATION_ERROR' && 'The data sent doesn\'t match the expected format. Check your request structure.'}
                                       {error.error_type === 'AUTHENTICATION_ERROR' && 'Your API key is missing or invalid. Verify your authentication credentials.'}
                                       {error.error_type === 'AUTHORIZATION_ERROR' && 'Your API key doesn\'t have permission to access this resource.'}
-                                      {error.error_type === 'NOT_FOUND_ERROR' && 'The resource you\'re trying to access doesn't exist.'}
+                                      {error.error_type === 'NOT_FOUND_ERROR' && 'The resource you\'re trying to access doesn\'t exist.'}
                                       {error.error_type === 'RATE_LIMIT_ERROR' && 'Too many requests sent too quickly. Please slow down.'}
                                       {!['VALIDATION_ERROR', 'AUTHENTICATION_ERROR', 'AUTHORIZATION_ERROR', 'NOT_FOUND_ERROR', 'RATE_LIMIT_ERROR'].includes(error.error_type) && 
                                         'An unexpected error occurred. Contact support if this persists.'}

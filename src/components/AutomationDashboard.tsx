@@ -185,11 +185,22 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
         .limit(100);
 
       if (runsError) throw runsError;
-      setAutomationRuns(runsData || []);
+      
+      // Transform the data to match our AutomationRun interface
+      const transformedRuns: AutomationRun[] = (runsData || []).map(run => ({
+        id: run.id,
+        status: run.status,
+        duration_ms: run.duration_ms || 0,
+        run_timestamp: run.run_timestamp,
+        details_log: run.details_log as { platforms?: string[]; [key: string]: any; } | null,
+        trigger_data: run.trigger_data
+      }));
+      
+      setAutomationRuns(transformedRuns);
 
       // Extract platform usage from runs
       const platformStats: { [key: string]: PlatformUsage } = {};
-      (runsData || []).forEach(run => {
+      transformedRuns.forEach(run => {
         // Safely access platforms from details_log
         const detailsLog = run.details_log as { platforms?: string[] } | null;
         if (detailsLog?.platforms) {

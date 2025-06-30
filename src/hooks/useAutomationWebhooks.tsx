@@ -58,8 +58,8 @@ export const useAutomationWebhooks = (automationId?: string) => {
           return {
             id: webhook.id,
             automation_id: webhook.automation_id,
-            webhook_name: webhook.webhook_name || 'Untitled Webhook',
-            webhook_description: webhook.webhook_description || undefined,
+            webhook_name: webhook.webhook_name,
+            webhook_description: webhook.webhook_description,
             webhook_url: webhook.webhook_url,
             webhook_secret: webhook.webhook_secret,
             expected_events: webhook.expected_events || [],

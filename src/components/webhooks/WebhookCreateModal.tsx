@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { X, Plus, Webhook } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,30 +19,46 @@ interface WebhookCreateModalProps {
   onWebhookCreated: () => void;
 }
 
+const commonEvents = [
+  'order.created',
+  'order.updated',
+  'order.paid',
+  'order.cancelled',
+  'customer.created',
+  'customer.updated',
+  'user.signup',
+  'user.login',
+  'payment.succeeded',
+  'payment.failed',
+  'subscription.created',
+  'subscription.cancelled',
+  'product.created',
+  'product.updated',
+  'invoice.created',
+  'invoice.paid',
+  'data.updated',
+  'form.submitted'
+];
+
 const WebhookCreateModal = ({ isOpen, onClose, automationId, onWebhookCreated }: WebhookCreateModalProps) => {
   const [webhookName, setWebhookName] = useState('');
   const [webhookDescription, setWebhookDescription] = useState('');
   const [expectedEvents, setExpectedEvents] = useState<string[]>([]);
-  const [newEvent, setNewEvent] = useState('');
+  const [selectedEvent, setSelectedEvent] = useState('');
+  const [customEvent, setCustomEvent] = useState('');
   const [creating, setCreating] = useState(false);
   const { toast } = useToast();
 
-  const handleAddEvent = () => {
-    if (newEvent.trim() && !expectedEvents.includes(newEvent.trim())) {
-      setExpectedEvents([...expectedEvents, newEvent.trim()]);
-      setNewEvent('');
+  const handleAddEvent = (event: string) => {
+    if (event && !expectedEvents.includes(event)) {
+      setExpectedEvents([...expectedEvents, event]);
+      setSelectedEvent('');
+      setCustomEvent('');
     }
   };
 
   const handleRemoveEvent = (eventToRemove: string) => {
     setExpectedEvents(expectedEvents.filter(event => event !== eventToRemove));
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddEvent();
-    }
   };
 
   const handleCreateWebhook = async () => {
@@ -86,7 +103,8 @@ const WebhookCreateModal = ({ isOpen, onClose, automationId, onWebhookCreated }:
       setWebhookName('');
       setWebhookDescription('');
       setExpectedEvents([]);
-      setNewEvent('');
+      setSelectedEvent('');
+      setCustomEvent('');
       
       onWebhookCreated();
       onClose();
@@ -146,23 +164,49 @@ const WebhookCreateModal = ({ isOpen, onClose, automationId, onWebhookCreated }:
             <Label>Expected Events</Label>
             <div className="mt-1 space-y-2">
               <div className="flex gap-2">
-                <Input
-                  placeholder="e.g., order.created, user.signup"
-                  value={newEvent}
-                  onChange={(e) => setNewEvent(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className="flex-1"
-                />
+                <Select value={selectedEvent} onValueChange={setSelectedEvent}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Select an event type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {commonEvents.map((event) => (
+                      <SelectItem key={event} value={event}>
+                        {event}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Button 
                   type="button" 
-                  onClick={handleAddEvent}
+                  onClick={() => handleAddEvent(selectedEvent)}
                   variant="outline"
                   size="sm"
                   className="px-3"
+                  disabled={!selectedEvent}
                 >
                   <Plus className="w-4 h-4" />
                 </Button>
               </div>
+              
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Or enter custom event..."
+                  value={customEvent}
+                  onChange={(e) => setCustomEvent(e.target.value)}
+                  className="flex-1"
+                />
+                <Button 
+                  type="button" 
+                  onClick={() => handleAddEvent(customEvent)}
+                  variant="outline"
+                  size="sm"
+                  className="px-3"
+                  disabled={!customEvent.trim()}
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+
               {expectedEvents.length > 0 && (
                 <div className="flex gap-2 flex-wrap">
                   {expectedEvents.map((event) => (
@@ -189,7 +233,11 @@ const WebhookCreateModal = ({ isOpen, onClose, automationId, onWebhookCreated }:
           <Button variant="outline" onClick={onClose} disabled={creating}>
             Cancel
           </Button>
-          <Button onClick={handleCreateWebhook} disabled={creating || !webhookName.trim()}>
+          <Button 
+            onClick={handleCreateWebhook} 
+            disabled={creating || !webhookName.trim()}
+            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
+          >
             {creating ? 'Creating...' : 'Create Webhook'}
           </Button>
         </div>

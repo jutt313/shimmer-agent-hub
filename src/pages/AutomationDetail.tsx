@@ -688,7 +688,7 @@ const AutomationDetail = () => {
           </div>
         </div>
       </div>
-        
+      
       {/* Platform Buttons - Reduced spacing */}
       {!showDashboard && !showDiagram && !showWebhooks && currentPlatforms && currentPlatforms.length > 0 && (
         <div className="px-6 pb-2">

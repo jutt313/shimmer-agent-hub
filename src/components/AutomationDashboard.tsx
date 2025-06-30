@@ -24,7 +24,10 @@ interface AutomationRun {
   status: string;
   duration_ms: number;
   run_timestamp: string;
-  details_log: any;
+  details_log: {
+    platforms?: string[];
+    [key: string]: any;
+  } | null;
   trigger_data: any;
 }
 
@@ -187,8 +190,10 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
       // Extract platform usage from runs
       const platformStats: { [key: string]: PlatformUsage } = {};
       (runsData || []).forEach(run => {
-        if (run.details_log?.platforms) {
-          run.details_log.platforms.forEach((platform: string) => {
+        // Safely access platforms from details_log
+        const detailsLog = run.details_log as { platforms?: string[] } | null;
+        if (detailsLog?.platforms) {
+          detailsLog.platforms.forEach((platform: string) => {
             if (!platformStats[platform]) {
               platformStats[platform] = {
                 platform_name: platform,

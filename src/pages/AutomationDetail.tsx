@@ -633,7 +633,6 @@ const AutomationDetail = () => {
                   automationId={automation.id}
                   automationTitle={automation.title}
                   automationBlueprint={automation.automation_blueprint}
-                  onClose={() => setShowDashboard(false)}
                 />
               </div>
             )}

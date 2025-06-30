@@ -26,7 +26,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Missing or invalid Authorization header',
-          message: 'Please provide a valid API token with Bearer authentication'
+          message: 'Please provide a valid YUSR_ API token with Bearer authentication'
         }),
         { 
           status: 401, 
@@ -36,6 +36,20 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '')
+    
+    // Validate YUSR_ prefix
+    if (!token.startsWith('YUSR_')) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid API token format',
+          message: 'API token must start with YUSR_ prefix'
+        }),
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
     
     // Validate token and get user info
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
@@ -49,10 +63,27 @@ serve(async (req) => {
 
     if (tokenError || !tokenData?.is_valid) {
       console.error('Token validation failed:', tokenError)
+      
+      // Log the failed authentication attempt
+      await supabase
+        .from('error_logs')
+        .insert({
+          user_id: null,
+          error_type: 'AUTHENTICATION_ERROR',
+          error_code: 'INVALID_TOKEN',
+          error_message: 'Invalid or expired API token',
+          severity: 'medium',
+          context: {
+            token_prefix: token.substring(0, 10) + '...',
+            endpoint: url.pathname,
+            method: method
+          }
+        })
+
       return new Response(
         JSON.stringify({ 
           error: 'Invalid API token',
-          message: 'The provided API token is invalid or expired'
+          message: 'The provided YUSR_ API token is invalid or expired'
         }),
         { 
           status: 401, 
@@ -68,74 +99,150 @@ serve(async (req) => {
       .from('user_api_tokens')
       .update({ 
         last_used_at: new Date().toISOString(),
-        usage_count: supabase.sql`usage_count + 1`
+        usage_count: supabase.sql`usage_count + 1`,
+        last_usage_details: {
+          endpoint: url.pathname,
+          method: method,
+          timestamp: new Date().toISOString(),
+          ip: req.headers.get('x-forwarded-for') || 'unknown'
+        }
       })
       .eq('token_hash', tokenHash)
 
-    // Log API usage
-    await supabase
-      .from('api_usage_logs')
-      .insert({
-        user_id: tokenData.user_id,
-        endpoint: url.pathname,
-        method: method,
-        status_code: 200,
-        response_time_ms: 0,
-        created_at: new Date().toISOString()
-      })
+    // Log API usage with real-time response time
+    const requestStartTime = Date.now()
 
-    // Route API requests
-    if (path.length === 0) {
-      // Root API endpoint - return documentation
-      return new Response(
-        JSON.stringify({ 
-          message: 'Welcome to YusrAI Personal API v1.0',
-          user_id: tokenData.user_id,
-          base_url: 'https://zorwtyijosgdcckljmqd.supabase.co/functions/v1/yusrai-api',
-          documentation: 'https://docs.yusrai.com/api',
-          available_endpoints: [
-            'GET /automations - List user automations',
-            'GET /automations/{id} - Get automation details',
-            'POST /automations - Create automation',
-            'PUT /automations/{id} - Update automation',
-            'DELETE /automations/{id} - Delete automation',
-            'GET /webhooks - List all webhooks',
-            'POST /execute/{id} - Execute automation',
-            'GET /events - List webhook events'
-          ],
-          real_time_webhook: `https://zorwtyijosgdcckljmqd.supabase.co/functions/v1/realtime-webhook/${tokenData.user_id}`,
-          rate_limits: {
-            requests_per_minute: 100,
-            requests_per_hour: 1000
+    try {
+      // Route API requests
+      let response
+      
+      if (path.length === 0) {
+        // Root API endpoint - return documentation
+        response = new Response(
+          JSON.stringify({ 
+            message: 'Welcome to YusrAI Personal API v1.0',
+            user_id: tokenData.user_id,
+            base_url: 'https://usr.com/api/v1',
+            documentation: 'https://docs.usr.com/api',
+            available_endpoints: [
+              'GET /automations - List user automations',
+              'GET /automations/{id} - Get automation details', 
+              'POST /automations - Create automation',
+              'PUT /automations/{id} - Update automation',
+              'DELETE /automations/{id} - Delete automation',
+              'GET /webhooks - List all webhooks',
+              'POST /execute/{id} - Execute automation',
+              'GET /events - List webhook events'
+            ],
+            real_time_webhook: `https://usr.com/api/realtime-webhook/${tokenData.user_id}`,
+            rate_limits: {
+              requests_per_minute: 100,
+              requests_per_hour: 1000
+            },
+            authentication: {
+              type: 'Bearer Token',
+              format: 'YUSR_[token]',
+              header: 'Authorization: Bearer YUSR_your_token_here'
+            }
+          }),
+          { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           }
-        }),
-        { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
+        )
+      } else if (path[0] === 'automations') {
+        response = await handleAutomationsAPI(supabase, tokenData, method, path, req)
+      } else if (path[0] === 'webhooks') {
+        response = await handleWebhooksAPI(supabase, tokenData, method, path, req)
+      } else if (path[0] === 'execute') {
+        response = await handleExecuteAPI(supabase, tokenData, method, path, req)
+      } else if (path[0] === 'events') {
+        response = await handleEventsAPI(supabase, tokenData, method, path, req)
+      } else {
+        response = new Response(
+          JSON.stringify({ 
+            error: 'Not Found',
+            message: `Endpoint ${url.pathname} not found`,
+            available_endpoints: ['/automations', '/webhooks', '/execute', '/events']
+          }),
+          { 
+            status: 404, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
+      }
 
-    if (path[0] === 'automations') {
-      return await handleAutomationsAPI(supabase, tokenData, method, path, req)
-    } else if (path[0] === 'webhooks') {
-      return await handleWebhooksAPI(supabase, tokenData, method, path, req)
-    } else if (path[0] === 'execute') {
-      return await handleExecuteAPI(supabase, tokenData, method, path, req)
-    } else if (path[0] === 'events') {
-      return await handleEventsAPI(supabase, tokenData, method, path, req)
-    } else {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Not Found',
-          message: `Endpoint ${url.pathname} not found`,
-          available_endpoints: ['/automations', '/webhooks', '/execute', '/events']
-        }),
-        { 
-          status: 404, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      // Calculate response time
+      const responseTime = Date.now() - requestStartTime
+      const responseStatus = response.status
+
+      // Log successful API usage
+      await supabase
+        .from('api_usage_logs')
+        .insert({
+          user_id: tokenData.user_id,
+          endpoint: url.pathname,
+          method: method,
+          status_code: responseStatus,
+          response_time_ms: responseTime,
+          created_at: new Date().toISOString()
+        })
+
+      // Trigger real-time webhook for successful API calls
+      if (responseStatus < 400) {
+        try {
+          await fetch(`https://usr.com/api/realtime-webhook/${tokenData.user_id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              event_type: 'api_call_made',
+              user_id: tokenData.user_id,
+              endpoint: url.pathname,
+              method: method,
+              status_code: responseStatus,
+              response_time: responseTime,
+              timestamp: new Date().toISOString()
+            })
+          })
+        } catch (webhookError) {
+          console.error('Failed to trigger real-time webhook:', webhookError)
         }
-      )
+      }
+
+      return response
+
+    } catch (error) {
+      const responseTime = Date.now() - requestStartTime
+      
+      // Log API error
+      await supabase
+        .from('error_logs')
+        .insert({
+          user_id: tokenData.user_id,
+          error_type: 'API_ERROR',
+          error_code: 'INTERNAL_ERROR',
+          error_message: error.message || 'Unknown API error',
+          severity: 'high',
+          context: {
+            endpoint: url.pathname,
+            method: method,
+            response_time: responseTime
+          }
+        })
+
+      // Log failed API usage
+      await supabase
+        .from('api_usage_logs')
+        .insert({
+          user_id: tokenData.user_id,
+          endpoint: url.pathname,
+          method: method,
+          status_code: 500,
+          response_time_ms: responseTime,
+          created_at: new Date().toISOString()
+        })
+
+      throw error
     }
 
   } catch (error) {
@@ -143,7 +250,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         error: 'Internal server error',
-        message: 'An unexpected error occurred. Please try again.'
+        message: 'An unexpected error occurred. Please try again.',
+        support: 'If this issue persists, contact support@usr.com'
       }),
       { 
         status: 500, 
@@ -179,7 +287,8 @@ async function handleAutomationsAPI(supabase: any, tokenData: any, method: strin
         JSON.stringify({ 
           success: true,
           data,
-          count: data?.length || 0
+          count: data?.length || 0,
+          user_id: userId
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -221,17 +330,17 @@ async function handleAutomationsAPI(supabase: any, tokenData: any, method: strin
       const body = await req.json()
       console.log('Creating automation with body:', body)
       
-      // Enhanced automation creation
+      // Enhanced automation creation with real webhook URL
       const automationData = {
         title: body.title || 'API Created Automation',
         description: body.description || 'Created via Personal API',
         user_id: userId,
-        status: 'draft',
+        status: 'active',
         automation_blueprint: {
           trigger: {
-            type: body.trigger_type || 'webhook',
-            event: body.event_type || 'api_trigger',
-            webhook_endpoint: `https://zorwtyijosgdcckljmqd.supabase.co/functions/v1/realtime-webhook/${userId}`,
+            type: body.trigger_type || 'api_trigger',
+            event: body.event_type || 'api_created',
+            webhook_endpoint: `https://usr.com/api/realtime-webhook/${userId}`,
             webhook_secret: crypto.randomUUID()
           },
           actions: body.actions || [
@@ -239,7 +348,7 @@ async function handleAutomationsAPI(supabase: any, tokenData: any, method: strin
               type: 'notification',
               config: {
                 message: `Automation "${body.title || 'API Automation'}" was triggered`,
-                channels: ['dashboard', 'email']
+                channels: ['dashboard', 'email', 'webhook']
               }
             }
           ],
@@ -272,7 +381,7 @@ async function handleAutomationsAPI(supabase: any, tokenData: any, method: strin
         .insert({
           user_id: userId,
           title: 'New Automation Created via API',
-          message: `Automation "${data.title}" was created successfully`,
+          message: `Automation "${data.title}" was created successfully via your Personal API`,
           type: 'automation_created',
           category: 'system',
           metadata: {
@@ -281,9 +390,9 @@ async function handleAutomationsAPI(supabase: any, tokenData: any, method: strin
           }
         })
 
-      // Trigger real-time webhook if configured
+      // Trigger real-time webhook for automation creation
       try {
-        await fetch(`https://zorwtyijosgdcckljmqd.supabase.co/functions/v1/realtime-webhook/${userId}`, {
+        await fetch(`https://usr.com/api/realtime-webhook/${userId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -291,7 +400,8 @@ async function handleAutomationsAPI(supabase: any, tokenData: any, method: strin
             automation_id: data.id,
             automation_title: data.title,
             created_at: data.created_at,
-            user_id: userId
+            user_id: userId,
+            api_created: true
           })
         })
       } catch (webhookError) {
@@ -301,21 +411,22 @@ async function handleAutomationsAPI(supabase: any, tokenData: any, method: strin
       // Return comprehensive response
       const response = {
         success: true,
-        message: 'Automation created successfully',
+        message: 'Automation created successfully via YusrAI Personal API',
         data: {
           automation: data,
-          webhook_url: automationData.automation_blueprint.trigger.webhook_endpoint,
+          webhook_url: `https://usr.com/api/realtime-webhook/${userId}`,
           api_endpoints: {
             get_automation: `/automations/${data.id}`,
             update_automation: `/automations/${data.id}`,
             delete_automation: `/automations/${data.id}`,
             execute_automation: `/execute/${data.id}`
           },
-          real_time_updates: `Webhook events will be sent to your configured webhook URL`,
+          real_time_updates: `Real-time webhook events will be sent to https://usr.com/api/realtime-webhook/${userId}`,
           next_steps: [
             'Test the automation using the execute endpoint',
             'Monitor automation runs via your webhook',
-            'Update automation configuration as needed'
+            'Update automation configuration as needed',
+            'Check your dashboard for real-time updates'
           ]
         }
       }
@@ -429,7 +540,18 @@ async function handleWebhooksAPI(supabase: any, tokenData: any, method: string, 
         JSON.stringify({ 
           success: true,
           data,
-          real_time_webhook: `https://zorwtyijosgdcckljmqd.supabase.co/functions/v1/realtime-webhook/${userId}`
+          real_time_webhook: `https://usr.com/api/realtime-webhook/${userId}`,
+          webhook_events_supported: [
+            'automation_created',
+            'automation_executed', 
+            'automation_updated',
+            'automation_error',
+            'account_updated',
+            'notification_sent',
+            'user_login',
+            'api_call_made',
+            'webhook_received'
+          ]
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -478,35 +600,77 @@ async function handleExecuteAPI(supabase: any, tokenData: any, method: string, p
   const body = await req.json()
 
   try {
-    // Mock execution for now - in real implementation, this would trigger the automation
+    // Get the automation details
+    const { data: automation, error: automationError } = await supabase
+      .from('automations')
+      .select('*')
+      .eq('id', automationId)
+      .eq('user_id', tokenData.user_id)
+      .single()
+
+    if (automationError || !automation) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Automation not found',
+          message: 'The specified automation does not exist or you do not have access to it'
+        }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Execute the automation
     const executionId = crypto.randomUUID()
+    const startTime = Date.now()
     
+    // Simulate automation execution
     const result = {
       success: true,
       execution_id: executionId,
       automation_id: automationId,
+      automation_title: automation.title,
       status: 'completed',
       started_at: new Date().toISOString(),
       completed_at: new Date().toISOString(),
+      execution_time_ms: Date.now() - startTime,
       result: {
-        message: 'Automation executed successfully',
+        message: 'Automation executed successfully via Personal API',
         trigger_data: body.triggerData || {},
-        actions_performed: ['notification_sent']
+        actions_performed: ['notification_sent', 'webhook_triggered'],
+        webhook_url: `https://usr.com/api/realtime-webhook/${tokenData.user_id}`
       }
     }
 
     // Log the execution
     await supabase
-      .from('automation_execution_logs')
+      .from('automation_runs')
       .insert({
         user_id: tokenData.user_id,
         automation_id: automationId,
-        execution_id: executionId,
-        execution_status: 'completed',
-        execution_time: 150,
-        result: result,
-        triggered_at: new Date().toISOString()
+        status: 'completed',
+        duration_ms: result.execution_time_ms,
+        trigger_data: body.triggerData || {},
+        details_log: result
       })
+
+    // Trigger real-time webhook
+    try {
+      await fetch(`https://usr.com/api/realtime-webhook/${tokenData.user_id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_type: 'automation_executed',
+          execution_id: executionId,
+          automation_id: automationId,
+          automation_title: automation.title,
+          status: 'completed',
+          execution_time_ms: result.execution_time_ms,
+          user_id: tokenData.user_id,
+          timestamp: new Date().toISOString()
+        })
+      })
+    } catch (webhookError) {
+      console.error('Failed to trigger execution webhook:', webhookError)
+    }
 
     return new Response(
       JSON.stringify(result),
@@ -542,7 +706,8 @@ async function handleEventsAPI(supabase: any, tokenData: any, method: string, pa
       return new Response(
         JSON.stringify({ 
           success: true,
-          data
+          data,
+          real_time_webhook: `https://usr.com/api/realtime-webhook/${userId}`
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )

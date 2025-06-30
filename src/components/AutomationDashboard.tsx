@@ -17,7 +17,6 @@ interface AutomationDashboardProps {
   automationId: string;
   automationTitle: string;
   automationBlueprint: AutomationBlueprint | null;
-  onClose: () => void;
 }
 
 interface AutomationRun {
@@ -69,7 +68,17 @@ interface WebhookLog {
   delivery_attempts: number;
 }
 
-const AutomationDashboard = ({ automationId, automationTitle, automationBlueprint, onClose }: AutomationDashboardProps) => {
+interface WebhookError {
+  id: string;
+  webhook_name: string;
+  error_code: string;
+  error_message: string;
+  timestamp: string;
+  payload: any;
+  attempts: number;
+}
+
+const AutomationDashboard = ({ automationId, automationTitle, automationBlueprint }: AutomationDashboardProps) => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('overview');
   const [webhookActiveTab, setWebhookActiveTab] = useState('overview');
@@ -80,7 +89,7 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
   const [aiAgents, setAiAgents] = useState<AIAgent[]>([]);
   const [webhooks, setWebhooks] = useState<WebhookData[]>([]);
   const [webhookLogs, setWebhookLogs] = useState<WebhookLog[]>([]);
-  const [webhookErrors, setWebhookErrors] = useState<any[]>([]);
+  const [webhookErrors, setWebhookErrors] = useState<WebhookError[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Webhook management states
@@ -257,9 +266,18 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
       }));
       setWebhookLogs(transformedLogs);
 
-      // Get failed deliveries as errors
+      // Simulate webhook errors from failed deliveries
       const failedLogs = transformedLogs.filter(log => !log.delivered_at);
-      setWebhookErrors(failedLogs);
+      const simulatedErrors: WebhookError[] = failedLogs.map(log => ({
+        id: log.id,
+        webhook_name: log.webhook_name,
+        error_code: `HTTP_${log.status_code}`,
+        error_message: log.response_body || 'Webhook delivery failed',
+        timestamp: log.created_at,
+        payload: log.payload,
+        attempts: log.delivery_attempts
+      }));
+      setWebhookErrors(simulatedErrors);
 
     } catch (error) {
       console.error('Error fetching automation data:', error);
@@ -929,10 +947,10 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                               <div className="flex items-center gap-2 mb-2">
                                 <AlertCircle className="w-4 h-4 text-red-500" />
                                 <span className="font-medium text-red-800">{error.webhook_name}</span>
-                                <Badge variant="destructive" className="text-xs">HTTP_{error.status_code}</Badge>
+                                <Badge variant="destructive" className="text-xs">{error.error_code}</Badge>
                               </div>
                               <p className="text-sm text-red-700 mb-2">
-                                <strong>Error:</strong> Webhook delivery failed after {error.delivery_attempts} attempts
+                                <strong>Error:</strong> Webhook delivery failed after {error.attempts} attempts
                               </p>
                               <p className="text-sm text-red-700 mb-2">
                                 <strong>Plain English:</strong> The webhook endpoint is not responding correctly. 
@@ -941,10 +959,10 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                               <div className="mt-2 p-2 bg-red-100 rounded text-xs">
                                 <p className="font-medium mb-1">Raw Response:</p>
                                 <pre className="text-red-800 overflow-x-auto">
-                                  {error.response_body || 'No response received'}
+                                  {error.error_message || 'No response received'}
                                 </pre>
                               </div>
-                              <p className="text-xs text-red-600 mt-2">{new Date(error.created_at).toLocaleString()}</p>
+                              <p className="text-xs text-red-600 mt-2">{new Date(error.timestamp).toLocaleString()}</p>
                             </div>
                           </div>
                         </div>
@@ -1005,7 +1023,7 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                       <Textarea
                         value={testPayload}
                         onChange={(e) => setTestPayload(e.target.value)}
-                        placeholder='{"event": "automation_completed", "data": {"automation_id": "' + automationId + '", "status": "success"}}'
+                        placeholder={'{"event": "automation_completed", "data": {"automation_id": "' + automationId + '", "status": "success"}}'}
                         className="h-32 font-mono text-sm"
                       />
                     </div>

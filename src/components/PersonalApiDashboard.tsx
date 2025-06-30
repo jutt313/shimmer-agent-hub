@@ -1,5 +1,3 @@
-
-
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -135,6 +133,28 @@ const PersonalApiDashboard = ({ isOpen, onClose }: PersonalApiDashboardProps) =>
   const [testResult, setTestResult] = useState<any>(null);
   const [testLoading, setTestLoading] = useState(false);
 
+  // Helper function to safely parse permissions
+  const parsePermissions = (permissions: any) => {
+    if (typeof permissions === 'object' && permissions !== null && !Array.isArray(permissions)) {
+      return {
+        read: Boolean(permissions.read || false),
+        write: Boolean(permissions.write || false),
+        webhook: Boolean(permissions.webhook || false),
+        notifications: Boolean(permissions.notifications || false),
+        full_control: Boolean(permissions.full_control || false),
+        platform_connections: Boolean(permissions.platform_connections || false),
+      };
+    }
+    return {
+      read: true,
+      write: false,
+      webhook: false,
+      notifications: false,
+      full_control: false,
+      platform_connections: false,
+    };
+  };
+
   // Fetch dashboard data
   const fetchDashboardData = useCallback(async () => {
     if (!user) return;
@@ -172,23 +192,7 @@ const PersonalApiDashboard = ({ isOpen, onClose }: PersonalApiDashboardProps) =>
       
       const transformedTokens: ApiToken[] = (data || []).map(token => ({
         ...token,
-        permissions: typeof token.permissions === 'object' && token.permissions !== null
-          ? {
-              read: Boolean(token.permissions.read || false),
-              write: Boolean(token.permissions.write || false),
-              webhook: Boolean(token.permissions.webhook || false),
-              notifications: Boolean(token.permissions.notifications || false),
-              full_control: Boolean(token.permissions.full_control || false),
-              platform_connections: Boolean(token.permissions.platform_connections || false),
-            }
-          : {
-              read: true,
-              write: false,
-              webhook: false,
-              notifications: false,
-              full_control: false,
-              platform_connections: false,
-            },
+        permissions: parsePermissions(token.permissions),
         usage_count: token.usage_count || 0,
       }));
       

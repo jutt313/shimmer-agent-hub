@@ -62,10 +62,13 @@ interface ApiError {
   id: string;
   error_type: string;
   error_message: string;
-  endpoint: string;
+  automation_id?: string;
   created_at: string;
   stack_trace?: string;
   context?: any;
+  severity: string;
+  error_code: string;
+  resolved: boolean;
 }
 
 const PersonalApiDashboard = ({ isOpen, onClose }: PersonalApiDashboardProps) => {
@@ -749,10 +752,10 @@ const PersonalApiDashboard = ({ isOpen, onClose }: PersonalApiDashboardProps) =>
                             </p>
                           </div>
 
-                          {error.endpoint && (
+                          {error.automation_id && (
                             <div>
-                              <p className="text-sm font-medium text-gray-700 mb-1">Endpoint:</p>
-                              <code className="text-sm bg-gray-100 px-2 py-1 rounded">{error.endpoint}</code>
+                              <p className="text-sm font-medium text-gray-700 mb-1">Related Automation:</p>
+                              <code className="text-sm bg-gray-100 px-2 py-1 rounded">{error.automation_id}</code>
                             </div>
                           )}
                         </div>

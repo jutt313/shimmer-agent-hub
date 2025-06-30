@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -70,6 +69,8 @@ interface ApiError {
   severity: string;
   error_code: string;
   resolved: boolean;
+  updated_at: string;
+  user_id: string;
 }
 
 interface ApiToken {
@@ -87,6 +88,30 @@ interface ApiToken {
     platform_connections: boolean;
   };
 }
+
+// Helper function to parse permissions from Json to expected structure
+const parsePermissions = (permissions: any) => {
+  if (typeof permissions === 'object' && permissions !== null && !Array.isArray(permissions)) {
+    return {
+      read: Boolean(permissions.read || false),
+      write: Boolean(permissions.write || false),
+      webhook: Boolean(permissions.webhook || false),
+      notifications: Boolean(permissions.notifications || false),
+      full_control: Boolean(permissions.full_control || false),
+      platform_connections: Boolean(permissions.platform_connections || false),
+    };
+  }
+  
+  // Default permissions if parsing fails
+  return {
+    read: true,
+    write: false,
+    webhook: false,
+    notifications: false,
+    full_control: false,
+    platform_connections: false,
+  };
+};
 
 const PersonalApiDashboard = ({ isOpen, onClose }: PersonalApiDashboardProps) => {
   const { user } = useAuth();
@@ -181,7 +206,18 @@ const PersonalApiDashboard = ({ isOpen, onClose }: PersonalApiDashboardProps) =>
 
       const hasActiveTokens = tokens && tokens.length > 0;
       setHasTokens(hasActiveTokens);
-      setApiTokens(tokens || []);
+      
+      // Transform the tokens to match our ApiToken interface
+      const transformedTokens: ApiToken[] = (tokens || []).map(token => ({
+        id: token.id,
+        token_name: token.token_name,
+        token_description: token.token_description || '',
+        is_active: token.is_active,
+        created_at: token.created_at,
+        permissions: parsePermissions(token.permissions),
+      }));
+      
+      setApiTokens(transformedTokens);
 
       if (hasActiveTokens) {
         await loadDashboardData();
@@ -311,7 +347,7 @@ const PersonalApiDashboard = ({ isOpen, onClose }: PersonalApiDashboardProps) =>
       const token = tokenResult as string;
       const tokenHash = await hashToken(token);
 
-      // Store the token in database
+      // Store the token in database using correct token_type
       const { data: tokenData, error: insertError } = await supabase
         .from('user_api_tokens')
         .insert({
@@ -321,7 +357,7 @@ const PersonalApiDashboard = ({ isOpen, onClose }: PersonalApiDashboardProps) =>
           token_hash: tokenHash,
           connection_purpose: newToken.connection_purpose,
           permissions: newToken.permissions,
-          token_type: 'personal',
+          token_type: 'user', // Use 'user' instead of 'personal'
           is_active: true
         })
         .select()
@@ -854,7 +890,7 @@ const PersonalApiDashboard = ({ isOpen, onClose }: PersonalApiDashboardProps) =>
                                       {error.error_type === 'VALIDATION_ERROR' && 'The data sent doesn\'t match the expected format. Check your request structure.'}
                                       {error.error_type === 'AUTHENTICATION_ERROR' && 'Your API key is missing or invalid. Verify your authentication credentials.'}
                                       {error.error_type === 'AUTHORIZATION_ERROR' && 'Your API key doesn\'t have permission to access this resource.'}
-                                      {error.error_type === 'NOT_FOUND_ERROR' && 'The resource you\'re trying to access doesn\'t exist.'}
+                                      {error.error_type === 'NOT_FOUND_ERROR' && 'The resource you\'re trying to access doesn't exist.'}
                                       {error.error_type === 'RATE_LIMIT_ERROR' && 'Too many requests sent too quickly. Please slow down.'}
                                       {!['VALIDATION_ERROR', 'AUTHENTICATION_ERROR', 'AUTHORIZATION_ERROR', 'NOT_FOUND_ERROR', 'RATE_LIMIT_ERROR'].includes(error.error_type) && 
                                         'An unexpected error occurred. Contact support if this persists.'}

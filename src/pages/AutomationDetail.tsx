@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Send, ArrowLeft, Bot, BarChart3, Code2, Webhook } from "lucide-react";
+import { Send, ArrowLeft, Bot, BarChart3, Code2 } from "lucide-react";
 import ChatCard from "@/components/ChatCard";
 import AutomationDashboard from "@/components/AutomationDashboard";
 import AIAgentForm from "@/components/AIAgentForm";
@@ -14,7 +14,6 @@ import BlueprintCard from "@/components/BlueprintCard";
 import AutomationDiagramDisplay from "@/components/AutomationDiagramDisplay";
 import { AutomationBlueprint } from "@/types/automation";
 import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
-import WebhookManagementTab from '@/components/webhooks/WebhookManagementTab';
 
 interface Automation {
   id: string;
@@ -52,7 +51,6 @@ const AutomationDetail = () => {
   const [showDashboard, setShowDashboard] = useState(false);
   const [showDiagram, setShowDiagram] = useState(false);
   const [generatingDiagram, setGeneratingDiagram] = useState(false);
-  const [showWebhooks, setShowWebhooks] = useState(false);
 
   useEffect(() => {
     if (!user || !id) {
@@ -557,13 +555,12 @@ const AutomationDetail = () => {
           </div>
         </div>
 
-        {/* Center - Main Navigation */}
+        {/* Center - Main Navigation (Only 3 buttons now) */}
         <div className="flex items-center bg-white/90 backdrop-blur-sm rounded-full shadow-lg border border-gray-200/50 p-1">
           <Button
             onClick={() => {
               setShowDashboard(!showDashboard);
               setShowDiagram(false);
-              setShowWebhooks(false);
             }}
             size="sm"
             className={`rounded-full px-4 py-2 transition-all duration-300 ${
@@ -579,11 +576,10 @@ const AutomationDetail = () => {
             onClick={() => {
               setShowDashboard(false);
               setShowDiagram(false);
-              setShowWebhooks(false);
             }}
             size="sm"
             className={`rounded-full px-4 py-2 mx-1 transition-all duration-300 ${
-              !showDashboard && !showDiagram && !showWebhooks
+              !showDashboard && !showDiagram
                 ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md' 
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
@@ -595,7 +591,6 @@ const AutomationDetail = () => {
             onClick={() => {
               setShowDiagram(!showDiagram);
               setShowDashboard(false);
-              setShowWebhooks(false);
             }}
             size="sm"
             className={`rounded-full px-4 py-2 transition-all duration-300 ${
@@ -607,22 +602,6 @@ const AutomationDetail = () => {
           >
             <Code2 className={`w-4 h-4 ${generatingDiagram ? 'animate-spin' : ''}`} />
           </Button>
-
-          <Button
-            onClick={() => {
-              setShowWebhooks(!showWebhooks);
-              setShowDashboard(false);
-              setShowDiagram(false);
-            }}
-            size="sm"
-            className={`rounded-full px-4 py-2 transition-all duration-300 ${
-              showWebhooks 
-                ? 'bg-gradient-to-r from-purple-500 to-blue-600 text-white shadow-md' 
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <Webhook className="w-4 h-4" />
-          </Button>
         </div>
 
         {/* Right side - spacer for balance */}
@@ -633,7 +612,7 @@ const AutomationDetail = () => {
         {/* Main Content Area - Fixed height management */}
         <div className="relative h-full">
           {/* Chat Card - Improved height calculation */}
-          <div className={`transition-transform duration-500 ease-in-out ${showDashboard || showDiagram || showWebhooks ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'} ${showDashboard || showDiagram || showWebhooks ? 'absolute' : 'relative'} w-full`}>
+          <div className={`transition-transform duration-500 ease-in-out ${showDashboard || showDiagram ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'} ${showDashboard || showDiagram ? 'absolute' : 'relative'} w-full`}>
             <div className="h-[calc(100vh-220px)]">
               <ChatCard 
                 messages={messages} 
@@ -677,27 +656,18 @@ const AutomationDetail = () => {
               </div>
             )}
           </div>
-
-          {/* Webhooks Card - Fixed height */}
-          <div className={`transition-transform duration-500 ease-in-out ${showWebhooks ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} ${showWebhooks ? 'relative' : 'absolute'} w-full`}>
-            {showWebhooks && (
-              <div className="h-[calc(100vh-160px)] overflow-y-auto">
-                <WebhookManagementTab automationId={automation.id} />
-              </div>
-            )}
-          </div>
         </div>
       </div>
       
       {/* Platform Buttons - Reduced spacing */}
-      {!showDashboard && !showDiagram && !showWebhooks && currentPlatforms && currentPlatforms.length > 0 && (
+      {!showDashboard && !showDiagram && currentPlatforms && currentPlatforms.length > 0 && (
         <div className="px-6 pb-2">
           <PlatformButtons platforms={currentPlatforms} />
         </div>
       )}
       
       {/* Input Section - Fixed positioning and reduced spacing */}
-      {!showDashboard && !showDiagram && !showWebhooks && (
+      {!showDashboard && !showDiagram && (
         <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent px-6 pt-2 pb-4">
           <div className="flex gap-3 items-end">
             <Button

@@ -132,7 +132,7 @@ export const usePersonalApiDashboard = () => {
   };
 
   const setupRealTimeSubscriptions = useCallback(() => {
-    if (!user?.id) return;
+    if (!user?.id) return () => {};
 
     console.log('Setting up real-time subscriptions for API dashboard');
     
@@ -181,7 +181,8 @@ export const usePersonalApiDashboard = () => {
   useEffect(() => {
     if (user) {
       fetchDashboardData();
-      setupRealTimeSubscriptions();
+      const cleanup = setupRealTimeSubscriptions();
+      return cleanup;
     }
   }, [user, fetchDashboardData, setupRealTimeSubscriptions]);
 

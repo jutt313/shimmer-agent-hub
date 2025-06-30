@@ -173,7 +173,7 @@ async function handleAutomationsAPI(supabase: any, tokenData: any, method: strin
     }
 
     if (method === 'POST' && path.length === 1) {
-      // POST /automations - Create automation
+      // POST /automations - Create automation with enhanced functionality
       if (!tokenData.permissions.write) {
         return new Response(
           JSON.stringify({ error: 'Insufficient permissions' }),
@@ -182,19 +182,101 @@ async function handleAutomationsAPI(supabase: any, tokenData: any, method: strin
       }
 
       const body = await req.json()
+      
+      // Enhanced automation creation with event-based configuration
+      const automationData = {
+        title: body.title || 'API Created Automation',
+        description: body.description || 'Created via API',
+        user_id: userId,
+        status: 'draft',
+        automation_blueprint: {
+          trigger: {
+            type: body.trigger_type || 'webhook',
+            event: body.event_type || 'api_trigger',
+            webhook_endpoint: body.webhook_url || `https://api.yusrai.com/webhooks/${crypto.randomUUID()}`,
+            webhook_secret: body.webhook_secret || crypto.randomUUID()
+          },
+          actions: body.actions || [
+            {
+              type: 'notification',
+              config: {
+                message: `Automation ${body.title || 'API Automation'} triggered via API`,
+                channels: ['dashboard', 'email']
+              }
+            }
+          ],
+          conditions: body.conditions || [],
+          metadata: {
+            created_via: 'api',
+            api_token_id: tokenData.token_id,
+            external_service: body.external_service || 'unknown'
+          }
+        }
+      }
+
       const { data, error } = await supabase
         .from('automations')
-        .insert({
-          ...body,
-          user_id: userId
-        })
+        .insert(automationData)
         .select()
         .single()
 
       if (error) throw error
 
+      // Create associated webhook if requested
+      if (body.create_webhook !== false) {
+        const webhookData = {
+          automation_id: data.id,
+          webhook_name: `${data.title} Webhook`,
+          webhook_description: `Auto-generated webhook for ${data.title}`,
+          webhook_url: automationData.automation_blueprint.trigger.webhook_endpoint,
+          webhook_secret: automationData.automation_blueprint.trigger.webhook_secret,
+          expected_events: body.expected_events || [body.event_type || 'api_trigger'],
+          is_active: true
+        }
+
+        await supabase
+          .from('automation_webhooks')
+          .insert(webhookData)
+      }
+
+      // Send notification about automation creation
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: userId,
+          title: 'New Automation Created',
+          message: `Automation "${data.title}" was created via API`,
+          type: 'automation_created',
+          category: 'system',
+          metadata: {
+            automation_id: data.id,
+            created_via: 'api'
+          }
+        })
+
+      // Return comprehensive response with all details
+      const response = {
+        automation: data,
+        webhook_url: automationData.automation_blueprint.trigger.webhook_endpoint,
+        webhook_secret: automationData.automation_blueprint.trigger.webhook_secret,
+        api_endpoints: {
+          get_automation: `/automations/${data.id}`,
+          update_automation: `/automations/${data.id}`,
+          delete_automation: `/automations/${data.id}`,
+          execute_automation: `/execute/${data.id}`,
+          webhook_events: `/automations/${data.id}/webhooks`
+        },
+        documentation: 'https://docs.yusrai.com/api',
+        next_steps: [
+          'Configure your webhook endpoint to receive events',
+          'Test the automation using the execute endpoint',
+          'Monitor automation runs via the dashboard',
+          'Set up real-time notifications'
+        ]
+      }
+
       return new Response(
-        JSON.stringify({ data }),
+        JSON.stringify({ data: response }),
         { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }

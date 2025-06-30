@@ -49,17 +49,27 @@ export const useAutomationWebhooks = (automationId?: string) => {
 
       if (error) throw error;
 
-      // Fetch delivery stats for each webhook
+      // Transform the data to match the AutomationWebhook interface
       const webhooksWithStats = await Promise.all(
         (webhookData || []).map(async (webhook) => {
           const deliveryStats = await fetchDeliveryStats(webhook.id);
           const recentDeliveries = await fetchRecentDeliveries(webhook.id);
           
           return {
-            ...webhook,
+            id: webhook.id,
+            automation_id: webhook.automation_id,
+            webhook_name: webhook.webhook_name || 'Untitled Webhook',
+            webhook_description: webhook.webhook_description || undefined,
+            webhook_url: webhook.webhook_url,
+            webhook_secret: webhook.webhook_secret,
+            expected_events: webhook.expected_events || [],
+            is_active: webhook.is_active,
+            trigger_count: webhook.trigger_count,
+            last_triggered_at: webhook.last_triggered_at,
+            created_at: webhook.created_at,
             delivery_stats: deliveryStats,
             recent_deliveries: recentDeliveries
-          };
+          } as AutomationWebhook;
         })
       );
 

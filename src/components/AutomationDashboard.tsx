@@ -1,177 +1,173 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowRight, Clock, CheckCircle, XCircle, Play, Activity, Server, Bot, History, Calendar, TrendingUp, Webhook, Plus, Copy, Eye, EyeOff, TestTube, AlertCircle, BarChart } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
-import { format, subDays, startOfDay, subWeeks, subMonths, startOfWeek, startOfMonth } from "date-fns";
-import { useToast } from "@/components/ui/use-toast";
-import { useAutomationWebhooks } from "@/hooks/useAutomationWebhooks";
-import WebhookCreateModal from "@/components/webhooks/WebhookCreateModal";
-import AgentChatPopup from "./AgentChatPopup";
-
-interface AutomationRun {
-  id: string;
-  status: string;
-  run_timestamp: string;
-  duration_ms: number | null;
-  details_log: any;
-  trigger_data: any;
-}
-
-interface AIAgent {
-  id: string;
-  agent_name: string;
-  agent_role: string;
-  agent_goal: string;
-  llm_provider: string;
-  model: string;
-  agent_memory: any;
-  agent_rules: string;
-  created_at: string;
-  updated_at: string;
-}
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Activity, Clock, CheckCircle, AlertCircle, Play, Pause, Settings, Webhook, BarChart as BarChartIcon, TrendingUp, Calendar, Globe } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { AutomationBlueprint } from '@/types/automation';
+import { useAutomationWebhooks } from '@/hooks/useAutomationWebhooks';
+import WebhookCard from '@/components/webhooks/WebhookCard';
+import WebhookCreateModal from '@/components/webhooks/WebhookCreateModal';
+import { BarChart, LineChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface AutomationDashboardProps {
   automationId: string;
   automationTitle: string;
-  automationBlueprint: any;
+  automationBlueprint: AutomationBlueprint | null;
   onClose: () => void;
 }
 
-const AutomationDashboard = ({
-  automationId,
-  automationTitle,
-  automationBlueprint,
-  onClose
-}: AutomationDashboardProps) => {
-  const [runs, setRuns] = useState<AutomationRun[]>([]);
-  const [agents, setAgents] = useState<AIAgent[]>([]);
-  const [platforms, setPlatforms] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedAgent, setSelectedAgent] = useState<AIAgent | null>(null);
-  const [showAgentChat, setShowAgentChat] = useState(false);
-  const [showCreateWebhookModal, setShowCreateWebhookModal] = useState(false);
-  const [selectedWebhookTab, setSelectedWebhookTab] = useState('overview');
-  const [webhookLogs, setWebhookLogs] = useState<any[]>([]);
-  const [webhookErrors, setWebhookErrors] = useState<any[]>([]);
-  const [testPayload, setTestPayload] = useState('{\n  "event": "test",\n  "data": {\n    "message": "Hello World"\n  }\n}');
-  const [testingWebhook, setTestingWebhook] = useState(false);
+interface WebhookLog {
+  webhook_name: string;
+  event_type: string;
+  status: string;
+  status_code: number;
+  timestamp: string;
+}
+
+interface WebhookError {
+  webhook_name: string;
+  error_code: string;
+  error_message: string;
+  timestamp: string;
+}
+
+const AutomationDashboard = ({ automationId, automationTitle, automationBlueprint, onClose }: AutomationDashboardProps) => {
   const { toast } = useToast();
 
-  // Use the webhook hook
-  const { webhooks, loading: webhooksLoading, toggleWebhookStatus, refetch: refetchWebhooks } = useAutomationWebhooks(automationId);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [webhookActiveTab, setWebhookActiveTab] = useState('overview');
+  const [webhooks, setWebhooks] = useState<any[]>([]);
+  const [webhookLogs, setWebhookLogs] = useState<WebhookLog[]>([]);
+  const [webhookErrors, setWebhookErrors] = useState<WebhookError[]>([]);
+  const [showCreateWebhook, setShowCreateWebhook] = useState(false);
+  const [selectedWebhookForTest, setSelectedWebhookForTest] = useState<string>('');
+  const [testPayload, setTestPayload] = useState<string>('{"event": "test", "data": {"message": "Hello World"}}');
+  const [testingWebhook, setTestingWebhook] = useState(false);
+  const [testResult, setTestResult] = useState<null | {
+    success: boolean;
+    status_code: number;
+    response_time: number;
+    response_body?: string;
+  }>(null);
 
-  useEffect(() => {
-    fetchDashboardData();
-    fetchWebhookLogs();
+  // Sample performance data for charts
+  const performanceData = [
+    { date: '2023-06-01', total: 100, successful: 90, failed: 10 },
+    { date: '2023-06-02', total: 120, successful: 110, failed: 10 },
+    { date: '2023-06-03', total: 130, successful: 125, failed: 5 },
+    { date: '2023-06-04', total: 90, successful: 85, failed: 5 },
+    { date: '2023-06-05', total: 150, successful: 140, failed: 10 },
+    { date: '2023-06-06', total: 160, successful: 150, failed: 10 },
+    { date: '2023-06-07', total: 170, successful: 160, failed: 10 },
+  ];
 
-    // Setup real-time subscriptions with unique channel names
-    const runsChannel = supabase.channel(`automation-runs-${automationId}`).on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'automation_runs',
-      filter: `automation_id=eq.${automationId}`
-    }, () => {
-      fetchDashboardData();
-    }).subscribe();
+  const webhookDeliveryData = [
+    { date: '2023-06-01', successful: 80, failed: 5 },
+    { date: '2023-06-02', successful: 90, failed: 10 },
+    { date: '2023-06-03', successful: 85, failed: 15 },
+    { date: '2023-06-04', successful: 95, failed: 5 },
+    { date: '2023-06-05', successful: 100, failed: 8 },
+    { date: '2023-06-06', successful: 110, failed: 7 },
+    { date: '2023-06-07', successful: 120, failed: 6 },
+  ];
 
-    const agentsChannel = supabase.channel(`ai-agents-${automationId}`).on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'ai_agents',
-      filter: `automation_id=eq.${automationId}`
-    }, () => {
-      fetchDashboardData();
-    }).subscribe();
-
-    const webhooksChannel = supabase.channel(`webhooks-${automationId}`).on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'automation_webhooks',
-      filter: `automation_id=eq.${automationId}`
-    }, () => {
-      refetchWebhooks();
-      fetchWebhookLogs();
-    }).subscribe();
-
-    // Cleanup function
-    return () => {
-      supabase.removeChannel(runsChannel);
-      supabase.removeChannel(agentsChannel);
-      supabase.removeChannel(webhooksChannel);
-    };
-  }, [automationId]);
-
-  const fetchDashboardData = async () => {
+  const fetchWebhooks = async () => {
     try {
-      // Fetch automation runs
-      const {
-        data: runsData,
-        error: runsError
-      } = await supabase.from('automation_runs').select('*').eq('automation_id', automationId).order('run_timestamp', {
-        ascending: false
-      });
-      if (runsError) throw runsError;
-      setRuns(runsData || []);
+      const { data, error } = await supabase
+        .from('automation_webhooks')
+        .select('*')
+        .eq('automation_id', automationId);
 
-      // Fetch AI agents
-      const {
-        data: agentsData,
-        error: agentsError
-      } = await supabase.from('ai_agents').select('*').eq('automation_id', automationId).order('created_at', {
-        ascending: false
-      });
-      if (agentsError) throw agentsError;
-      setAgents(agentsData || []);
-
-      // Extract platforms from blueprint - only real platforms
-      if (automationBlueprint?.steps) {
-        const extractedPlatforms = automationBlueprint.steps.filter((step: any) => step.action?.integration).map((step: any) => ({
-          name: step.action.integration,
-          method: step.action.method,
-          parameters: step.action.parameters
-        }));
-
-        // Remove duplicates
-        const uniquePlatforms = extractedPlatforms.filter((platform: any, index: number, self: any[]) => index === self.findIndex(p => p.name === platform.name));
-        setPlatforms(uniquePlatforms);
-      }
+      if (error) throw error;
+      setWebhooks(data || []);
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error fetching webhooks:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load webhooks",
+        variant: "destructive",
+      });
     }
   };
 
   const fetchWebhookLogs = async () => {
     try {
-      const { data: logsData, error: logsError } = await supabase
+      const { data, error } = await supabase
         .from('webhook_delivery_logs')
-        .select(`
-          *,
-          automation_webhooks!inner(automation_id)
-        `)
-        .eq('automation_webhooks.automation_id', automationId)
-        .order('created_at', { ascending: false })
+        .select('*')
+        .eq('automation_id', automationId)
+        .order('timestamp', { ascending: false })
         .limit(50);
 
-      if (logsError) throw logsError;
-      setWebhookLogs(logsData || []);
-
-      // Filter errors
-      const errors = (logsData || []).filter(log => log.status_code >= 400 || !log.delivered_at);
-      setWebhookErrors(errors);
+      if (error) throw error;
+      setWebhookLogs(data || []);
     } catch (error) {
       console.error('Error fetching webhook logs:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load webhook logs",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const fetchWebhookErrors = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('webhook_errors')
+        .select('*')
+        .eq('automation_id', automationId)
+        .order('timestamp', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setWebhookErrors(data || []);
+    } catch (error) {
+      console.error('Error fetching webhook errors:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load webhook errors",
+        variant: "destructive",
+      });
+    }
+  };
+
+  useEffect(() => {
+    fetchWebhooks();
+    fetchWebhookLogs();
+    fetchWebhookErrors();
+  }, [automationId]);
+
+  const handleToggleWebhookStatus = async (webhookId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('automation_webhooks')
+        .update({ is_active: !currentStatus })
+        .eq('id', webhookId);
+
+      if (error) throw error;
+      toast({
+        title: "Success",
+        description: `Webhook ${!currentStatus ? 'activated' : 'deactivated'}`,
+      });
+      fetchWebhooks();
+    } catch (error) {
+      console.error('Error toggling webhook status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update webhook status",
+        variant: "destructive",
+      });
     }
   };
 
   const handleDeleteWebhook = async (webhookId: string) => {
+    if (!confirm('Are you sure you want to delete this webhook?')) return;
     try {
       const { error } = await supabase
         .from('automation_webhooks')
@@ -179,13 +175,11 @@ const AutomationDashboard = ({
         .eq('id', webhookId);
 
       if (error) throw error;
-
       toast({
-        title: "Webhook Deleted",
-        description: "The webhook has been successfully deleted",
+        title: "Deleted",
+        description: "Webhook deleted successfully",
       });
-
-      refetchWebhooks();
+      fetchWebhooks();
     } catch (error) {
       console.error('Error deleting webhook:', error);
       toast({
@@ -196,887 +190,590 @@ const AutomationDashboard = ({
     }
   };
 
-  const handleTestWebhook = async (webhookUrl: string) => {
-    setTestingWebhook(true);
+  const handleTestWebhook = async () => {
+    if (!selectedWebhookForTest) {
+      toast({
+        title: "Select Webhook",
+        description: "Please select a webhook to test",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    let payload;
     try {
-      const response = await fetch(webhookUrl, {
+      payload = JSON.parse(testPayload);
+    } catch {
+      toast({
+        title: "Invalid JSON",
+        description: "Test payload must be valid JSON",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTestingWebhook(true);
+    setTestResult(null);
+
+    try {
+      const webhook = webhooks.find(w => w.id === selectedWebhookForTest);
+      if (!webhook) throw new Error('Webhook not found');
+
+      const startTime = performance.now();
+      const response = await fetch(webhook.webhook_url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Webhook-Secret': webhook.webhook_secret,
         },
-        body: testPayload,
+        body: JSON.stringify(payload),
+      });
+      const endTime = performance.now();
+
+      const responseBody = await response.text();
+
+      setTestResult({
+        success: response.ok,
+        status_code: response.status,
+        response_time: Math.round(endTime - startTime),
+        response_body: responseBody,
       });
 
-      const responseText = await response.text();
-      
       toast({
         title: response.ok ? "Test Successful" : "Test Failed",
-        description: response.ok 
-          ? "Webhook test completed successfully" 
-          : `Test failed with status ${response.status}`,
+        description: `Status code: ${response.status}`,
         variant: response.ok ? "default" : "destructive",
       });
-
-      // Refresh logs to show the test
-      fetchWebhookLogs();
     } catch (error) {
-      console.error('Webhook test error:', error);
+      console.error('Error testing webhook:', error);
       toast({
-        title: "Test Error",
-        description: "Failed to test webhook",
+        title: "Error",
+        description: "Failed to send test request",
         variant: "destructive",
+      });
+      setTestResult({
+        success: false,
+        status_code: 0,
+        response_time: 0,
+        response_body: String(error),
       });
     } finally {
       setTestingWebhook(false);
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast({
-      title: "Copied!",
-      description: "Text copied to clipboard",
-    });
-  };
-
-  // Calculate real metrics from actual data
-  const totalRuns = runs.length;
-  const successfulRuns = runs.filter(run => run.status === 'completed').length;
-  const successRate = totalRuns > 0 ? Math.round(successfulRuns / totalRuns * 100) : 0;
-  const avgExecutionTime = runs.length > 0 && runs.filter(run => run.duration_ms).length > 0 ? Math.round(runs.filter(run => run.duration_ms).reduce((acc, run) => acc + (run.duration_ms || 0), 0) / runs.filter(run => run.duration_ms).length) : 0;
-
-  // Get last run
-  const lastRun = runs[0];
-
-  // Enhanced chart data for daily, weekly, monthly views
-  const getDailyData = () => {
-    return Array.from({
-      length: 7
-    }, (_, i) => {
-      const date = startOfDay(subDays(new Date(), 6 - i));
-      const dayRuns = runs.filter(run => startOfDay(new Date(run.run_timestamp)).getTime() === date.getTime());
-      return {
-        date: format(date, 'MMM dd'),
-        total: dayRuns.length,
-        successful: dayRuns.filter(run => run.status === 'completed').length,
-        failed: dayRuns.filter(run => run.status === 'failed').length
-      };
-    });
-  };
-
-  const getWeeklyData = () => {
-    return Array.from({
-      length: 4
-    }, (_, i) => {
-      const weekStart = startOfWeek(subWeeks(new Date(), 3 - i));
-      const weekEnd = subDays(startOfWeek(subWeeks(new Date(), 3 - i - 1)), 1);
-      const weekRuns = runs.filter(run => {
-        const runDate = new Date(run.run_timestamp);
-        return runDate >= weekStart && runDate <= weekEnd;
-      });
-      return {
-        date: format(weekStart, 'MMM dd'),
-        total: weekRuns.length,
-        successful: weekRuns.filter(run => run.status === 'completed').length,
-        failed: weekRuns.filter(run => run.status === 'failed').length
-      };
-    });
-  };
-
-  const getMonthlyData = () => {
-    return Array.from({
-      length: 6
-    }, (_, i) => {
-      const monthStart = startOfMonth(subMonths(new Date(), 5 - i));
-      const monthEnd = subDays(startOfMonth(subMonths(new Date(), 5 - i - 1)), 1);
-      const monthRuns = runs.filter(run => {
-        const runDate = new Date(run.run_timestamp);
-        return runDate >= monthStart && runDate <= monthEnd;
-      });
-      return {
-        date: format(monthStart, 'MMM yyyy'),
-        total: monthRuns.length,
-        successful: monthRuns.filter(run => run.status === 'completed').length,
-        failed: monthRuns.filter(run => run.status === 'failed').length
-      };
-    });
-  };
-
-  // Get last 24 hours runs
-  const last24Hours = runs.filter(run => new Date(run.run_timestamp) > subDays(new Date(), 1)).slice(0, 10);
-
-  // Recommended agents based on automation blueprint
-  const getRecommendedAgents = () => {
-    const recommendations = [];
-    if (automationBlueprint?.steps) {
-      const hasEmailSteps = automationBlueprint.steps.some((step: any) => step.action?.integration?.toLowerCase().includes('email') || step.action?.method?.toLowerCase().includes('email'));
-      const hasDataSteps = automationBlueprint.steps.some((step: any) => step.action?.integration?.toLowerCase().includes('sheets') || step.action?.integration?.toLowerCase().includes('database'));
-      const hasNotificationSteps = automationBlueprint.steps.some((step: any) => step.action?.integration?.toLowerCase().includes('slack') || step.action?.integration?.toLowerCase().includes('discord'));
-      if (hasEmailSteps && !agents.some(a => a.agent_role.toLowerCase().includes('email'))) {
-        recommendations.push({
-          name: "Email Marketing Agent",
-          role: "Email Campaign Manager",
-          goal: "Optimize email campaigns and improve engagement rates",
-          reason: "Your automation includes email operations"
-        });
-      }
-      if (hasDataSteps && !agents.some(a => a.agent_role.toLowerCase().includes('data'))) {
-        recommendations.push({
-          name: "Data Analysis Agent",
-          role: "Data Analyst",
-          goal: "Analyze data patterns and provide insights",
-          reason: "Your automation processes data"
-        });
-      }
-      if (hasNotificationSteps && !agents.some(a => a.agent_role.toLowerCase().includes('notification'))) {
-        recommendations.push({
-          name: "Communication Agent",
-          role: "Communication Manager",
-          goal: "Manage notifications and team communications",
-          reason: "Your automation sends notifications"
-        });
-      }
-    }
-    return recommendations;
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'running':
-        return <Clock className="w-4 h-4 text-blue-500 animate-pulse" />;
-      case 'completed':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'failed':
-        return <XCircle className="w-4 h-4 text-red-500" />;
-      default:
-        return <Play className="w-4 h-4 text-gray-500" />;
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      running: "default",
-      completed: "secondary",
-      failed: "destructive"
-    };
-    return <Badge variant={variants[status] || "outline"} className="capitalize">
-        {status}
-      </Badge>;
-  };
-
-  const handleTalkToAgent = (agent: AIAgent) => {
-    setSelectedAgent(agent);
-    setShowAgentChat(true);
-  };
-
-  if (loading) {
-    return <div className="w-[calc(100vw-6rem)] max-w-none h-[75vh] bg-white/70 backdrop-blur-md rounded-3xl p-8 shadow-2xl border-0 relative flex items-center justify-center mx-12" style={{
-      boxShadow: '0 0 50px rgba(92, 142, 246, 0.2), 0 0 100px rgba(154, 94, 255, 0.1)'
-    }}>
-        <div className="text-lg text-gray-600">Loading dashboard...</div>
-      </div>;
-  }
-
-  return <>
-      <div style={{
-      boxShadow: '0 0 50px rgba(92, 142, 246, 0.2), 0 0 100px rgba(154, 94, 255, 0.1)'
-    }} className="w-[calc(100vw-6rem)] max-w-none h-[75vh] bg-white/70 backdrop-blur-md rounded-3xl p-6 shadow-2xl border-0 relative mx-12">
-        <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/30 to-purple-100/30 pointer-events-none"></div>
-        
-        {/* Header */}
-        <div className="relative z-10 flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            {automationTitle} Dashboard
-          </h2>
+  return (
+    <Card className="w-full h-full bg-white/90 backdrop-blur-sm border-0 shadow-2xl rounded-3xl overflow-hidden">
+      <CardHeader className="bg-gradient-to-r from-purple-500 via-blue-500 to-purple-600 text-white pb-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <CardTitle className="text-2xl font-bold flex items-center gap-3">
+              <Activity className="w-7 h-7" />
+              Dashboard
+            </CardTitle>
+            <p className="text-blue-100 mt-1 font-medium">{automationTitle}</p>
+          </div>
+          <Button variant="ghost" onClick={onClose} className="text-white hover:bg-white/20 rounded-full px-3 py-1">
+            Close
+          </Button>
         </div>
+      </CardHeader>
+      
+      <CardContent className="p-0 h-[calc(100%-120px)]">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+          <TabsList className="grid grid-cols-5 gap-1 p-2 bg-gray-50 mx-4 mt-4 rounded-2xl">
+            <TabsTrigger 
+              value="overview" 
+              className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-600 data-[state=active]:text-white"
+            >
+              <BarChartIcon className="w-4 h-4 mr-2" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger 
+              value="activity" 
+              className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-600 data-[state=active]:text-white"
+            >
+              <Activity className="w-4 h-4 mr-2" />
+              Activity
+            </TabsTrigger>
+            <TabsTrigger 
+              value="performance" 
+              className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-600 data-[state=active]:text-white"
+            >
+              <TrendingUp className="w-4 h-4 mr-2" />
+              Performance
+            </TabsTrigger>
+            <TabsTrigger 
+              value="settings" 
+              className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-600 data-[state=active]:text-white"
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              Settings
+            </TabsTrigger>
+            <TabsTrigger 
+              value="webhooks" 
+              className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-600 data-[state=active]:text-white"
+            >
+              <Webhook className="w-4 h-4 mr-2" />
+              Webhooks
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Tabs Navigation - Now with 5 tabs */}
-        <div className="relative z-10 h-[calc(100%-4rem)]">
-          <Tabs defaultValue="overview" className="h-full">
-            <TabsList className="grid w-full grid-cols-5 bg-white/50 rounded-2xl p-1 mb-4">
-              <TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                <Activity className="w-4 h-4" />
-                Overview
-              </TabsTrigger>
-              <TabsTrigger value="services" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                <Server className="w-4 h-4" />
-                Services
-              </TabsTrigger>
-              <TabsTrigger value="agents" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                <Bot className="w-4 h-4" />
-                AI Agents
-              </TabsTrigger>
-              <TabsTrigger value="activity" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                <History className="w-4 h-4" />
-                Activity
-              </TabsTrigger>
-              <TabsTrigger value="webhooks" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                <Webhook className="w-4 h-4" />
-                Webhooks
-              </TabsTrigger>
-            </TabsList>
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="flex-1 p-6 overflow-y-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="bg-gradient-to-br from-blue-50 to-cyan-100 border-0 shadow-lg">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Total Executions</p>
+                      <p className="text-3xl font-bold text-blue-600">1,247</p>
+                    </div>
+                    <Activity className="w-8 h-8 text-blue-500" />
+                  </div>
+                </CardContent>
+              </Card>
 
-            {/* Overview Tab */}
-            <TabsContent value="overview" className="mt-0 h-[calc(100%-5rem)]">
-              <ScrollArea className="h-full">
-                <div className="space-y-4 pr-4">
-                  {/* Status Message */}
-                  <div className="bg-white/50 rounded-2xl p-4 border border-blue-200/50">
+              <Card className="bg-gradient-to-br from-green-50 to-emerald-100 border-0 shadow-lg">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Active Webhooks</p>
+                      <p className="text-3xl font-bold text-green-600">{webhooks.filter(w => w.is_active).length}</p>
+                    </div>
+                    <CheckCircle className="w-8 h-8 text-green-500" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-purple-50 to-violet-100 border-0 shadow-lg">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Total Webhooks</p>
+                      <p className="text-3xl font-bold text-purple-600">{webhooks.length}</p>
+                    </div>
+                    <Webhook className="w-8 h-8 text-purple-500" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Activity Tab */}
+          <TabsContent value="activity" className="flex-1 p-6 overflow-y-auto">
+            <div className="space-y-4">
+              <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-lg text-gray-800">Recent Activity</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-gray-600">Activity details will be shown here.</p>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Performance Tab */}
+          <TabsContent value="performance" className="flex-1 p-6 overflow-y-auto">
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="bg-gradient-to-br from-green-50 to-emerald-100 border-0 shadow-lg">
+                  <CardContent className="p-6">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {lastRun ? getStatusIcon(lastRun.status) : <Clock className="w-4 h-4 text-gray-400" />}
-                        <div>
-                          <p className="font-medium text-gray-800">
-                            {lastRun ? 'Last Run' : 'Automation Status'}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            {lastRun ? new Date(lastRun.run_timestamp).toLocaleString() : 'Automation is configured but not yet started'}
-                          </p>
-                        </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Success Rate</p>
+                        <p className="text-3xl font-bold text-green-600">94.2%</p>
                       </div>
-                      {lastRun ? getStatusBadge(lastRun.status) : <Badge variant="outline">Ready to Start</Badge>}
+                      <CheckCircle className="w-8 h-8 text-green-500" />
                     </div>
-                  </div>
+                  </CardContent>
+                </Card>
 
-                  {/* Metrics Cards */}
-                  <div className="grid grid-cols-3 gap-4">
-                    <Card className="bg-white/50 border-blue-200/50">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-600">Total Runs</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold text-blue-600">{totalRuns}</div>
-                      </CardContent>
-                    </Card>
-                    
-                    <Card className="bg-white/50 border-blue-200/50">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-600">Success Rate</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold text-green-600">{successRate}%</div>
-                      </CardContent>
-                    </Card>
-                    
-                    <Card className="bg-white/50 border-blue-200/50">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-600">Avg Execution Time</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold text-purple-600">{avgExecutionTime}ms</div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Multi-timeframe Charts */}
-                  <Card className="bg-white/50 border-blue-200/50">
-                    <CardHeader>
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <TrendingUp className="w-5 h-5" />
-                        Automation Activity Trends
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <Tabs defaultValue="daily" className="w-full">
-                        <TabsList className="grid w-full grid-cols-3 mb-4">
-                          <TabsTrigger value="daily">Daily (7 days)</TabsTrigger>
-                          <TabsTrigger value="weekly">Weekly (4 weeks)</TabsTrigger>
-                          <TabsTrigger value="monthly">Monthly (6 months)</TabsTrigger>
-                        </TabsList>
-                        
-                        <TabsContent value="daily">
-                          <ChartContainer config={{
-                          successful: {
-                            label: "Successful",
-                            color: "#10b981"
-                          },
-                          failed: {
-                            label: "Failed",
-                            color: "#ef4444"
-                          },
-                          total: {
-                            label: "Total",
-                            color: "#3b82f6"
-                          }
-                        }} className="h-[200px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={getDailyData()}>
-                                <XAxis dataKey="date" />
-                                <YAxis />
-                                <ChartTooltip content={<ChartTooltipContent />} />
-                                <Bar dataKey="successful" fill="#10b981" name="Successful" />
-                                <Bar dataKey="failed" fill="#ef4444" name="Failed" />
-                              </BarChart>
-                            </ResponsiveContainer>
-                          </ChartContainer>
-                        </TabsContent>
-                        
-                        <TabsContent value="weekly">
-                          <ChartContainer config={{
-                          successful: {
-                            label: "Successful",
-                            color: "#10b981"
-                          },
-                          failed: {
-                            label: "Failed",
-                            color: "#ef4444"
-                          }
-                        }} className="h-[200px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={getWeeklyData()}>
-                                <XAxis dataKey="date" />
-                                <YAxis />
-                                <ChartTooltip content={<ChartTooltipContent />} />
-                                <Bar dataKey="successful" fill="#10b981" name="Successful" />
-                                <Bar dataKey="failed" fill="#ef4444" name="Failed" />
-                              </BarChart>
-                            </ResponsiveContainer>
-                          </ChartContainer>
-                        </TabsContent>
-                        
-                        <TabsContent value="monthly">
-                          <ChartContainer config={{
-                          successful: {
-                            label: "Successful",
-                            color: "#10b981"
-                          },
-                          failed: {
-                            label: "Failed",
-                            color: "#ef4444"
-                          }
-                        }} className="h-[200px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={getMonthlyData()}>
-                                <XAxis dataKey="date" />
-                                <YAxis />
-                                <ChartTooltip content={<ChartTooltipContent />} />
-                                <Bar dataKey="successful" fill="#10b981" name="Successful" />
-                                <Bar dataKey="failed" fill="#ef4444" name="Failed" />
-                              </BarChart>
-                            </ResponsiveContainer>
-                          </ChartContainer>
-                        </TabsContent>
-                      </Tabs>
-                    </CardContent>
-                  </Card>
-
-                  {/* Last 24 Hours History */}
-                  <Card className="bg-white/50 border-blue-200/50">
-                    <CardHeader>
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <Calendar className="w-5 h-5" />
-                        Last 24 Hours Activity
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {last24Hours.length > 0 ? <div className="space-y-2 max-h-48 overflow-y-auto">
-                          {last24Hours.map(run => <div key={run.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50/50 border border-gray-200/50">
-                              <div className="flex items-center gap-3">
-                                {getStatusIcon(run.status)}
-                                <div>
-                                  <span className="text-sm font-medium">
-                                    Run {run.id.slice(0, 8)}...
-                                  </span>
-                                  <p className="text-xs text-gray-500">
-                                    {new Date(run.run_timestamp).toLocaleTimeString()}
-                                  </p>
-                                  {run.duration_ms && <p className="text-xs text-gray-400">
-                                      {run.duration_ms}ms
-                                    </p>}
-                                </div>
-                              </div>
-                              {getStatusBadge(run.status)}
-                            </div>)}
-                        </div> : <div className="text-center py-8 text-gray-500">
-                          <Clock className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                          <p>No activity in the last 24 hours</p>
-                        </div>}
-                    </CardContent>
-                  </Card>
-                </div>
-              </ScrollArea>
-            </TabsContent>
-
-            {/* Services Tab */}
-            <TabsContent value="services" className="mt-6 h-[calc(100%-4rem)]">
-              <ScrollArea className="h-full">
-                <div className="space-y-6 pr-4">
-                  {platforms.length > 0 ? <>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {platforms.map((platform, index) => <Card key={index} className="bg-white/50 border-blue-200/50">
-                            <CardHeader>
-                              <CardTitle className="text-lg">{platform.name}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="space-y-2">
-                                <p className="text-sm text-gray-600">Method: {platform.method}</p>
-                                <div className="flex gap-2">
-                                  <Badge variant="secondary">Configured</Badge>
-                                  <Badge variant="outline">
-                                    {runs.filter(run => run.details_log && JSON.stringify(run.details_log).toLowerCase().includes(platform.name.toLowerCase())).length} calls
-                                  </Badge>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>)}
+                <Card className="bg-gradient-to-br from-blue-50 to-cyan-100 border-0 shadow-lg">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Avg Response Time</p>
+                        <p className="text-3xl font-bold text-blue-600">1.2s</p>
                       </div>
-                    </> : <Card className="bg-white/50 border-blue-200/50">
-                      <CardContent className="text-center py-8">
-                        <Server className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                        <p className="text-gray-500">No platforms configured yet</p>
-                      </CardContent>
-                    </Card>}
-                </div>
-              </ScrollArea>
-            </TabsContent>
-
-            {/* AI Agents Tab */}
-            <TabsContent value="agents" className="mt-0 h-[calc(100%-5rem)]">
-              <ScrollArea className="h-full">
-                <div className="space-y-4 pr-4">
-                  {/* Current Agents */}
-                  {agents.length > 0 && <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-gray-800">Active AI Agents</h3>
-                      {agents.map(agent => <Card key={agent.id} className="bg-white/50 border-blue-200/50">
-                          <CardHeader>
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <CardTitle className="text-lg">{agent.agent_name}</CardTitle>
-                                <p className="text-sm text-gray-600">{agent.agent_role}</p>
-                              </div>
-                              <Button onClick={() => handleTalkToAgent(agent)} size="sm" className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white">
-                                Talk to Agent
-                              </Button>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="space-y-2">
-                              <p className="text-sm"><strong>Goal:</strong> {agent.agent_goal}</p>
-                              <p className="text-sm"><strong>Provider:</strong> {agent.llm_provider} - {agent.model}</p>
-                              <Badge variant="secondary">Active</Badge>
-                            </div>
-                          </CardContent>
-                        </Card>)}
-                    </div>}
-
-                  {/* Recommended Agents */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-800">Recommended AI Agents</h3>
-                    {getRecommendedAgents().length > 0 ? <div className="space-y-3">
-                        {getRecommendedAgents().map((recommendation, index) => <Card key={index} className="bg-gradient-to-r from-blue-50/50 to-purple-50/50 border-blue-200/50">
-                            <CardContent className="p-4">
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <h4 className="font-medium text-gray-800">{recommendation.name}</h4>
-                                  <p className="text-sm text-gray-600 mb-1">{recommendation.role}</p>
-                                  <p className="text-sm text-gray-700 mb-2">{recommendation.goal}</p>
-                                  <p className="text-xs text-blue-600 bg-blue-100/50 px-2 py-1 rounded">
-                                    💡 {recommendation.reason}
-                                  </p>
-                                </div>
-                                <Button size="sm" variant="outline" className="ml-4 border-blue-300 text-blue-600 hover:bg-blue-50">
-                                  Add Agent
-                                </Button>
-                              </div>
-                            </CardContent>
-                          </Card>)}
-                      </div> : <Card className="bg-white/50 border-blue-200/50">
-                        <CardContent className="text-center py-8">
-                          <Bot className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                          <p className="text-gray-500">No specific agent recommendations available</p>
-                          <p className="text-sm text-gray-400 mt-1">Recommendations will appear based on your automation's needs</p>
-                        </CardContent>
-                      </Card>}
-                  </div>
-                </div>
-              </ScrollArea>
-            </TabsContent>
-
-            {/* Activity Tab */}
-            <TabsContent value="activity" className="mt-6 h-[calc(100%-4rem)]">
-              <ScrollArea className="h-full">
-                <div className="space-y-4 pr-4">
-                  {runs.length > 0 ? <Card className="bg-white/50 border-blue-200/50">
-                      <CardContent className="p-0">
-                        <div className="space-y-0">
-                          {runs.slice(0, 20).map(run => <div key={run.id} className="border-b border-gray-200/50 last:border-b-0 p-4">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  {getStatusIcon(run.status)}
-                                  <div>
-                                    <p className="font-medium text-gray-800">
-                                      Run {run.id.slice(0, 8)}...
-                                    </p>
-                                    <p className="text-sm text-gray-600">
-                                      {new Date(run.run_timestamp).toLocaleString()}
-                                    </p>
-                                    {run.duration_ms && <p className="text-xs text-gray-500">
-                                        Duration: {run.duration_ms}ms
-                                      </p>}
-                                  </div>
-                                </div>
-                                {getStatusBadge(run.status)}
-                              </div>
-                            </div>)}
-                        </div>
-                      </CardContent>
-                    </Card> : <Card className="bg-white/50 border-blue-200/50">
-                      <CardContent className="text-center py-8">
-                        <History className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                        <p className="text-gray-500">No activity history yet</p>
-                      </CardContent>
-                    </Card>}
-                </div>
-              </ScrollArea>
-            </TabsContent>
-
-            {/* NEW: Webhooks Tab */}
-            <TabsContent value="webhooks" className="mt-0 h-[calc(100%-5rem)]">
-              <div className="h-full">
-                {webhooks.length === 0 ? (
-                  // Empty state
-                  <div className="flex items-center justify-center h-full">
-                    <Card className="bg-white/50 border-blue-200/50 max-w-md mx-auto">
-                      <CardContent className="text-center py-12">
-                        <div className="w-16 h-16 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <Webhook className="w-8 h-8 text-blue-600" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                          No webhooks configured
-                        </h3>
-                        <p className="text-gray-600 mb-6">
-                          Create webhooks to allow external systems to trigger this automation
-                        </p>
-                        <Button
-                          onClick={() => setShowCreateWebhookModal(true)}
-                          className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
-                        >
-                          <Plus className="w-4 h-4 mr-2" />
-                          Create Your First Webhook
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  </div>
-                ) : (
-                  // Webhooks exist - show management interface
-                  <div className="h-full">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-gray-800">Webhook Management</h3>
-                      <Button
-                        onClick={() => setShowCreateWebhookModal(true)}
-                        size="sm"
-                        className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Webhook
-                      </Button>
+                      <Clock className="w-8 h-8 text-blue-500" />
                     </div>
+                  </CardContent>
+                </Card>
 
-                    <Tabs value={selectedWebhookTab} onValueChange={setSelectedWebhookTab} className="h-[calc(100%-4rem)]">
-                      <TabsList className="grid w-full grid-cols-4 bg-white/50 rounded-xl p-1 mb-4">
-                        <TabsTrigger value="overview" className="flex items-center gap-2">
-                          <BarChart className="w-4 h-4" />
-                          Overview
-                        </TabsTrigger>
-                        <TabsTrigger value="logs" className="flex items-center gap-2">
-                          <History className="w-4 h-4" />
-                          Logs
-                        </TabsTrigger>
-                        <TabsTrigger value="errors" className="flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4" />
-                          Errors
-                        </TabsTrigger>
-                        <TabsTrigger value="test" className="flex items-center gap-2">
-                          <TestTube className="w-4 h-4" />
-                          Test
-                        </TabsTrigger>
-                      </TabsList>
+                <Card className="bg-gradient-to-br from-purple-50 to-violet-100 border-0 shadow-lg">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Total Executions</p>
+                        <p className="text-3xl font-bold text-purple-600">1,247</p>
+                      </div>
+                      <Activity className="w-8 h-8 text-purple-500" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
-                      {/* Overview Tab */}
-                      <TabsContent value="overview" className="mt-0 h-[calc(100%-4rem)]">
-                        <ScrollArea className="h-full">
-                          <div className="space-y-4 pr-4">
-                            {webhooks.map((webhook) => (
-                              <Card key={webhook.id} className="bg-white/50 border-blue-200/50">
-                                <CardHeader>
-                                  <div className="flex justify-between items-start">
-                                    <div>
-                                      <CardTitle className="text-lg">{webhook.webhook_name}</CardTitle>
-                                      {webhook.webhook_description && (
-                                        <p className="text-sm text-gray-600">{webhook.webhook_description}</p>
-                                      )}
-                                    </div>
-                                    <div className="flex gap-2">
-                                      <Button 
-                                        onClick={() => toggleWebhookStatus(webhook.id, webhook.is_active)}
-                                        size="sm"
-                                        variant={webhook.is_active ? "default" : "outline"}
-                                        className={webhook.is_active ? "bg-gradient-to-r from-green-500 to-green-600 text-white" : ""}
-                                      >
-                                        {webhook.is_active ? "Active" : "Inactive"}
-                                      </Button>
-                                      <Button 
-                                        onClick={() => handleDeleteWebhook(webhook.id)}
-                                        size="sm"
-                                        variant="outline"
-                                        className="text-red-600 hover:bg-red-50"
-                                      >
-                                        Delete
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </CardHeader>
-                                <CardContent>
-                                  <div className="space-y-4">
-                                    {/* Webhook URL */}
-                                    <div>
-                                      <label className="text-sm font-medium text-gray-700">Webhook URL</label>
-                                      <div className="flex items-center gap-2 mt-1">
-                                        <code className="flex-1 bg-gray-100 px-3 py-2 rounded text-sm font-mono break-all">
-                                          {webhook.webhook_url}
-                                        </code>
-                                        <Button 
-                                          onClick={() => copyToClipboard(webhook.webhook_url)}
-                                          size="sm"
-                                          variant="outline"
-                                        >
-                                          <Copy className="w-4 h-4" />
-                                        </Button>
-                                      </div>
-                                    </div>
-
-                                    {/* Webhook Secret */}
-                                    <div>
-                                      <label className="text-sm font-medium text-gray-700">Webhook Secret</label>
-                                      <div className="flex items-center gap-2 mt-1">
-                                        <code className="flex-1 bg-gray-100 px-3 py-2 rounded text-sm font-mono">
-                                          {'•'.repeat(32)}
-                                        </code>
-                                        <Button 
-                                          onClick={() => copyToClipboard(webhook.webhook_secret)}
-                                          size="sm"
-                                          variant="outline"
-                                        >
-                                          <Copy className="w-4 h-4" />
-                                        </Button>
-                                      </div>
-                                    </div>
-
-                                    {/* Statistics */}
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                      <div className="bg-blue-50 p-3 rounded-lg">
-                                        <div className="text-lg font-bold text-blue-600">
-                                          {webhook.delivery_stats?.total_deliveries || 0}
-                                        </div>
-                                        <div className="text-xs text-gray-600">Total Calls</div>
-                                      </div>
-                                      <div className="bg-green-50 p-3 rounded-lg">
-                                        <div className="text-lg font-bold text-green-600">
-                                          {webhook.delivery_stats?.success_rate || 0}%
-                                        </div>
-                                        <div className="text-xs text-gray-600">Success Rate</div>
-                                      </div>
-                                      <div className="bg-purple-50 p-3 rounded-lg">
-                                        <div className="text-lg font-bold text-purple-600">
-                                          {webhook.delivery_stats?.avg_response_time || 0}ms
-                                        </div>
-                                        <div className="text-xs text-gray-600">Avg Response</div>
-                                      </div>
-                                      <div className="bg-orange-50 p-3 rounded-lg">
-                                        <div className="text-lg font-bold text-orange-600">
-                                          {webhook.trigger_count || 0}
-                                        </div>
-                                        <div className="text-xs text-gray-600">Total Triggers</div>
-                                      </div>
-                                    </div>
-
-                                    {/* Expected Events */}
-                                    {webhook.expected_events && webhook.expected_events.length > 0 && (
-                                      <div>
-                                        <label className="text-sm font-medium text-gray-700">Expected Events</label>
-                                        <div className="flex flex-wrap gap-2 mt-1">
-                                          {webhook.expected_events.map((event, index) => (
-                                            <Badge key={index} variant="secondary" className="text-xs">
-                                              {event}
-                                            </Badge>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            ))}
-                          </div>
-                        </ScrollArea>
-                      </TabsContent>
-
-                      {/* Logs Tab */}
-                      <TabsContent value="logs" className="mt-0 h-[calc(100%-4rem)]">
-                        <ScrollArea className="h-full">
-                          <div className="space-y-2 pr-4">
-                            {webhookLogs.length > 0 ? (
-                              webhookLogs.map((log) => (
-                                <Card key={log.id} className="bg-white/50 border-blue-200/50">
-                                  <CardContent className="p-4">
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-3">
-                                        <div className={`w-2 h-2 rounded-full ${log.delivered_at ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                                        <div>
-                                          <p className="font-medium text-sm">
-                                            {log.delivered_at ? 'Delivered' : 'Failed'}
-                                          </p>
-                                          <p className="text-xs text-gray-500">
-                                            {new Date(log.created_at).toLocaleString()}
-                                          </p>
-                                        </div>
-                                      </div>
-                                      <div className="text-right">
-                                        <Badge variant={log.status_code >= 200 && log.status_code < 300 ? "secondary" : "destructive"}>
-                                          {log.status_code || 'No Response'}
-                                        </Badge>
-                                        <p className="text-xs text-gray-500 mt-1">
-                                          Attempt {log.delivery_attempts}
-                                        </p>
-                                      </div>
-                                    </div>
-                                    {log.response_body && (
-                                      <div className="mt-2">
-                                        <details className="cursor-pointer">
-                                          <summary className="text-xs text-gray-600">View Response</summary>
-                                          <pre className="text-xs bg-gray-50 p-2 rounded mt-1 overflow-x-auto">
-                                            {log.response_body}
-                                          </pre>
-                                        </details>
-                                      </div>
-                                    )}
-                                  </CardContent>
-                                </Card>
-                              ))
-                            ) : (
-                              <div className="text-center py-8">
-                                <History className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                                <p className="text-gray-500">No webhook logs yet</p>
-                              </div>
-                            )}
-                          </div>
-                        </ScrollArea>
-                      </TabsContent>
-
-                      {/* Errors Tab */}
-                      <TabsContent value="errors" className="mt-0 h-[calc(100%-4rem)]">
-                        <ScrollArea className="h-full">
-                          <div className="space-y-2 pr-4">
-                            {webhookErrors.length > 0 ? (
-                              webhookErrors.map((error) => (
-                                <Card key={error.id} className="bg-red-50/50 border-red-200/50">
-                                  <CardContent className="p-4">
-                                    <div className="flex items-center gap-3">
-                                      <AlertCircle className="w-4 h-4 text-red-500" />
-                                      <div className="flex-1">
-                                        <p className="font-medium text-sm text-red-800">
-                                          Failed Delivery
-                                        </p>
-                                        <p className="text-xs text-red-600">
-                                          {new Date(error.created_at).toLocaleString()}
-                                        </p>
-                                        <p className="text-xs text-red-600 mt-1">
-                                          Status: {error.status_code || 'No Response'} | Attempts: {error.delivery_attempts}
-                                        </p>
-                                      </div>
-                                    </div>
-                                    {error.response_body && (
-                                      <div className="mt-2">
-                                        <details className="cursor-pointer">
-                                          <summary className="text-xs text-red-600">View Error Details</summary>
-                                          <pre className="text-xs bg-red-100 p-2 rounded mt-1 overflow-x-auto">
-                                            {error.response_body}
-                                          </pre>
-                                        </details>
-                                      </div>
-                                    )}
-                                  </CardContent>
-                                </Card>
-                              ))
-                            ) : (
-                              <div className="text-center py-8">
-                                <CheckCircle className="w-8 h-8 mx-auto mb-2 text-green-400" />
-                                <p className="text-gray-500">No webhook errors - great job!</p>
-                              </div>
-                            )}
-                          </div>
-                        </ScrollArea>
-                      </TabsContent>
-
-                      {/* Test Tab */}
-                      <TabsContent value="test" className="mt-0 h-[calc(100%-4rem)]">
-                        <div className="space-y-4 h-full">
-                          <div className="bg-white/50 rounded-2xl p-4 border border-blue-200/50">
-                            <h4 className="font-medium text-gray-800 mb-3">Test Webhook</h4>
-                            
-                            {webhooks.length > 0 && (
-                              <div className="space-y-4">
-                                <div>
-                                  <label className="text-sm font-medium text-gray-700">Select Webhook</label>
-                                  <select className="w-full mt-1 p-2 border border-gray-300 rounded-md">
-                                    {webhooks.map((webhook) => (
-                                      <option key={webhook.id} value={webhook.id}>
-                                        {webhook.webhook_name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-
-                                <div>
-                                  <label className="text-sm font-medium text-gray-700">Test Payload</label>
-                                  <textarea
-                                    value={testPayload}
-                                    onChange={(e) => setTestPayload(e.target.value)}
-                                    className="w-full mt-1 p-3 border border-gray-300 rounded-md font-mono text-sm"
-                                    rows={8}
-                                    placeholder="Enter JSON payload to test..."
-                                  />
-                                </div>
-
-                                <Button
-                                  onClick={() => webhooks.length > 0 && handleTestWebhook(webhooks[0].webhook_url)}
-                                  disabled={testingWebhook}
-                                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
-                                >
-                                  <TestTube className="w-4 h-4 mr-2" />
-                                  {testingWebhook ? 'Testing...' : 'Send Test Request'}
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </TabsContent>
-                    </Tabs>
+              <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-lg text-gray-800">Performance Trends</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={performanceData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="successful" stroke="#10b981" strokeWidth={2} />
+                        <Line type="monotone" dataKey="failed" stroke="#ef4444" strokeWidth={2} />
+                      </LineChart>
+                    </ResponsiveContainer>
                   </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-lg text-gray-800">Execution Distribution</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={performanceData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="total" fill="#8b5cf6" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Settings Tab */}
+          <TabsContent value="settings" className="flex-1 p-6 overflow-y-auto">
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Settings</h3>
+              <p className="text-gray-600">Settings content will be here.</p>
+            </div>
+          </TabsContent>
+
+          {/* Webhooks Tab */}
+          <TabsContent value="webhooks" className="flex-1 p-6 overflow-y-auto">
+            <Tabs value={webhookActiveTab} onValueChange={setWebhookActiveTab} className="h-full">
+              <div className="flex justify-between items-center mb-4">
+                <TabsList className="bg-gray-100 p-1 rounded-xl">
+                  <TabsTrigger 
+                    value="overview" 
+                    className="rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-600 data-[state=active]:text-white"
+                  >
+                    Overview
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="logs" 
+                    className="rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-600 data-[state=active]:text-white"
+                  >
+                    Logs
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="errors" 
+                    className="rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-600 data-[state=active]:text-white"
+                  >
+                    Errors
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="test" 
+                    className="rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-600 data-[state=active]:text-white"
+                  >
+                    Test
+                  </TabsTrigger>
+                </TabsList>
+                
+                {webhooks.length > 0 && (
+                  <Button
+                    onClick={() => setShowCreateWebhook(true)}
+                    className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl"
+                  >
+                    <Webhook className="w-4 h-4 mr-2" />
+                    Add Webhook
+                  </Button>
                 )}
               </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-      </div>
+
+              <TabsContent value="overview" className="space-y-6 h-full overflow-y-auto">
+                {webhooks.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-96 text-center">
+                    <Webhook className="w-16 h-16 text-gray-300 mb-4" />
+                    <h3 className="text-xl font-semibold text-gray-600 mb-2">No Webhooks Yet</h3>
+                    <p className="text-gray-500 mb-6 max-w-md">
+                      Create your first webhook to receive real-time notifications when your automation runs.
+                    </p>
+                    <Button
+                      onClick={() => setShowCreateWebhook(true)}
+                      className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl px-8 py-3"
+                    >
+                      <Webhook className="w-5 h-5 mr-2" />
+                      Create Webhook
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Webhook Statistics */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                      <Card className="bg-gradient-to-br from-blue-50 to-cyan-100 border-0 shadow-lg">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-gray-600">Total Webhooks</p>
+                              <p className="text-2xl font-bold text-blue-600">{webhooks.length}</p>
+                            </div>
+                            <Webhook className="w-6 h-6 text-blue-500" />
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="bg-gradient-to-br from-green-50 to-emerald-100 border-0 shadow-lg">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-gray-600">Active</p>
+                              <p className="text-2xl font-bold text-green-600">
+                                {webhooks.filter(w => w.is_active).length}
+                              </p>
+                            </div>
+                            <CheckCircle className="w-6 h-6 text-green-500" />
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="bg-gradient-to-br from-purple-50 to-violet-100 border-0 shadow-lg">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-gray-600">Total Calls</p>
+                              <p className="text-2xl font-bold text-purple-600">
+                                {webhooks.reduce((sum, w) => sum + w.trigger_count, 0)}
+                              </p>
+                            </div>
+                            <Activity className="w-6 h-6 text-purple-500" />
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="bg-gradient-to-br from-orange-50 to-amber-100 border-0 shadow-lg">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-gray-600">Success Rate</p>
+                              <p className="text-2xl font-bold text-orange-600">96%</p>
+                            </div>
+                            <TrendingUp className="w-6 h-6 text-orange-500" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Webhook Delivery Chart */}
+                    <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg mb-6">
+                      <CardHeader>
+                        <CardTitle className="text-lg text-gray-800 flex items-center gap-2">
+                          <BarChartIcon className="w-5 h-5" />
+                          Webhook Delivery Statistics (Last 30 days)
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-64">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={webhookDeliveryData}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="date" />
+                              <YAxis />
+                              <Tooltip />
+                              <Bar dataKey="successful" fill="#10b981" name="Successful" />
+                              <Bar dataKey="failed" fill="#ef4444" name="Failed" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Webhook Cards */}
+                    <div className="grid gap-4">
+                      {webhooks.map((webhook) => (
+                        <WebhookCard
+                          key={webhook.id}
+                          webhook={webhook}
+                          onToggleStatus={handleToggleWebhookStatus}
+                          onDelete={handleDeleteWebhook}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="logs" className="space-y-4 h-full overflow-y-auto">
+                <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="text-lg text-gray-800">Webhook Delivery Logs</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {webhookLogs.map((log, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-2 h-2 rounded-full ${log.status === 'success' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                            <div>
+                              <p className="font-medium">{log.webhook_name}</p>
+                              <p className="text-sm text-gray-600">{log.event_type}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium">{log.status_code}</p>
+                            <p className="text-xs text-gray-500">{log.timestamp}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="errors" className="space-y-4 h-full overflow-y-auto">
+                <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="text-lg text-gray-800 flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5 text-red-500" />
+                      Webhook Errors
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {webhookErrors.map((error, index) => (
+                        <div key={index} className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <AlertCircle className="w-4 h-4 text-red-500" />
+                                <span className="font-medium text-red-800">{error.webhook_name}</span>
+                                <Badge variant="destructive" className="text-xs">{error.error_code}</Badge>
+                              </div>
+                              <p className="text-sm text-red-700 mb-1">{error.error_message}</p>
+                              <p className="text-xs text-red-600">{error.timestamp}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {webhookErrors.length === 0 && (
+                        <div className="text-center py-8">
+                          <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                          <p className="text-gray-600">No webhook errors found. Great job!</p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="test" className="space-y-4 h-full overflow-y-auto">
+                <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="text-lg text-gray-800">Test Webhook</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Select Webhook to Test
+                      </label>
+                      <select 
+                        value={selectedWebhookForTest}
+                        onChange={(e) => setSelectedWebhookForTest(e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Choose a webhook...</option>
+                        {webhooks.map((webhook) => (
+                          <option key={webhook.id} value={webhook.id}>
+                            {webhook.webhook_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Test Payload (JSON)
+                      </label>
+                      <Textarea
+                        value={testPayload}
+                        onChange={(e) => setTestPayload(e.target.value)}
+                        placeholder='{"event": "test", "data": {"message": "Hello World"}}'
+                        className="h-32 font-mono text-sm"
+                      />
+                    </div>
+
+                    <Button
+                      onClick={handleTestWebhook}
+                      disabled={!selectedWebhookForTest || testingWebhook}
+                      className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg"
+                    >
+                      {testingWebhook ? 'Testing...' : 'Send Test Request'}
+                    </Button>
+
+                    {testResult && (
+                      <Card className={`mt-4 ${testResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            {testResult.success ? (
+                              <CheckCircle className="w-5 h-5 text-green-500" />
+                            ) : (
+                              <AlertCircle className="w-5 h-5 text-red-500" />
+                            )}
+                            <span className={`font-medium ${testResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                              {testResult.success ? 'Test Successful' : 'Test Failed'}
+                            </span>
+                          </div>
+                          <div className="text-sm">
+                            <p><strong>Status Code:</strong> {testResult.status_code}</p>
+                            <p><strong>Response Time:</strong> {testResult.response_time}ms</p>
+                            {testResult.response_body && (
+                              <div className="mt-2">
+                                <strong>Response:</strong>
+                                <pre className="mt-1 p-2 bg-gray-100 rounded text-xs overflow-x-auto">
+                                  {testResult.response_body}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
 
       {/* Create Webhook Modal */}
-      <WebhookCreateModal
-        isOpen={showCreateWebhookModal}
-        onClose={() => setShowCreateWebhookModal(false)}
-        automationId={automationId}
-        onWebhookCreated={() => {
-          refetchWebhooks();
-          fetchWebhookLogs();
-        }}
-      />
-
-      {/* Agent Chat Popup */}
-      {showAgentChat && selectedAgent && <AgentChatPopup agent={selectedAgent} onClose={() => {
-      setShowAgentChat(false);
-      setSelectedAgent(null);
-    }} />}
-    </>;
+      {showCreateWebhook && (
+        <WebhookCreateModal
+          automationId={automationId}
+          onClose={() => setShowCreateWebhook(false)}
+          onWebhookCreated={() => {
+            setShowCreateWebhook(false);
+            fetchWebhooks();
+          }}
+        />
+      )}
+    </Card>
+  );
 };
 
 export default AutomationDashboard;

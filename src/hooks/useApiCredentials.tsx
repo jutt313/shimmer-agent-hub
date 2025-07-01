@@ -41,6 +41,24 @@ export const useApiCredentials = () => {
     }
   }, [user]);
 
+  const transformCredential = (item: any): ApiCredential => {
+    return {
+      ...item,
+      credential_type: item.credential_type as 'personal' | 'developer' | 'service',
+      permissions: typeof item.permissions === 'string' 
+        ? JSON.parse(item.permissions) 
+        : item.permissions as {
+            read: boolean;
+            write: boolean;
+            webhook: boolean;
+            notifications: boolean;
+            automations: boolean;
+            platform_connections: boolean;
+          },
+      allowed_origins: item.allowed_origins || []
+    };
+  };
+
   const fetchCredentials = async () => {
     try {
       const { data, error } = await supabase
@@ -50,10 +68,7 @@ export const useApiCredentials = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setCredentials((data || []).map(item => ({
-        ...item,
-        credential_type: item.credential_type as 'personal' | 'developer' | 'service'
-      })));
+      setCredentials((data || []).map(transformCredential));
     } catch (error) {
       console.error('Error fetching credentials:', error);
       toast({
@@ -99,11 +114,7 @@ export const useApiCredentials = () => {
 
       if (error) throw error;
 
-      const newCredential = {
-        ...data,
-        credential_type: data.credential_type as 'personal' | 'developer' | 'service'
-      };
-
+      const newCredential = transformCredential(data);
       setCredentials(prev => [newCredential, ...prev]);
       
       toast({
@@ -135,10 +146,7 @@ export const useApiCredentials = () => {
 
       if (error) throw error;
 
-      const updatedCredential = {
-        ...data,
-        credential_type: data.credential_type as 'personal' | 'developer' | 'service'
-      };
+      const updatedCredential = transformCredential(data);
 
       setCredentials(prev => 
         prev.map(cred => 

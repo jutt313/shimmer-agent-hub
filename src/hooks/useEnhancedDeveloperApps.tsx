@@ -37,6 +37,15 @@ export const useEnhancedDeveloperApps = () => {
     }
   }, [user]);
 
+  const transformApp = (item: any): DeveloperApp => {
+    return {
+      ...item,
+      environment: (item.environment === 'production' ? 'production' : 'test') as 'test' | 'production',
+      redirect_uris: item.redirect_uris || [],
+      supported_events: item.supported_events || []
+    };
+  };
+
   const fetchApps = async () => {
     try {
       const { data, error } = await supabase
@@ -46,7 +55,7 @@ export const useEnhancedDeveloperApps = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setApps(data || []);
+      setApps((data || []).map(transformApp));
     } catch (error) {
       console.error('Error fetching apps:', error);
       toast({
@@ -72,14 +81,15 @@ export const useEnhancedDeveloperApps = () => {
 
       if (error) throw error;
 
-      setApps(prev => [data, ...prev]);
+      const newApp = transformApp(data);
+      setApps(prev => [newApp, ...prev]);
       
       toast({
         title: "Success",
         description: "Developer app created successfully",
       });
 
-      return data;
+      return newApp;
     } catch (error) {
       console.error('Error creating app:', error);
       toast({
@@ -103,9 +113,10 @@ export const useEnhancedDeveloperApps = () => {
 
       if (error) throw error;
 
+      const updatedApp = transformApp(data);
       setApps(prev => 
         prev.map(app => 
-          app.id === appId ? { ...app, ...data } : app
+          app.id === appId ? { ...app, ...updatedApp } : app
         )
       );
       
@@ -114,7 +125,7 @@ export const useEnhancedDeveloperApps = () => {
         description: "Developer app updated successfully",
       });
 
-      return data;
+      return updatedApp;
     } catch (error) {
       console.error('Error updating app:', error);
       toast({

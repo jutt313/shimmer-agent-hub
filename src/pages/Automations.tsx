@@ -1,5 +1,4 @@
 
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -30,6 +29,7 @@ interface Automation {
 const Automations = () => {
   const [automations, setAutomations] = useState<Automation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -52,7 +52,7 @@ const Automations = () => {
   const transformAutomation = (item: any): Automation => {
     return {
       ...item,
-      name: item.title || item.name || 'Untitled Automation', // Map title to name
+      name: item.title || item.name || 'Untitled Automation',
       status: item.status as 'active' | 'paused' | 'draft'
     };
   };
@@ -79,12 +79,12 @@ const Automations = () => {
     }
   };
 
+  // Instead of navigating to a non-existent route, show a form
   const handleCreateAutomation = () => {
-    navigate('/create-automation');
+    setShowCreateForm(true);
   };
 
   const toggleAutomationStatus = async (automationId: string, currentStatus: 'active' | 'paused' | 'draft') => {
-    // Only allow toggling between active and paused, not draft
     if (currentStatus === 'draft') {
       toast({
         title: "Cannot toggle draft automation",
@@ -124,6 +124,32 @@ const Automations = () => {
     }
   };
 
+  if (showCreateForm) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/30 p-4 sm:p-6 lg:p-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+              Create New Automation
+            </h1>
+            <p className="text-gray-600 mt-2">
+              Set up your AI-powered automation
+            </p>
+          </div>
+          <Button
+            onClick={() => setShowCreateForm(false)}
+            variant="outline"
+            className="rounded-xl"
+          >
+            Back to Automations
+          </Button>
+        </div>
+        
+        <AIAgentForm />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/30 p-4 sm:p-6 lg:p-8">
       <div className="flex items-center justify-between mb-6">
@@ -145,41 +171,27 @@ const Automations = () => {
       </div>
       
       <Tabs defaultValue="automations" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 mb-8 bg-white/70 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg">
+        <TabsList className="grid w-full grid-cols-3 mb-8 bg-white/70 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg">
           <TabsTrigger 
             value="automations" 
             className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white data-[state=active]:shadow-lg rounded-xl transition-all duration-200"
           >
             <Bot className="w-4 h-4 mr-2" />
-            Automations
-          </TabsTrigger>
-          <TabsTrigger 
-            value="dashboard"
-            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white data-[state=active]:shadow-lg rounded-xl transition-all duration-200"
-          >
-            <TrendingUp className="w-4 h-4 mr-2" />
-            Dashboard
+            My Automations
           </TabsTrigger>
           <TabsTrigger 
             value="runs"
             className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white data-[state=active]:shadow-lg rounded-xl transition-all duration-200"
           >
             <Play className="w-4 h-4 mr-2" />
-            Runs
+            Activity
           </TabsTrigger>
           <TabsTrigger 
             value="performance"
             className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white data-[state=active]:shadow-lg rounded-xl transition-all duration-200"
           >
             <TrendingUp className="w-4 h-4 mr-2" />
-            Performance
-          </TabsTrigger>
-          <TabsTrigger 
-            value="security"
-            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white data-[state=active]:shadow-lg rounded-xl transition-all duration-200"
-          >
-            <Settings className="w-4 h-4 mr-2" />
-            Security
+            Analytics
           </TabsTrigger>
         </TabsList>
 
@@ -244,14 +256,6 @@ const Automations = () => {
           )}
         </TabsContent>
 
-        <TabsContent value="dashboard" className="space-y-6">
-          <AutomationDashboard 
-            automationId="" 
-            automationTitle="All Automations" 
-            automationBlueprint={defaultBlueprint} 
-          />
-        </TabsContent>
-
         <TabsContent value="runs" className="space-y-6">
           <AutomationRunsMonitor automationId="" />
         </TabsContent>
@@ -259,14 +263,9 @@ const Automations = () => {
         <TabsContent value="performance" className="space-y-6">
           <PerformanceMonitor />
         </TabsContent>
-
-        <TabsContent value="security" className="space-y-6">
-          <SecurityDashboard />
-        </TabsContent>
       </Tabs>
     </div>
   );
 };
 
 export default Automations;
-

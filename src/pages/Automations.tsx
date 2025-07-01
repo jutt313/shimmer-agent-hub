@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Plus, MessageCircle, Bot, Zap, Settings, Code } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,6 @@ import ChatCard from '@/components/ChatCard';
 import HelpChatModal from '@/components/HelpChatModal';
 import NotificationDropdown from '@/components/NotificationDropdown';
 import SettingsDropdown from '@/components/SettingsDropdown';
-import PersonalApiDashboard from '@/components/PersonalApiDashboard';
 
 interface Agent {
   name: string;
@@ -62,7 +62,6 @@ const Automations = () => {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [helpInitialMessage, setHelpInitialMessage] = useState<string>('');
   const [helpInitialContext, setHelpInitialContext] = useState<string>('');
-  const [isPersonalApiOpen, setIsPersonalApiOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -203,14 +202,6 @@ const Automations = () => {
           <div className="flex items-center gap-3 mt-4 md:mt-0">
             <NotificationDropdown />
             <SettingsDropdown />
-            <Button
-              onClick={() => setIsPersonalApiOpen(true)}
-              variant="outline"
-              className="rounded-xl border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-200"
-            >
-              <Code className="w-5 h-5 mr-2" />
-              API Dashboard
-            </Button>
             <Button
               onClick={() => setIsHelpOpen(true)}
               variant="outline"
@@ -412,12 +403,6 @@ const Automations = () => {
             </div>
           </div>
         )}
-
-        {/* Personal API Dashboard */}
-        <PersonalApiDashboard 
-          isOpen={isPersonalApiOpen} 
-          onClose={() => setIsPersonalApiOpen(false)} 
-        />
 
         {/* Help Chat Modal */}
         <HelpChatModal

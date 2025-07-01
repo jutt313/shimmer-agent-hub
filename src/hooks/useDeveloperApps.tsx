@@ -1,9 +1,10 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 
-export interface EnhancedDeveloperApp {
+export interface DeveloperApp {
   id: string;
   app_name: string;
   app_description: string | null;
@@ -11,27 +12,15 @@ export interface EnhancedDeveloperApp {
   client_secret: string;
   redirect_uris: string[];
   webhook_url: string | null;
-  app_logo_url: string | null;
-  privacy_policy_url: string | null;
-  terms_of_service_url: string | null;
-  homepage_url: string | null;
-  developer_email: string | null;
-  tool_description: string | null;
-  use_cases: string[];
-  supported_events: any;
-  event_descriptions: any;
   is_active: boolean;
   tier: 'free' | 'pro' | 'enterprise';
   rate_limit_per_hour: number;
-  environment: 'test' | 'production';
-  test_client_id?: string;
-  test_client_secret?: string;
   created_at: string;
   updated_at: string;
 }
 
-export const useEnhancedDeveloperApps = () => {
-  const [apps, setApps] = useState<EnhancedDeveloperApp[]>([]);
+export const useDeveloperApps = () => {
+  const [apps, setApps] = useState<DeveloperApp[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -44,23 +33,20 @@ export const useEnhancedDeveloperApps = () => {
 
   const fetchApps = async () => {
     try {
+      console.log('Fetching developer apps for user:', user?.id);
       const { data, error } = await supabase
         .from('developer_integrations')
         .select('*')
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching developer apps:', error);
+        throw error;
+      }
       
-      // Transform data to include environment settings
-      const transformedApps = (data || []).map(app => ({
-        ...app,
-        environment: (app as any).environment || 'test' as 'test' | 'production',
-        test_client_id: (app as any).test_client_id || `test_${app.client_id}`,
-        test_client_secret: (app as any).test_client_secret || `test_${app.client_secret}`
-      }));
-      
-      setApps(transformedApps);
+      console.log('Fetched developer apps:', data);
+      setApps(data || []);
     } catch (error) {
       console.error('Error fetching developer apps:', error);
       toast({
@@ -78,55 +64,30 @@ export const useEnhancedDeveloperApps = () => {
     app_description: string;
     redirect_uris: string[];
     webhook_url?: string;
-    app_logo_url?: string;
-    privacy_policy_url?: string;
-    terms_of_service_url?: string;
-    homepage_url?: string;
-    developer_email?: string;
-    tool_description?: string;
-    use_cases?: string[];
-    supported_events?: any;
-    event_descriptions?: any;
-    environment?: 'test' | 'production';
   }) => {
     try {
-      // Generate test credentials
-      const testClientId = `test_${crypto.randomUUID().replace(/-/g, '').substring(0, 16)}`;
-      const testClientSecret = `test_secret_${crypto.randomUUID().replace(/-/g, '').substring(0, 32)}`;
-
+      console.log('Creating developer app:', appData);
       const { data, error } = await supabase
         .from('developer_integrations')
         .insert({
           user_id: user?.id,
           ...appData,
           redirect_uris: appData.redirect_uris.filter(uri => uri.trim()),
-          use_cases: appData.use_cases || [],
-          supported_events: appData.supported_events || [],
-          event_descriptions: appData.event_descriptions || {},
-          environment: appData.environment || 'test',
-          test_client_id: testClientId,
-          test_client_secret: testClientSecret,
-        } as any)
+          webhook_url: appData.webhook_url || null
+        })
         .select()
         .single();
 
       if (error) throw error;
 
-      const transformedApp = {
-        ...data,
-        environment: (data as any).environment || 'test' as 'test' | 'production',
-        test_client_id: testClientId,
-        test_client_secret: testClientSecret
-      };
-
-      setApps(prev => [transformedApp, ...prev]);
+      setApps(prev => [data, ...prev]);
       
       toast({
         title: "Success",
-        description: `Developer application created in ${transformedApp.environment} mode`,
+        description: "Developer application created successfully",
       });
 
-      return transformedApp;
+      return data;
     } catch (error) {
       console.error('Error creating developer app:', error);
       toast({
@@ -138,11 +99,12 @@ export const useEnhancedDeveloperApps = () => {
     }
   };
 
-  const updateApp = async (appId: string, updates: Partial<EnhancedDeveloperApp>) => {
+  const updateApp = async (appId: string, updates: Partial<Omit<DeveloperApp, 'id' | 'user_id' | 'client_id' | 'client_secret' | 'created_at' | 'updated_at'>>) => {
     try {
+      console.log('Updating developer app:', appId, updates);
       const { data, error } = await supabase
         .from('developer_integrations')
-        .update(updates as any)
+        .update(updates)
         .eq('id', appId)
         .eq('user_id', user?.id)
         .select()
@@ -150,16 +112,9 @@ export const useEnhancedDeveloperApps = () => {
 
       if (error) throw error;
 
-      const transformedApp = {
-        ...data,
-        environment: (data as any).environment || 'test' as 'test' | 'production',
-        test_client_id: (data as any).test_client_id,
-        test_client_secret: (data as any).test_client_secret
-      };
-
       setApps(prev => 
         prev.map(app => 
-          app.id === appId ? { ...app, ...transformedApp } : app
+          app.id === appId ? { ...app, ...data } : app
         )
       );
       
@@ -168,7 +123,7 @@ export const useEnhancedDeveloperApps = () => {
         description: "Developer application updated successfully",
       });
 
-      return transformedApp;
+      return data;
     } catch (error) {
       console.error('Error updating developer app:', error);
       toast({
@@ -180,38 +135,9 @@ export const useEnhancedDeveloperApps = () => {
     }
   };
 
-  const switchEnvironment = async (appId: string, newEnvironment: 'test' | 'production') => {
-    try {
-      const { error } = await supabase
-        .from('developer_integrations')
-        .update({ environment: newEnvironment } as any)
-        .eq('id', appId)
-        .eq('user_id', user?.id);
-
-      if (error) throw error;
-
-      setApps(prev => 
-        prev.map(app => 
-          app.id === appId ? { ...app, environment: newEnvironment } : app
-        )
-      );
-      
-      toast({
-        title: "Success",
-        description: `Switched to ${newEnvironment} mode`,
-      });
-    } catch (error) {
-      console.error('Error switching environment:', error);
-      toast({
-        title: "Error",
-        description: "Failed to switch environment",
-        variant: "destructive",
-      });
-    }
-  };
-
   const deleteApp = async (appId: string) => {
     try {
+      console.log('Deleting developer app:', appId);
       const { error } = await supabase
         .from('developer_integrations')
         .delete()
@@ -238,6 +164,7 @@ export const useEnhancedDeveloperApps = () => {
 
   const toggleAppStatus = async (appId: string, isActive: boolean) => {
     try {
+      console.log('Toggling app status:', appId, isActive);
       const { error } = await supabase
         .from('developer_integrations')
         .update({ is_active: !isActive })
@@ -273,7 +200,6 @@ export const useEnhancedDeveloperApps = () => {
     updateApp,
     deleteApp,
     toggleAppStatus,
-    switchEnvironment,
     refetch: fetchApps
   };
 };

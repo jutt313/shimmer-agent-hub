@@ -202,7 +202,7 @@ const Automations = () => {
             <NotificationDropdown />
             <SettingsDropdown />
             <Button
-              onClick={() => navigate('/documentation')}
+              onClick={() => window.open('/documentation', '_blank')}
               variant="outline"
               className="rounded-xl border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-200"
             >

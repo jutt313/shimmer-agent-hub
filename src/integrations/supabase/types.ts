@@ -102,60 +102,65 @@ export type Database = {
       }
       api_credentials: {
         Row: {
-          allowed_origins: string[] | null
           api_key: string
-          api_secret: string | null
           created_at: string
-          credential_description: string | null
           credential_name: string
-          credential_type: string
+          credential_type: Database["public"]["Enums"]["api_credential_type"]
           id: string
-          is_active: boolean
+          is_active: boolean | null
+          is_private_only: boolean | null
           last_used_at: string | null
           permissions: Json
-          rate_limit_per_hour: number
+          project_id: string | null
+          rate_limit_per_day: number | null
+          rate_limit_per_hour: number | null
           updated_at: string
           usage_count: number | null
           user_id: string
-          webhook_url: string | null
         }
         Insert: {
-          allowed_origins?: string[] | null
           api_key: string
-          api_secret?: string | null
           created_at?: string
-          credential_description?: string | null
           credential_name: string
-          credential_type?: string
+          credential_type?: Database["public"]["Enums"]["api_credential_type"]
           id?: string
-          is_active?: boolean
+          is_active?: boolean | null
+          is_private_only?: boolean | null
           last_used_at?: string | null
           permissions?: Json
-          rate_limit_per_hour?: number
+          project_id?: string | null
+          rate_limit_per_day?: number | null
+          rate_limit_per_hour?: number | null
           updated_at?: string
           usage_count?: number | null
           user_id: string
-          webhook_url?: string | null
         }
         Update: {
-          allowed_origins?: string[] | null
           api_key?: string
-          api_secret?: string | null
           created_at?: string
-          credential_description?: string | null
           credential_name?: string
-          credential_type?: string
+          credential_type?: Database["public"]["Enums"]["api_credential_type"]
           id?: string
-          is_active?: boolean
+          is_active?: boolean | null
+          is_private_only?: boolean | null
           last_used_at?: string | null
           permissions?: Json
-          rate_limit_per_hour?: number
+          project_id?: string | null
+          rate_limit_per_day?: number | null
+          rate_limit_per_hour?: number | null
           updated_at?: string
           usage_count?: number | null
           user_id?: string
-          webhook_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "api_credentials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "developer_projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       api_usage_logs: {
         Row: {
@@ -196,17 +201,70 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "api_usage_logs_api_credential_id_fkey"
+            foreignKeyName: "api_usage_logs_developer_integration_id_fkey"
+            columns: ["developer_integration_id"]
+            isOneToOne: false
+            referencedRelation: "developer_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      api_usage_tracking: {
+        Row: {
+          api_credential_id: string
+          cost_amount: number | null
+          created_at: string
+          endpoint: string
+          id: string
+          method: string
+          project_id: string | null
+          response_time_ms: number | null
+          status_code: number | null
+          tokens_used: number | null
+          usage_date: string
+          user_id: string
+        }
+        Insert: {
+          api_credential_id: string
+          cost_amount?: number | null
+          created_at?: string
+          endpoint: string
+          id?: string
+          method: string
+          project_id?: string | null
+          response_time_ms?: number | null
+          status_code?: number | null
+          tokens_used?: number | null
+          usage_date?: string
+          user_id: string
+        }
+        Update: {
+          api_credential_id?: string
+          cost_amount?: number | null
+          created_at?: string
+          endpoint?: string
+          id?: string
+          method?: string
+          project_id?: string | null
+          response_time_ms?: number | null
+          status_code?: number | null
+          tokens_used?: number | null
+          usage_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_usage_tracking_api_credential_id_fkey"
             columns: ["api_credential_id"]
             isOneToOne: false
             referencedRelation: "api_credentials"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "api_usage_logs_developer_integration_id_fkey"
-            columns: ["developer_integration_id"]
+            foreignKeyName: "api_usage_tracking_project_id_fkey"
+            columns: ["project_id"]
             isOneToOne: false
-            referencedRelation: "developer_integrations"
+            referencedRelation: "developer_projects"
             referencedColumns: ["id"]
           },
         ]
@@ -427,6 +485,154 @@ export type Database = {
         }
         Relationships: []
       }
+      billing_accounts: {
+        Row: {
+          auto_recharge_amount: number | null
+          auto_recharge_enabled: boolean | null
+          auto_recharge_threshold: number | null
+          billing_email: string
+          billing_status: Database["public"]["Enums"]["billing_status"] | null
+          company_name: string | null
+          created_at: string
+          credits_balance: number | null
+          id: string
+          primary_business_address: Json | null
+          stripe_customer_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_recharge_amount?: number | null
+          auto_recharge_enabled?: boolean | null
+          auto_recharge_threshold?: number | null
+          billing_email: string
+          billing_status?: Database["public"]["Enums"]["billing_status"] | null
+          company_name?: string | null
+          created_at?: string
+          credits_balance?: number | null
+          id?: string
+          primary_business_address?: Json | null
+          stripe_customer_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_recharge_amount?: number | null
+          auto_recharge_enabled?: boolean | null
+          auto_recharge_threshold?: number | null
+          billing_email?: string
+          billing_status?: Database["public"]["Enums"]["billing_status"] | null
+          company_name?: string | null
+          created_at?: string
+          credits_balance?: number | null
+          id?: string
+          primary_business_address?: Json | null
+          stripe_customer_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      billing_transactions: {
+        Row: {
+          amount: number
+          billing_account_id: string
+          created_at: string
+          credits_amount: number | null
+          description: string | null
+          id: string
+          status: string | null
+          stripe_payment_intent_id: string | null
+          transaction_type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          billing_account_id: string
+          created_at?: string
+          credits_amount?: number | null
+          description?: string | null
+          id?: string
+          status?: string | null
+          stripe_payment_intent_id?: string | null
+          transaction_type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          billing_account_id?: string
+          created_at?: string
+          credits_amount?: number | null
+          description?: string | null
+          id?: string
+          status?: string | null
+          stripe_payment_intent_id?: string | null
+          transaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_transactions_billing_account_id_fkey"
+            columns: ["billing_account_id"]
+            isOneToOne: false
+            referencedRelation: "billing_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_limits: {
+        Row: {
+          budget_amount: number
+          budget_name: string
+          budget_period: string
+          created_at: string
+          current_spend: number | null
+          end_date: string | null
+          id: string
+          is_active: boolean | null
+          project_id: string | null
+          start_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          budget_amount: number
+          budget_name: string
+          budget_period: string
+          created_at?: string
+          current_spend?: number | null
+          end_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          project_id?: string | null
+          start_date: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          budget_amount?: number
+          budget_name?: string
+          budget_period?: string
+          created_at?: string
+          current_spend?: number | null
+          end_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          project_id?: string | null
+          start_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_limits_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "developer_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credential_test_results: {
         Row: {
           created_at: string
@@ -546,6 +752,39 @@ export type Database = {
           use_cases?: string[] | null
           user_id?: string
           webhook_url?: string | null
+        }
+        Relationships: []
+      }
+      developer_projects: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean | null
+          project_description: string | null
+          project_name: string
+          updated_at: string
+          use_case: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          project_description?: string | null
+          project_name: string
+          updated_at?: string
+          use_case?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          project_description?: string | null
+          project_name?: string
+          updated_at?: string
+          use_case?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -1240,9 +1479,27 @@ export type Database = {
         Args: { automation_id: string }
         Returns: string
       }
+      generate_yusrai_api_key: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       hash_api_token: {
         Args: { token: string }
         Returns: string
+      }
+      track_api_usage: {
+        Args: {
+          p_user_id: string
+          p_api_credential_id: string
+          p_project_id: string
+          p_endpoint: string
+          p_method: string
+          p_tokens_used?: number
+          p_cost_amount?: number
+          p_response_time_ms?: number
+          p_status_code?: number
+        }
+        Returns: undefined
       }
       validate_api_token: {
         Args: { token_hash: string }
@@ -1263,9 +1520,21 @@ export type Database = {
           rate_limit_per_hour: number
         }[]
       }
+      validate_yusrai_api_key: {
+        Args: { api_key: string }
+        Returns: {
+          user_id: string
+          project_id: string
+          permissions: Json
+          is_valid: boolean
+          rate_limit_per_hour: number
+        }[]
+      }
     }
     Enums: {
+      api_credential_type: "personal" | "project" | "service"
       api_token_type: "developer" | "user" | "automation"
+      billing_status: "active" | "suspended" | "cancelled"
       developer_tier: "free" | "pro" | "enterprise"
       integration_type: "oauth" | "api_key" | "webhook"
     }
@@ -1383,7 +1652,9 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      api_credential_type: ["personal", "project", "service"],
       api_token_type: ["developer", "user", "automation"],
+      billing_status: ["active", "suspended", "cancelled"],
       developer_tier: ["free", "pro", "enterprise"],
       integration_type: ["oauth", "api_key", "webhook"],
     },

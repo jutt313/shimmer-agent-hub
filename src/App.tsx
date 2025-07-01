@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -18,6 +19,7 @@ import OAuthAuthorize from "./pages/OAuthAuthorize";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
 import Documentation from "./pages/Documentation";
+import DeveloperPortal from "./pages/DeveloperPortal";
 
 const queryClient = new QueryClient();
 
@@ -51,6 +53,14 @@ function App() {
               <Route
                 path="/documentation"
                 element={<Documentation />}
+              />
+              <Route
+                path="/developer"
+                element={
+                  <ProtectedRoute>
+                    <DeveloperPortal />
+                  </ProtectedRoute>
+                }
               />
               <Route
                 path="/support"

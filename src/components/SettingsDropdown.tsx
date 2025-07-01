@@ -13,18 +13,22 @@ import { useAuth } from "@/contexts/AuthContext";
 import SettingsTabs from "./settings/SettingsTabs";
 import DeveloperPortal from "./developer/DeveloperPortal";
 import PlaygroundConsole from "./developer/PlaygroundConsole";
-import DocumentationModal from "./documentation/DocumentationModal";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useNavigate } from "react-router-dom";
 
 const SettingsDropdown = () => {
   const { signOut } = useAuth();
+  const navigate = useNavigate();
   const [showSettings, setShowSettings] = useState(false);
   const [showDeveloperPortal, setShowDeveloperPortal] = useState(false);
   const [showPlayground, setShowPlayground] = useState(false);
-  const [showDocumentation, setShowDocumentation] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
+  };
+
+  const handleDocumentationClick = () => {
+    navigate('/documentation');
   };
 
   return (
@@ -41,9 +45,9 @@ const SettingsDropdown = () => {
             Profile & Settings
           </DropdownMenuItem>
           
-          <DropdownMenuItem onClick={() => setShowDocumentation(true)}>
+          <DropdownMenuItem onClick={handleDocumentationClick}>
             <BookOpen className="w-4 h-4 mr-2" />
-            Documentation
+            Documentation Library
           </DropdownMenuItem>
           
           <DropdownMenuItem onClick={() => setShowDeveloperPortal(true)}>
@@ -69,13 +73,6 @@ const SettingsDropdown = () => {
       <Dialog open={showSettings} onOpenChange={setShowSettings}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <SettingsTabs />
-        </DialogContent>
-      </Dialog>
-
-      {/* Documentation Modal */}
-      <Dialog open={showDocumentation} onOpenChange={setShowDocumentation}>
-        <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto p-0">
-          <DocumentationModal />
         </DialogContent>
       </Dialog>
 

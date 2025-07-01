@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Settings, User, LogOut, Code, PlayCircle } from "lucide-react";
+import { Settings, User, LogOut, Code, PlayCircle, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import SettingsTabs from "./settings/SettingsTabs";
 import DeveloperPortal from "./developer/DeveloperPortal";
 import PlaygroundConsole from "./developer/PlaygroundConsole";
+import DocumentationModal from "./documentation/DocumentationModal";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 const SettingsDropdown = () => {
@@ -20,6 +21,7 @@ const SettingsDropdown = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [showDeveloperPortal, setShowDeveloperPortal] = useState(false);
   const [showPlayground, setShowPlayground] = useState(false);
+  const [showDocumentation, setShowDocumentation] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -37,6 +39,11 @@ const SettingsDropdown = () => {
           <DropdownMenuItem onClick={() => setShowSettings(true)}>
             <User className="w-4 h-4 mr-2" />
             Profile & Settings
+          </DropdownMenuItem>
+          
+          <DropdownMenuItem onClick={() => setShowDocumentation(true)}>
+            <BookOpen className="w-4 h-4 mr-2" />
+            Documentation
           </DropdownMenuItem>
           
           <DropdownMenuItem onClick={() => setShowDeveloperPortal(true)}>
@@ -62,6 +69,13 @@ const SettingsDropdown = () => {
       <Dialog open={showSettings} onOpenChange={setShowSettings}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <SettingsTabs />
+        </DialogContent>
+      </Dialog>
+
+      {/* Documentation Modal */}
+      <Dialog open={showDocumentation} onOpenChange={setShowDocumentation}>
+        <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto p-0">
+          <DocumentationModal />
         </DialogContent>
       </Dialog>
 

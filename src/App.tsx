@@ -1,85 +1,32 @@
 
 import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./contexts/AuthContext";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-import Automations from "./pages/Automations";
-import AutomationDetail from "./pages/AutomationDetail";
-import Support from "./pages/Support";
-import KnowledgeAdmin from "./pages/KnowledgeAdmin";
-import NotFound from "./pages/NotFound";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import TermsConditions from "./pages/TermsConditions";
-import CookiePolicy from "./pages/CookiePolicy";
-import Disclaimer from "./pages/Disclaimer";
-import OAuthAuthorize from "./pages/OAuthAuthorize";
-import ProtectedRoute from "./components/ProtectedRoute";
-import AdminRoute from "./components/AdminRoute";
-import Documentation from "./pages/Documentation";
 
 const queryClient = new QueryClient();
 
-function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <AuthProvider>
       <TooltipProvider>
-        <AuthProvider>
-          <Toaster />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/oauth/authorize" element={<OAuthAuthorize />} />
-              <Route
-                path="/automations"
-                element={
-                  <ProtectedRoute>
-                    <Automations />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/automations/:id"
-                element={
-                  <ProtectedRoute>
-                    <AutomationDetail />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/documentation"
-                element={<Documentation />}
-              />
-              <Route
-                path="/support"
-                element={
-                  <ProtectedRoute>
-                    <Support />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/knowledge-admin"
-                element={
-                  <AdminRoute>
-                    <KnowledgeAdmin />
-                  </AdminRoute>
-                }
-              />
-              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-              <Route path="/terms-conditions" element={<TermsConditions />} />
-              <Route path="/cookie-policy" element={<CookiePolicy />} />
-              <Route path="/disclaimer" element={<Disclaimer />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </AuthProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<Auth />} />
+            {/* Remove the documentation route as it's now in settings */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
       </TooltipProvider>
-    </QueryClientProvider>
-  );
-}
+    </AuthProvider>
+  </QueryClientProvider>
+);
 
 export default App;

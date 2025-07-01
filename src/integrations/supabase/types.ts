@@ -100,8 +100,66 @@ export type Database = {
           },
         ]
       }
+      api_credentials: {
+        Row: {
+          allowed_origins: string[] | null
+          api_key: string
+          api_secret: string | null
+          created_at: string
+          credential_description: string | null
+          credential_name: string
+          credential_type: string
+          id: string
+          is_active: boolean
+          last_used_at: string | null
+          permissions: Json
+          rate_limit_per_hour: number
+          updated_at: string
+          usage_count: number | null
+          user_id: string
+          webhook_url: string | null
+        }
+        Insert: {
+          allowed_origins?: string[] | null
+          api_key: string
+          api_secret?: string | null
+          created_at?: string
+          credential_description?: string | null
+          credential_name: string
+          credential_type?: string
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          permissions?: Json
+          rate_limit_per_hour?: number
+          updated_at?: string
+          usage_count?: number | null
+          user_id: string
+          webhook_url?: string | null
+        }
+        Update: {
+          allowed_origins?: string[] | null
+          api_key?: string
+          api_secret?: string | null
+          created_at?: string
+          credential_description?: string | null
+          credential_name?: string
+          credential_type?: string
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          permissions?: Json
+          rate_limit_per_hour?: number
+          updated_at?: string
+          usage_count?: number | null
+          user_id?: string
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
       api_usage_logs: {
         Row: {
+          api_credential_id: string | null
           api_token_id: string | null
           created_at: string
           developer_integration_id: string | null
@@ -113,6 +171,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          api_credential_id?: string | null
           api_token_id?: string | null
           created_at?: string
           developer_integration_id?: string | null
@@ -124,6 +183,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          api_credential_id?: string | null
           api_token_id?: string | null
           created_at?: string
           developer_integration_id?: string | null
@@ -136,10 +196,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "api_usage_logs_api_token_id_fkey"
-            columns: ["api_token_id"]
+            foreignKeyName: "api_usage_logs_api_credential_id_fkey"
+            columns: ["api_credential_id"]
             isOneToOne: false
-            referencedRelation: "user_api_tokens"
+            referencedRelation: "api_credentials"
             referencedColumns: ["id"]
           },
           {
@@ -1007,6 +1067,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      generate_unified_api_key: {
+        Args: { key_type?: string }
+        Returns: string
+      }
       generate_webhook_url: {
         Args: { automation_id: string }
         Returns: string
@@ -1022,6 +1086,16 @@ export type Database = {
           token_type: Database["public"]["Enums"]["api_token_type"]
           permissions: Json
           is_valid: boolean
+        }[]
+      }
+      validate_unified_api_key: {
+        Args: { api_key: string }
+        Returns: {
+          user_id: string
+          credential_type: string
+          permissions: Json
+          is_valid: boolean
+          rate_limit_per_hour: number
         }[]
       }
     }

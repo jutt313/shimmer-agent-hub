@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Settings, User, Shield, Key, Code2, LogOut } from "lucide-react";
+import { Settings, User, Code2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,14 +10,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
-import PersonalApiDashboard from "./PersonalApiDashboard";
-import DeveloperPortalDashboard from "./DeveloperPortalDashboard";
+import UnifiedDeveloperPortal from "./UnifiedDeveloperPortal";
 import SettingsTabs from "./settings/SettingsTabs";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 const SettingsDropdown = () => {
   const { signOut } = useAuth();
-  const [showPersonalApi, setShowPersonalApi] = useState(false);
   const [showDeveloperPortal, setShowDeveloperPortal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -41,14 +39,9 @@ const SettingsDropdown = () => {
           
           <DropdownMenuSeparator />
           
-          <DropdownMenuItem onClick={() => setShowPersonalApi(true)}>
-            <Key className="w-4 h-4 mr-2" />
-            Personal API Keys
-          </DropdownMenuItem>
-          
           <DropdownMenuItem onClick={() => setShowDeveloperPortal(true)}>
             <Code2 className="w-4 h-4 mr-2" />
-            Dev Portal
+            Developer Portal
           </DropdownMenuItem>
           
           <DropdownMenuSeparator />
@@ -60,14 +53,8 @@ const SettingsDropdown = () => {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Personal API Dashboard */}
-      <PersonalApiDashboard 
-        isOpen={showPersonalApi} 
-        onClose={() => setShowPersonalApi(false)} 
-      />
-
-      {/* Developer Portal Dashboard */}
-      <DeveloperPortalDashboard 
+      {/* Unified Developer Portal */}
+      <UnifiedDeveloperPortal 
         isOpen={showDeveloperPortal} 
         onClose={() => setShowDeveloperPortal(false)} 
       />

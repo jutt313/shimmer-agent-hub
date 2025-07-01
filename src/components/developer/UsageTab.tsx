@@ -69,7 +69,7 @@ const UsageTab = () => {
       const totals = (data || []).reduce((acc, curr) => ({
         total_calls: acc.total_calls + 1,
         total_tokens: acc.total_tokens + (curr.tokens_used || 0),
-        total_cost: acc.total_cost + parseFloat(curr.cost_amount || '0'),
+        total_cost: acc.total_cost + (parseFloat(curr.cost_amount?.toString() || '0')),
         avg_response_time: acc.avg_response_time + (curr.response_time_ms || 0)
       }), { total_calls: 0, total_tokens: 0, total_cost: 0, avg_response_time: 0 });
 
@@ -100,7 +100,7 @@ const UsageTab = () => {
       }
       acc[key].count += 1;
       acc[key].tokens_used += curr.tokens_used || 0;
-      acc[key].cost_amount += parseFloat(curr.cost_amount || '0');
+      acc[key].cost_amount += parseFloat(curr.cost_amount?.toString() || '0');
       if (curr.response_time_ms) {
         acc[key].response_times.push(curr.response_time_ms);
       }

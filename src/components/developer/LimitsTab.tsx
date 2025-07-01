@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -70,7 +69,14 @@ const LimitsTab = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setBudgetLimits(data || []);
+      
+      // Transform the data to ensure budget_period matches our type
+      const transformedData = (data || []).map(item => ({
+        ...item,
+        budget_period: item.budget_period as 'daily' | 'weekly' | 'monthly'
+      }));
+      
+      setBudgetLimits(transformedData);
     } catch (error) {
       console.error('Error fetching budget limits:', error);
       toast({

@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Settings, User, LogOut } from "lucide-react";
+import { Settings, User, LogOut, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,11 +11,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 import SettingsTabs from "./settings/SettingsTabs";
+import DeveloperPortal from "./developer/DeveloperPortal";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 const SettingsDropdown = () => {
   const { signOut } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
+  const [showDeveloperPortal, setShowDeveloperPortal] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -29,10 +31,15 @@ const SettingsDropdown = () => {
             <Settings className="w-5 h-5" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56 bg-white border shadow-lg">
+        <DropdownMenuContent align="end" className="w-56 bg-white border shadow-lg z-50">
           <DropdownMenuItem onClick={() => setShowSettings(true)}>
             <User className="w-4 h-4 mr-2" />
             Profile & Settings
+          </DropdownMenuItem>
+          
+          <DropdownMenuItem onClick={() => setShowDeveloperPortal(true)}>
+            <Code className="w-4 h-4 mr-2" />
+            Developer API
           </DropdownMenuItem>
           
           <DropdownMenuSeparator />
@@ -48,6 +55,13 @@ const SettingsDropdown = () => {
       <Dialog open={showSettings} onOpenChange={setShowSettings}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <SettingsTabs />
+        </DialogContent>
+      </Dialog>
+
+      {/* Developer Portal Modal */}
+      <Dialog open={showDeveloperPortal} onOpenChange={setShowDeveloperPortal}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DeveloperPortal />
         </DialogContent>
       </Dialog>
     </>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,7 +19,8 @@ import {
   Target,
   Edit,
   Trash2,
-  CheckCircle
+  CheckCircle,
+  DollarSign
 } from 'lucide-react';
 
 interface BudgetLimit {
@@ -38,11 +40,17 @@ interface Project {
   project_name: string;
 }
 
+interface ApiCredential {
+  id: string;
+  credential_name: string;
+}
+
 const LimitsTab = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [budgetLimits, setBudgetLimits] = useState<BudgetLimit[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [apiKeys, setApiKeys] = useState<ApiCredential[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingLimit, setEditingLimit] = useState<BudgetLimit | null>(null);
@@ -52,11 +60,13 @@ const LimitsTab = () => {
   const [budgetAmount, setBudgetAmount] = useState(100);
   const [budgetPeriod, setBudgetPeriod] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
   const [selectedProject, setSelectedProject] = useState<string>('');
+  const [limitType, setLimitType] = useState<'global' | 'project' | 'api_key' | 'service'>('global');
 
   useEffect(() => {
     if (user) {
       fetchBudgetLimits();
       fetchProjects();
+      fetchApiKeys();
     }
   }, [user]);
 
@@ -70,11 +80,10 @@ const LimitsTab = () => {
 
       if (error) throw error;
       
-      // Transform the data to ensure budget_period matches our type
       const transformedData = (data || []).map(item => ({
         ...item,
         budget_period: item.budget_period as 'daily' | 'weekly' | 'monthly'
-      }));
+      })) as BudgetLimit[];
       
       setBudgetLimits(transformedData);
     } catch (error) {
@@ -104,13 +113,28 @@ const LimitsTab = () => {
     }
   };
 
+  const fetchApiKeys = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('api_credentials')
+        .select('id, credential_name')
+        .eq('user_id', user?.id)
+        .eq('is_active', true);
+
+      if (error) throw error;
+      setApiKeys(data || []);
+    } catch (error) {
+      console.error('Error fetching API keys:', error);
+    }
+  };
+
   const createBudgetLimit = async () => {
     try {
       const { error } = await supabase
         .from('budget_limits')
         .insert({
           user_id: user?.id,
-          project_id: selectedProject || null,
+          project_id: limitType === 'project' ? selectedProject || null : null,
           budget_name: budgetName,
           budget_amount: budgetAmount,
           budget_period: budgetPeriod,
@@ -147,7 +171,7 @@ const LimitsTab = () => {
           budget_name: budgetName,
           budget_amount: budgetAmount,
           budget_period: budgetPeriod,
-          project_id: selectedProject || null,
+          project_id: limitType === 'project' ? selectedProject || null : null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', editingLimit.id);
@@ -202,6 +226,7 @@ const LimitsTab = () => {
     setBudgetAmount(100);
     setBudgetPeriod('monthly');
     setSelectedProject('');
+    setLimitType('global');
   };
 
   const startEdit = (limit: BudgetLimit) => {
@@ -210,6 +235,7 @@ const LimitsTab = () => {
     setBudgetAmount(limit.budget_amount);
     setBudgetPeriod(limit.budget_period);
     setSelectedProject(limit.project_id || '');
+    setLimitType(limit.project_id ? 'project' : 'global');
   };
 
   const getUsagePercentage = (limit: BudgetLimit) => {
@@ -238,7 +264,7 @@ const LimitsTab = () => {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Budget Limits</h2>
-          <p className="text-gray-600">Set spending limits to control your API costs</p>
+          <p className="text-gray-600">Set spending limits to control your API costs by project, API key, or service</p>
         </div>
         
         <Dialog 
@@ -254,7 +280,7 @@ const LimitsTab = () => {
           }}
         >
           <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 rounded-xl">
+            <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 rounded-xl shadow-lg">
               <Plus className="h-4 w-4 mr-2" />
               Create Budget Limit
             </Button>
@@ -272,7 +298,7 @@ const LimitsTab = () => {
                   placeholder="Monthly API Budget"
                   value={budgetName}
                   onChange={(e) => setBudgetName(e.target.value)}
-                  className="mt-1 rounded-xl"
+                  className="mt-1 rounded-xl border-gray-300 focus:border-blue-500"
                 />
               </div>
               
@@ -284,17 +310,17 @@ const LimitsTab = () => {
                   step="0.01"
                   value={budgetAmount}
                   onChange={(e) => setBudgetAmount(parseFloat(e.target.value) || 100)}
-                  className="mt-1 rounded-xl"
+                  className="mt-1 rounded-xl border-gray-300 focus:border-blue-500"
                 />
               </div>
 
               <div>
                 <label className="text-sm font-medium text-gray-700">Period</label>
-                <Select value={budgetPeriod} onValueChange={(value: any) => setBudgetPeriod(value)}>
-                  <SelectTrigger className="mt-1 rounded-xl">
+                <Select value={budgetPeriod} onValueChange={(value: 'daily' | 'weekly' | 'monthly') => setBudgetPeriod(value)}>
+                  <SelectTrigger className="mt-1 rounded-xl bg-white border-gray-300">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white border shadow-lg rounded-xl z-50">
                     <SelectItem value="daily">Daily</SelectItem>
                     <SelectItem value="weekly">Weekly</SelectItem>
                     <SelectItem value="monthly">Monthly</SelectItem>
@@ -303,21 +329,37 @@ const LimitsTab = () => {
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-700">Project (Optional)</label>
-                <Select value={selectedProject} onValueChange={setSelectedProject}>
-                  <SelectTrigger className="mt-1 rounded-xl">
-                    <SelectValue placeholder="All projects" />
+                <label className="text-sm font-medium text-gray-700">Limit Type</label>
+                <Select value={limitType} onValueChange={(value: 'global' | 'project' | 'api_key' | 'service') => setLimitType(value)}>
+                  <SelectTrigger className="mt-1 rounded-xl bg-white border-gray-300">
+                    <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All projects</SelectItem>
-                    {projects.map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.project_name}
-                      </SelectItem>
-                    ))}
+                  <SelectContent className="bg-white border shadow-lg rounded-xl z-50">
+                    <SelectItem value="global">Global Account</SelectItem>
+                    <SelectItem value="project">By Project</SelectItem>
+                    <SelectItem value="api_key">By API Key</SelectItem>
+                    <SelectItem value="service">By Service Type</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              {limitType === 'project' && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Project</label>
+                  <Select value={selectedProject} onValueChange={setSelectedProject}>
+                    <SelectTrigger className="mt-1 rounded-xl bg-white border-gray-300">
+                      <SelectValue placeholder="Select project" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border shadow-lg rounded-xl z-50">
+                      {projects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.project_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <Button 
                 onClick={editingLimit ? updateBudgetLimit : createBudgetLimit}
@@ -334,9 +376,9 @@ const LimitsTab = () => {
       {/* Budget Limits List */}
       <div className="grid gap-4">
         {budgetLimits.length === 0 ? (
-          <Card className="bg-white/80 backdrop-blur-sm border-gray-200 rounded-3xl shadow-lg">
+          <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-200 rounded-3xl shadow-lg">
             <CardContent className="p-8 text-center">
-              <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <Shield className="h-12 w-12 text-blue-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No Budget Limits</h3>
               <p className="text-gray-600 mb-4">Create budget limits to monitor and control your API spending</p>
               <Button 
@@ -354,27 +396,27 @@ const LimitsTab = () => {
             const project = projects.find(p => p.id === limit.project_id);
             
             return (
-              <Card key={limit.id} className="bg-white/80 backdrop-blur-sm border-gray-200 rounded-3xl shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card key={limit.id} className="bg-gradient-to-br from-white to-blue-50/30 border-blue-200 rounded-3xl shadow-lg hover:shadow-xl transition-all duration-300">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-blue-100 rounded-xl">
-                        <Target className="h-5 w-5 text-blue-600" />
+                      <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl">
+                        <Target className="h-5 w-5 text-white" />
                       </div>
                       <div>
                         <CardTitle className="text-lg font-semibold text-gray-900">
                           {limit.budget_name}
                         </CardTitle>
                         <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline" className="capitalize">
+                          <Badge variant="outline" className="capitalize bg-blue-50 text-blue-700 border-blue-200">
                             {limit.budget_period}
                           </Badge>
                           {project && (
-                            <Badge variant="secondary">
+                            <Badge variant="secondary" className="bg-gray-100 text-gray-700">
                               {project.project_name}
                             </Badge>
                           )}
-                          <Badge variant={limit.is_active ? "default" : "secondary"}>
+                          <Badge variant={limit.is_active ? "default" : "secondary"} className="bg-green-100 text-green-800">
                             {limit.is_active ? "Active" : "Inactive"}
                           </Badge>
                         </div>
@@ -457,7 +499,7 @@ const LimitsTab = () => {
                       Started {new Date(limit.start_date).toLocaleDateString()}
                     </div>
                     <div className="flex items-center gap-1">
-                      <TrendingUp className="h-4 w-4" />
+                      <DollarSign className="h-4 w-4" />
                       ${((limit.current_spend / limit.budget_amount) * 100).toFixed(0)}% used
                     </div>
                   </div>

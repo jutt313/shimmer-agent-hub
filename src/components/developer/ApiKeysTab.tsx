@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -5,21 +6,22 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import PermissionsDropdown from './PermissionsDropdown';
 import { 
   Key, 
   Plus, 
   Copy, 
   Eye, 
   EyeOff, 
-  Trash2, 
-  Settings,
+  Trash2,
   Shield,
   Calendar,
-  Activity
+  Activity,
+  AlertCircle,
+  CheckCircle
 } from 'lucide-react';
 
 interface ApiKey {
@@ -33,6 +35,11 @@ interface ApiKey {
     automations: boolean;
     webhooks: boolean;
     ai_agents: boolean;
+    dashboard?: boolean;
+    chat_ai?: boolean;
+    notifications?: boolean;
+    credentials?: boolean;
+    diagrams?: boolean;
   };
   is_active: boolean;
   last_used_at: string | null;
@@ -54,6 +61,7 @@ const ApiKeysTab = () => {
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
+  const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
   
   // Form state
   const [newKeyName, setNewKeyName] = useState('');
@@ -64,7 +72,12 @@ const ApiKeysTab = () => {
     write: false,
     automations: true,
     webhooks: false,
-    ai_agents: false
+    ai_agents: false,
+    dashboard: false,
+    chat_ai: false,
+    notifications: false,
+    credentials: false,
+    diagrams: false
   });
 
   useEffect(() => {
@@ -84,7 +97,6 @@ const ApiKeysTab = () => {
 
       if (error) throw error;
       
-      // Transform the data to match our interface
       const transformedData = (data || []).map(item => ({
         ...item,
         permissions: typeof item.permissions === 'string' 
@@ -96,7 +108,7 @@ const ApiKeysTab = () => {
               webhooks: false,
               ai_agents: false
             }
-      }));
+      })) as ApiKey[];
       
       setApiKeys(transformedData);
     } catch (error) {
@@ -125,6 +137,13 @@ const ApiKeysTab = () => {
       console.error('Error fetching projects:', error);
     }
   };
+
+  useEffect(() => {
+    if (user) {
+      fetchApiKeys();
+      fetchProjects();
+    }
+  }, [user]);
 
   const generateApiKey = async () => {
     try {
@@ -155,9 +174,10 @@ const ApiKeysTab = () => {
 
       if (error) throw error;
 
+      setNewlyCreatedKey(apiKey);
       toast({
         title: "Success",
-        description: "API key created successfully",
+        description: "API key created successfully. This is the only time you'll see the full key!",
       });
 
       setShowCreateDialog(false);
@@ -227,15 +247,35 @@ const ApiKeysTab = () => {
       write: false,
       automations: true,
       webhooks: false,
-      ai_agents: false
+      ai_agents: false,
+      dashboard: false,
+      chat_ai: false,
+      notifications: false,
+      credentials: false,
+      diagrams: false
     });
   };
 
   const maskApiKey = (key: string) => {
     if (key.length <= 8) return key;
-    const prefix = key.substring(0, 4);
+    const prefix = key.substring(0, 8);
     const suffix = key.substring(key.length - 4);
     return `${prefix}...${suffix}`;
+  };
+
+  const getCredentialTypeDescription = (type: 'personal' | 'project' | 'service') => {
+    switch (type) {
+      case 'personal':
+        return 'Full account control - manage automations, agents, dashboard, notifications, and all account features';
+      case 'project':
+        return 'External application integration - specific project scope with limited features for external UI integration';
+      case 'service':
+        return 'Backend service integration - minimal scopes for server-to-server communication';
+    }
+  };
+
+  const handlePermissionChange = (key: string, checked: boolean) => {
+    setPermissions(prev => ({ ...prev, [key]: checked }));
   };
 
   if (loading) {
@@ -244,6 +284,44 @@ const ApiKeysTab = () => {
 
   return (
     <div className="space-y-6">
+      {/* Newly Created Key Alert */}
+      {newlyCreatedKey && (
+        <Card className="border-green-200 bg-green-50">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-medium text-green-800">API Key Created Successfully!</h4>
+                <p className="text-sm text-green-700 mt-1">
+                  This is the only time you'll see the full key. Copy it now and store it securely.
+                </p>
+                <div className="mt-3 p-3 bg-white rounded-lg border border-green-200">
+                  <div className="flex items-center justify-between">
+                    <code className="text-sm font-mono text-gray-800 break-all">{newlyCreatedKey}</code>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(newlyCreatedKey)}
+                      className="ml-2 text-green-600 hover:text-green-700"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setNewlyCreatedKey(null)}
+                  className="mt-2 text-green-600 hover:text-green-700"
+                >
+                  Dismiss
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -253,12 +331,12 @@ const ApiKeysTab = () => {
         
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 rounded-xl">
+            <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 rounded-xl shadow-lg">
               <Plus className="h-4 w-4 mr-2" />
               Create New Key
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md rounded-2xl">
+          <DialogContent className="max-w-lg rounded-2xl">
             <DialogHeader>
               <DialogTitle>Create New API Key</DialogTitle>
             </DialogHeader>
@@ -269,32 +347,35 @@ const ApiKeysTab = () => {
                   placeholder="My API Key"
                   value={newKeyName}
                   onChange={(e) => setNewKeyName(e.target.value)}
-                  className="mt-1 rounded-xl"
+                  className="mt-1 rounded-xl border-gray-300 focus:border-blue-500"
                 />
               </div>
               
               <div>
                 <label className="text-sm font-medium text-gray-700">Type</label>
                 <Select value={newKeyType} onValueChange={(value: any) => setNewKeyType(value)}>
-                  <SelectTrigger className="mt-1 rounded-xl">
+                  <SelectTrigger className="mt-1 rounded-xl bg-white border-gray-300">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white border shadow-lg rounded-xl z-50">
                     <SelectItem value="personal">Personal</SelectItem>
                     <SelectItem value="project">Project</SelectItem>
                     <SelectItem value="service">Service</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {getCredentialTypeDescription(newKeyType)}
+                </p>
               </div>
 
               {newKeyType === 'project' && (
                 <div>
                   <label className="text-sm font-medium text-gray-700">Project</label>
                   <Select value={selectedProject} onValueChange={setSelectedProject}>
-                    <SelectTrigger className="mt-1 rounded-xl">
+                    <SelectTrigger className="mt-1 rounded-xl bg-white border-gray-300">
                       <SelectValue placeholder="Select a project" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white border shadow-lg rounded-xl z-50">
                       {projects.map((project) => (
                         <SelectItem key={project.id} value={project.id}>
                           {project.project_name}
@@ -305,25 +386,11 @@ const ApiKeysTab = () => {
                 </div>
               )}
 
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-3 block">Permissions</label>
-                <div className="space-y-2">
-                  {Object.entries(permissions).map(([key, value]) => (
-                    <div key={key} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={key}
-                        checked={value}
-                        onCheckedChange={(checked) => 
-                          setPermissions(prev => ({ ...prev, [key]: !!checked }))
-                        }
-                      />
-                      <label htmlFor={key} className="text-sm capitalize">
-                        {key.replace('_', ' ')}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <PermissionsDropdown
+                permissions={permissions}
+                onPermissionChange={handlePermissionChange}
+                credentialType={newKeyType}
+              />
 
               <Button 
                 onClick={createApiKey} 
@@ -340,9 +407,9 @@ const ApiKeysTab = () => {
       {/* API Keys List */}
       <div className="grid gap-4">
         {apiKeys.length === 0 ? (
-          <Card className="bg-white/80 backdrop-blur-sm border-gray-200 rounded-3xl shadow-lg">
+          <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-200 rounded-3xl shadow-lg">
             <CardContent className="p-8 text-center">
-              <Key className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <Key className="h-12 w-12 text-blue-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No API Keys</h3>
               <p className="text-gray-600 mb-4">Create your first API key to get started</p>
               <Button 
@@ -356,22 +423,22 @@ const ApiKeysTab = () => {
           </Card>
         ) : (
           apiKeys.map((apiKey) => (
-            <Card key={apiKey.id} className="bg-white/80 backdrop-blur-sm border-gray-200 rounded-3xl shadow-lg hover:shadow-xl transition-all duration-300">
+            <Card key={apiKey.id} className="bg-gradient-to-br from-white to-blue-50/30 border-blue-200 rounded-3xl shadow-lg hover:shadow-xl transition-all duration-300">
               <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 rounded-xl">
-                      <Key className="h-5 w-5 text-blue-600" />
+                    <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl">
+                      <Key className="h-5 w-5 text-white" />
                     </div>
                     <div>
                       <CardTitle className="text-lg font-semibold text-gray-900">
                         {apiKey.credential_name}
                       </CardTitle>
                       <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className="capitalize">
+                        <Badge variant="outline" className="capitalize bg-blue-50 text-blue-700 border-blue-200">
                           {apiKey.credential_type}
                         </Badge>
-                        <Badge variant={apiKey.is_active ? "default" : "destructive"}>
+                        <Badge variant={apiKey.is_active ? "default" : "destructive"} className="bg-green-100 text-green-800">
                           {apiKey.is_active ? "Active" : "Inactive"}
                         </Badge>
                       </div>
@@ -389,17 +456,17 @@ const ApiKeysTab = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* API Key Display */}
-                <div className="bg-gray-50 rounded-xl p-4">
+                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                   <div className="flex items-center justify-between">
-                    <code className="text-sm font-mono text-gray-800">
+                    <code className="text-sm font-mono text-gray-800 break-all">
                       {visibleKeys.has(apiKey.id) ? apiKey.api_key : maskApiKey(apiKey.api_key)}
                     </code>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 ml-2">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => toggleKeyVisibility(apiKey.id)}
-                        className="rounded-lg"
+                        className="rounded-lg hover:bg-gray-200"
                       >
                         {visibleKeys.has(apiKey.id) ? 
                           <EyeOff className="h-4 w-4" /> : 
@@ -410,12 +477,19 @@ const ApiKeysTab = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => copyToClipboard(apiKey.api_key)}
-                        className="rounded-lg"
+                        className="rounded-lg hover:bg-gray-200"
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
+                </div>
+
+                {/* Type Description */}
+                <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
+                  <p className="text-sm text-blue-800">
+                    <strong>{apiKey.credential_type.charAt(0).toUpperCase() + apiKey.credential_type.slice(1)}:</strong> {getCredentialTypeDescription(apiKey.credential_type)}
+                  </p>
                 </div>
 
                 {/* Permissions */}
@@ -424,7 +498,7 @@ const ApiKeysTab = () => {
                   <div className="flex flex-wrap gap-2">
                     {Object.entries(apiKey.permissions).map(([key, value]) => (
                       value && (
-                        <Badge key={key} variant="secondary" className="capitalize">
+                        <Badge key={key} variant="secondary" className="capitalize bg-gray-100 text-gray-700 border border-gray-200">
                           {key.replace('_', ' ')}
                         </Badge>
                       )

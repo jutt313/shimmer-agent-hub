@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -69,7 +68,7 @@ const UsageTab = () => {
       const totals = (data || []).reduce((acc, curr) => ({
         total_calls: acc.total_calls + 1,
         total_tokens: acc.total_tokens + (curr.tokens_used || 0),
-        total_cost: acc.total_cost + (parseFloat(curr.cost_amount?.toString() || '0')),
+        total_cost: acc.total_cost + (parseFloat(String(curr.cost_amount || 0))),
         avg_response_time: acc.avg_response_time + (curr.response_time_ms || 0)
       }), { total_calls: 0, total_tokens: 0, total_cost: 0, avg_response_time: 0 });
 
@@ -100,7 +99,7 @@ const UsageTab = () => {
       }
       acc[key].count += 1;
       acc[key].tokens_used += curr.tokens_used || 0;
-      acc[key].cost_amount += parseFloat(curr.cost_amount?.toString() || '0');
+      acc[key].cost_amount += parseFloat(String(curr.cost_amount || 0));
       if (curr.response_time_ms) {
         acc[key].response_times.push(curr.response_time_ms);
       }
@@ -139,10 +138,10 @@ const UsageTab = () => {
         </div>
         
         <Select value={timeframe} onValueChange={setTimeframe}>
-          <SelectTrigger className="w-48 rounded-xl">
+          <SelectTrigger className="w-48 rounded-xl bg-white border-gray-300">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-white border shadow-lg rounded-xl z-50">
             <SelectItem value="1d">Last 24 Hours</SelectItem>
             <SelectItem value="7d">Last 7 Days</SelectItem>
             <SelectItem value="30d">Last 30 Days</SelectItem>
@@ -153,7 +152,7 @@ const UsageTab = () => {
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-white/80 backdrop-blur-sm border-gray-200 rounded-3xl shadow-lg">
+        <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-200 rounded-3xl shadow-lg">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-blue-100 rounded-xl">
@@ -167,7 +166,7 @@ const UsageTab = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-white/80 backdrop-blur-sm border-gray-200 rounded-3xl shadow-lg">
+        <Card className="bg-gradient-to-br from-purple-50 to-white border-purple-200 rounded-3xl shadow-lg">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-purple-100 rounded-xl">
@@ -181,7 +180,7 @@ const UsageTab = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-white/80 backdrop-blur-sm border-gray-200 rounded-3xl shadow-lg">
+        <Card className="bg-gradient-to-br from-green-50 to-white border-green-200 rounded-3xl shadow-lg">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-green-100 rounded-xl">
@@ -195,7 +194,7 @@ const UsageTab = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-white/80 backdrop-blur-sm border-gray-200 rounded-3xl shadow-lg">
+        <Card className="bg-gradient-to-br from-orange-50 to-white border-orange-200 rounded-3xl shadow-lg">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-orange-100 rounded-xl">
@@ -211,7 +210,7 @@ const UsageTab = () => {
       </div>
 
       {/* Usage by Endpoint */}
-      <Card className="bg-white/80 backdrop-blur-sm border-gray-200 rounded-3xl shadow-lg">
+      <Card className="bg-gradient-to-br from-white to-gray-50/30 border-gray-200 rounded-3xl shadow-lg">
         <CardHeader>
           <CardTitle className="text-xl font-semibold text-gray-900 flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-blue-600" />
@@ -228,10 +227,10 @@ const UsageTab = () => {
           ) : (
             <div className="space-y-4">
               {usageData.slice(0, 10).map((item, index) => (
-                <div key={index} className="p-4 bg-gray-50 rounded-2xl">
+                <div key={index} className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <Badge variant="outline" className="font-mono text-xs">
+                      <Badge variant="outline" className="font-mono text-xs bg-blue-50 text-blue-700 border-blue-200">
                         {item.method}
                       </Badge>
                       <code className="text-sm text-gray-700">{item.endpoint}</code>

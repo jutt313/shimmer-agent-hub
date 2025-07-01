@@ -5,8 +5,7 @@ import ProfileTab from "./ProfileTab";
 import AutomationsTab from "./AutomationsTab";
 import PlatformCredentialsTab from "./PlatformCredentialsTab";
 import PrivacyTab from "./PrivacyTab";
-import DeveloperTab from "./DeveloperTab";
-import { User, Bot, Key, Shield, Code } from "lucide-react";
+import { User, Bot, Key, Shield } from "lucide-react";
 
 const SettingsTabs = () => {
   const [activeTab, setActiveTab] = useState("profile");
@@ -14,7 +13,7 @@ const SettingsTabs = () => {
   return (
     <div className="w-full max-w-6xl mx-auto">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5 mb-8">
+        <TabsList className="grid w-full grid-cols-4 mb-8">
           <TabsTrigger value="profile" className="flex items-center gap-2">
             <User className="w-4 h-4" />
             Profile
@@ -26,10 +25,6 @@ const SettingsTabs = () => {
           <TabsTrigger value="credentials" className="flex items-center gap-2">
             <Key className="w-4 h-4" />
             Platforms
-          </TabsTrigger>
-          <TabsTrigger value="developer" className="flex items-center gap-2">
-            <Code className="w-4 h-4" />
-            Developer
           </TabsTrigger>
           <TabsTrigger value="privacy" className="flex items-center gap-2">
             <Shield className="w-4 h-4" />
@@ -47,10 +42,6 @@ const SettingsTabs = () => {
 
         <TabsContent value="credentials" className="space-y-6">
           <PlatformCredentialsTab />
-        </TabsContent>
-
-        <TabsContent value="developer" className="space-y-6">
-          <DeveloperTab />
         </TabsContent>
 
         <TabsContent value="privacy" className="space-y-6">

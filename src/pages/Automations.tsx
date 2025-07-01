@@ -79,9 +79,12 @@ const Automations = () => {
     }
   };
 
-  // Instead of navigating to a non-existent route, show a form
   const handleCreateAutomation = () => {
     setShowCreateForm(true);
+  };
+
+  const handleCloseForm = () => {
+    setShowCreateForm(false);
   };
 
   const toggleAutomationStatus = async (automationId: string, currentStatus: 'active' | 'paused' | 'draft') => {
@@ -137,7 +140,7 @@ const Automations = () => {
             </p>
           </div>
           <Button
-            onClick={() => setShowCreateForm(false)}
+            onClick={handleCloseForm}
             variant="outline"
             className="rounded-xl"
           >
@@ -145,7 +148,7 @@ const Automations = () => {
           </Button>
         </div>
         
-        <AIAgentForm />
+        <AIAgentForm onClose={handleCloseForm} />
       </div>
     );
   }

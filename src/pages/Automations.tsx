@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,7 +13,7 @@ import AutomationDashboard from "@/components/AutomationDashboard";
 import AIAgentForm from "@/components/AIAgentForm";
 import AutomationRunsMonitor from "@/components/AutomationRunsMonitor";
 import PerformanceMonitor from "@/components/PerformanceMonitor";
-import SecurityDashboard from "@/components/SecurityDashboard";
+import { SecurityDashboard } from "@/components/SecurityDashboard";
 
 interface Automation {
   id: string;
@@ -37,6 +38,14 @@ const Automations = () => {
     }
   }, [user]);
 
+  const transformAutomation = (item: any): Automation => {
+    return {
+      ...item,
+      name: item.title || item.name || 'Untitled Automation', // Map title to name
+      status: item.status as 'active' | 'paused' | 'draft'
+    };
+  };
+
   const fetchAutomations = async () => {
     try {
       const { data, error } = await supabase
@@ -46,7 +55,7 @@ const Automations = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setAutomations(data || []);
+      setAutomations((data || []).map(transformAutomation));
     } catch (error) {
       console.error('Error fetching automations:', error);
       toast({
@@ -63,7 +72,17 @@ const Automations = () => {
     navigate('/create-automation');
   };
 
-  const toggleAutomationStatus = async (automationId: string, currentStatus: 'active' | 'paused') => {
+  const toggleAutomationStatus = async (automationId: string, currentStatus: 'active' | 'paused' | 'draft') => {
+    // Only allow toggling between active and paused, not draft
+    if (currentStatus === 'draft') {
+      toast({
+        title: "Cannot toggle draft automation",
+        description: "Please complete the automation setup first",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const newStatus = currentStatus === 'active' ? 'paused' : 'active';
     try {
       const { error } = await supabase
@@ -185,23 +204,27 @@ const Automations = () => {
                       <div className="text-sm text-gray-500">
                         Updated {new Date(automation.updated_at).toLocaleDateString()}
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => toggleAutomationStatus(automation.id, automation.status)}
-                      >
-                        {automation.status === 'active' ? (
-                          <>
-                            <Pause className="w-4 h-4 mr-2" />
-                            Pause
-                          </>
-                        ) : (
-                          <>
-                            <Play className="w-4 h-4 mr-2" />
-                            Activate
-                          </>
-                        )}
-                      </Button>
+                      {automation.status !== 'draft' ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleAutomationStatus(automation.id, automation.status)}
+                        >
+                          {automation.status === 'active' ? (
+                            <>
+                              <Pause className="w-4 h-4 mr-2" />
+                              Pause
+                            </>
+                          ) : (
+                            <>
+                              <Play className="w-4 h-4 mr-2" />
+                              Activate
+                            </>
+                          )}
+                        </Button>
+                      ) : (
+                        <Badge variant="outline">Draft</Badge>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -211,11 +234,15 @@ const Automations = () => {
         </TabsContent>
 
         <TabsContent value="dashboard" className="space-y-6">
-          <AutomationDashboard />
+          <AutomationDashboard 
+            automationId="" 
+            automationTitle="All Automations" 
+            automationBlueprint={{}} 
+          />
         </TabsContent>
 
         <TabsContent value="runs" className="space-y-6">
-          <AutomationRunsMonitor />
+          <AutomationRunsMonitor automationId="" />
         </TabsContent>
 
         <TabsContent value="performance" className="space-y-6">

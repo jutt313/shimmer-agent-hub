@@ -1,4 +1,5 @@
 
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,6 +15,7 @@ import AIAgentForm from "@/components/AIAgentForm";
 import AutomationRunsMonitor from "@/components/AutomationRunsMonitor";
 import PerformanceMonitor from "@/components/PerformanceMonitor";
 import { SecurityDashboard } from "@/components/SecurityDashboard";
+import { AutomationBlueprint } from "@/types/automation";
 
 interface Automation {
   id: string;
@@ -31,6 +33,15 @@ const Automations = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Default automation blueprint for dashboard view
+  const defaultBlueprint: AutomationBlueprint = {
+    version: "1.0",
+    trigger: {
+      type: 'manual'
+    },
+    steps: []
+  };
 
   useEffect(() => {
     if (user) {
@@ -237,7 +248,7 @@ const Automations = () => {
           <AutomationDashboard 
             automationId="" 
             automationTitle="All Automations" 
-            automationBlueprint={{}} 
+            automationBlueprint={defaultBlueprint} 
           />
         </TabsContent>
 
@@ -258,3 +269,4 @@ const Automations = () => {
 };
 
 export default Automations;
+

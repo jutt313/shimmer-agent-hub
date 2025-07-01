@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -18,6 +17,7 @@ import Disclaimer from "./pages/Disclaimer";
 import OAuthAuthorize from "./pages/OAuthAuthorize";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
+import Documentation from "./pages/Documentation";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +47,10 @@ function App() {
                     <AutomationDetail />
                   </ProtectedRoute>
                 }
+              />
+              <Route
+                path="/documentation"
+                element={<Documentation />}
               />
               <Route
                 path="/support"

@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from 'react';
-import { Plus, MessageCircle, Bot, Zap, Settings, Code } from 'lucide-react';
+import { Plus, MessageCircle, Bot, Zap, Settings, Code, Book } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -202,6 +201,14 @@ const Automations = () => {
           <div className="flex items-center gap-3 mt-4 md:mt-0">
             <NotificationDropdown />
             <SettingsDropdown />
+            <Button
+              onClick={() => navigate('/documentation')}
+              variant="outline"
+              className="rounded-xl border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-200"
+            >
+              <Book className="w-5 h-5 mr-2" />
+              Documentation
+            </Button>
             <Button
               onClick={() => setIsHelpOpen(true)}
               variant="outline"

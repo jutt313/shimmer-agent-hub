@@ -549,6 +549,171 @@ export type Database = {
         }
         Relationships: []
       }
+      documentation_articles: {
+        Row: {
+          category_id: string | null
+          content: string
+          created_at: string
+          excerpt: string | null
+          id: string
+          is_published: boolean | null
+          rating_count: number | null
+          rating_sum: number | null
+          read_count: number | null
+          slug: string
+          sort_order: number | null
+          tags: string[] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category_id?: string | null
+          content: string
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          is_published?: boolean | null
+          rating_count?: number | null
+          rating_sum?: number | null
+          read_count?: number | null
+          slug: string
+          sort_order?: number | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string | null
+          content?: string
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          is_published?: boolean | null
+          rating_count?: number | null
+          rating_sum?: number | null
+          read_count?: number | null
+          slug?: string
+          sort_order?: number | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documentation_articles_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "documentation_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documentation_categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          sort_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      documentation_feedback: {
+        Row: {
+          article_id: string | null
+          comment: string | null
+          created_at: string
+          id: string
+          is_helpful: boolean | null
+          rating: number | null
+          user_id: string
+        }
+        Insert: {
+          article_id?: string | null
+          comment?: string | null
+          created_at?: string
+          id?: string
+          is_helpful?: boolean | null
+          rating?: number | null
+          user_id: string
+        }
+        Update: {
+          article_id?: string | null
+          comment?: string | null
+          created_at?: string
+          id?: string
+          is_helpful?: boolean | null
+          rating?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documentation_feedback_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "documentation_articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documentation_progress: {
+        Row: {
+          article_id: string | null
+          created_at: string
+          id: string
+          is_completed: boolean | null
+          last_read_at: string | null
+          user_id: string
+        }
+        Insert: {
+          article_id?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean | null
+          last_read_at?: string | null
+          user_id: string
+        }
+        Update: {
+          article_id?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean | null
+          last_read_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documentation_progress_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "documentation_articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       error_conversations: {
         Row: {
           conversation_history: Json

@@ -50,7 +50,10 @@ export const useApiCredentials = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setCredentials(data || []);
+      setCredentials((data || []).map(item => ({
+        ...item,
+        credential_type: item.credential_type as 'personal' | 'developer' | 'service'
+      })));
     } catch (error) {
       console.error('Error fetching credentials:', error);
       toast({
@@ -96,14 +99,19 @@ export const useApiCredentials = () => {
 
       if (error) throw error;
 
-      setCredentials(prev => [data, ...prev]);
+      const newCredential = {
+        ...data,
+        credential_type: data.credential_type as 'personal' | 'developer' | 'service'
+      };
+
+      setCredentials(prev => [newCredential, ...prev]);
       
       toast({
         title: "Success",
         description: `API credential created successfully`,
       });
 
-      return { credential: data, apiKey };
+      return { credential: newCredential, apiKey };
     } catch (error) {
       console.error('Error creating credential:', error);
       toast({
@@ -127,9 +135,14 @@ export const useApiCredentials = () => {
 
       if (error) throw error;
 
+      const updatedCredential = {
+        ...data,
+        credential_type: data.credential_type as 'personal' | 'developer' | 'service'
+      };
+
       setCredentials(prev => 
         prev.map(cred => 
-          cred.id === credentialId ? { ...cred, ...data } : cred
+          cred.id === credentialId ? { ...cred, ...updatedCredential } : cred
         )
       );
       
@@ -138,7 +151,7 @@ export const useApiCredentials = () => {
         description: "API credential updated successfully",
       });
 
-      return data;
+      return updatedCredential;
     } catch (error) {
       console.error('Error updating credential:', error);
       toast({

@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Settings, User, LogOut, Code } from "lucide-react";
+import { Settings, User, LogOut, Code, PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,12 +12,14 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import SettingsTabs from "./settings/SettingsTabs";
 import DeveloperPortal from "./developer/DeveloperPortal";
+import PlaygroundConsole from "./developer/PlaygroundConsole";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 const SettingsDropdown = () => {
   const { signOut } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
   const [showDeveloperPortal, setShowDeveloperPortal] = useState(false);
+  const [showPlayground, setShowPlayground] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -42,6 +44,11 @@ const SettingsDropdown = () => {
             Developer API
           </DropdownMenuItem>
           
+          <DropdownMenuItem onClick={() => setShowPlayground(true)}>
+            <PlayCircle className="w-4 h-4 mr-2" />
+            API Playground
+          </DropdownMenuItem>
+          
           <DropdownMenuSeparator />
           
           <DropdownMenuItem onClick={handleSignOut} className="text-red-600">
@@ -62,6 +69,13 @@ const SettingsDropdown = () => {
       <Dialog open={showDeveloperPortal} onOpenChange={setShowDeveloperPortal}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DeveloperPortal />
+        </DialogContent>
+      </Dialog>
+
+      {/* API Playground Modal */}
+      <Dialog open={showPlayground} onOpenChange={setShowPlayground}>
+        <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
+          <PlaygroundConsole />
         </DialogContent>
       </Dialog>
     </>

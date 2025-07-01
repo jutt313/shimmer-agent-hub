@@ -4,245 +4,46 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import PermissionsDropdown from './PermissionsDropdown';
 import { 
   Key, 
   Plus, 
-  Copy, 
   Eye, 
   EyeOff, 
-  Trash2,
-  Shield,
-  Calendar,
-  Activity,
-  AlertCircle,
-  CheckCircle
+  Copy, 
+  Trash2, 
+  CheckCircle,
+  AlertTriangle,
+  Clock,
+  BarChart3
 } from 'lucide-react';
+import { toast } from 'sonner';
 
-interface ApiKey {
+interface ApiCredential {
   id: string;
   credential_name: string;
-  api_key: string;
   credential_type: 'personal' | 'project' | 'service';
-  permissions: {
-    read: boolean;
-    write: boolean;
-    automations: boolean;
-    webhooks: boolean;
-    ai_agents: boolean;
-    dashboard?: boolean;
-    chat_ai?: boolean;
-    notifications?: boolean;
-    credentials?: boolean;
-    diagrams?: boolean;
-  };
+  api_key: string;
+  permissions: any;
   is_active: boolean;
-  last_used_at: string | null;
   usage_count: number;
+  last_used_at: string | null;
   created_at: string;
-  project_id: string | null;
-}
-
-interface Project {
-  id: string;
-  project_name: string;
+  rate_limit_per_hour: number;
 }
 
 const ApiKeysTab = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [credentials, setCredentials] = useState<ApiCredential[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
-  const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
-  
-  // Form state
-  const [newKeyName, setNewKeyName] = useState('');
-  const [newKeyType, setNewKeyType] = useState<'personal' | 'project' | 'service'>('personal');
-  const [selectedProject, setSelectedProject] = useState<string>('');
-  const [permissions, setPermissions] = useState({
-    read: true,
-    write: false,
-    automations: true,
-    webhooks: false,
-    ai_agents: false,
-    dashboard: false,
-    chat_ai: false,
-    notifications: false,
-    credentials: false,
-    diagrams: false
-  });
-
-  useEffect(() => {
-    if (user) {
-      fetchApiKeys();
-      fetchProjects();
-    }
-  }, [user]);
-
-  const fetchApiKeys = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('api_credentials')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      const transformedData = (data || []).map(item => ({
-        ...item,
-        permissions: typeof item.permissions === 'string' 
-          ? JSON.parse(item.permissions) 
-          : item.permissions || {
-              read: true,
-              write: false,
-              automations: true,
-              webhooks: false,
-              ai_agents: false
-            }
-      })) as ApiKey[];
-      
-      setApiKeys(transformedData);
-    } catch (error) {
-      console.error('Error fetching API keys:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load API keys",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchProjects = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('developer_projects')
-        .select('id, project_name')
-        .eq('user_id', user?.id)
-        .eq('is_active', true);
-
-      if (error) throw error;
-      setProjects(data || []);
-    } catch (error) {
-      console.error('Error fetching projects:', error);
-    }
-  };
-
-  useEffect(() => {
-    if (user) {
-      fetchApiKeys();
-      fetchProjects();
-    }
-  }, [user]);
-
-  const generateApiKey = async () => {
-    try {
-      const { data, error } = await supabase.rpc('generate_yusrai_api_key');
-      
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Error generating API key:', error);
-      throw error;
-    }
-  };
-
-  const createApiKey = async () => {
-    try {
-      const apiKey = await generateApiKey();
-      
-      const { error } = await supabase
-        .from('api_credentials')
-        .insert({
-          user_id: user?.id,
-          project_id: newKeyType === 'project' ? selectedProject || null : null,
-          credential_name: newKeyName,
-          api_key: apiKey,
-          credential_type: newKeyType,
-          permissions,
-        });
-
-      if (error) throw error;
-
-      setNewlyCreatedKey(apiKey);
-      toast({
-        title: "Success",
-        description: "API key created successfully. This is the only time you'll see the full key!",
-      });
-
-      setShowCreateDialog(false);
-      resetForm();
-      fetchApiKeys();
-    } catch (error) {
-      console.error('Error creating API key:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create API key",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const deleteApiKey = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('api_credentials')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "API key deleted successfully",
-      });
-
-      fetchApiKeys();
-    } catch (error) {
-      console.error('Error deleting API key:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete API key",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast({
-      title: "Copied",
-      description: "API key copied to clipboard",
-    });
-  };
-
-  const toggleKeyVisibility = (keyId: string) => {
-    setVisibleKeys(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(keyId)) {
-        newSet.delete(keyId);
-      } else {
-        newSet.add(keyId);
-      }
-      return newSet;
-    });
-  };
-
-  const resetForm = () => {
-    setNewKeyName('');
-    setNewKeyType('personal');
-    setSelectedProject('');
-    setPermissions({
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newCredential, setNewCredential] = useState({
+    name: '',
+    type: 'personal' as 'personal' | 'project' | 'service',
+    permissions: {
       read: true,
       write: false,
       automations: true,
@@ -252,296 +53,493 @@ const ApiKeysTab = () => {
       chat_ai: false,
       notifications: false,
       credentials: false,
-      diagrams: false
-    });
+      diagrams: false,
+    }
+  });
+  const [createdApiKey, setCreatedApiKey] = useState<string | null>(null);
+  const [showApiKey, setShowApiKey] = useState<{ [key: string]: boolean }>({});
+
+  useEffect(() => {
+    if (user) {
+      fetchCredentials();
+    }
+  }, [user]);
+
+  const fetchCredentials = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('api_credentials')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setCredentials(data || []);
+    } catch (error) {
+      console.error('Error fetching credentials:', error);
+      toast.error('Failed to fetch API credentials');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const maskApiKey = (key: string) => {
-    if (key.length <= 8) return key;
-    const prefix = key.substring(0, 8);
-    const suffix = key.substring(key.length - 4);
-    return `${prefix}...${suffix}`;
+  const createApiKey = async () => {
+    if (!newCredential.name.trim()) {
+      toast.error('Please enter a credential name');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('generate_unified_api_key', {
+        key_type: newCredential.type
+      });
+
+      if (error) throw error;
+
+      const apiKey = data;
+      
+      const { error: insertError } = await supabase
+        .from('api_credentials')
+        .insert({
+          user_id: user?.id,
+          credential_name: newCredential.name,
+          credential_type: newCredential.type,
+          api_key: apiKey,
+          permissions: newCredential.permissions,
+          is_active: true,
+          rate_limit_per_hour: newCredential.type === 'service' ? 2000 : 
+                               newCredential.type === 'project' ? 500 : 1000
+        });
+
+      if (insertError) throw insertError;
+
+      setCreatedApiKey(apiKey);
+      await fetchCredentials();
+      toast.success('API key created successfully!');
+      
+      // Reset form
+      setNewCredential({
+        name: '',
+        type: 'personal',
+        permissions: {
+          read: true,
+          write: false,
+          automations: true,
+          webhooks: false,
+          ai_agents: false,
+          dashboard: false,
+          chat_ai: false,
+          notifications: false,
+          credentials: false,
+          diagrams: false,
+        }
+      });
+
+    } catch (error) {
+      console.error('Error creating API key:', error);
+      toast.error('Failed to create API key');
+    }
   };
 
-  const getCredentialTypeDescription = (type: 'personal' | 'project' | 'service') => {
-    switch (type) {
-      case 'personal':
-        return 'Full account control - manage automations, agents, dashboard, notifications, and all account features';
-      case 'project':
-        return 'External application integration - specific project scope with limited features for external UI integration';
-      case 'service':
-        return 'Backend service integration - minimal scopes for server-to-server communication';
+  const toggleApiKeyVisibility = (credentialId: string) => {
+    setShowApiKey(prev => ({
+      ...prev,
+      [credentialId]: !prev[credentialId]
+    }));
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied to clipboard`);
+  };
+
+  const deleteCredential = async (credentialId: string) => {
+    try {
+      const { error } = await supabase
+        .from('api_credentials')
+        .delete()
+        .eq('id', credentialId)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      await fetchCredentials();
+      toast.success('API credential deleted successfully');
+    } catch (error) {
+      console.error('Error deleting credential:', error);
+      toast.error('Failed to delete API credential');
     }
   };
 
   const handlePermissionChange = (key: string, checked: boolean) => {
-    setPermissions(prev => ({ ...prev, [key]: checked }));
+    setNewCredential(prev => ({
+      ...prev,
+      permissions: {
+        ...prev.permissions,
+        [key]: checked
+      }
+    }));
+  };
+
+  const getCredentialTypeInfo = (type: string) => {
+    switch (type) {
+      case 'personal':
+        return {
+          color: 'bg-blue-100 text-blue-800 border-blue-200',
+          description: 'Full account control - perfect for personal automation and testing'
+        };
+      case 'project':
+        return {
+          color: 'bg-green-100 text-green-800 border-green-200',
+          description: 'Project-scoped access - ideal for client applications and external integrations'
+        };
+      case 'service':
+        return {
+          color: 'bg-purple-100 text-purple-800 border-purple-200',
+          description: 'Backend service integration - minimal permissions for production services'
+        };
+      default:
+        return {
+          color: 'bg-gray-100 text-gray-800 border-gray-200',
+          description: 'Unknown credential type'
+        };
+    }
+  };
+
+  const maskApiKey = (apiKey: string) => {
+    if (apiKey.length <= 12) return apiKey;
+    return `${apiKey.substring(0, 8)}${'*'.repeat(32)}${apiKey.substring(apiKey.length - 4)}`;
   };
 
   if (loading) {
-    return <div className="flex justify-center p-8">Loading API keys...</div>;
+    return <div className="flex justify-center p-8">Loading API credentials...</div>;
   }
 
   return (
     <div className="space-y-6">
-      {/* Newly Created Key Alert */}
-      {newlyCreatedKey && (
-        <Card className="border-green-200 bg-green-50">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
-              <div className="flex-1">
-                <h4 className="font-medium text-green-800">API Key Created Successfully!</h4>
-                <p className="text-sm text-green-700 mt-1">
-                  This is the only time you'll see the full key. Copy it now and store it securely.
-                </p>
-                <div className="mt-3 p-3 bg-white rounded-lg border border-green-200">
-                  <div className="flex items-center justify-between">
-                    <code className="text-sm font-mono text-gray-800 break-all">{newlyCreatedKey}</code>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => copyToClipboard(newlyCreatedKey)}
-                      className="ml-2 text-green-600 hover:text-green-700"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setNewlyCreatedKey(null)}
-                  className="mt-2 text-green-600 hover:text-green-700"
-                >
-                  Dismiss
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">API Keys</h2>
-          <p className="text-gray-600">Manage your API keys and access tokens</p>
+          <p className="text-gray-600">Manage your API credentials and access tokens</p>
         </div>
         
-        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 rounded-xl shadow-lg">
-              <Plus className="h-4 w-4 mr-2" />
-              Create New Key
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg rounded-2xl">
-            <DialogHeader>
-              <DialogTitle>Create New API Key</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Key Name</label>
-                <Input
-                  placeholder="My API Key"
-                  value={newKeyName}
-                  onChange={(e) => setNewKeyName(e.target.value)}
-                  className="mt-1 rounded-xl border-gray-300 focus:border-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="text-sm font-medium text-gray-700">Type</label>
-                <Select value={newKeyType} onValueChange={(value: any) => setNewKeyType(value)}>
-                  <SelectTrigger className="mt-1 rounded-xl bg-white border-gray-300">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border shadow-lg rounded-xl z-50">
-                    <SelectItem value="personal">Personal</SelectItem>
-                    <SelectItem value="project">Project</SelectItem>
-                    <SelectItem value="service">Service</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-gray-500 mt-1">
-                  {getCredentialTypeDescription(newKeyType)}
-                </p>
-              </div>
-
-              {newKeyType === 'project' && (
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Project</label>
-                  <Select value={selectedProject} onValueChange={setSelectedProject}>
-                    <SelectTrigger className="mt-1 rounded-xl bg-white border-gray-300">
-                      <SelectValue placeholder="Select a project" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white border shadow-lg rounded-xl z-50">
-                      {projects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.project_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <PermissionsDropdown
-                permissions={permissions}
-                onPermissionChange={handlePermissionChange}
-                credentialType={newKeyType}
-              />
-
-              <Button 
-                onClick={createApiKey} 
-                className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 rounded-xl"
-                disabled={!newKeyName.trim()}
-              >
-                Create API Key
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button 
+          onClick={() => setShowCreateModal(true)}
+          className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 rounded-xl"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Create API Key
+        </Button>
       </div>
 
-      {/* API Keys List */}
-      <div className="grid gap-4">
-        {apiKeys.length === 0 ? (
-          <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-200 rounded-3xl shadow-lg">
-            <CardContent className="p-8 text-center">
-              <Key className="h-12 w-12 text-blue-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No API Keys</h3>
-              <p className="text-gray-600 mb-4">Create your first API key to get started</p>
-              <Button 
-                onClick={() => setShowCreateDialog(true)}
-                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 rounded-xl"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create API Key
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          apiKeys.map((apiKey) => (
-            <Card key={apiKey.id} className="bg-gradient-to-br from-white to-blue-50/30 border-blue-200 rounded-3xl shadow-lg hover:shadow-xl transition-all duration-300">
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl">
-                      <Key className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg font-semibold text-gray-900">
-                        {apiKey.credential_name}
-                      </CardTitle>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className="capitalize bg-blue-50 text-blue-700 border-blue-200">
-                          {apiKey.credential_type}
-                        </Badge>
-                        <Badge variant={apiKey.is_active ? "default" : "destructive"} className="bg-green-100 text-green-800">
-                          {apiKey.is_active ? "Active" : "Inactive"}
-                        </Badge>
+      {/* API Key Cards */}
+      {credentials.length === 0 ? (
+        <Card className="bg-gradient-to-br from-white to-gray-50/30 border-gray-200 rounded-3xl shadow-lg">
+          <CardContent className="p-12 text-center">
+            <Key className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No API Keys Yet</h3>
+            <p className="text-gray-600 mb-6">
+              Create your first API key to start integrating with YusrAI API
+            </p>
+            <Button 
+              onClick={() => setShowCreateModal(true)}
+              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 rounded-xl"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Your First API Key
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-6">
+          {credentials.map((credential) => {
+            const typeInfo = getCredentialTypeInfo(credential.credential_type);
+            const isVisible = showApiKey[credential.id];
+            
+            return (
+              <Card key={credential.id} className="bg-gradient-to-br from-white to-gray-50/30 border-gray-200 rounded-3xl shadow-lg hover:shadow-xl transition-all duration-300">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl">
+                        <Key className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg font-semibold text-gray-900">
+                          {credential.credential_name}
+                        </CardTitle>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge className={`text-xs font-medium ${typeInfo.color}`}>
+                            {credential.credential_type.toUpperCase()}
+                          </Badge>
+                          {credential.is_active ? (
+                            <div className="flex items-center gap-1">
+                              <CheckCircle className="h-3 w-3 text-green-500" />
+                              <span className="text-xs text-green-600">Active</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3 text-orange-500" />
+                              <span className="text-xs text-orange-600">Inactive</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => deleteCredential(credential.id)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl border-red-200"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => deleteApiKey(apiKey.id)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* API Key Display */}
-                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <code className="text-sm font-mono text-gray-800 break-all">
-                      {visibleKeys.has(apiKey.id) ? apiKey.api_key : maskApiKey(apiKey.api_key)}
-                    </code>
-                    <div className="flex gap-2 ml-2">
+                </CardHeader>
+                
+                <CardContent className="space-y-4">
+                  {/* Description */}
+                  <p className="text-sm text-gray-600">{typeInfo.description}</p>
+                  
+                  {/* API Key Display */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">API Key</label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 p-3 bg-gray-50 rounded-xl border border-gray-200 font-mono text-sm">
+                        {isVisible ? credential.api_key : maskApiKey(credential.api_key)}
+                      </div>
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
-                        onClick={() => toggleKeyVisibility(apiKey.id)}
-                        className="rounded-lg hover:bg-gray-200"
+                        onClick={() => toggleApiKeyVisibility(credential.id)}
+                        className="rounded-xl"
                       >
-                        {visibleKeys.has(apiKey.id) ? 
-                          <EyeOff className="h-4 w-4" /> : 
-                          <Eye className="h-4 w-4" />
-                        }
+                        {isVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </Button>
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
-                        onClick={() => copyToClipboard(apiKey.api_key)}
-                        className="rounded-lg hover:bg-gray-200"
+                        onClick={() => copyToClipboard(credential.api_key, 'API Key')}
+                        className="rounded-xl"
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
-                </div>
 
-                {/* Type Description */}
-                <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
-                  <p className="text-sm text-blue-800">
-                    <strong>{apiKey.credential_type.charAt(0).toUpperCase() + apiKey.credential_type.slice(1)}:</strong> {getCredentialTypeDescription(apiKey.credential_type)}
-                  </p>
-                </div>
+                  {/* Usage Stats */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-gray-200">
+                    <div className="text-center p-3 bg-blue-50 rounded-xl">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <BarChart3 className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm font-medium text-blue-600">Usage</span>
+                      </div>
+                      <p className="text-lg font-bold text-gray-900">{credential.usage_count.toLocaleString()}</p>
+                      <p className="text-xs text-gray-600">Total Requests</p>
+                    </div>
+                    
+                    <div className="text-center p-3 bg-green-50 rounded-xl">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <Key className="h-4 w-4 text-green-600" />
+                        <span className="text-sm font-medium text-green-600">Rate Limit</span>
+                      </div>
+                      <p className="text-lg font-bold text-gray-900">{credential.rate_limit_per_hour.toLocaleString()}</p>
+                      <p className="text-xs text-gray-600">Requests/Hour</p>
+                    </div>
+                    
+                    <div className="text-center p-3 bg-purple-50 rounded-xl">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <Clock className="h-4 w-4 text-purple-600" />
+                        <span className="text-sm font-medium text-purple-600">Last Used</span>
+                      </div>
+                      <p className="text-sm font-bold text-gray-900">
+                        {credential.last_used_at 
+                          ? new Date(credential.last_used_at).toLocaleDateString()
+                          : 'Never'
+                        }
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        {credential.last_used_at 
+                          ? new Date(credential.last_used_at).toLocaleTimeString()
+                          : 'Not used yet'
+                        }
+                      </p>
+                    </div>
+                  </div>
 
-                {/* Permissions */}
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Permissions</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {Object.entries(apiKey.permissions).map(([key, value]) => (
-                      value && (
-                        <Badge key={key} variant="secondary" className="capitalize bg-gray-100 text-gray-700 border border-gray-200">
-                          {key.replace('_', ' ')}
-                        </Badge>
-                      )
-                    ))}
+                  {/* Permissions */}
+                  <div className="pt-4 border-t border-gray-200">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Permissions</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(credential.permissions).map(([key, value]) => (
+                        value && (
+                          <Badge key={key} variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                            {key.replace('_', ' ')}
+                          </Badge>
+                        )
+                      ))}
+                    </div>
                   </div>
-                </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-200">
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 text-gray-600 mb-1">
-                      <Activity className="h-4 w-4" />
-                    </div>
-                    <p className="text-sm text-gray-600">Usage</p>
-                    <p className="font-semibold text-gray-900">{apiKey.usage_count}</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 text-gray-600 mb-1">
-                      <Calendar className="h-4 w-4" />
-                    </div>
-                    <p className="text-sm text-gray-600">Created</p>
-                    <p className="font-semibold text-gray-900">
-                      {new Date(apiKey.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 text-gray-600 mb-1">
-                      <Shield className="h-4 w-4" />
-                    </div>
-                    <p className="text-sm text-gray-600">Last Used</p>
-                    <p className="font-semibold text-gray-900">
-                      {apiKey.last_used_at ? 
-                        new Date(apiKey.last_used_at).toLocaleDateString() : 
-                        'Never'
-                      }
-                    </p>
-                  </div>
+      {/* Create API Key Modal */}
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-gray-900">Create New API Key</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6 pt-4">
+            {/* Basic Info */}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">API Key Name</label>
+                <Input
+                  placeholder="e.g., My Project API Key"
+                  value={newCredential.name}
+                  onChange={(e) => setNewCredential(prev => ({ ...prev, name: e.target.value }))}
+                  className="rounded-xl border-gray-300"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Credential Type</label>
+                <div className="grid grid-cols-1 gap-3">
+                  {(['personal', 'project', 'service'] as const).map((type) => {
+                    const info = getCredentialTypeInfo(type);
+                    return (
+                      <div
+                        key={type}
+                        className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                          newCredential.type === type 
+                            ? 'border-blue-500 bg-blue-50' 
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                        onClick={() => setNewCredential(prev => ({ ...prev, type }))}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <Badge className={`text-xs font-medium ${info.color}`}>
+                                {type.toUpperCase()}
+                              </Badge>
+                              <div className={`w-4 h-4 rounded-full border-2 ${
+                                newCredential.type === type 
+                                  ? 'border-blue-500 bg-blue-500' 
+                                  : 'border-gray-300'
+                              }`}>
+                                {newCredential.type === type && (
+                                  <CheckCircle className="w-full h-full text-white" />
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">{info.description}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+              </div>
+            </div>
+
+            {/* Permissions */}
+            <div className="space-y-4">
+              <PermissionsDropdown
+                permissions={newCredential.permissions}
+                onPermissionChange={handlePermissionChange}
+                credentialType={newCredential.type}
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-6 border-t border-gray-200">
+              <Button
+                variant="outline"
+                onClick={() => setShowCreateModal(false)}
+                className="flex-1 rounded-xl"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={createApiKey}
+                className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 rounded-xl"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create API Key
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Created API Key Modal */}
+      <Dialog open={!!createdApiKey} onOpenChange={() => setCreatedApiKey(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <CheckCircle className="h-6 w-6 text-green-500" />
+              API Key Created Successfully!
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6 pt-4">
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                <span className="font-semibold text-yellow-800">Important Security Notice</span>
+              </div>
+              <p className="text-sm text-yellow-700">
+                This is the only time you'll see this API key. Copy it now and store it securely. 
+                You won't be able to view it again.
+              </p>
+            </div>
+
+            {createdApiKey && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Your New API Key</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 p-4 bg-gray-50 rounded-xl border border-gray-200 font-mono text-sm break-all">
+                    {createdApiKey}
+                  </div>
+                  <Button
+                    onClick={() => copyToClipboard(createdApiKey, 'API Key')}
+                    className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 rounded-xl"
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-3 text-sm text-gray-600">
+              <h4 className="font-semibold text-gray-900">Next Steps:</h4>
+              <ul className="space-y-1 ml-4">
+                <li>• Test your API key in the API Playground</li>
+                <li>• Add it to your application's environment variables</li>
+                <li>• Check the documentation for integration examples</li>
+                <li>• Monitor usage in the Developer Portal</li>
+              </ul>
+            </div>
+
+            <Button
+              onClick={() => setCreatedApiKey(null)}
+              className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 rounded-xl"
+            >
+              I've Saved My API Key
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

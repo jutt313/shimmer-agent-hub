@@ -259,11 +259,85 @@ async function handleAutomationsAPI(supabase: any, tokenData: any, method: strin
       // POST /automations - Create automation
       const body = await req.json()
       
+      // Create comprehensive automation blueprint
+      const automationBlueprint = {
+        trigger: {
+          type: body.trigger_type || 'manual',
+          webhook_endpoint: body.trigger_type === 'webhook' ? `https://zorwtyijosgdcckljmqd.supabase.co/functions/v1/webhook-trigger/${crypto.randomUUID()}` : null,
+          conditions: body.trigger_conditions || []
+        },
+        actions: body.actions || [
+          {
+            id: crypto.randomUUID(),
+            type: 'notification',
+            name: 'Send Notification',
+            config: {
+              message: 'Automation executed successfully',
+              type: 'success'
+            }
+          }
+        ],
+        ai_agents: body.ai_agents || [
+          {
+            id: crypto.randomUUID(),
+            name: 'Default Assistant',
+            role: 'automation_assistant',
+            goal: 'Help execute automation tasks',
+            rules: [
+              'Always respond professionally',
+              'Provide clear and concise information',
+              'Follow automation workflow'
+            ],
+            llm_provider: 'openai',
+            model: 'gpt-4'
+          }
+        ],
+        platforms: body.platforms || [
+          {
+            id: crypto.randomUUID(),
+            name: 'notification_service',
+            type: 'internal',
+            config: {
+              enabled: true,
+              settings: {}
+            }
+          }
+        ],
+        workflow: {
+          nodes: body.workflow_nodes || [
+            {
+              id: 'trigger-1',
+              type: 'trigger',
+              position: { x: 100, y: 100 },
+              data: { label: 'Start' }
+            },
+            {
+              id: 'action-1',
+              type: 'action',
+              position: { x: 300, y: 100 },
+              data: { label: 'Execute' }
+            }
+          ],
+          edges: body.workflow_edges || [
+            {
+              id: 'e1',
+              source: 'trigger-1',
+              target: 'action-1'
+            }
+          ]
+        }
+      }
+      
       const automationData = {
         title: body.title || 'API Created Automation',
         description: body.description || 'Created via Personal API',
         user_id: userId,
-        status: 'active'
+        status: 'active',
+        automation_blueprint: automationBlueprint,
+        platforms_config: {
+          notification_service: { enabled: true },
+          ...body.platforms_config
+        }
       }
 
       const { data, error } = await supabase
@@ -277,11 +351,45 @@ async function handleAutomationsAPI(supabase: any, tokenData: any, method: strin
         throw error
       }
 
+      // Create AI agent record
+      if (automationBlueprint.ai_agents.length > 0) {
+        const agentData = automationBlueprint.ai_agents[0]
+        await supabase
+          .from('ai_agents')
+          .insert({
+            automation_id: data.id,
+            agent_name: agentData.name,
+            agent_role: agentData.role,
+            agent_goal: agentData.goal,
+            agent_rules: agentData.rules.join('\n'),
+            llm_provider: agentData.llm_provider,
+            model: agentData.model
+          })
+      }
+
+      // Create automation chat welcome message
+      await supabase
+        .from('automation_chats')
+        .insert({
+          automation_id: data.id,
+          sender: 'system',
+          message_content: `Welcome! Your automation "${data.title}" has been created and is ready to use. You can interact with it here.`
+        })
+
       return new Response(
         JSON.stringify({ 
           success: true,
-          message: 'Automation created successfully',
-          data
+          message: 'Automation created successfully with AI agents and chat capabilities',
+          data: {
+            ...data,
+            blueprint: automationBlueprint,
+            features: {
+              ai_agents: true,
+              chat_interface: true,
+              webhook_support: automationBlueprint.trigger.type === 'webhook',
+              platform_integrations: true
+            }
+          }
         }),
         { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )

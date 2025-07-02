@@ -46,8 +46,8 @@ const PlaygroundConsole = () => {
   const [response, setResponse] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<PlaygroundRequest[]>([]);
-  const [selectedHistoryItem, setSelectedHistoryItem] = useState<PlaygroundRequest | null>(null);
 
+  // Fixed API base URL - matches the edge function
   const API_BASE_URL = 'https://zorwtyijosgdcckljmqd.supabase.co/functions/v1/yusrai-api';
 
   const availableEndpoints = [
@@ -113,6 +113,7 @@ const PlaygroundConsole = () => {
         requestConfig = { method, endpoint, body: null };
       }
 
+      // Use the correct API base URL
       const url = `${API_BASE_URL}${requestConfig.endpoint}`;
       const headers = {
         'Authorization': `Bearer ${apiKey}`,
@@ -185,6 +186,11 @@ const PlaygroundConsole = () => {
       setResponse(responseData);
       setHistory(prev => [newRequest, ...prev.slice(0, 9)]);
 
+      // Track usage if successful
+      if (response.ok && user) {
+        await trackApiUsage(requestConfig.endpoint, requestConfig.method, response.status, duration);
+      }
+
     } catch (error: any) {
       console.error('[Playground] Network error:', error);
       const duration = Date.now() - startTime;
@@ -228,6 +234,27 @@ const PlaygroundConsole = () => {
       toast.error(`Network error: ${errorMessage}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const trackApiUsage = async (endpoint: string, method: string, statusCode: number, duration: number) => {
+    try {
+      const { error } = await supabase
+        .from('api_usage_tracking')
+        .insert({
+          user_id: user?.id,
+          endpoint,
+          method,
+          status_code: statusCode,
+          response_time_ms: duration,
+          usage_date: new Date().toISOString().split('T')[0]
+        });
+
+      if (error) {
+        console.error('Failed to track API usage:', error);
+      }
+    } catch (err) {
+      console.error('Error tracking API usage:', err);
     }
   };
 
@@ -461,7 +488,7 @@ const PlaygroundConsole = () => {
         </Card>
       </div>
 
-      {/* Request History with enhanced error display */}
+      {/* Request History */}
       {history.length > 0 && (
         <Card className="bg-gradient-to-br from-white to-gray-50/30 border-gray-200 rounded-3xl shadow-lg">
           <CardHeader>
@@ -476,7 +503,6 @@ const PlaygroundConsole = () => {
                 <div 
                   key={item.id} 
                   className="p-4 bg-gray-50 rounded-2xl border border-gray-100 cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => setSelectedHistoryItem(item)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">

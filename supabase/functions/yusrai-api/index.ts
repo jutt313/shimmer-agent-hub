@@ -21,10 +21,13 @@ serve(async (req) => {
 
   try {
     const url = new URL(req.url)
-    const path = url.pathname.split('/').filter(Boolean)
+    // Fix: Remove the function prefix to get the actual path
+    const fullPath = url.pathname
+    const pathWithoutFunction = fullPath.replace('/yusrai-api', '') || '/'
+    const path = pathWithoutFunction.split('/').filter(Boolean)
     const method = req.method
     
-    console.log(`[YusrAI API] ${method} ${url.pathname} - Start`)
+    console.log(`[YusrAI API] ${method} ${fullPath} -> ${pathWithoutFunction} - Start`)
     
     // Extract API token from Authorization header
     const authHeader = req.headers.get('Authorization')
@@ -84,7 +87,8 @@ serve(async (req) => {
         JSON.stringify({ 
           error: 'Database Error',
           message: 'Unable to validate API token',
-          code: 'DB_ERROR'
+          code: 'DB_ERROR',
+          details: tokenError.message
         }),
         { 
           status: 500, 
@@ -167,7 +171,7 @@ serve(async (req) => {
       response = new Response(
         JSON.stringify({ 
           error: 'Endpoint Not Found',
-          message: `Endpoint ${url.pathname} not found`,
+          message: `Endpoint ${pathWithoutFunction} not found`,
           available_endpoints: ['/automations', '/webhooks', '/execute', '/events'],
           code: 'ENDPOINT_NOT_FOUND'
         }),
@@ -186,7 +190,7 @@ serve(async (req) => {
         .insert({
           user_id: tokenData.user_id,
           api_credential_id: tokenData.id,
-          endpoint: url.pathname,
+          endpoint: pathWithoutFunction,
           method: method,
           status_code: response.status,
           response_time_ms: finalResponseTime,
@@ -196,13 +200,13 @@ serve(async (req) => {
       if (logError) {
         console.error('[YusrAI API] Failed to log usage:', logError)
       } else {
-        console.log(`[YusrAI API] Usage logged: ${method} ${url.pathname} - ${response.status} - ${finalResponseTime}ms`)
+        console.log(`[YusrAI API] Usage logged: ${method} ${pathWithoutFunction} - ${response.status} - ${finalResponseTime}ms`)
       }
     } catch (logErr) {
       console.error('[YusrAI API] Exception logging usage:', logErr)
     }
 
-    console.log(`[YusrAI API] ${method} ${url.pathname} - Complete - ${response.status} - ${finalResponseTime}ms`)
+    console.log(`[YusrAI API] ${method} ${pathWithoutFunction} - Complete - ${response.status} - ${finalResponseTime}ms`)
     return response
 
   } catch (error) {
@@ -213,7 +217,8 @@ serve(async (req) => {
         error: 'Internal Server Error',
         message: 'An unexpected error occurred. Please try again.',
         code: 'INTERNAL_ERROR',
-        response_time_ms: errorResponseTime
+        response_time_ms: errorResponseTime,
+        details: error.message
       }),
       { 
         status: 500, 

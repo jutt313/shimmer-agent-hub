@@ -79,15 +79,12 @@ const PermissionsDropdown = ({ permissions, onPermissionChange, credentialType }
           </Button>
         </PopoverTrigger>
         <PopoverContent 
-          className="w-96 p-0 rounded-xl bg-white border shadow-lg z-50" 
+          className="w-96 p-0 rounded-xl bg-white border shadow-lg z-[100]" 
           align="start"
           side="bottom"
           sideOffset={4}
         >
-          <div className="p-4 space-y-3 max-h-80 overflow-y-auto" style={{
-            scrollbarWidth: 'thin',
-            scrollbarColor: '#d1d5db #f3f4f6'
-          }}>
+          <div className="p-4 space-y-3 max-h-80 overflow-y-auto">
             {availablePermissions.map((permission) => (
               <div key={permission.key} className="flex items-start space-x-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
                 <Checkbox
@@ -126,21 +123,6 @@ const PermissionsDropdown = ({ permissions, onPermissionChange, credentialType }
             ))}
         </div>
       )}
-      <style>{`
-        .scrollbar-thin::-webkit-scrollbar {
-          width: 6px;
-        }
-        .scrollbar-thin::-webkit-scrollbar-track {
-          background-color: #f3f4f6;
-        }
-        .scrollbar-thin::-webkit-scrollbar-thumb {
-          background-color: #d1d5db;
-          border-radius: 0.375rem;
-        }
-        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-          background-color: #9ca3af;
-        }
-      `}</style>
     </div>
   );
 };

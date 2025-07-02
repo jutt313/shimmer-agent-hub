@@ -122,9 +122,13 @@ const PlaygroundConsole = () => {
         fetchOptions.body = JSON.stringify(requestConfig.body);
       }
 
+      console.log('Making API call to:', url, 'with method:', requestConfig.method);
+      
       const response = await fetch(url, fetchOptions);
       const responseData = await response.json();
       const duration = Date.now() - startTime;
+
+      console.log('API response:', response.status, responseData);
 
       const newRequest: PlaygroundRequest = {
         id: crypto.randomUUID(),
@@ -140,9 +144,10 @@ const PlaygroundConsole = () => {
       setResponse(responseData);
       setHistory(prev => [newRequest, ...prev.slice(0, 9)]); // Keep last 10 requests
       
-      // Track usage for both success and failure
+      // Track usage - improved error handling and logging
       try {
-        await supabase.functions.invoke('yusrai-api', {
+        console.log('Tracking usage for API call...');
+        const trackingResponse = await supabase.functions.invoke('yusrai-api', {
           body: {
             action: 'track_usage',
             endpoint: requestConfig.endpoint,
@@ -155,21 +160,31 @@ const PlaygroundConsole = () => {
             'Authorization': `Bearer ${apiKey}`
           }
         });
+        
+        console.log('Usage tracking response:', trackingResponse);
+        
+        if (trackingResponse.error) {
+          console.error('Usage tracking failed:', trackingResponse.error);
+        } else {
+          console.log('Usage tracked successfully');
+        }
       } catch (trackingError) {
-        console.log('Usage tracking failed:', trackingError);
+        console.error('Usage tracking error:', trackingError);
       }
       
       if (response.ok) {
         toast.success(`API call successful (${duration}ms)`);
       } else {
-        toast.error(`API call failed: ${response.status}`);
+        toast.error(`API call failed: ${response.status} - ${responseData.message || responseData.error || 'Unknown error'}`);
       }
 
     } catch (error: any) {
+      console.error('Network error:', error);
       const duration = Date.now() - startTime;
       const errorResponse = {
         error: 'Network Error',
-        message: error.message || 'Failed to make API call'
+        message: error.message || 'Failed to make API call',
+        details: 'Check console for more information'
       };
 
       const newRequest: PlaygroundRequest = {
@@ -186,26 +201,30 @@ const PlaygroundConsole = () => {
       setResponse(errorResponse);
       setHistory(prev => [newRequest, ...prev.slice(0, 9)]);
       
-      // Track network errors too
+      // Track network errors too - improved error handling
       try {
-        await supabase.functions.invoke('yusrai-api', {
+        console.log('Tracking usage for network error...');
+        const trackingResponse = await supabase.functions.invoke('yusrai-api', {
           body: {
             action: 'track_usage',
             endpoint: endpoint,
             method: method,
             status_code: 0,
             response_time_ms: duration,
-            success: false
+            success: false,
+            error_details: error.message
           },
           headers: {
             'Authorization': `Bearer ${apiKey}`
           }
         });
+        
+        console.log('Network error usage tracking response:', trackingResponse);
       } catch (trackingError) {
-        console.log('Usage tracking failed:', trackingError);
+        console.error('Network error usage tracking failed:', trackingError);
       }
       
-      toast.error('Network error occurred');
+      toast.error(`Network error: ${error.message}`);
     } finally {
       setLoading(false);
     }

@@ -1,1 +1,5 @@
+
 project_id = "zorwtyijosgdcckljmqd"
+
+[functions.yusrai-api]
+verify_jwt = false

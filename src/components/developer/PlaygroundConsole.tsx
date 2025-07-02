@@ -18,7 +18,8 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Zap
+  Zap,
+  AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -31,6 +32,8 @@ interface PlaygroundRequest {
   response: any;
   status: number;
   duration: number;
+  error?: string;
+  errorCode?: string;
 }
 
 const PlaygroundConsole = () => {
@@ -94,6 +97,11 @@ const PlaygroundConsole = () => {
       return;
     }
 
+    if (!apiKey.startsWith('YUSR_')) {
+      toast.error('API key must start with YUSR_ prefix');
+      return;
+    }
+
     setLoading(true);
     const startTime = Date.now();
 
@@ -121,13 +129,48 @@ const PlaygroundConsole = () => {
         fetchOptions.body = JSON.stringify(requestConfig.body);
       }
 
-      console.log('Making API call to:', url, 'with method:', requestConfig.method);
+      console.log(`[Playground] Making API call to: ${url}`, { method: requestConfig.method, headers });
       
       const response = await fetch(url, fetchOptions);
       const responseData = await response.json();
       const duration = Date.now() - startTime;
 
-      console.log('API response:', response.status, responseData);
+      console.log(`[Playground] API response:`, { status: response.status, data: responseData, duration });
+
+      // Enhanced error handling based on response
+      let errorMessage = '';
+      let errorCode = '';
+      
+      if (!response.ok) {
+        errorCode = responseData.code || 'UNKNOWN_ERROR';
+        errorMessage = responseData.message || 'Unknown error occurred';
+        
+        // Specific error handling for common issues
+        switch (errorCode) {
+          case 'AUTH_MISSING_TOKEN':
+            toast.error('Authentication required: Please provide your API key');
+            break;
+          case 'AUTH_INVALID_FORMAT':
+            toast.error('Invalid API key format: Must start with YUSR_');
+            break;
+          case 'AUTH_INVALID_TOKEN':
+            toast.error('Invalid API key: Token not found or expired');
+            break;
+          case 'DB_ERROR':
+            toast.error('Database error: Please try again later');
+            break;
+          case 'METHOD_NOT_ALLOWED':
+            toast.error(`Method not allowed: ${requestConfig.method} not supported for this endpoint`);
+            break;
+          case 'ENDPOINT_NOT_FOUND':
+            toast.error('Endpoint not found: Please check the URL');
+            break;
+          default:
+            toast.error(`API Error (${response.status}): ${errorMessage}`);
+        }
+      } else {
+        toast.success(`API call successful (${duration}ms)`);
+      }
 
       const newRequest: PlaygroundRequest = {
         id: crypto.randomUUID(),
@@ -137,24 +180,35 @@ const PlaygroundConsole = () => {
         request: plainTextRequest || `${requestConfig.method} ${requestConfig.endpoint}`,
         response: responseData,
         status: response.status,
-        duration
+        duration,
+        error: !response.ok ? errorMessage : undefined,
+        errorCode: !response.ok ? errorCode : undefined
       };
 
       setResponse(responseData);
       setHistory(prev => [newRequest, ...prev.slice(0, 9)]);
-      
-      if (response.ok) {
-        toast.success(`API call successful (${duration}ms)`);
-      } else {
-        toast.error(`API call failed: ${response.status} - ${responseData.message || responseData.error || 'Unknown error'}`);
-      }
 
     } catch (error: any) {
-      console.error('Network error:', error);
+      console.error('[Playground] Network error:', error);
       const duration = Date.now() - startTime;
+      
+      let errorMessage = 'Network error occurred';
+      let errorCode = 'NETWORK_ERROR';
+      
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        errorMessage = 'Unable to connect to API server';
+        errorCode = 'CONNECTION_ERROR';
+      } else if (error.message.includes('CORS')) {
+        errorMessage = 'Cross-origin request blocked';
+        errorCode = 'CORS_ERROR';
+      } else {
+        errorMessage = error.message || 'Unknown network error';
+      }
+
       const errorResponse = {
         error: 'Network Error',
-        message: error.message || 'Failed to make API call',
+        message: errorMessage,
+        code: errorCode,
         details: 'Check console for more information'
       };
 
@@ -166,13 +220,15 @@ const PlaygroundConsole = () => {
         request: plainTextRequest || `${method} ${endpoint}`,
         response: errorResponse,
         status: 0,
-        duration
+        duration,
+        error: errorMessage,
+        errorCode
       };
 
       setResponse(errorResponse);
       setHistory(prev => [newRequest, ...prev.slice(0, 9)]);
       
-      toast.error(`Network error: ${error.message}`);
+      toast.error(`Network error: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -192,6 +248,19 @@ const PlaygroundConsole = () => {
     }
     
     return curl;
+  };
+
+  const getStatusColor = (status: number) => {
+    if (status === 0) return 'text-gray-500';
+    if (status >= 200 && status < 300) return 'text-green-500';
+    if (status >= 400 && status < 500) return 'text-yellow-500';
+    return 'text-red-500';
+  };
+
+  const getStatusIcon = (status: number) => {
+    if (status === 0) return <AlertTriangle className="h-4 w-4 text-gray-500" />;
+    if (status >= 200 && status < 300) return <CheckCircle className="h-4 w-4 text-green-500" />;
+    return <XCircle className="h-4 w-4 text-red-500" />;
   };
 
   return (
@@ -221,7 +290,7 @@ const PlaygroundConsole = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* API Key Input */}
+            {/* API Key Input with validation feedback */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">API Key</label>
               <Input
@@ -229,8 +298,16 @@ const PlaygroundConsole = () => {
                 placeholder="Enter your YUSR_ API key"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                className="rounded-xl border-gray-300"
+                className={`rounded-xl border-gray-300 ${
+                  apiKey && !apiKey.startsWith('YUSR_') ? 'border-red-300 bg-red-50' : ''
+                }`}
               />
+              {apiKey && !apiKey.startsWith('YUSR_') && (
+                <p className="text-xs text-red-600 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  API key must start with YUSR_ prefix
+                </p>
+              )}
             </div>
 
             {/* Plain Text Request */}
@@ -293,8 +370,8 @@ const PlaygroundConsole = () => {
             <div className="flex gap-3 pt-4">
               <Button 
                 onClick={makeApiCall} 
-                disabled={loading}
-                className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 rounded-xl"
+                disabled={loading || !apiKey.trim() || (apiKey && !apiKey.startsWith('YUSR_'))}
+                className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 rounded-xl disabled:opacity-50"
               >
                 {loading ? (
                   <>
@@ -313,6 +390,7 @@ const PlaygroundConsole = () => {
                 variant="outline" 
                 onClick={() => copyToClipboard(generateCurlCommand())}
                 className="rounded-xl"
+                disabled={!apiKey.trim()}
               >
                 <Copy className="h-4 w-4 mr-2" />
                 Copy cURL
@@ -332,23 +410,36 @@ const PlaygroundConsole = () => {
           <CardContent>
             {response ? (
               <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  {history[0]?.status >= 200 && history[0]?.status < 300 ? (
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                  ) : (
-                    <XCircle className="h-5 w-5 text-red-500" />
-                  )}
-                  <Badge variant={history[0]?.status >= 200 && history[0]?.status < 300 ? "default" : "destructive"}>
-                    {history[0]?.status || 'Error'}
-                  </Badge>
-                  <div className="flex items-center gap-1 text-sm text-gray-500">
-                    <Clock className="h-4 w-4" />
-                    {history[0]?.duration}ms
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {getStatusIcon(history[0]?.status || 0)}
+                    <Badge 
+                      variant={history[0]?.status >= 200 && history[0]?.status < 300 ? "default" : "destructive"}
+                      className="font-mono"
+                    >
+                      {history[0]?.status || 'ERROR'}
+                    </Badge>
+                    <div className="flex items-center gap-1 text-sm text-gray-500">
+                      <Clock className="h-4 w-4" />
+                      {history[0]?.duration}ms
+                    </div>
                   </div>
+                  {history[0]?.errorCode && (
+                    <Badge variant="outline" className="text-xs font-mono text-red-600 border-red-200">
+                      {history[0].errorCode}
+                    </Badge>
+                  )}
                 </div>
+
+                {history[0]?.error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-800 font-medium">Error Details:</p>
+                    <p className="text-sm text-red-700 mt-1">{history[0].error}</p>
+                  </div>
+                )}
                 
                 <ScrollArea className="h-96 w-full rounded-xl border border-gray-200 bg-gray-50">
-                  <pre className="p-4 text-sm">
+                  <pre className="p-4 text-sm font-mono">
                     <code>{JSON.stringify(response, null, 2)}</code>
                   </pre>
                 </ScrollArea>
@@ -373,7 +464,7 @@ const PlaygroundConsole = () => {
         </Card>
       </div>
 
-      {/* Request History */}
+      {/* Request History with enhanced error display */}
       {history.length > 0 && (
         <Card className="bg-gradient-to-br from-white to-gray-50/30 border-gray-200 rounded-3xl shadow-lg">
           <CardHeader>
@@ -396,17 +487,31 @@ const PlaygroundConsole = () => {
                         {item.method}
                       </Badge>
                       <code className="text-sm text-gray-700">{item.endpoint}</code>
-                      {item.status >= 200 && item.status < 300 ? (
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <XCircle className="h-4 w-4 text-red-500" />
+                      {getStatusIcon(item.status)}
+                      <span className={`text-sm font-mono ${getStatusColor(item.status)}`}>
+                        {item.status || 'ERROR'}
+                      </span>
+                      {item.errorCode && (
+                        <Badge variant="outline" className="text-xs font-mono text-red-600 border-red-200">
+                          {item.errorCode}
+                        </Badge>
                       )}
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-gray-500 flex items-center gap-2">
+                      <Clock className="h-3 w-3" />
                       {item.timestamp.toLocaleTimeString()}
+                      <span>({item.duration}ms)</span>
                     </div>
                   </div>
-                  <p className="text-sm text-gray-600 mt-2">{item.request}</p>
+                  <div className="mt-2 flex items-start justify-between">
+                    <p className="text-sm text-gray-600">{item.request}</p>
+                    {item.error && (
+                      <p className="text-xs text-red-600 ml-4 flex-shrink-0">
+                        <AlertTriangle className="h-3 w-3 inline mr-1" />
+                        {item.error}
+                      </p>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

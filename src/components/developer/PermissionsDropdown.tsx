@@ -78,27 +78,37 @@ const PermissionsDropdown = ({ permissions, onPermissionChange, credentialType }
             <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-96 p-0 rounded-xl bg-white border shadow-lg z-50" align="start">
-          <div className="p-4 space-y-3 max-h-80 overflow-y-auto">
+        <PopoverContent 
+          className="w-96 p-0 rounded-xl bg-white border shadow-lg z-50" 
+          align="start"
+          side="bottom"
+          sideOffset={4}
+        >
+          <div className="p-4 space-y-3 max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
             {availablePermissions.map((permission) => (
-              <div key={permission.key} className="flex items-start space-x-3 p-2 rounded-lg hover:bg-gray-50">
+              <div key={permission.key} className="flex items-start space-x-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
                 <Checkbox
                   id={permission.key}
                   checked={permissions[permission.key] || false}
                   onCheckedChange={(checked) => onPermissionChange(permission.key, checked as boolean)}
-                  className="mt-1"
+                  className="mt-1 flex-shrink-0"
                 />
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <label 
                     htmlFor={permission.key} 
-                    className="text-sm font-medium text-gray-700 cursor-pointer"
+                    className="text-sm font-medium text-gray-700 cursor-pointer block"
                   >
                     {permission.label}
                   </label>
-                  <p className="text-xs text-gray-500 mt-1">{permission.description}</p>
+                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">{permission.description}</p>
                 </div>
               </div>
             ))}
+          </div>
+          <div className="border-t p-3 bg-gray-50 rounded-b-xl">
+            <p className="text-xs text-gray-600 text-center">
+              {selectedCount} of {availablePermissions.length} permissions selected
+            </p>
           </div>
         </PopoverContent>
       </Popover>
@@ -107,12 +117,27 @@ const PermissionsDropdown = ({ permissions, onPermissionChange, credentialType }
           {availablePermissions
             .filter(p => permissions[p.key])
             .map(p => (
-              <Badge key={p.key} variant="outline" className="text-xs rounded-full border-blue-200 text-blue-700">
+              <Badge key={p.key} variant="outline" className="text-xs rounded-full border-blue-200 text-blue-700 bg-blue-50">
                 {p.label}
               </Badge>
             ))}
         </div>
       )}
+      <style jsx global>{`
+        .scrollbar-thin {
+          scrollbar-width: thin;
+        }
+        .scrollbar-thumb-gray-300::-webkit-scrollbar-thumb {
+          background-color: #d1d5db;
+          border-radius: 0.375rem;
+        }
+        .scrollbar-track-gray-100::-webkit-scrollbar-track {
+          background-color: #f3f4f6;
+        }
+        .scrollbar-thin::-webkit-scrollbar {
+          width: 6px;
+        }
+      `}</style>
     </div>
   );
 };

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -71,9 +72,7 @@ const PlaygroundConsole = () => {
         endpoint: '/automations', 
         body: {
           title: 'New Automation from Playground',
-          description: 'Created via API Playground',
-          trigger_type: 'manual',
-          actions: []
+          description: 'Created via API Playground'
         }
       };
     } else if (lowerText.includes('webhook')) {
@@ -83,7 +82,7 @@ const PlaygroundConsole = () => {
     } else if (lowerText.includes('execute') || lowerText.includes('run')) {
       return { 
         method: 'POST', 
-        endpoint: '/execute/placeholder-id', 
+        endpoint: '/execute/test-id', 
         body: { triggerData: { source: 'playground' } }
       };
     }
@@ -137,7 +136,6 @@ const PlaygroundConsole = () => {
 
       console.log(`[Playground] API response:`, { status: response.status, data: responseData, duration });
 
-      // Enhanced error handling based on response
       let errorMessage = '';
       let errorCode = '';
       
@@ -145,7 +143,6 @@ const PlaygroundConsole = () => {
         errorCode = responseData.code || 'UNKNOWN_ERROR';
         errorMessage = responseData.message || 'Unknown error occurred';
         
-        // Specific error handling for common issues
         switch (errorCode) {
           case 'AUTH_MISSING_TOKEN':
             toast.error('Authentication required: Please provide your API key');

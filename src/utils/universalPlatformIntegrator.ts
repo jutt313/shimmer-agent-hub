@@ -92,7 +92,7 @@ export class UniversalPlatformIntegrator {
           console.log(`✅ Platform ${platformName} discovered and configured`);
           return config;
         }
-      } catch (error) {
+      } catch (error: any) {
         console.log(`⚠️ Failed to fetch from ${url}:`, error.message);
       }
     }
@@ -251,7 +251,7 @@ export class UniversalPlatformIntegrator {
     });
 
     // Build headers with authentication
-    const headers = await this.buildHeaders(config.auth_config, credentials);
+    const headers = await this.buildAuthHeaders(config.auth_config, credentials);
 
     // Build request options
     const requestOptions: RequestInit = {
@@ -295,7 +295,7 @@ export class UniversalPlatformIntegrator {
     }
   }
 
-  private async buildHeaders(authConfig: any, credentials: Record<string, string>): Promise<Record<string, string>> {
+  private async buildAuthHeaders(authConfig: any, credentials: Record<string, string>): Promise<Record<string, string>> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'User-Agent': 'YusrAI-Universal-Integrator/1.0'
@@ -375,7 +375,7 @@ export const buildUniversalPlatformConfig = async (
   
   return {
     baseURL: config.api_spec.servers[0]?.url || `https://api.${platformName.toLowerCase()}.com`,
-    headers: await universalIntegrator.buildHeaders(config.auth_config, credentials),
+    headers: await universalIntegrator.buildAuthHeaders(config.auth_config, credentials),
     timeout: 30000,
     platform_config: config
   };

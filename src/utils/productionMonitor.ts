@@ -204,8 +204,8 @@ export class ProductionMonitor {
     try {
       const { data: runs, error } = await supabase
         .from('automation_runs')
-        .select('status, created_at')
-        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+        .select('status, run_timestamp')
+        .gte('run_timestamp', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
       if (error) throw error;
 

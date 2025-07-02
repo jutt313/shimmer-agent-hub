@@ -26,7 +26,7 @@ export interface TestSuite {
 }
 
 export class ComprehensiveTestingSuite {
-  private testResults: TestResult[] = [];
+  public testResults: TestResult[] = [];
   private suiteStartTime: number = 0;
 
   constructor() {
@@ -125,7 +125,15 @@ export class ComprehensiveTestingSuite {
   async testWebhookSystem(): Promise<void> {
     console.log('🎯 Testing Webhook System...');
 
+    const startTime = Date.now();
+
     try {
+      // Get current user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('No authenticated user found for webhook testing');
+      }
+
       // First, create a test automation
       const { data: automation, error: automationError } = await supabase
         .from('automations')
@@ -133,6 +141,7 @@ export class ComprehensiveTestingSuite {
           title: 'Test Automation for Webhook Testing',
           description: 'Created for comprehensive testing',
           status: 'active',
+          user_id: user.id,
           automation_blueprint: {
             version: '1.0.0',
             description: 'Test automation',
@@ -171,7 +180,6 @@ export class ComprehensiveTestingSuite {
       }
 
       // Test webhook trigger
-      const startTime = Date.now();
       console.log(`🎯 Testing webhook: ${webhook.webhook_url}`);
 
       const webhookResponse = await fetch(webhook.webhook_url, {
@@ -223,7 +231,7 @@ export class ComprehensiveTestingSuite {
       this.addTestResult({
         test_name: 'Webhook System - Trigger and Delivery',
         status: 'FAIL',
-        execution_time_ms: Date.now() - this.suiteStartTime,
+        execution_time_ms: Date.now() - startTime,
         error_message: error.message
       });
 
@@ -289,9 +297,9 @@ export class ComprehensiveTestingSuite {
   async testDeveloperPortal(): Promise<void> {
     console.log('👨‍💻 Testing Developer Portal...');
 
-    try {
-      const startTime = Date.now();
+    const startTime = Date.now();
 
+    try {
       // Test API documentation generation
       console.log('🧪 Testing API documentation generation...');
       
@@ -322,7 +330,7 @@ export class ComprehensiveTestingSuite {
       this.addTestResult({
         test_name: 'Developer Portal - API Documentation',
         status: 'FAIL',
-        execution_time_ms: Date.now() - this.suiteStartTime,
+        execution_time_ms: Date.now() - startTime,
         error_message: error.message
       });
 
@@ -334,9 +342,9 @@ export class ComprehensiveTestingSuite {
   async testAutomationExecution(): Promise<void> {
     console.log('⚙️ Testing Automation Execution...');
 
-    try {
-      const startTime = Date.now();
+    const startTime = Date.now();
 
+    try {
       // Test execution tracking
       console.log('🧪 Testing automation execution tracking...');
 
@@ -419,9 +427,9 @@ export class ComprehensiveTestingSuite {
   async testKnowledgeSystem(): Promise<void> {
     console.log('📚 Testing Knowledge System...');
 
-    try {
-      const startTime = Date.now();
+    const startTime = Date.now();
 
+    try {
       // Test knowledge retrieval
       const { data: knowledgeData, error } = await supabase
         .from('universal_knowledge_store')
@@ -450,7 +458,7 @@ export class ComprehensiveTestingSuite {
       this.addTestResult({
         test_name: 'Knowledge System - Retrieval',
         status: 'FAIL',
-        execution_time_ms: Date.now() - this.suiteStartTime,
+        execution_time_ms: Date.now() - startTime,
         error_message: error.message
       });
 
@@ -462,9 +470,9 @@ export class ComprehensiveTestingSuite {
   async testDiagramGeneration(): Promise<void> {
     console.log('📊 Testing Diagram Generation...');
 
-    try {
-      const startTime = Date.now();
+    const startTime = Date.now();
 
+    try {
       console.log('🧪 Testing diagram generation functionality...');
 
       const executionTime = Date.now() - startTime;
@@ -485,7 +493,7 @@ export class ComprehensiveTestingSuite {
       this.addTestResult({
         test_name: 'Diagram Generation - Visualization',
         status: 'FAIL',
-        execution_time_ms: Date.now() - this.suiteStartTime,
+        execution_time_ms: Date.now() - startTime,
         error_message: error.message
       });
 

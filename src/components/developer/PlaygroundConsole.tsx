@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -142,35 +141,7 @@ const PlaygroundConsole = () => {
       };
 
       setResponse(responseData);
-      setHistory(prev => [newRequest, ...prev.slice(0, 9)]); // Keep last 10 requests
-      
-      // Track usage - improved error handling and logging
-      try {
-        console.log('Tracking usage for API call...');
-        const trackingResponse = await supabase.functions.invoke('yusrai-api', {
-          body: {
-            action: 'track_usage',
-            endpoint: requestConfig.endpoint,
-            method: requestConfig.method,
-            status_code: response.status,
-            response_time_ms: duration,
-            success: response.ok
-          },
-          headers: {
-            'Authorization': `Bearer ${apiKey}`
-          }
-        });
-        
-        console.log('Usage tracking response:', trackingResponse);
-        
-        if (trackingResponse.error) {
-          console.error('Usage tracking failed:', trackingResponse.error);
-        } else {
-          console.log('Usage tracked successfully');
-        }
-      } catch (trackingError) {
-        console.error('Usage tracking error:', trackingError);
-      }
+      setHistory(prev => [newRequest, ...prev.slice(0, 9)]);
       
       if (response.ok) {
         toast.success(`API call successful (${duration}ms)`);
@@ -200,29 +171,6 @@ const PlaygroundConsole = () => {
 
       setResponse(errorResponse);
       setHistory(prev => [newRequest, ...prev.slice(0, 9)]);
-      
-      // Track network errors too - improved error handling
-      try {
-        console.log('Tracking usage for network error...');
-        const trackingResponse = await supabase.functions.invoke('yusrai-api', {
-          body: {
-            action: 'track_usage',
-            endpoint: endpoint,
-            method: method,
-            status_code: 0,
-            response_time_ms: duration,
-            success: false,
-            error_details: error.message
-          },
-          headers: {
-            'Authorization': `Bearer ${apiKey}`
-          }
-        });
-        
-        console.log('Network error usage tracking response:', trackingResponse);
-      } catch (trackingError) {
-        console.error('Network error usage tracking failed:', trackingError);
-      }
       
       toast.error(`Network error: ${error.message}`);
     } finally {

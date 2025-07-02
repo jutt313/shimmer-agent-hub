@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { 
   PlayCircle, 
   Copy, 
@@ -186,11 +185,6 @@ const PlaygroundConsole = () => {
       setResponse(responseData);
       setHistory(prev => [newRequest, ...prev.slice(0, 9)]);
 
-      // Track usage if successful
-      if (response.ok && user) {
-        await trackApiUsage(requestConfig.endpoint, requestConfig.method, response.status, duration);
-      }
-
     } catch (error: any) {
       console.error('[Playground] Network error:', error);
       const duration = Date.now() - startTime;
@@ -234,27 +228,6 @@ const PlaygroundConsole = () => {
       toast.error(`Network error: ${errorMessage}`);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const trackApiUsage = async (endpoint: string, method: string, statusCode: number, duration: number) => {
-    try {
-      const { error } = await supabase
-        .from('api_usage_tracking')
-        .insert({
-          user_id: user?.id,
-          endpoint,
-          method,
-          status_code: statusCode,
-          response_time_ms: duration,
-          usage_date: new Date().toISOString().split('T')[0]
-        });
-
-      if (error) {
-        console.error('Failed to track API usage:', error);
-      }
-    } catch (err) {
-      console.error('Error tracking API usage:', err);
     }
   };
 

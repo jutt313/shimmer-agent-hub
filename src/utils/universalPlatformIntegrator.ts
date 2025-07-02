@@ -295,7 +295,8 @@ export class UniversalPlatformIntegrator {
     }
   }
 
-  private async buildAuthHeaders(authConfig: any, credentials: Record<string, string>): Promise<Record<string, string>> {
+  // Make buildAuthHeaders public so it can be accessed from buildUniversalPlatformConfig
+  async buildAuthHeaders(authConfig: any, credentials: Record<string, string>): Promise<Record<string, string>> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'User-Agent': 'YusrAI-Universal-Integrator/1.0'

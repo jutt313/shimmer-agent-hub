@@ -140,6 +140,25 @@ const PlaygroundConsole = () => {
       setResponse(responseData);
       setHistory(prev => [newRequest, ...prev.slice(0, 9)]); // Keep last 10 requests
       
+      // Track usage for both success and failure
+      try {
+        await supabase.functions.invoke('yusrai-api', {
+          body: {
+            action: 'track_usage',
+            endpoint: requestConfig.endpoint,
+            method: requestConfig.method,
+            status_code: response.status,
+            response_time_ms: duration,
+            success: response.ok
+          },
+          headers: {
+            'Authorization': `Bearer ${apiKey}`
+          }
+        });
+      } catch (trackingError) {
+        console.log('Usage tracking failed:', trackingError);
+      }
+      
       if (response.ok) {
         toast.success(`API call successful (${duration}ms)`);
       } else {
@@ -166,6 +185,26 @@ const PlaygroundConsole = () => {
 
       setResponse(errorResponse);
       setHistory(prev => [newRequest, ...prev.slice(0, 9)]);
+      
+      // Track network errors too
+      try {
+        await supabase.functions.invoke('yusrai-api', {
+          body: {
+            action: 'track_usage',
+            endpoint: endpoint,
+            method: method,
+            status_code: 0,
+            response_time_ms: duration,
+            success: false
+          },
+          headers: {
+            'Authorization': `Bearer ${apiKey}`
+          }
+        });
+      } catch (trackingError) {
+        console.log('Usage tracking failed:', trackingError);
+      }
+      
       toast.error('Network error occurred');
     } finally {
       setLoading(false);

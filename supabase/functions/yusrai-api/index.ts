@@ -20,6 +20,43 @@ serve(async (req) => {
     
     console.log(`YusrAI API: ${method} ${url.pathname}`)
     
+    // Handle usage tracking requests (these don't need full validation)
+    if (path[0] === 'track_usage') {
+      const body = await req.json()
+      const authHeader = req.headers.get('Authorization')
+      const token = authHeader?.replace('Bearer ', '') || ''
+      
+      if (token.startsWith('YUSR_')) {
+        // Get user from token
+        const supabase = createClient(supabaseUrl, supabaseServiceKey)
+        const { data: credentials } = await supabase
+          .from('api_credentials')
+          .select('user_id, id')
+          .eq('api_key', token)
+          .single()
+        
+        if (credentials) {
+          // Track the usage
+          await supabase
+            .from('api_usage_tracking')
+            .insert({
+              user_id: credentials.user_id,
+              api_credential_id: credentials.id,
+              endpoint: body.endpoint || '/unknown',
+              method: body.method || 'GET',
+              status_code: body.status_code || 0,
+              response_time_ms: body.response_time_ms || 0,
+              tokens_used: 0,
+              cost_amount: 0
+            })
+        }
+      }
+      
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    
     // Extract API token from Authorization header
     const authHeader = req.headers.get('Authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {

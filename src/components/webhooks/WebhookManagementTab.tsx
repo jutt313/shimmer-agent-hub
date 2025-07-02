@@ -28,7 +28,8 @@ import {
   EyeOff,
   AlertTriangle,
   TrendingUp,
-  Activity
+  Activity,
+  Info
 } from 'lucide-react';
 
 interface AutomationWebhook {
@@ -228,48 +229,31 @@ const WebhookManagementTab = () => {
     setTestingWebhook(webhook.id);
     
     try {
+      console.log('Testing webhook:', webhook.webhook_url);
+      
+      // Create test payload
       const testPayload = {
         event: 'test_webhook',
         data: {
-          message: 'Test webhook from YusrAI',
+          message: 'Test webhook from YusrAI Developer Portal',
           timestamp: new Date().toISOString(),
           automation_id: webhook.automation_id,
-          test: true
+          test: true,
+          source: 'developer_portal'
         },
         timestamp: new Date().toISOString()
       };
 
       const startTime = Date.now();
       
-      // Generate signature for authentication
-      const encoder = new TextEncoder();
-      const keyData = encoder.encode(webhook.webhook_secret);
-      const messageData = encoder.encode(JSON.stringify(testPayload));
-      
-      const cryptoKey = await crypto.subtle.importKey(
-        'raw',
-        keyData,
-        { name: 'HMAC', hash: 'SHA-256' },
-        false,
-        ['sign']
-      );
-      
-      const signature = await crypto.subtle.sign('HMAC', cryptoKey, messageData);
-      const hashArray = Array.from(new Uint8Array(signature));
-      const webhookSignature = 'sha256=' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-      console.log('Testing webhook:', webhook.webhook_url);
-      console.log('Payload:', testPayload);
-      console.log('Signature:', webhookSignature);
-
+      // Use the webhook URL directly - it should be the full Supabase function URL
       const response = await fetch(webhook.webhook_url, {
         method: 'POST',
-        mode: 'cors',
         headers: {
           'Content-Type': 'application/json',
           'X-Webhook-Event': 'test_webhook',
           'X-Webhook-Timestamp': testPayload.timestamp,
-          'X-Webhook-Signature': webhookSignature
+          // Don't include signature for test - let the webhook handle it
         },
         body: JSON.stringify(testPayload)
       });
@@ -283,6 +267,13 @@ const WebhookManagementTab = () => {
         responseBody = 'Failed to read response body';
       }
 
+      console.log('Webhook test response:', {
+        status: response.status,
+        statusText: response.statusText,
+        responseTime,
+        body: responseBody
+      });
+
       const result: WebhookTestResult = {
         success: response.ok,
         status_code: response.status,
@@ -293,14 +284,22 @@ const WebhookManagementTab = () => {
       if (!response.ok) {
         result.error = `HTTP ${response.status}: ${response.statusText}`;
         if (responseBody) {
-          result.error += ` - ${responseBody}`;
+          try {
+            const jsonBody = JSON.parse(responseBody);
+            if (jsonBody.error) {
+              result.error = jsonBody.error;
+            }
+          } catch (e) {
+            // Response body is not JSON, use as-is
+            result.error += ` - ${responseBody}`;
+          }
         }
       }
 
       setTestResults(prev => ({ ...prev, [webhook.id]: result }));
       
       if (result.success) {
-        toast.success(`Webhook test successful (${responseTime}ms)`);
+        toast.success(`Webhook test successful! (${responseTime}ms)`);
       } else {
         toast.error(`Webhook test failed: ${result.error}`);
       }
@@ -310,7 +309,9 @@ const WebhookManagementTab = () => {
       const result: WebhookTestResult = {
         success: false,
         response_time: 0,
-        error: error.message || 'Network error - Check CORS settings and URL accessibility'
+        error: error.message === 'Failed to fetch' 
+          ? 'Network error - Unable to reach webhook endpoint. This could be due to CORS restrictions or the service being offline.'
+          : error.message || 'Unknown error occurred during webhook test'
       };
       
       setTestResults(prev => ({ ...prev, [webhook.id]: result }));
@@ -503,6 +504,23 @@ const WebhookManagementTab = () => {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Webhook Testing Info */}
+      <Card className="bg-blue-50 border-blue-200 rounded-2xl">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-medium text-blue-900 mb-1">About Webhook Testing</p>
+              <p className="text-blue-700">
+                The webhook test sends a test payload to your automation's webhook endpoint. 
+                If the test fails with a network error, it might be due to browser CORS restrictions. 
+                Your actual webhook will work fine when called from external services.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -698,6 +716,14 @@ const WebhookManagementTab = () => {
                               <p className="text-xs text-red-600 bg-red-50 p-2 rounded border">
                                 {testResults[webhook.id].error}
                               </p>
+                            )}
+                            {testResults[webhook.id].success && testResults[webhook.id].response_body && (
+                              <div className="text-xs text-green-600 bg-green-50 p-2 rounded border mt-2">
+                                <p className="font-medium mb-1">Response:</p>
+                                <pre className="whitespace-pre-wrap break-words">
+                                  {testResults[webhook.id].response_body}
+                                </pre>
+                              </div>
                             )}
                           </div>
                         )}

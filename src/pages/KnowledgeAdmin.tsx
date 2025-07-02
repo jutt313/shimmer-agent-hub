@@ -1,746 +1,414 @@
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/components/ui/use-toast";
-import { Trash2, Edit, Search, Plus, Database, Brain, Lock, Settings, FileJson, Wrench } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/components/ui/use-toast";
+import { 
+  Database, 
+  Plus, 
+  Search, 
+  Filter, 
+  Download, 
+  Upload,
+  Brain,
+  Zap,
+  CheckCircle,
+  AlertCircle,
+  TrendingUp
+} from "lucide-react";
 import KnowledgeChat from "@/components/KnowledgeChat";
-import PlatformCredentialManager from "@/components/PlatformCredentialManager";
 import JsonDataImporter from "@/components/JsonDataImporter";
+import PlatformCredentialManager from "@/components/PlatformCredentialManager";
+import { supabase } from "@/integrations/supabase/client";
 
 interface KnowledgeEntry {
   id: string;
   category: string;
   title: string;
   summary: string;
-  details: any;
-  tags: string[];
-  priority: number;
-  usage_count: number;
-  created_at: string;
-  updated_at: string;
   platform_name?: string;
   credential_fields?: any[];
   platform_description?: string;
   use_cases?: string[];
+  details: any;
+  tags: string[];
+  priority: number;
+  usage_count: number;
+  last_used: string | null;
+  created_at: string;
+  updated_at: string;
+  source_type: string;
+}
+
+interface KnowledgeStats {
+  total_entries: number;
+  platform_entries: number;
+  categories: { [key: string]: number };
+  recent_usage: number;
+  top_platforms: Array<{ name: string; count: number }>;
 }
 
 const KnowledgeAdmin = () => {
-  // Authentication state
-  const [currentPasswordStep, setCurrentPasswordStep] = useState(1);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [enteredPasswords, setEnteredPasswords] = useState<string[]>([]);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [attemptCount, setAttemptCount] = useState(0);
-  const [isBlocked, setIsBlocked] = useState(false);
-  const [blockEndTime, setBlockEndTime] = useState<Date | null>(null);
-
-  // Main application state
+  const { user } = useAuth();
+  const { toast } = useToast();
+  
   const [knowledge, setKnowledge] = useState<KnowledgeEntry[]>([]);
+  const [stats, setStats] = useState<KnowledgeStats>({
+    total_entries: 0,
+    platform_entries: 0,
+    categories: {},
+    recent_usage: 0,
+    top_platforms: []
+  });
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [isLoading, setIsLoading] = useState(false);
-  const [editingEntry, setEditingEntry] = useState<KnowledgeEntry | null>(null);
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [showPlatformManager, setShowPlatformManager] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const { toast } = useToast();
-
-  // Security configuration
-  const REQUIRED_PASSWORDS = [
-    "Yasmin7223",
-    "26052007", 
-    "14011977",
-    "19052005",
-    "313"
-  ];
-
-  const categories = [
-    'platform_knowledge',
-    'credential_knowledge', 
-    'workflow_patterns',
-    'agent_recommendations',
-    'error_solutions',
-    'automation_patterns',
-    'conversation_insights',
-    'summary_templates'
-  ];
-
-  const [newEntry, setNewEntry] = useState({
-    category: 'platform_knowledge',
-    title: '',
-    summary: '',
-    details: '{}',
-    tags: '',
-    priority: 1
-  });
-
-  // Check if currently blocked
-  useEffect(() => {
-    const storedBlockTime = localStorage.getItem('universalAdminBlockEnd');
-    const storedAttempts = localStorage.getItem('universalAdminAttempts');
-    
-    if (storedBlockTime) {
-      const blockEnd = new Date(storedBlockTime);
-      if (new Date() < blockEnd) {
-        setIsBlocked(true);
-        setBlockEndTime(blockEnd);
-      } else {
-        localStorage.removeItem('universalAdminBlockEnd');
-        localStorage.removeItem('universalAdminAttempts');
-      }
-    }
-    
-    if (storedAttempts) {
-      setAttemptCount(parseInt(storedAttempts));
-    }
-  }, []);
-
-  // Timer for block countdown
-  useEffect(() => {
-    if (isBlocked && blockEndTime) {
-      const timer = setInterval(() => {
-        if (new Date() >= blockEndTime) {
-          setIsBlocked(false);
-          setBlockEndTime(null);
-          setAttemptCount(0);
-          setCurrentPasswordStep(1);
-          setEnteredPasswords([]);
-          localStorage.removeItem('universalAdminBlockEnd');
-          localStorage.removeItem('universalAdminAttempts');
-        }
-      }, 1000);
-      
-      return () => clearInterval(timer);
-    }
-  }, [isBlocked, blockEndTime]);
-
-  const handlePasswordSubmit = () => {
-    if (isBlocked) {
-      toast({
-        title: "Access Blocked",
-        description: "Too many failed attempts. Please wait.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const expectedPassword = REQUIRED_PASSWORDS[currentPasswordStep - 1];
-    
-    if (currentPassword === expectedPassword) {
-      const newEnteredPasswords = [...enteredPasswords, currentPassword];
-      setEnteredPasswords(newEnteredPasswords);
-      setCurrentPassword("");
-      
-      if (currentPasswordStep === 5) {
-        // All passwords correct
-        setIsAuthenticated(true);
-        setAttemptCount(0);
-        localStorage.removeItem('universalAdminAttempts');
-        localStorage.removeItem('universalAdminBlockEnd');
-        toast({
-          title: "Access Granted",
-          description: "Welcome to Universal Memory System",
-        });
-      } else {
-        setCurrentPasswordStep(currentPasswordStep + 1);
-      }
-    } else {
-      // Wrong password - reset and increment attempts
-      const newAttemptCount = attemptCount + 1;
-      setAttemptCount(newAttemptCount);
-      setCurrentPasswordStep(1);
-      setEnteredPasswords([]);
-      setCurrentPassword("");
-      localStorage.setItem('universalAdminAttempts', newAttemptCount.toString());
-      
-      if (newAttemptCount >= 3) {
-        const blockEnd = new Date(Date.now() + 12 * 60 * 60 * 1000); // 12 hours
-        setIsBlocked(true);
-        setBlockEndTime(blockEnd);
-        localStorage.setItem('universalAdminBlockEnd', blockEnd.toISOString());
-        toast({
-          title: "Access Blocked",
-          description: "Too many failed attempts. Access blocked for 12 hours.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Access Denied",
-          description: `Invalid password. ${3 - newAttemptCount} attempts remaining.`,
-          variant: "destructive",
-        });
-      }
-    }
-  };
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchKnowledge();
-    }
-  }, [isAuthenticated]);
-
+  // Enhanced knowledge fetching with comprehensive stats
   const fetchKnowledge = async () => {
-    setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      console.log('🔄 Fetching comprehensive knowledge data...');
+      setLoading(true);
+
+      // Fetch all knowledge entries
+      const { data: knowledgeData, error: knowledgeError } = await supabase
         .from('universal_knowledge_store')
         .select('*')
-        .order('priority', { ascending: false })
-        .order('usage_count', { ascending: false });
+        .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setKnowledge(data || []);
-    } catch (error) {
-      console.error('Error fetching knowledge:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch knowledge entries",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleAddEntry = async () => {
-    try {
-      let parsedDetails;
-      try {
-        parsedDetails = JSON.parse(newEntry.details);
-      } catch {
-        parsedDetails = { raw: newEntry.details };
+      if (knowledgeError) {
+        console.error('❌ Error fetching knowledge:', knowledgeError);
+        throw knowledgeError;
       }
 
-      const { error } = await supabase
-        .from('universal_knowledge_store')
-        .insert({
-          category: newEntry.category,
-          title: newEntry.title,
-          summary: newEntry.summary,
-          details: parsedDetails,
-          tags: newEntry.tags.split(',').map(tag => tag.trim()).filter(Boolean),
-          priority: newEntry.priority,
-          source_type: 'admin'
+      console.log(`✅ Fetched ${knowledgeData?.length || 0} knowledge entries`);
+      setKnowledge(knowledgeData || []);
+
+      // Calculate comprehensive stats
+      if (knowledgeData && knowledgeData.length > 0) {
+        const platformEntries = knowledgeData.filter(entry => entry.category === 'platform_knowledge');
+        
+        // Category distribution
+        const categoryCount: { [key: string]: number } = {};
+        knowledgeData.forEach(entry => {
+          categoryCount[entry.category] = (categoryCount[entry.category] || 0) + 1;
         });
 
-      if (error) throw error;
+        // Recent usage (last 7 days)
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const recentUsage = knowledgeData.filter(entry => 
+          entry.last_used && new Date(entry.last_used) > sevenDaysAgo
+        ).length;
 
-      toast({
-        title: "Success",
-        description: "Knowledge entry added successfully",
-      });
+        // Top platforms by usage
+        const platformUsage: { [key: string]: number } = {};
+        platformEntries.forEach(entry => {
+          if (entry.platform_name) {
+            platformUsage[entry.platform_name] = (platformUsage[entry.platform_name] || 0) + (entry.usage_count || 0);
+          }
+        });
 
-      setNewEntry({
-        category: 'platform_knowledge',
-        title: '',
-        summary: '',
-        details: '{}',
-        tags: '',
-        priority: 1
-      });
-      setShowAddDialog(false);
-      fetchKnowledge();
+        const topPlatforms = Object.entries(platformUsage)
+          .sort(([,a], [,b]) => b - a)
+          .slice(0, 10)
+          .map(([name, count]) => ({ name, count }));
+
+        const calculatedStats: KnowledgeStats = {
+          total_entries: knowledgeData.length,
+          platform_entries: platformEntries.length,
+          categories: categoryCount,
+          recent_usage: recentUsage,
+          top_platforms: topPlatforms
+        };
+
+        console.log('📊 Calculated knowledge stats:', calculatedStats);
+        setStats(calculatedStats);
+      }
+
     } catch (error) {
-      console.error('Error adding entry:', error);
+      console.error('💥 Error in fetchKnowledge:', error);
       toast({
         title: "Error",
-        description: "Failed to add knowledge entry",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDeleteEntry = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('universal_knowledge_store')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Knowledge entry deleted successfully",
-      });
-      fetchKnowledge();
-    } catch (error) {
-      console.error('Error deleting entry:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete knowledge entry",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleSeedInitialData = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('seed-knowledge-store');
-      
-      if (error) throw error;
-      
-      toast({
-        title: "Success",
-        description: "Initial knowledge data seeded successfully",
-      });
-      fetchKnowledge();
-    } catch (error) {
-      console.error('Error seeding data:', error);
-      toast({
-        title: "Error", 
-        description: "Failed to seed initial data",
+        description: "Failed to fetch knowledge data",
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleSavePlatformData = async (platformData: any) => {
-    try {
-      const { error } = await supabase
-        .from('universal_knowledge_store')
-        .insert({
-          category: 'platform_knowledge',
-          title: `${platformData.platform_name} Integration`,
-          summary: platformData.summary,
-          platform_name: platformData.platform_name,
-          credential_fields: platformData.credential_fields,
-          platform_description: platformData.platform_description,
-          use_cases: platformData.use_cases,
-          details: {
-            credential_count: platformData.credential_fields.length,
-            integration_type: 'API',
-            last_updated: new Date().toISOString()
-          },
-          tags: [platformData.platform_name.toLowerCase().replace(/\s+/g, '-'), 'platform', 'integration'],
-          priority: 5,
-          source_type: 'admin'
-        });
+  // CRITICAL FIX: Auto-refresh after import
+  const handleKnowledgeUpdate = async () => {
+    console.log('🔄 Knowledge updated, refreshing data...');
+    setRefreshKey(prev => prev + 1);
+    await fetchKnowledge();
+    toast({
+      title: "Knowledge Updated",
+      description: "Knowledge base has been refreshed with new data",
+    });
+  };
 
-      if (error) throw error;
+  // CRITICAL FIX: Auto-refresh after JSON import
+  const handleJsonImportSuccess = async (importedCount: number) => {
+    console.log(`🎉 Successfully imported ${importedCount} entries, refreshing UI...`);
+    await fetchKnowledge(); // Immediately refresh the data
+    toast({
+      title: "Import Successful",
+      description: `Successfully imported ${importedCount} platform entries. UI updated!`,
+    });
+  };
 
-      toast({
-        title: "Success",
-        description: `${platformData.platform_name} platform data saved successfully`,
-      });
-      
-      setShowPlatformManager(false);
+  useEffect(() => {
+    if (user) {
       fetchKnowledge();
-    } catch (error) {
-      console.error('Error saving platform data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save platform data",
-        variant: "destructive",
-      });
     }
-  };
+  }, [user, refreshKey]);
 
-  const handleImportJsonData = async (jsonData: any[]) => {
-    try {
-      const insertPromises = jsonData.map(platformData => 
-        supabase
-          .from('universal_knowledge_store')
-          .insert({
-            category: 'platform_knowledge',
-            title: `${platformData.platform_name} Integration`,
-            summary: platformData.summary,
-            platform_name: platformData.platform_name,
-            credential_fields: platformData.credential_fields,
-            platform_description: platformData.platform_description,
-            use_cases: platformData.use_cases,
-            details: {
-              credential_count: platformData.credential_fields?.length || 0,
-              integration_type: 'API',
-              imported_at: new Date().toISOString()
-            },
-            tags: [platformData.platform_name.toLowerCase().replace(/\s+/g, '-'), 'platform', 'integration'],
-            priority: 5,
-            source_type: 'import'
-          })
-      );
-
-      await Promise.all(insertPromises);
-      
-      toast({
-        title: "Import Successful",
-        description: `Imported ${jsonData.length} platform entries`,
-      });
-      
-      fetchKnowledge();
-    } catch (error) {
-      console.error('Error importing data:', error);
-      toast({
-        title: "Import Failed",
-        description: "Failed to import platform data",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleExportJsonData = () => {
-    return knowledge
-      .filter(entry => entry.platform_name)
-      .map(entry => ({
-        platform_name: entry.platform_name,
-        summary: entry.summary,
-        platform_description: entry.platform_description,
-        credential_fields: entry.credential_fields || [],
-        use_cases: entry.use_cases || []
-      }));
-  };
-
+  // Filter knowledge based on search and category
   const filteredKnowledge = knowledge.filter(entry => {
-    const matchesSearch = searchTerm === "" || 
-      entry.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      entry.summary?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      entry.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesSearch = entry.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         entry.summary?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         entry.platform_name?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesCategory = selectedCategory === "all" || entry.category === selectedCategory;
     
     return matchesSearch && matchesCategory;
   });
 
-  const getTimeRemaining = () => {
-    if (!blockEndTime) return "";
-    const now = new Date();
-    const diff = blockEndTime.getTime() - now.getTime();
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    return `${hours}h ${minutes}m`;
-  };
-
-  if (isBlocked) {
+  if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-100 via-red-50 to-orange-100 flex items-center justify-center p-6">
-        <Card className="w-full max-w-md border-red-200 rounded-3xl shadow-2xl">
-          <CardHeader className="text-center">
-            <Lock className="h-16 w-16 text-red-600 mx-auto mb-4" />
-            <CardTitle className="text-3xl text-red-700 font-bold">System Locked</CardTitle>
-          </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-gray-700 mb-6 text-lg">
-              Security protocols activated. Access temporarily restricted.
-            </p>
-            <div className="bg-red-50 p-4 rounded-2xl border border-red-200">
-              <p className="text-xl font-bold text-red-700 mb-2">
-                Time Remaining: {getTimeRemaining()}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-50 to-pink-100 flex items-center justify-center p-6">
-        <Card className="w-full max-w-lg border-gray-200 rounded-3xl shadow-2xl bg-white/80 backdrop-blur-sm">
-          <CardHeader className="text-center">
-            <Lock className="h-16 w-16 text-gray-700 mx-auto mb-4" />
-            <CardTitle className="text-3xl text-gray-800 font-bold">Secure Access Required</CardTitle>
-            <p className="text-gray-600 mt-2">Step {currentPasswordStep} of 5</p>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <Input
-                type="password"
-                placeholder={`Enter Password ${currentPasswordStep}`}
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                className="border-gray-300 rounded-xl h-12 text-lg"
-                onKeyPress={(e) => e.key === 'Enter' && handlePasswordSubmit()}
-              />
-              <Button 
-                onClick={handlePasswordSubmit} 
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl h-12 text-lg font-semibold"
-              >
-                {currentPasswordStep === 5 ? 'Complete Authentication' : 'Next Step'}
-              </Button>
-            </div>
-            
-            {enteredPasswords.length > 0 && (
-              <div className="flex justify-center space-x-2 mt-4">
-                {[1, 2, 3, 4, 5].map((step) => (
-                  <div
-                    key={step}
-                    className={`w-3 h-3 rounded-full ${
-                      enteredPasswords.length >= step 
-                        ? 'bg-green-500' 
-                        : step === currentPasswordStep 
-                        ? 'bg-blue-500' 
-                        : 'bg-gray-300'
-                    }`}
-                  />
-                ))}
-              </div>
-            )}
-            
-            {attemptCount > 0 && (
-              <p className="text-sm text-red-600 text-center bg-red-50 p-3 rounded-xl">
-                {3 - attemptCount} attempts remaining
-              </p>
-            )}
-          </CardContent>
-        </Card>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-4">Please sign in to access Knowledge Admin</h2>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-100">
-      <div className="flex h-screen">
-        {/* Left Side - Knowledge Management (Larger) */}
-        <div className="flex-1 flex flex-col">
-          <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-purple-50">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <Brain className="h-10 w-10 text-indigo-600" />
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                  Universal Memory System
-                </h1>
-              </div>
-              
-              <div className="flex gap-4">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="border-gray-300 rounded-xl">
-                      <Settings className="h-4 w-4 mr-2" />
-                      Tools
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="bg-white border border-gray-200 rounded-xl shadow-lg z-50">
-                    <DropdownMenuItem onClick={handleSeedInitialData} disabled={isLoading}>
-                      <Database className="h-4 w-4 mr-2" />
-                      Seed Data
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                
-                <Button 
-                  onClick={() => setShowPlatformManager(true)}
-                  variant="outline" 
-                  className="border-indigo-300 text-indigo-600 hover:bg-indigo-50 rounded-xl"
-                >
-                  <Wrench className="h-4 w-4 mr-2" />
-                  Platform Manager
-                </Button>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Enhanced Header with Real-time Stats */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-gradient-to-br from-purple-500 to-blue-600 rounded-2xl shadow-lg">
+              <Database className="h-8 w-8 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                Universal Knowledge Admin
+              </h1>
+              <p className="text-gray-600">
+                Manage your AI's comprehensive platform knowledge database
+              </p>
+            </div>
+          </div>
+          
+          {/* Real-time Stats Badges */}
+          <div className="flex items-center gap-3">
+            <Badge variant="outline" className="text-green-700 border-green-200 bg-green-50 px-3 py-1">
+              <CheckCircle className="h-4 w-4 mr-1" />
+              {stats.total_entries} Total Entries
+            </Badge>
+            <Badge variant="outline" className="text-blue-700 border-blue-200 bg-blue-50 px-3 py-1">
+              <Zap className="h-4 w-4 mr-1" />
+              {stats.platform_entries} Platforms
+            </Badge>
+            <Badge variant="outline" className="text-purple-700 border-purple-200 bg-purple-50 px-3 py-1">
+              <TrendingUp className="h-4 w-4 mr-1" />
+              {stats.recent_usage} Recent Usage
+            </Badge>
+          </div>
+        </div>
 
-                <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 rounded-xl">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Knowledge
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl rounded-2xl">
-                    <DialogHeader>
-                      <DialogTitle>Add New Knowledge Entry</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <Select value={newEntry.category} onValueChange={(value) => setNewEntry({...newEntry, category: value})}>
-                        <SelectTrigger className="border-gray-300 rounded-xl">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white border border-gray-200 rounded-xl shadow-lg z-50">
-                          {categories.map(cat => (
-                            <SelectItem key={cat} value={cat} className="hover:bg-blue-50">
-                              {cat.replace('_', ' ')}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        placeholder="Title"
-                        value={newEntry.title}
-                        onChange={(e) => setNewEntry({...newEntry, title: e.target.value})}
-                        className="border-gray-300 rounded-xl"
-                      />
-                      <Textarea
-                        placeholder="Summary"
-                        value={newEntry.summary}
-                        onChange={(e) => setNewEntry({...newEntry, summary: e.target.value})}
-                        className="border-gray-300 rounded-xl"
-                      />
-                      <Textarea
-                        placeholder="Details (JSON format)"
-                        value={newEntry.details}
-                        onChange={(e) => setNewEntry({...newEntry, details: e.target.value})}
-                        rows={6}
-                        className="border-gray-300 rounded-xl"
-                      />
-                      <Input
-                        placeholder="Tags (comma separated)"
-                        value={newEntry.tags}
-                        onChange={(e) => setNewEntry({...newEntry, tags: e.target.value})}
-                        className="border-gray-300 rounded-xl"
-                      />
-                      <Input
-                        type="number"
-                        placeholder="Priority (1-10)"
-                        value={newEntry.priority}
-                        onChange={(e) => setNewEntry({...newEntry, priority: parseInt(e.target.value) || 1})}
-                        className="border-gray-300 rounded-xl"
-                      />
-                      <Button onClick={handleAddEntry} className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 rounded-xl">
-                        Add Entry
-                      </Button>
+        {/* Main Content Tabs */}
+        <Tabs defaultValue="dashboard" className="w-full">
+          <TabsList className="grid w-full grid-cols-5 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200/50">
+            <TabsTrigger value="dashboard" className="rounded-xl">
+              <Database className="h-4 w-4 mr-2" />
+              Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="chat" className="rounded-xl">
+              <Brain className="h-4 w-4 mr-2" />
+              AI Assistant
+            </TabsTrigger>
+            <TabsTrigger value="import" className="rounded-xl">
+              <Upload className="h-4 w-4 mr-2" />
+              JSON Import
+            </TabsTrigger>
+            <TabsTrigger value="platforms" className="rounded-xl">
+              <Zap className="h-4 w-4 mr-2" />
+              Platform Manager
+            </TabsTrigger>
+            <TabsTrigger value="browse" className="rounded-xl">
+              <Search className="h-4 w-4 mr-2" />
+              Browse Knowledge
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Dashboard Tab */}
+          <TabsContent value="dashboard" className="mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              {/* Enhanced Stats Cards */}
+              <Card className="rounded-2xl border-0 shadow-lg bg-gradient-to-br from-green-50 to-emerald-50">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-green-700">Total Knowledge</p>
+                      <p className="text-3xl font-bold text-green-900">{stats.total_entries}</p>
                     </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
+                    <Database className="h-8 w-8 text-green-600" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl border-0 shadow-lg bg-gradient-to-br from-blue-50 to-cyan-50">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-blue-700">Platform Integrations</p>
+                      <p className="text-3xl font-bold text-blue-900">{stats.platform_entries}</p>
+                    </div>
+                    <Zap className="h-8 w-8 text-blue-600" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl border-0 shadow-lg bg-gradient-to-br from-purple-50 to-violet-50">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-purple-700">Recent Usage</p>
+                      <p className="text-3xl font-bold text-purple-900">{stats.recent_usage}</p>
+                    </div>
+                    <TrendingUp className="h-8 w-8 text-purple-600" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl border-0 shadow-lg bg-gradient-to-br from-orange-50 to-amber-50">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-orange-700">Categories</p>
+                      <p className="text-3xl font-bold text-orange-900">{Object.keys(stats.categories).length}</p>
+                    </div>
+                    <Filter className="h-8 w-8 text-orange-600" />
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
-            {/* Search and Filter Controls */}
-            <div className="flex gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search universal memory..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 border-gray-300 rounded-xl"
-                />
-              </div>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-48 border-gray-300 rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-white border border-gray-200 rounded-xl shadow-lg z-50">
-                  <SelectItem value="all" className="hover:bg-blue-50">All Categories</SelectItem>
-                  {categories.map(cat => (
-                    <SelectItem key={cat} value={cat} className="hover:bg-blue-50">
-                      {cat.replace('_', ' ')}
-                    </SelectItem>
+            {/* Top Platforms */}
+            <Card className="rounded-2xl shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  Top Platforms by Usage
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                  {stats.top_platforms.slice(0, 10).map((platform, index) => (
+                    <div key={platform.name} className="p-3 bg-gray-50 rounded-lg">
+                      <div className="text-sm font-medium text-gray-900">{platform.name}</div>
+                      <div className="text-xs text-gray-600">{platform.count} uses</div>
+                    </div>
                   ))}
-                </SelectContent>
-              </Select>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* AI Assistant Tab */}
+          <TabsContent value="chat" className="mt-6">
+            <div className="h-[600px]">
+              <KnowledgeChat onKnowledgeUpdate={handleKnowledgeUpdate} />
             </div>
-          </div>
+          </TabsContent>
 
-          {/* Platform Manager Dialog */}
-          <Dialog open={showPlatformManager} onOpenChange={setShowPlatformManager}>
-            <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto rounded-2xl">
-              <DialogHeader>
-                <DialogTitle>Platform Credential Manager</DialogTitle>
-              </DialogHeader>
-              <Tabs defaultValue="manager" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="manager">Platform Manager</TabsTrigger>
-                  <TabsTrigger value="import">JSON Import/Export</TabsTrigger>
-                </TabsList>
-                <TabsContent value="manager">
-                  <PlatformCredentialManager onSave={handleSavePlatformData} />
-                </TabsContent>
-                <TabsContent value="import">
-                  <JsonDataImporter 
-                    onImport={handleImportJsonData}
-                    onExport={handleExportJsonData}
-                  />
-                </TabsContent>
-              </Tabs>
-            </DialogContent>
-          </Dialog>
+          {/* JSON Import Tab with Auto-refresh */}
+          <TabsContent value="import" className="mt-6">
+            <JsonDataImporter onImportSuccess={handleJsonImportSuccess} />
+          </TabsContent>
 
-          {/* Knowledge Entries Grid */}
-          <div className="flex-1 overflow-y-auto p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              {filteredKnowledge.map((entry) => (
-                <Card key={entry.id} className="hover:shadow-xl transition-all duration-300 border-gray-200 rounded-2xl bg-white/70 backdrop-blur-sm hover:bg-white/90">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <Badge variant="outline" className="mb-3 border-indigo-300 text-indigo-700 bg-indigo-50 rounded-lg">
-                          {entry.category.replace('_', ' ')}
-                        </Badge>
-                        <CardTitle className="text-lg text-gray-800">{entry.title}</CardTitle>
-                        {entry.platform_name && (
-                          <Badge variant="secondary" className="mt-2 bg-green-100 text-green-700">
-                            {entry.platform_name}
-                          </Badge>
-                        )}
+          {/* Platform Manager Tab */}
+          <TabsContent value="platforms" className="mt-6">
+            <PlatformCredentialManager />
+          </TabsContent>
+
+          {/* Browse Knowledge Tab */}
+          <TabsContent value="browse" className="mt-6">
+            <Card className="rounded-2xl shadow-lg">
+              <CardHeader>
+                <CardTitle>Browse Knowledge Entries</CardTitle>
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      placeholder="Search knowledge..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-lg"
+                    />
+                  </div>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="px-3 py-2 border rounded-lg"
+                  >
+                    <option value="all">All Categories</option>
+                    {Object.keys(stats.categories).map(category => (
+                      <option key={category} value={category}>
+                        {category} ({stats.categories[category]})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="text-gray-500">Loading knowledge entries...</div>
+                  </div>
+                ) : (
+                  <div className="space-y-4 max-h-96 overflow-y-auto">
+                    {filteredKnowledge.map((entry) => (
+                      <div key={entry.id} className="p-4 border rounded-lg">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-gray-900">{entry.title}</h3>
+                            {entry.platform_name && (
+                              <p className="text-sm text-blue-600 font-medium">Platform: {entry.platform_name}</p>
+                            )}
+                            <p className="text-sm text-gray-600 mt-1">{entry.summary}</p>
+                            <div className="flex gap-2 mt-2">
+                              <Badge variant="outline">{entry.category}</Badge>
+                              <Badge variant="outline">Used {entry.usage_count} times</Badge>
+                              {entry.credential_fields && (
+                                <Badge variant="outline">{entry.credential_fields.length} credentials</Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="ghost" onClick={() => setEditingEntry(entry)} className="rounded-lg">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => handleDeleteEntry(entry.id)} className="rounded-lg text-red-600 hover:text-red-700">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-gray-600 mb-3">{entry.summary}</p>
-                    
-                    {/* Show credential fields count for platform entries */}
-                    {entry.credential_fields && entry.credential_fields.length > 0 && (
-                      <div className="mb-3">
-                        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700">
-                          {entry.credential_fields.length} credential fields
-                        </Badge>
+                    ))}
+                    {filteredKnowledge.length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        No knowledge entries found matching your criteria.
                       </div>
                     )}
-
-                    {/* Show use cases */}
-                    {entry.use_cases && entry.use_cases.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {entry.use_cases.slice(0, 3).map((useCase, index) => (
-                          <Badge key={index} variant="secondary" className="text-xs bg-purple-50 text-purple-700 rounded-lg">
-                            {useCase}
-                          </Badge>
-                        ))}
-                        {entry.use_cases.length > 3 && (
-                          <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600 rounded-lg">
-                            +{entry.use_cases.length - 3}
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {entry.tags.map((tag, index) => (
-                        <Badge key={index} variant="secondary" className="text-xs bg-gray-100 text-gray-700 rounded-lg">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-500">
-                      <span>Priority: {entry.priority}</span>
-                      <span>Used: {entry.usage_count} times</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {filteredKnowledge.length === 0 && (
-              <div className="text-center py-12">
-                <Brain className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-medium text-gray-600 mb-2">No Knowledge Entries Found</h3>
-                <p className="text-gray-500">Add some knowledge entries to get started.</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right Side - AI Chat (Smaller) */}
-        <div className="w-96 border-l border-gray-200 bg-white/60 backdrop-blur-sm">
-          <KnowledgeChat onKnowledgeUpdate={fetchKnowledge} />
-        </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

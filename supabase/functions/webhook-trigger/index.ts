@@ -4,7 +4,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-webhook-signature',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-webhook-signature, x-webhook-event, x-webhook-timestamp',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 }
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
@@ -68,30 +69,46 @@ serve(async (req) => {
       )
     }
 
+    // Get request body first (we need it for both signature validation and execution)
+    let requestBody = '';
+    let payload = {};
+    
+    try {
+      if (req.method === 'POST') {
+        requestBody = await req.text();
+        payload = requestBody ? JSON.parse(requestBody) : {};
+      }
+    } catch (parseError) {
+      console.error('[Webhook Trigger] Failed to parse request body:', parseError);
+      payload = { raw_body: requestBody };
+    }
+
     // Validate webhook signature if provided
     const signature = req.headers.get('x-webhook-signature')
-    if (signature) {
-      const body = await req.text()
-      const expectedSignature = await generateSignature(body, webhook.webhook_secret)
+    if (signature && webhook.webhook_secret) {
+      const expectedSignature = await generateSignature(requestBody, webhook.webhook_secret)
       
       if (signature !== expectedSignature) {
+        console.log('[Webhook Trigger] Invalid signature. Expected:', expectedSignature, 'Got:', signature);
+        
+        // Still log the failed delivery attempt
+        await supabase
+          .from('webhook_delivery_logs')
+          .insert({
+            automation_webhook_id: webhook.id,
+            automation_run_id: null,
+            payload: payload,
+            status_code: 401,
+            response_body: JSON.stringify({ error: 'Invalid webhook signature' }),
+            delivered_at: null,
+            delivery_attempts: 1
+          });
+          
         return new Response(
           JSON.stringify({ error: 'Invalid webhook signature' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
-    }
-
-    // Get request body for execution
-    let payload = {}
-    try {
-      if (req.method === 'POST') {
-        const body = await req.text()
-        payload = body ? JSON.parse(body) : {}
-      }
-    } catch (parseError) {
-      console.error('[Webhook Trigger] Failed to parse request body:', parseError)
-      payload = { raw_body: await req.text() }
     }
 
     console.log(`[Webhook Trigger] Processing webhook for automation: ${webhook.automations.title}`)
@@ -163,8 +180,8 @@ serve(async (req) => {
       })
       .eq('id', webhook.id)
 
-    // Log webhook delivery with proper automation run reference
-    await supabase
+    // Log successful webhook delivery
+    const { error: deliveryLogError } = await supabase
       .from('webhook_delivery_logs')
       .insert({
         automation_webhook_id: webhook.id,
@@ -174,7 +191,11 @@ serve(async (req) => {
         response_body: JSON.stringify(executionResult),
         delivered_at: new Date().toISOString(),
         delivery_attempts: 1
-      })
+      });
+      
+    if (deliveryLogError) {
+      console.error('[Webhook Trigger] Failed to log delivery:', deliveryLogError);
+    }
 
     // Send success response
     const responseData = {
@@ -201,6 +222,24 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Webhook trigger error:', error)
+    
+    // Log failed delivery attempt
+    try {
+      await supabase
+        .from('webhook_delivery_logs')
+        .insert({
+          automation_webhook_id: webhookId || 'unknown',
+          automation_run_id: null,
+          payload: { error: 'Failed to process webhook' },
+          status_code: 500,
+          response_body: JSON.stringify({ error: 'Internal server error', details: error.message }),
+          delivered_at: null,
+          delivery_attempts: 1
+        });
+    } catch (logError) {
+      console.error('[Webhook Trigger] Failed to log error delivery:', logError);
+    }
+    
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

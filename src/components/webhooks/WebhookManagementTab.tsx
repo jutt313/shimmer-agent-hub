@@ -233,24 +233,55 @@ const WebhookManagementTab = () => {
         data: {
           message: 'Test webhook from YusrAI',
           timestamp: new Date().toISOString(),
-          automation_id: webhook.automation_id
+          automation_id: webhook.automation_id,
+          test: true
         },
         timestamp: new Date().toISOString()
       };
 
       const startTime = Date.now();
+      
+      // Generate signature for authentication
+      const encoder = new TextEncoder();
+      const keyData = encoder.encode(webhook.webhook_secret);
+      const messageData = encoder.encode(JSON.stringify(testPayload));
+      
+      const cryptoKey = await crypto.subtle.importKey(
+        'raw',
+        keyData,
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      );
+      
+      const signature = await crypto.subtle.sign('HMAC', cryptoKey, messageData);
+      const hashArray = Array.from(new Uint8Array(signature));
+      const webhookSignature = 'sha256=' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+      console.log('Testing webhook:', webhook.webhook_url);
+      console.log('Payload:', testPayload);
+      console.log('Signature:', webhookSignature);
+
       const response = await fetch(webhook.webhook_url, {
         method: 'POST',
+        mode: 'cors',
         headers: {
           'Content-Type': 'application/json',
           'X-Webhook-Event': 'test_webhook',
-          'X-Webhook-Timestamp': testPayload.timestamp
+          'X-Webhook-Timestamp': testPayload.timestamp,
+          'X-Webhook-Signature': webhookSignature
         },
         body: JSON.stringify(testPayload)
       });
 
       const responseTime = Date.now() - startTime;
-      const responseBody = await response.text();
+      let responseBody = '';
+      
+      try {
+        responseBody = await response.text();
+      } catch (e) {
+        responseBody = 'Failed to read response body';
+      }
 
       const result: WebhookTestResult = {
         success: response.ok,
@@ -261,6 +292,9 @@ const WebhookManagementTab = () => {
 
       if (!response.ok) {
         result.error = `HTTP ${response.status}: ${response.statusText}`;
+        if (responseBody) {
+          result.error += ` - ${responseBody}`;
+        }
       }
 
       setTestResults(prev => ({ ...prev, [webhook.id]: result }));
@@ -271,14 +305,16 @@ const WebhookManagementTab = () => {
         toast.error(`Webhook test failed: ${result.error}`);
       }
     } catch (error: any) {
+      console.error('Webhook test error:', error);
+      
       const result: WebhookTestResult = {
         success: false,
         response_time: 0,
-        error: error.message || 'Network error'
+        error: error.message || 'Network error - Check CORS settings and URL accessibility'
       };
       
       setTestResults(prev => ({ ...prev, [webhook.id]: result }));
-      toast.error(`Webhook test failed: ${error.message}`);
+      toast.error(`Webhook test failed: ${result.error}`);
     } finally {
       setTestingWebhook(null);
     }
@@ -312,8 +348,37 @@ const WebhookManagementTab = () => {
   const totalWebhooks = webhooks.length;
   const activeWebhooks = webhooks.filter(w => w.is_active).length;
   const totalCalls = webhooks.reduce((sum, w) => sum + w.trigger_count, 0);
-  const successfulCalls = webhooks.filter(w => testResults[w.id]?.success).length;
-  const successRate = totalCalls > 0 ? Math.round((successfulCalls / totalCalls) * 100) : 0;
+  
+  // Calculate success rate from actual delivery logs, not test results
+  const [webhookStats, setWebhookStats] = useState({ successRate: 0, totalDeliveries: 0 });
+  
+  useEffect(() => {
+    const calculateStats = async () => {
+      if (webhooks.length === 0) return;
+      
+      try {
+        const { data: deliveryLogs, error } = await supabase
+          .from('webhook_delivery_logs')
+          .select('status_code, automation_webhook_id')
+          .in('automation_webhook_id', webhooks.map(w => w.id));
+          
+        if (error) throw error;
+        
+        const totalDeliveries = deliveryLogs?.length || 0;
+        const successfulDeliveries = deliveryLogs?.filter(log => 
+          log.status_code && log.status_code >= 200 && log.status_code < 300
+        ).length || 0;
+        
+        const successRate = totalDeliveries > 0 ? Math.round((successfulDeliveries / totalDeliveries) * 100) : 0;
+        
+        setWebhookStats({ successRate, totalDeliveries });
+      } catch (error) {
+        console.error('Error calculating webhook stats:', error);
+      }
+    };
+    
+    calculateStats();
+  }, [webhooks]);
 
   if (loading) {
     return (
@@ -482,7 +547,7 @@ const WebhookManagementTab = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-orange-600 text-sm font-medium">Success Rate</p>
-                <p className="text-3xl font-bold text-orange-700">{successRate}%</p>
+                <p className="text-3xl font-bold text-orange-700">{webhookStats.successRate}%</p>
               </div>
               <CheckCircle className="h-8 w-8 text-orange-500" />
             </div>
@@ -565,33 +630,38 @@ const WebhookManagementTab = () => {
                             </div>
                           </div>
                           
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs font-medium text-gray-500">Secret:</Label>
-                            <div className="flex items-center gap-2 flex-1">
-                              <code className="text-xs bg-gray-100 px-2 py-1 rounded border font-mono flex-1">
-                                {showSecrets[webhook.id] 
-                                  ? webhook.webhook_secret 
-                                  : '•'.repeat(webhook.webhook_secret.length)
-                                }
-                              </code>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => toggleSecretVisibility(webhook.id)}
-                                className="h-7 w-7 p-0 rounded-lg"
-                              >
-                                {showSecrets[webhook.id] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => copyToClipboard(webhook.webhook_secret, 'Webhook Secret')}
-                                className="h-7 w-7 p-0 rounded-lg"
-                              >
-                                <Copy className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </div>
+                           <div className="flex items-center gap-2">
+                             <Label className="text-xs font-medium text-gray-500 flex items-center gap-1">
+                               Secret:
+                               <span className="text-gray-400 hover:text-gray-600 cursor-help" title="Used to verify webhook authenticity. Include as 'X-Webhook-Signature' header when sending requests.">
+                                 <AlertTriangle className="h-3 w-3" />
+                               </span>
+                             </Label>
+                             <div className="flex items-center gap-2 flex-1">
+                               <code className="text-xs bg-gray-100 px-2 py-1 rounded border font-mono flex-1">
+                                 {showSecrets[webhook.id] 
+                                   ? webhook.webhook_secret 
+                                   : '•'.repeat(webhook.webhook_secret.length)
+                                 }
+                               </code>
+                               <Button
+                                 size="sm"
+                                 variant="outline"
+                                 onClick={() => toggleSecretVisibility(webhook.id)}
+                                 className="h-7 w-7 p-0 rounded-lg"
+                               >
+                                 {showSecrets[webhook.id] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                               </Button>
+                               <Button
+                                 size="sm"
+                                 variant="outline"
+                                 onClick={() => copyToClipboard(webhook.webhook_secret, 'Webhook Secret')}
+                                 className="h-7 w-7 p-0 rounded-lg"
+                               >
+                                 <Copy className="h-3 w-3" />
+                               </Button>
+                             </div>
+                           </div>
                         </div>
                         
                         <div className="flex items-center gap-4 mt-4 text-sm text-gray-600">

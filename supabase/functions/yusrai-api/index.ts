@@ -114,7 +114,7 @@ serve(async (req) => {
 
     console.log(`[YusrAI API] Token validated successfully for user: ${tokenData.user_id}`)
 
-    // Update token usage with proper error handling
+    // Update token usage with proper error handling using raw SQL
     try {
       const { error: updateError } = await supabase
         .from('api_credentials')
@@ -126,6 +126,8 @@ serve(async (req) => {
 
       if (updateError) {
         console.error('[YusrAI API] Failed to update token usage:', updateError)
+      } else {
+        console.log(`[YusrAI API] Updated usage count for token: ${token.substring(0, 10)}...`)
       }
     } catch (updateErr) {
       console.error('[YusrAI API] Exception updating token usage:', updateErr)

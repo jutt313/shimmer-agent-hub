@@ -6,7 +6,8 @@ import ProjectsTab from "./ProjectsTab";
 import UsageTab from "./UsageTab";
 import BillingTab from "./BillingTab";
 import LimitsTab from "./LimitsTab";
-import { Key, FolderOpen, BarChart3, CreditCard, Shield } from "lucide-react";
+import { Key, FolderOpen, BarChart3, CreditCard, Shield, Webhook } from "lucide-react";
+import WebhookManagementTab from "@/components/webhooks/WebhookManagementTab";
 
 const DeveloperPortal = () => {
   const [activeTab, setActiveTab] = useState("api-keys");
@@ -19,7 +20,7 @@ const DeveloperPortal = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5 bg-white/50 rounded-2xl p-1">
+        <TabsList className="grid w-full grid-cols-6 bg-white/50 rounded-2xl p-1">
           <TabsTrigger 
             value="api-keys" 
             className="flex items-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm"
@@ -55,6 +56,13 @@ const DeveloperPortal = () => {
             <Shield className="w-4 h-4" />
             Limits
           </TabsTrigger>
+          <TabsTrigger 
+            value="webhooks" 
+            className="flex items-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm"
+          >
+            <Webhook className="w-4 h-4" />
+            Webhooks
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="api-keys" className="mt-6">
@@ -75,6 +83,10 @@ const DeveloperPortal = () => {
 
         <TabsContent value="limits" className="mt-6">
           <LimitsTab />
+        </TabsContent>
+
+        <TabsContent value="webhooks" className="mt-6">
+          <WebhookManagementTab />
         </TabsContent>
       </Tabs>
     </div>

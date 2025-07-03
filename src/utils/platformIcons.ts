@@ -1,4 +1,3 @@
-
 import { 
   Globe, 
   Mail, 
@@ -501,7 +500,6 @@ export const getStepTypeIcon = (stepType: string) => {
     'filter': { icon: Filter, color: '#6B7280' },
     'sort': { icon: ArrowUpDown, color: '#6B7280' },
     'validate': { icon: Shield, color: '#10B981' },
-    'test': { icon: Target, color: '#F59E0B' },
     'monitor': { icon: Activity, color: '#8B5CF6' },
     'log': { icon: FileText, color: '#6B7280' },
     'analytics': { icon: BarChart, color: '#8B5CF6' },
@@ -540,7 +538,7 @@ export const getStepTypeIcon = (stepType: string) => {
     'script': { icon: Terminal, color: '#6B7280' },
     'deploy': { icon: Upload, color: '#10B981' },
     'build': { icon: Package, color: '#F59E0B' },
-    'test': { icon: Target, color: '#F59E0B' },
+    'testing': { icon: Target, color: '#F59E0B' },
     'debug': { icon: AlertCircle, color: '#EF4444' },
     'version': { icon: Tag, color: '#6B7280' },
     'release': { icon: Upload, color: '#10B981' },

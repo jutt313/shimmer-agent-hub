@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -131,12 +132,12 @@ CRITICAL THINKING PROCESS - FOLLOW EXACTLY:
    - For each platform, list ALL necessary setup parameters:
      - Authentication credentials (e.g., API Key, OAuth Token).
      - Essential operational identifiers (e.g., Spreadsheet ID, Channel ID, Project ID, Database Name, List ID) that are needed for the platform to function in this specific automation context.
-   - Populate the `platforms` array with these details. If the supplementary database doesn't provide a specific field, infer the common type from your core knowledge.
+   - Populate the platforms array with these details. If the supplementary database doesn't provide a specific field, infer the common type from your core knowledge.
    - **Crucially: NEVER state "no specific credentials required" unless a platform truly has NO authentication or setup identifiers for the stated operation.**
 
 3. **DYNAMIC RUNTIME PARAMETER IDENTIFICATION & CLARIFICATION:**
    - For every action, identify ONLY truly *dynamic runtime parameters* (e.g., "assigned team member's email if dynamic", "message content variable") that are not known at setup and require user input per run or are derived from previous steps.
-   - For each such missing dynamic parameter, formulate a precise `clarification_question`. Ensure these questions are generic and do NOT mention specific platform names (e.g., ask about "messaging destination" instead of "Slack channel").
+   - For each such missing dynamic parameter, formulate a precise clarification question. Ensure these questions are generic and do NOT mention specific platform names (e.g., ask about "messaging destination" instead of "Slack channel").
 
 4. **PLATFORM SELECTION LOGIC:**
    - Prioritize platforms with comprehensive setup information and known capabilities (from both core knowledge and supplementary database).
@@ -152,11 +153,10 @@ MANDATORY JSON STRUCTURE - EXACTLY THIS FORMAT:
     "Step 2: [GRANULAR_ATOMIC_ACTION] e.g., 'Step 2: Extract task name and due date from row data'.",
     "Step 3: [GRANULAR_ATOMIC_ACTION] e.g., 'Step 3: Create new task in task management service'.",
     "Step 4: [GRANULAR_ATOMIC_ACTION] e.g., 'Step 4: Send message via communication service'."
-    // ... continue for all atomic steps
   ],
   "platforms": [
     {
-      "name": "Platform Name (e.g., Google Sheets, Asana, Slack)", // Use actual platform name here
+      "name": "Platform Name (e.g., Google Sheets, Asana, Slack)",
       "credentials": [
         {
           "field": "Authentication Token/ID (e.g., 'OAuth 2.0 Token', 'Personal Access Token', 'API Key')",
@@ -167,13 +167,11 @@ MANDATORY JSON STRUCTURE - EXACTLY THIS FORMAT:
         {
           "field": "Operational Identifier (e.g., 'Spreadsheet ID', 'Channel ID', 'Project ID')",
           "placeholder": "Enter identifier value (e.g., spreadsheet_id_123, channel_id_abc)",
-          "link": "link_to_find_identifier_if_known", // Optional, if applicable
+          "link": "link_to_find_identifier_if_known",
           "why_needed": "Required to specify the exact resource for the automation (e.g., 'to monitor this specific sheet', 'to send message to this channel')."
         }
-        // ... include ALL required authentication and operational identifiers for this platform
       ]
     }
-    // ... include ALL required platforms and their credential/setup details
   ],
   "platforms_to_remove": [],
   "agents": [
@@ -188,7 +186,6 @@ MANDATORY JSON STRUCTURE - EXACTLY THIS FORMAT:
   ],
   "clarification_questions": [
     "How should the system dynamically determine the 'assigned team member' for the notification (e.g., a specific name, an ID from the extracted data, or a default)?"
-    // Removed questions about Spreadsheet ID, Channel ID, etc., as they are now expected in 'platforms' credentials
   ],
   "automation_blueprint": {
     "version": "1.0.0",
@@ -218,7 +215,6 @@ MANDATORY JSON STRUCTURE - EXACTLY THIS FORMAT:
           "platform_credential_id": "credential_reference"
         }
       }
-      // ... more granular steps
     ],
     "error_handling": {
       "retry_attempts": 3,
@@ -233,7 +229,7 @@ MANDATORY JSON STRUCTURE - EXACTLY THIS FORMAT:
     "missing_parameters_identified": "List of dynamic runtime parameters that require clarification from user."
   },
   "is_update": false,
-  "recheck_status": "parameters_clarification_needed" // Or "ready_for_blueprint_generation" if no questions
+  "recheck_status": "parameters_clarification_needed"
 }
 
 CRITICAL SUCCESS METRICS:

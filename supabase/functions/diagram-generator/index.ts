@@ -37,39 +37,40 @@ interface DiagramEdge {
     style?: any;
 }
 
-class CompactDiagramBuilder {
+class EnhancedDiagramBuilder {
     private nodes: DiagramNode[] = [];
     private edges: DiagramEdge[] = [];
     private nodeIndex = 0;
-    // Reduced spacing for more compact layout
-    private readonly NODE_WIDTH = 280;
-    private readonly NODE_HEIGHT = 120;
-    private readonly HORIZONTAL_GAP = 200; // Reduced from 350
-    private readonly VERTICAL_GAP = 150;   // Reduced from 200
+    private readonly NODE_WIDTH = 320;
+    private readonly NODE_HEIGHT = 140;
+    private readonly HORIZONTAL_GAP = 350;
+    private readonly VERTICAL_GAP = 200;
     private readonly START_X = 50;
     private readonly START_Y = 100;
 
     constructor(private blueprint: any) {}
 
     build(): { nodes: DiagramNode[]; edges: DiagramEdge[] } {
-        console.log('🔧 Compact Diagram Builder - Processing blueprint:', {
+        console.log('🔧 Enhanced Diagram Builder - Processing blueprint:', {
             hasSteps: !!this.blueprint.steps,
             stepCount: this.blueprint.steps?.length || 0,
-            hasTrigger: !!this.blueprint.trigger
+            hasTrigger: !!this.blueprint.trigger,
+            triggerType: this.blueprint.trigger?.type
         });
         
-        // Create trigger node
+        // Step 1: Create trigger node
         this.createTriggerNode();
         
-        // Process all steps with enhanced conditional handling
+        // Step 2: Process all steps sequentially
         if (this.blueprint.steps && this.blueprint.steps.length > 0) {
-            this.processStepsWithConditionals(this.blueprint.steps);
+            this.processAllSteps(this.blueprint.steps);
         }
         
-        console.log('✅ Compact diagram built:', {
+        console.log('✅ Enhanced diagram built:', {
             totalNodes: this.nodes.length,
             totalEdges: this.edges.length,
-            nodeTypes: [...new Set(this.nodes.map(n => n.type))]
+            nodeTypes: [...new Set(this.nodes.map(n => n.type))],
+            platforms: [...new Set(this.nodes.map(n => n.data?.platform).filter(Boolean))]
         });
         
         return {
@@ -87,245 +88,289 @@ class CompactDiagramBuilder {
             type: platform ? 'platformTriggerNode' : 'triggerNode',
             position: { x: this.START_X, y: this.START_Y },
             data: {
-                label: trigger?.explanation || trigger?.type || 'S3 File Upload',
-                platform: platform || 'aws',
+                label: trigger?.explanation || trigger?.type || 'Manual Trigger',
+                platform: platform,
                 trigger: trigger,
-                explanation: trigger?.explanation || 'Detects new file uploads in S3 bucket',
-                stepType: 'trigger',
-                expandedData: {
-                    service: platform || 'AWS S3',
-                    eventType: 'file-upload',
-                    configuration: trigger
-                }
+                explanation: trigger?.explanation || 'This automation starts when triggered',
+                stepType: 'trigger'
             }
         };
         
         this.nodes.push(triggerNode);
+        console.log('📍 Created trigger node:', {
+            id: triggerNode.id,
+            type: triggerNode.type,
+            platform: platform
+        });
     }
 
-    private processStepsWithConditionals(steps: BlueprintStep[]) {
+    private processAllSteps(steps: BlueprintStep[]) {
         let lastNodeId = 'trigger-node';
-        let currentX = this.START_X + this.HORIZONTAL_GAP;
         
         for (let i = 0; i < steps.length; i++) {
             const step = steps[i];
-            const nodeId = `step-${this.nodeIndex++}`;
+            console.log(`🔄 Processing step ${i + 1}/${steps.length}:`, {
+                type: step.type,
+                hasAction: !!step.action,
+                hasCondition: !!step.condition,
+                hasAiAgent: !!step.ai_agent_call
+            });
             
-            // Create node with enhanced data
-            const node = this.createEnhancedNode(step, nodeId, currentX, this.START_Y);
+            const nodeId = `step-${this.nodeIndex++}`;
+            const node = this.createEnhancedNodeForStep(step, nodeId, i);
             this.nodes.push(node);
             
             // Create edge from previous node
             this.createEdge(lastNodeId, nodeId);
             
-            // Handle conditional branching
-            if (step.type === 'condition') {
-                const branchResults = this.handleConditionalBranches(step, nodeId, currentX);
-                if (branchResults.length > 0) {
-                    // Move to next position after all branches
-                    currentX += this.HORIZONTAL_GAP * 2;
-                    lastNodeId = branchResults[branchResults.length - 1];
-                } else {
-                    currentX += this.HORIZONTAL_GAP;
-                    lastNodeId = nodeId;
-                }
-            } else {
-                currentX += this.HORIZONTAL_GAP;
-                lastNodeId = nodeId;
-            }
+            // Handle nested steps and branches
+            lastNodeId = this.handleNestedSteps(step, nodeId) || nodeId;
         }
     }
 
-    private createEnhancedNode(step: BlueprintStep, nodeId: string, x: number, y: number): DiagramNode {
+    private createEnhancedNodeForStep(step: BlueprintStep, nodeId: string, index: number): DiagramNode {
+        const x = this.START_X + ((index + 1) * this.HORIZONTAL_GAP);
+        const y = this.START_Y;
         const position = { x, y };
         
-        // Determine node type and enhanced data based on step
-        const nodeData = this.buildNodeData(step);
+        console.log(`🎨 Creating node for step type: ${step.type}`);
+        
+        // Enhanced node creation based on step type
+        switch (step.type) {
+            case 'condition':
+                return this.createConditionNode(step, nodeId, position);
+                
+            case 'ai_agent_call':
+                return this.createAIAgentNode(step, nodeId, position);
+                
+            case 'delay':
+                return this.createDelayNode(step, nodeId, position);
+                
+            case 'loop':
+                return this.createLoopNode(step, nodeId, position);
+                
+            case 'retry':
+                return this.createRetryNode(step, nodeId, position);
+                
+            case 'fallback':
+                return this.createFallbackNode(step, nodeId, position);
+                
+            default:
+                return this.createActionNode(step, nodeId, position);
+        }
+    }
+
+    private createConditionNode(step: BlueprintStep, nodeId: string, position: { x: number; y: number }): DiagramNode {
+        const branches = this.extractConditionBranches(step.condition);
         
         return {
             id: nodeId,
-            type: nodeData.type,
+            type: 'conditionNode',
             position,
             data: {
-                ...nodeData.data,
-                expandedData: nodeData.expandedData,
-                clickToExpand: true
+                label: step.explanation || 'Condition Check',
+                icon: 'branch',
+                condition: step.condition,
+                explanation: step.explanation,
+                branches: branches,
+                stepType: 'condition'
             }
         };
     }
 
-    private buildNodeData(step: BlueprintStep) {
-        switch (step.type) {
-            case 'condition':
-                return {
-                    type: 'conditionNode',
-                    data: {
-                        label: step.explanation || 'File Type Check',
-                        icon: 'branch',
-                        condition: step.condition,
-                        explanation: step.explanation,
-                        stepType: 'condition'
-                    },
-                    expandedData: {
-                        conditionType: 'File Extension Check',
-                        branches: ['CSV Processing', 'JSON Processing'],
-                        logic: step.condition?.expression || 'Check file extension (.csv or .json)',
-                        outcomes: step.condition
-                    }
-                };
-                
-            case 'ai_agent_call':
-                return {
-                    type: 'aiAgentNode',
-                    data: {
-                        label: step.explanation || `AI: ${step.ai_agent_call?.agent_id || 'FileProcessingAgent'}`,
-                        icon: 'bot',
-                        agent: step.ai_agent_call,
-                        explanation: step.explanation,
-                        stepType: 'ai_agent_call'
-                    },
-                    expandedData: {
-                        agentName: step.ai_agent_call?.agent_id || 'FileProcessingAgent',
-                        model: step.ai_agent_call?.model || 'gpt-4',
-                        role: step.ai_agent_call?.role || 'File Processing Specialist',
-                        capabilities: ['File validation', 'Error handling', 'Data processing'],
-                        configuration: step.ai_agent_call
-                    }
-                };
-                
-            case 'retry':
-                return {
-                    type: 'retryNode',
-                    data: {
-                        label: step.explanation || 'Retry Logic',
-                        icon: 'refresh',
-                        retry: step.retry,
-                        explanation: step.explanation,
-                        stepType: 'retry'
-                    },
-                    expandedData: {
-                        maxAttempts: step.retry?.max_attempts || 1,
-                        strategy: 'Exponential backoff',
-                        applicable: 'All processing steps',
-                        configuration: step.retry
-                    }
-                };
-                
-            case 'notification':
-                const platform = this.extractPlatform(step.action);
-                return {
-                    type: platform ? 'platformNode' : 'actionNode',
-                    data: {
-                        label: step.explanation || 'Send Notification',
-                        platform: platform,
-                        action: step.action,
-                        stepType: step.type,
-                        explanation: step.explanation
-                    },
-                    expandedData: {
-                        service: platform || 'Email/Slack',
-                        recipients: step.action?.recipients || ['DevOps Team'],
-                        template: step.action?.template || 'Error notification',
-                        configuration: step.action
-                    }
-                };
-                
-            default:
-                const defaultPlatform = this.extractPlatform(step.action);
-                return {
-                    type: defaultPlatform ? 'platformNode' : 'actionNode',
-                    data: {
-                        label: step.explanation || step.action?.method || 'Process Step',
-                        platform: defaultPlatform,
-                        action: step.action,
-                        stepType: step.type,
-                        explanation: step.explanation
-                    },
-                    expandedData: {
-                        service: defaultPlatform || 'Processing Service',
-                        operation: step.action?.method || 'Data processing',
-                        parameters: step.action?.parameters || {},
-                        configuration: step.action
-                    }
-                };
-        }
+    private createAIAgentNode(step: BlueprintStep, nodeId: string, position: { x: number; y: number }): DiagramNode {
+        return {
+            id: nodeId,
+            type: 'aiAgentNode',
+            position,
+            data: {
+                label: step.explanation || `AI Agent: ${step.ai_agent_call?.agent_id || 'Unknown'}`,
+                icon: 'bot',
+                agent: step.ai_agent_call,
+                explanation: step.explanation,
+                stepType: 'ai_agent_call'
+            }
+        };
     }
 
-    private handleConditionalBranches(step: BlueprintStep, parentId: string, parentX: number): string[] {
-        const branchResults: string[] = [];
+    private createDelayNode(step: BlueprintStep, nodeId: string, position: { x: number; y: number }): DiagramNode {
+        return {
+            id: nodeId,
+            type: 'delayNode',
+            position,
+            data: {
+                label: step.explanation || `Delay: ${step.delay?.duration || 'Unknown'}`,
+                icon: 'clock',
+                delay: step.delay,
+                explanation: step.explanation,
+                stepType: 'delay'
+            }
+        };
+    }
+
+    private createLoopNode(step: BlueprintStep, nodeId: string, position: { x: number; y: number }): DiagramNode {
+        return {
+            id: nodeId,
+            type: 'loopNode',
+            position,
+            data: {
+                label: step.explanation || 'Loop',
+                icon: 'repeat',
+                loop: step.loop,
+                explanation: step.explanation,
+                stepType: 'loop'
+            }
+        };
+    }
+
+    private createRetryNode(step: BlueprintStep, nodeId: string, position: { x: number; y: number }): DiagramNode {
+        return {
+            id: nodeId,
+            type: 'retryNode',
+            position,
+            data: {
+                label: step.explanation || 'Retry Logic',
+                icon: 'refresh',
+                retry: step.retry,
+                explanation: step.explanation,
+                stepType: 'retry'
+            }
+        };
+    }
+
+    private createFallbackNode(step: BlueprintStep, nodeId: string, position: { x: number; y: number }): DiagramNode {
+        return {
+            id: nodeId,
+            type: 'fallbackNode',
+            position,
+            data: {
+                label: step.explanation || 'Fallback Handler',
+                icon: 'shield',
+                fallback: step.fallback,
+                explanation: step.explanation,
+                stepType: 'fallback'
+            }
+        };
+    }
+
+    private createActionNode(step: BlueprintStep, nodeId: string, position: { x: number; y: number }): DiagramNode {
+        const platform = this.extractPlatform(step.action);
+        const method = step.action?.method || '';
         
-        if (step.condition) {
-            // CSV branch (true path)
+        // Determine if this should be a platform node
+        const nodeType = platform ? 'platformNode' : 'actionNode';
+        
+        return {
+            id: nodeId,
+            type: nodeType,
+            position,
+            data: {
+                label: step.explanation || method || 'Action Step',
+                icon: 'settings',
+                platform: platform,
+                action: step.action,
+                stepType: step.type,
+                explanation: step.explanation,
+                stepDetails: {
+                    integration: platform,
+                    method: method,
+                    endpoint: step.action?.endpoint,
+                    parameters: step.action?.parameters
+                }
+            }
+        };
+    }
+
+    private handleNestedSteps(step: BlueprintStep, nodeId: string): string | null {
+        let lastNodeId: string | null = null;
+        
+        // Handle condition branches
+        if (step.type === 'condition' && step.condition) {
             if (step.condition.if_true && step.condition.if_true.length > 0) {
-                const csvBranchId = this.createBranch(
-                    step.condition.if_true, 
-                    parentId, 
-                    'csv', 
-                    parentX + this.HORIZONTAL_GAP, 
-                    this.START_Y - this.VERTICAL_GAP,
-                    'CSV Processing Path'
-                );
-                branchResults.push(csvBranchId);
+                console.log('🌿 Processing TRUE branch with', step.condition.if_true.length, 'steps');
+                this.processConditionalBranch(step.condition.if_true, nodeId, 'true');
             }
             
-            // JSON branch (false path)
             if (step.condition.if_false && step.condition.if_false.length > 0) {
-                const jsonBranchId = this.createBranch(
-                    step.condition.if_false, 
-                    parentId, 
-                    'json', 
-                    parentX + this.HORIZONTAL_GAP, 
-                    this.START_Y + this.VERTICAL_GAP,
-                    'JSON Processing Path'
-                );
-                branchResults.push(jsonBranchId);
+                console.log('🌿 Processing FALSE branch with', step.condition.if_false.length, 'steps');
+                this.processConditionalBranch(step.condition.if_false, nodeId, 'false');
             }
         }
         
-        return branchResults;
-    }
-
-    private createBranch(
-        branchSteps: BlueprintStep[], 
-        parentId: string, 
-        branchType: string, 
-        startX: number, 
-        startY: number,
-        branchLabel: string
-    ): string {
-        let lastNodeId = parentId;
-        let currentX = startX;
+        // Handle loop steps
+        if (step.type === 'loop' && step.loop?.steps) {
+            console.log('🔄 Processing loop with', step.loop.steps.length, 'steps');
+            this.processNestedSteps(step.loop.steps, nodeId);
+        }
         
-        for (let i = 0; i < branchSteps.length; i++) {
-            const step = branchSteps[i];
-            const nodeId = `branch-${branchType}-${this.nodeIndex++}`;
-            
-            const node = this.createEnhancedNode(step, nodeId, currentX, startY);
-            // Add branch context to node data
-            node.data.branchContext = {
-                type: branchType,
-                label: branchLabel,
-                position: i + 1,
-                total: branchSteps.length
-            };
-            
-            this.nodes.push(node);
-            
-            // Create edge (first node connects to parent with handle)
-            if (i === 0) {
-                this.createEdge(parentId, nodeId, branchType === 'csv' ? 'true' : 'false');
-            } else {
-                this.createEdge(lastNodeId, nodeId);
+        // Handle retry steps
+        if (step.type === 'retry' && step.retry?.steps) {
+            console.log('🔄 Processing retry with', step.retry.steps.length, 'steps');
+            this.processNestedSteps(step.retry.steps, nodeId);
+        }
+        
+        // Handle fallback steps
+        if (step.type === 'fallback' && step.fallback) {
+            if (step.fallback.primary_steps) {
+                console.log('🔄 Processing primary fallback with', step.fallback.primary_steps.length, 'steps');
+                this.processNestedSteps(step.fallback.primary_steps, nodeId);
             }
-            
-            lastNodeId = nodeId;
-            currentX += this.HORIZONTAL_GAP;
+            if (step.fallback.fallback_steps) {
+                console.log('🔄 Processing fallback steps with', step.fallback.fallback_steps.length, 'steps');
+                this.processNestedSteps(step.fallback.fallback_steps, nodeId);
+            }
         }
         
         return lastNodeId;
     }
 
-    private createEdge(source: string, target: string, sourceHandle?: string) {
+    private processConditionalBranch(steps: BlueprintStep[], parentId: string, branchType: string) {
+        const branchY = this.START_Y + (branchType === 'true' ? this.VERTICAL_GAP : this.VERTICAL_GAP * 2);
+        
+        for (let i = 0; i < steps.length; i++) {
+            const step = steps[i];
+            const nodeId = `branch-${branchType}-${this.nodeIndex++}`;
+            const position = {
+                x: this.START_X + ((this.nodeIndex + 1) * this.HORIZONTAL_GAP),
+                y: branchY
+            };
+            
+            const node = this.createEnhancedNodeForStep(step, nodeId, this.nodeIndex);
+            node.position = position;
+            this.nodes.push(node);
+            
+            // Create edge from parent condition node
+            if (i === 0) {
+                this.createEdge(parentId, nodeId, branchType);
+            } else {
+                this.createEdge(`branch-${branchType}-${this.nodeIndex - 1}`, nodeId);
+            }
+        }
+    }
+
+    private processNestedSteps(steps: BlueprintStep[], parentId: string) {
+        for (let i = 0; i < steps.length; i++) {
+            const step = steps[i];
+            const nodeId = `nested-${this.nodeIndex++}`;
+            const position = {
+                x: this.START_X + ((this.nodeIndex + 1) * this.HORIZONTAL_GAP),
+                y: this.START_Y + this.VERTICAL_GAP
+            };
+            
+            const node = this.createEnhancedNodeForStep(step, nodeId, this.nodeIndex);
+            node.position = position;
+            this.nodes.push(node);
+            
+            // Create edge
+            if (i === 0) {
+                this.createEdge(parentId, nodeId);
+            } else {
+                this.createEdge(`nested-${this.nodeIndex - 1}`, nodeId);
+            }
+        }
+    }
+
+    private createEdge(source: string, target: string, sourceHandle?: string, targetHandle?: string) {
         const edgeId = `edge-${source}-${target}${sourceHandle ? `-${sourceHandle}` : ''}`;
         
         const edge: DiagramEdge = {
@@ -341,38 +386,98 @@ class CompactDiagramBuilder {
         };
         
         if (sourceHandle) edge.sourceHandle = sourceHandle;
+        if (targetHandle) edge.targetHandle = targetHandle;
         
         this.edges.push(edge);
+        console.log('🔗 Created edge:', { source, target, sourceHandle });
     }
 
     private getEdgeColor(sourceHandle?: string): string {
         switch (sourceHandle) {
             case 'true':
-            case 'csv':
-                return '#10b981'; // Green for CSV
+            case 'yes':
+            case 'success':
+                return '#10b981';
             case 'false':
-            case 'json':
-                return '#3b82f6'; // Blue for JSON
+            case 'no':
             case 'error':
-                return '#ef4444'; // Red for errors
+                return '#ef4444';
+            case 'urgent':
+                return '#ef4444';
+            case 'task':
+                return '#10b981';
+            case 'followup':
+                return '#f59e0b';
             default:
-                return '#6b7280'; // Gray for default
+                return '#3b82f6';
         }
     }
 
     private extractPlatform(actionOrTrigger: any): string {
         if (!actionOrTrigger) return '';
         
+        // Try different possible property names
         return actionOrTrigger.integration || 
                actionOrTrigger.platform || 
                actionOrTrigger.service || 
                actionOrTrigger.provider || 
                '';
     }
+
+    private extractConditionBranches(condition: any): Array<{ label: string; handle: string; color: string }> {
+        const branches = [];
+        
+        if (!condition) {
+            return [
+                { label: 'Yes', handle: 'yes', color: '#10b981' },
+                { label: 'No', handle: 'no', color: '#ef4444' }
+            ];
+        }
+        
+        // Check for explicit branches
+        if (condition.if_true) {
+            branches.push({ label: 'True', handle: 'true', color: '#10b981' });
+        }
+        
+        if (condition.if_false) {
+            branches.push({ label: 'False', handle: 'false', color: '#ef4444' });
+        }
+        
+        // Analyze condition expression for specific cases
+        if (condition.expression) {
+            const expr = condition.expression.toLowerCase();
+            
+            if (expr.includes('urgent')) {
+                branches.push({ label: 'Urgent', handle: 'urgent', color: '#ef4444' });
+            }
+            if (expr.includes('task')) {
+                branches.push({ label: 'Task', handle: 'task', color: '#10b981' });
+            }
+            if (expr.includes('follow')) {
+                branches.push({ label: 'Follow-up', handle: 'followup', color: '#f59e0b' });
+            }
+            if (expr.includes('existing') || expr.includes('found')) {
+                branches.push({ label: 'Existing', handle: 'existing', color: '#3b82f6' });
+            }
+            if (expr.includes('new') || expr.includes('not found')) {
+                branches.push({ label: 'New', handle: 'new', color: '#10b981' });
+            }
+        }
+        
+        // Default branches if none found
+        if (branches.length === 0) {
+            branches.push(
+                { label: 'Yes', handle: 'yes', color: '#10b981' },
+                { label: 'No', handle: 'no', color: '#ef4444' }
+            );
+        }
+        
+        return branches;
+    }
 }
 
 serve(async (req) => {
-    console.log('🚀 Compact Diagram Generator - Request received');
+    console.log('🚀 Enhanced Diagram Generator - Request received');
     
     if (req.method === 'OPTIONS') {
         return new Response(null, { headers: corsHeaders });
@@ -396,20 +501,23 @@ serve(async (req) => {
             );
         }
 
-        console.log('📋 Processing compact blueprint:', {
+        console.log('📋 Processing enhanced blueprint:', {
             hasSteps: !!automation_blueprint.steps,
             stepCount: automation_blueprint.steps?.length || 0,
+            hasTrigger: !!automation_blueprint.trigger,
+            triggerType: automation_blueprint.trigger?.type,
             stepTypes: automation_blueprint.steps?.map((s: any) => s.type) || []
         });
 
-        // Use compact diagram builder
-        const builder = new CompactDiagramBuilder(automation_blueprint);
+        // Use enhanced diagram builder
+        const builder = new EnhancedDiagramBuilder(automation_blueprint);
         const diagramData = builder.build();
 
-        console.log('✅ Generated compact diagram:', {
+        console.log('✅ Generated enhanced diagram data:', {
             nodes: diagramData.nodes.length,
             edges: diagramData.edges.length,
-            nodeTypes: [...new Set(diagramData.nodes.map(n => n.type))]
+            nodeTypes: [...new Set(diagramData.nodes.map(n => n.type))],
+            platforms: [...new Set(diagramData.nodes.map(n => n.data?.platform).filter(Boolean))]
         });
 
         return new Response(JSON.stringify(diagramData), {
@@ -418,10 +526,10 @@ serve(async (req) => {
         });
 
     } catch (error) {
-        console.error('💥 Error in compact diagram generator:', error);
+        console.error('💥 Error in enhanced diagram generator:', error);
         return new Response(
             JSON.stringify({
-                error: error.message || 'Compact diagram generation failed',
+                error: error.message || 'Enhanced diagram generation failed',
                 details: error.toString()
             }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

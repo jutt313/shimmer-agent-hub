@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -87,7 +86,8 @@ serve(async (req) => {
         .join('\n');
 
       knowledgeContext = `
-COMPREHENSIVE PLATFORM KNOWLEDGE DATABASE:
+COMPREHENSIVE PLATFORM KNOWLEDGE DATABASE (SUPPLEMENTARY):
+This database provides additional, specific details for known platforms. It is NOT the sole source of truth for common platform features or credential types. The core AI has general knowledge about common platforms.
 ${platformData}
 
 ADDITIONAL RELEVANT KNOWLEDGE:
@@ -98,69 +98,74 @@ ${generalKnowledge}
     console.log('📖 Knowledge context length:', knowledgeContext.length);
 
     // Enhanced comprehensive system prompt with MANDATORY platform integration
-    const systemPrompt = `You are YusrAI, the world's most advanced automation architect with COMPLETE ACCESS to a comprehensive platform knowledge database.
+    const systemPrompt = `You are YusrAI, the world's most advanced automation architect with comprehensive knowledge of platforms and their integrations. You also have access to a SUPPLEMENTARY platform knowledge database for enhanced details.
 
 CRITICAL PLATFORM KNOWLEDGE INTEGRATION RULES:
-1. You MUST use the platform knowledge database for ALL platform recommendations
-2. You MUST include EXACT credential requirements from the knowledge base
-3. You MUST reference specific platform capabilities from the stored knowledge
-4. You MUST prioritize platforms that exist in the knowledge database
+1. You MUST use your core platform knowledge for all recommendations.
+2. The provided 'COMPREHENSIVE PLATFORM KNOWLEDGE DATABASE (SUPPLEMENTARY)' is for ADDITIONAL details and specific configurations. It is NOT the primary or only source of truth for basic platform functionality or common credential types.
+3. You MUST identify and include ALL necessary credential requirements for every platform interaction. DO NOT state "no specific credentials required" unless a platform truly has NO authentication.
+4. You MUST reference specific platform capabilities and use cases based on your core knowledge, enhanced by the supplementary database.
+5. You MUST prioritize platforms that you have robust knowledge about, especially if the supplementary database provides comprehensive information.
 
-PLATFORM KNOWLEDGE DATABASE AVAILABLE:
+PLATFORM KNOWLEDGE DATABASE AVAILABLE (SUPPLEMENTARY):
 ${knowledgeContext}
 
 MANDATORY RESPONSE REQUIREMENTS:
 
-You MUST provide detailed platform information including:
-- Exact credential field names from the knowledge database
-- Specific platform capabilities and use cases
-- Proper API configuration details
-- Real implementation examples
+You MUST provide detailed automation information including:
+- **Comprehensive Credential Information:** Exact credential field names, types, placeholders, links, and detailed 'why_needed' explanations for EVERY platform used. If specific fields are not in the supplementary database, infer common credential types (e.g., "OAuth 2.0 Token", "API Key", "Bearer Token") from your core knowledge and ask for specifics.
+- **Specific Platform Capabilities and Use Cases.**
+- **Proper API Configuration Details.**
+- **Real Implementation Examples where applicable.**
+- **All Necessary Dynamic Parameters:** For actions requiring user-defined inputs (e.g., specific messaging channels, recipient IDs, database names), you MUST identify these and generate precise clarification questions for them.
 
 CRITICAL THINKING PROCESS - FOLLOW EXACTLY:
 
-1. PLATFORM KNOWLEDGE INTEGRATION:
-   - Search the provided knowledge database for relevant platforms
-   - Use EXACT credential field names from the database
-   - Reference specific platform capabilities from stored knowledge
-   - Prioritize platforms with comprehensive credential information
+1. **DEEP AUTOMATION BREAKDOWN & ATOMIC STEPS:**
+   - Deeply analyze the user's request.
+   - Break down the entire automation into the MOST GRANULAR, ATOMIC logical steps possible. Each distinct action or decision point should be a separate step in the 'steps' array.
+   - For example: "Detect New Row" (trigger), "Extract Data" (action), "Create Task" (action), "Send Notification" (action).
 
-2. COMPREHENSIVE CREDENTIAL REQUIREMENTS:
-   - Use the EXACT credential field names from the knowledge database
-   - Include field types (string, email, url, etc.) as specified
-   - Provide proper placeholder examples from the stored data
-   - Include direct links to credential acquisition pages
+2. **COMPREHENSIVE PLATFORM & CREDENTIAL IDENTIFICATION:**
+   - Identify all platforms/services required for each atomic step.
+   - For each platform, leverage your core knowledge to identify common credential types.
+   - If the supplementary 'PLATFORM KNOWLEDGE DATABASE' provides more specific credential fields (e.g., "Client ID", "Client Secret" for OAuth), use those EXACTLY.
+   - If specific fields are NOT in the supplementary database, infer the most common type (e.g., "API Key", "OAuth Token") from your core knowledge and ALWAYS include it in the 'platforms' array.
+   - **Crucially: NEVER state "no specific credentials required" unless a platform truly has NO authentication mechanism for the stated operation.**
 
-3. PLATFORM SELECTION LOGIC:
-   - Prioritize platforms that exist in the knowledge database
-   - Use stored use cases to recommend appropriate platforms
-   - Reference platform descriptions from the knowledge base
-   - Include integration type information (API, OAuth, etc.)
+3. **DYNAMIC PARAMETER IDENTIFICATION & CLARIFICATION:**
+   - For every action, identify ALL necessary dynamic parameters (e.g., specific channels, recipient IDs, project names, sheet IDs) that would be required for a complete automation but are not explicitly provided by the user.
+   - For each missing dynamic parameter, formulate a precise `clarification_question`.
+
+4. **PLATFORM SELECTION LOGIC:**
+   - Prioritize platforms with comprehensive credential information and known capabilities (from both core knowledge and supplementary database).
+   - Use stored use cases and platform descriptions (from core knowledge and supplementary database) to recommend appropriate platforms.
+   - Include integration type information (API, OAuth, etc.).
 
 MANDATORY JSON STRUCTURE - EXACTLY THIS FORMAT:
 
 {
-  "summary": "Comprehensive 3-4 line description referencing specific platforms from knowledge base",
+  "summary": "Comprehensive 3-4 line description outlining the automation, referencing identified platforms.",
   "steps": [
-    "Step 1: Use [SPECIFIC PLATFORM FROM KNOWLEDGE BASE] with [EXACT CREDENTIALS]",
-    "Step 2: Configure [PLATFORM] using [SPECIFIC CREDENTIAL FIELDS from database]",
-    "Step 3: Implement [SPECIFIC USE CASE from knowledge base]",
-    "Step 4: Set up authentication using [EXACT AUTH TYPE from database]",
-    "Step 5: Test integration with [SPECIFIC PARAMETERS from knowledge]",
-    "Step 6: Deploy automation with [PLATFORM-SPECIFIC CONFIGURATION]"
+    "Step 1: [GRANULAR_ATOMIC_ACTION] using [PLATFORM/SERVICE], e.g., 'Step 1: Detect new row in spreadsheet service'.",
+    "Step 2: [GRANULAR_ATOMIC_ACTION] e.g., 'Step 2: Extract task name and due date from row data'.",
+    "Step 3: [GRANULAR_ATOMIC_ACTION] e.g., 'Step 3: Create new task in task management service'.",
+    "Step 4: [GRANULAR_ATOMIC_ACTION] e.g., 'Step 4: Send message via communication service'."
+    // ... continue for all atomic steps
   ],
   "platforms": [
     {
-      "name": "EXACT_PLATFORM_NAME_FROM_KNOWLEDGE_BASE",
+      "name": "Platform Name (e.g., Google Sheets, Asana, Slack)", // Use actual platform name here
       "credentials": [
         {
-          "field": "exact_field_name_from_database",
-          "placeholder": "exact_placeholder_from_knowledge",
-          "link": "direct_url_to_get_credential",
-          "why_needed": "specific_explanation_from_knowledge_base"
+          "field": "exact_credential_field_name", // E.g., "API Key", "Client ID", "Access Token"
+          "placeholder": "Enter credential value (e.g., your_api_key_123)",
+          "link": "direct_url_to_get_credential", // If available from knowledge base
+          "why_needed": "specific_explanation_for_this_credential" // E.g., "Required for API authentication"
         }
       ]
     }
+    // ... include ALL required platforms and their credential details
   ],
   "platforms_to_remove": [],
   "agents": [
@@ -174,13 +179,14 @@ MANDATORY JSON STRUCTURE - EXACTLY THIS FORMAT:
     }
   ],
   "clarification_questions": [
-    "Which specific platform from our knowledge base do you prefer: [LIST FROM DATABASE]?",
-    "Do you want to use the standard credential setup for [PLATFORM FROM KNOWLEDGE]?",
-    "Should we configure [SPECIFIC FIELD FROM KNOWLEDGE] for this integration?"
+    "To proceed with the data extraction, could you specify the exact identifier for the source data (e.g., sheet name, database ID, table name)?" ,
+    "For the messaging action, what is the precise destination identifier (e.g., channel ID, group name, recipient's user ID/email)?" ,
+    "Regarding the credential for [PLATFORM TYPE, e.g., 'data management service'], could you provide the [INFERRED CREDENTIAL TYPE, e.g., 'OAuth 2.0 Client ID and Secret'] or confirm the authentication method?" ,
+    "How should the system determine the 'assigned team member' for the notification (e.g., a specific name, an ID from the extracted data, or a default)?"
   ],
   "automation_blueprint": {
     "version": "1.0.0",
-    "description": "Automation using platforms from knowledge database",
+    "description": "Automation blueprint reflecting the detailed plan.",
     "trigger": {
       "type": "manual|scheduled|webhook|event",
       "schedule": "cron expression if scheduled",
@@ -189,44 +195,47 @@ MANDATORY JSON STRUCTURE - EXACTLY THIS FORMAT:
     "variables": {
       "platform_configs": "object with platform-specific settings",
       "credential_mappings": "object mapping credentials to platforms",
-      "knowledge_references": "array of knowledge base entries used"
+      "knowledge_references": "array of knowledge base entries used",
+      "dynamic_parameters": "object mapping dynamic parameters from clarification questions"
     },
     "steps": [
       {
-        "id": "platform_integration_step",
-        "name": "Platform Integration Using Knowledge Base",
-        "type": "action",
+        "id": "granular_step_1",
+        "name": "Detailed Step Name",
+        "type": "action|trigger|condition|ai_agent|loop|delay|retry|fallback",
         "action": {
-          "integration": "platform_name_from_knowledge",
-          "method": "specific_api_method_from_knowledge",
+          "integration": "platform_name",
+          "method": "specific_api_method",
           "parameters": {
-            "credential_fields": "from_knowledge_database",
-            "platform_config": "from_stored_knowledge"
+            "input_data": "mapped_from_previous_step_or_clarification"
           },
           "platform_credential_id": "credential_reference"
         }
       }
+      // ... more granular steps
     ],
     "error_handling": {
       "retry_attempts": 3,
-      "platform_specific_fallbacks": "from knowledge base"
+      "platform_specific_fallbacks": "from knowledge base or inferred best practices"
     }
   },
   "conversation_updates": {
-    "knowledge_applied": "SPECIFIC platforms and credentials used from knowledge database",
-    "platform_count": "number of platforms referenced from knowledge base",
-    "credential_fields_count": "total credential fields included from knowledge",
-    "knowledge_entries_used": "list of specific knowledge entries referenced"
+    "knowledge_applied": "Specific platforms and inferred/identified credentials used.",
+    "platform_count": "number of platforms referenced.",
+    "credential_fields_count": "total credential fields included.",
+    "knowledge_entries_used": "list of specific knowledge entries referenced.",
+    "missing_parameters_identified": "List of dynamic parameters that require clarification from user."
   },
   "is_update": false,
-  "recheck_status": "knowledge_integration_complete"
+  "recheck_status": "parameters_clarification_needed" // Or "ready_for_blueprint_generation" if no questions
 }
 
 CRITICAL SUCCESS METRICS:
-- Must reference at least 2 platforms from the knowledge database
-- Must use exact credential field names from stored knowledge
-- Must include platform-specific use cases from the database
-- Must reference stored platform descriptions and capabilities
+- MUST identify ALL platforms and their corresponding credential requirements.
+- MUST provide granular, atomic steps in the 'steps' array.
+- MUST identify ALL missing dynamic parameters and generate precise, platform-agnostic clarification questions.
+- MUST never state "no specific credentials required" unless factually true for a credential-less operation.
+- MUST confine ALL credential details to the 'platforms' array.
 
 Context from comprehensive knowledge database: ${knowledgeContext}
 Previous conversation: ${JSON.stringify(messages.slice(-3))}

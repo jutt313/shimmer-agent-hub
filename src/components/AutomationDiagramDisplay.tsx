@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ReactFlow, 
@@ -35,6 +36,34 @@ import { AutomationBlueprint } from "@/types/automation";
 import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
 import ExpandableNode from './diagram/ExpandableNode';
 
+// Add proper type definitions
+interface BranchContext {
+  type: string;
+  label: string;
+  position: number;
+  total: number;
+}
+
+interface AIAgent {
+  agent_id?: string;
+  name?: string;
+  [key: string]: any;
+}
+
+interface NodeData {
+  label: string;
+  platform?: string;
+  explanation?: string;
+  stepType?: string;
+  expandedData?: any;
+  branchContext?: BranchContext;
+  clickToExpand?: boolean;
+  agent?: AIAgent;
+  isRecommended?: boolean;
+  onAdd?: () => void;
+  onDismiss?: () => void;
+}
+
 interface AutomationDiagramDisplayProps {
   automationBlueprint?: AutomationBlueprint | null;
   automationDiagramData?: { nodes: Node[]; edges: Edge[]; warning?: string } | null;
@@ -62,10 +91,10 @@ const nodeTypes = {
 };
 
 // Enhanced Layouting with better positioning
-const NODE_WIDTH = 280;  // Reduced from 320
-const NODE_HEIGHT = 120; // Reduced from 140
-const HORIZONTAL_GAP = 200; // Reduced from 280
-const VERTICAL_GAP = 150;   // Reduced from 180
+const NODE_WIDTH = 280;
+const NODE_HEIGHT = 120;
+const HORIZONTAL_GAP = 200;
+const VERTICAL_GAP = 150;
 const START_X = 50;
 const START_Y = 100;
 
@@ -77,7 +106,6 @@ const getDynamicLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'L
   // Build adjacency graph for better positioning
   const graph = new Map<string, string[]>();
   const inDegrees = new Map<string, number>();
-  const processed = new Set<string>();
 
   nodes.forEach(node => {
     graph.set(node.id, []);
@@ -144,7 +172,7 @@ const getDynamicLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'L
     const x = START_X + (layer * (NODE_WIDTH + HORIZONTAL_GAP));
     const layerHeight = layerNodes.length * NODE_HEIGHT + (layerNodes.length - 1) * VERTICAL_GAP;
     const layerStartY = START_Y + (layerHeight > 0 ? -layerHeight / 2 : 0);
-    const y = layerStartY + nodeIndex * (NODE_HEIGHT + VERTICAL_GAP) + 200; // Reduced offset
+    const y = layerStartY + nodeIndex * (NODE_HEIGHT + VERTICAL_GAP) + 200;
     
     return { 
       ...node, 
@@ -244,7 +272,7 @@ const DiagramFlow: React.FC<{
       console.log('🔍 Fitting view for', nodes.length, 'compact nodes');
       const timer = setTimeout(() => {
         fitView({ 
-          padding: 0.15, // Tighter padding for compact view
+          padding: 0.15,
           minZoom: 0.3, 
           maxZoom: 1.2,
           duration: 800
@@ -383,7 +411,7 @@ const DiagramFlow: React.FC<{
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{
-          padding: 0.15, // Tighter padding
+          padding: 0.15,
           minZoom: 0.2,
           maxZoom: 1.5,
         }}
@@ -403,8 +431,8 @@ const DiagramFlow: React.FC<{
       >
         <Background 
           color="#e2e8f0" 
-          gap={20}  // Smaller gap for compact view
-          size={1}   // Smaller dots
+          gap={20}
+          size={1}
           variant={BackgroundVariant.Dots}
         />
         <Controls 
@@ -416,7 +444,7 @@ const DiagramFlow: React.FC<{
         />
         <MiniMap 
           style={{
-            height: 120, // Smaller minimap
+            height: 120,
             width: 180,
             backgroundColor: '#f8fafc',
             borderRadius: '12px',
@@ -424,10 +452,11 @@ const DiagramFlow: React.FC<{
             boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
           }}
           nodeColor={(node) => {
-            if (node.data?.branchContext) {
-              return node.data.branchContext.type === 'csv' ? '#10b981' : '#3b82f6';
+            const nodeData = node.data as NodeData;
+            if (nodeData?.branchContext) {
+              return nodeData.branchContext.type === 'csv' ? '#10b981' : '#3b82f6';
             }
-            switch (node.data?.stepType) {
+            switch (nodeData?.stepType) {
               case 'condition': return '#f97316';
               case 'ai_agent_call': return '#10b981';
               case 'retry': return '#f59e0b';
@@ -569,24 +598,25 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           id: node.id,
           type: node.type,
           hasData: !!node.data,
-          platform: node.data?.platform,
-          stepType: node.data?.stepType
+          platform: (node.data as NodeData)?.platform,
+          stepType: (node.data as NodeData)?.stepType
         });
 
         // Enhanced node type validation
         const nodeType = nodeTypes[node.type as keyof typeof nodeTypes] ? node.type : 'actionNode';
         
         // Enhanced AI agent integration
-        const isAIAgentNode = node.type === 'aiAgentNode' || node.data?.stepType === 'ai_agent_call';
+        const nodeData = node.data as NodeData;
+        const isAIAgentNode = node.type === 'aiAgentNode' || nodeData?.stepType === 'ai_agent_call';
         let aiAgentRecommendation = null;
         
         if (isAIAgentNode) {
           // Look for FileProcessingAgent or similar recommendations
-          aiAgentRecommendation = aiAgentRecommendations.find(agent => 
+          aiAgentRecommendation = aiAgentRecommendations.find((agent: AIAgent) => 
             agent?.name && (
               agent.name.toLowerCase().includes('fileprocessing') ||
               agent.name.toLowerCase().includes('processing') ||
-              node.data?.agent?.agent_id === agent.name
+              nodeData?.agent?.agent_id === agent.name
             )
           );
         }
@@ -600,8 +630,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             y: typeof node.position?.y === 'number' ? node.position.y : 100
           },
           data: {
-            ...node.data,
-            label: node.data?.label || node.data?.explanation || `Step ${index + 1}`,
+            ...nodeData,
+            label: nodeData?.label || nodeData?.explanation || `Step ${index + 1}`,
             clickToExpand: true,
             ...(aiAgentRecommendation && {
               isRecommended: true,
@@ -617,8 +647,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         console.log('✅ Enhanced processed node:', {
           id: processedNode.id,
           type: processedNode.type,
-          label: processedNode.data.label,
-          platform: processedNode.data.platform
+          label: (processedNode.data as NodeData).label,
+          platform: (processedNode.data as NodeData).platform
         });
         
         return processedNode;
@@ -672,7 +702,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       console.log('✅ Setting compact diagram with AI integration:', {
         nodes: layoutedNodes.length,
         edges: layoutedEdges.length,
-        aiAgentNodes: layoutedNodes.filter(n => n.data?.stepType === 'ai_agent_call').length
+        aiAgentNodes: layoutedNodes.filter(n => (n.data as NodeData)?.stepType === 'ai_agent_call').length
       });
       
       setNodes(layoutedNodes);

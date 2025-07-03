@@ -1,5 +1,8 @@
 
 project_id = "zorwtyijosgdcckljmqd"
 
-[functions.yusrai-api]
+[functions.test-webhook]
+verify_jwt = false
+
+[functions.webhook-trigger]
 verify_jwt = false

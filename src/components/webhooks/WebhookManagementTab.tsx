@@ -10,11 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { WebhookDeliverySystem } from '@/utils/webhookDeliverySystem';
 import { toast } from 'sonner';
 import { 
   Webhook, 
@@ -26,12 +23,8 @@ import {
   XCircle, 
   Clock, 
   ExternalLink,
-  Eye,
-  EyeOff,
-  AlertTriangle,
   TrendingUp,
-  Activity,
-  Info
+  Activity
 } from 'lucide-react';
 
 interface AutomationWebhook {
@@ -74,7 +67,6 @@ const WebhookManagementTab = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [testResults, setTestResults] = useState<Record<string, WebhookTestResult>>({});
   const [testingWebhook, setTestingWebhook] = useState<string | null>(null);
-  const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
 
   // Form state for creating webhooks
   const [webhookForm, setWebhookForm] = useState({
@@ -231,29 +223,42 @@ const WebhookManagementTab = () => {
     setTestingWebhook(webhook.id);
     
     try {
-      console.log('🧪 TESTING WEBHOOK (SERVER-SIDE):', webhook.webhook_url);
+      console.log('🧪 TESTING WEBHOOK:', webhook.webhook_url);
       
-      // Use the new server-side testing approach
-      const result = await WebhookDeliverySystem.testWebhook(
-        webhook.webhook_url,
-        webhook.webhook_secret
-      );
+      const { data, error } = await supabase.functions.invoke('test-webhook', {
+        body: { 
+          webhookUrl: webhook.webhook_url,
+          secret: webhook.webhook_secret 
+        }
+      });
 
-      console.log('✅ Server-side webhook test result:', result);
+      if (error) {
+        console.error('❌ Test webhook function error:', error);
+        const result: WebhookTestResult = {
+          success: false,
+          error: `Test function error: ${error.message}`,
+          response_time: 0
+        };
+        setTestResults(prev => ({ ...prev, [webhook.id]: result }));
+        toast.error(`❌ Webhook test failed: ${result.error}`);
+        return;
+      }
+
+      console.log('✅ Test webhook response:', data);
 
       const testResult: WebhookTestResult = {
-        success: result.success,
-        error: result.error,
-        response_time: result.responseTime,
-        status_code: result.statusCode
+        success: data.success,
+        error: data.error,
+        response_time: data.responseTime || 0,
+        status_code: data.statusCode
       };
 
       setTestResults(prev => ({ ...prev, [webhook.id]: testResult }));
       
-      if (result.success) {
-        toast.success(`✅ Webhook test successful! (${result.responseTime}ms)`);
+      if (data.success) {
+        toast.success(`✅ Webhook test successful! (${data.responseTime || 0}ms)`);
       } else {
-        toast.error(`❌ Webhook test failed: ${result.error}`);
+        toast.error(`❌ Webhook test failed: ${data.error}`);
       }
     } catch (error: any) {
       console.error('💥 Webhook test error:', error);
@@ -276,60 +281,9 @@ const WebhookManagementTab = () => {
     toast.success(`${label} copied to clipboard`);
   };
 
-  const toggleSecretVisibility = (webhookId: string) => {
-    setShowSecrets(prev => ({
-      ...prev,
-      [webhookId]: !prev[webhookId]
-    }));
-  };
-
-  const getStatusColor = (status_code?: number) => {
-    if (!status_code) return 'text-gray-500';
-    if (status_code >= 200 && status_code < 300) return 'text-green-500';
-    if (status_code >= 400 && status_code < 500) return 'text-yellow-500';
-    return 'text-red-500';
-  };
-
-  const getStatusIcon = (status_code?: number) => {
-    if (!status_code) return <AlertTriangle className="h-4 w-4 text-gray-500" />;
-    if (status_code >= 200 && status_code < 300) return <CheckCircle className="h-4 w-4 text-green-500" />;
-    return <XCircle className="h-4 w-4 text-red-500" />;
-  };
-
   const totalWebhooks = webhooks.length;
   const activeWebhooks = webhooks.filter(w => w.is_active).length;
   const totalCalls = webhooks.reduce((sum, w) => sum + w.trigger_count, 0);
-  
-  // Calculate success rate from actual delivery logs, not test results
-  const [webhookStats, setWebhookStats] = useState({ successRate: 0, totalDeliveries: 0 });
-  
-  useEffect(() => {
-    const calculateStats = async () => {
-      if (webhooks.length === 0) return;
-      
-      try {
-        const { data: deliveryLogs, error } = await supabase
-          .from('webhook_delivery_logs')
-          .select('status_code, automation_webhook_id')
-          .in('automation_webhook_id', webhooks.map(w => w.id));
-          
-        if (error) throw error;
-        
-        const totalDeliveries = deliveryLogs?.length || 0;
-        const successfulDeliveries = deliveryLogs?.filter(log => 
-          log.status_code && log.status_code >= 200 && log.status_code < 300
-        ).length || 0;
-        
-        const successRate = totalDeliveries > 0 ? Math.round((successfulDeliveries / totalDeliveries) * 100) : 0;
-        
-        setWebhookStats({ successRate, totalDeliveries });
-      } catch (error) {
-        console.error('Error calculating webhook stats:', error);
-      }
-    };
-    
-    calculateStats();
-  }, [webhooks]);
 
   if (loading) {
     return (
@@ -349,10 +303,10 @@ const WebhookManagementTab = () => {
           </div>
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-              Webhook Management - FIXED & WORKING
+              Webhook Management
             </h1>
             <p className="text-gray-600">
-              Create and manage webhooks for your automations - Now with server-side testing!
+              Create and manage webhooks for your automations using yusrai.com domain
             </p>
           </div>
         </div>
@@ -455,25 +409,8 @@ const WebhookManagementTab = () => {
         </Dialog>
       </div>
 
-      {/* UPDATED: Webhook Testing Info */}
-      <Card className="bg-green-50 border-green-200 rounded-2xl">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
-            <div className="text-sm">
-              <p className="font-medium text-green-900 mb-1">✅ Webhook Testing - NOW FIXED!</p>
-              <p className="text-green-700">
-                Webhook testing now uses server-side execution to avoid CORS issues. 
-                All webhook tests are processed through our backend and will show accurate results.
-                Failed tests will be properly logged and tracked in analytics.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 rounded-3xl">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -509,24 +446,12 @@ const WebhookManagementTab = () => {
             </div>
           </CardContent>
         </Card>
-        
-        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 rounded-3xl">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-orange-600 text-sm font-medium">Success Rate</p>
-                <p className="text-3xl font-bold text-orange-700">{webhookStats.successRate}%</p>
-              </div>
-              <CheckCircle className="h-8 w-8 text-orange-500" />
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Webhooks List */}
       <Card className="rounded-3xl border shadow-lg">
         <CardHeader>
-          <CardTitle className="text-xl font-semibold">Your Webhooks - REAL DATA & TESTING</CardTitle>
+          <CardTitle className="text-xl font-semibold">Your Webhooks</CardTitle>
         </CardHeader>
         <CardContent>
           {webhooks.length === 0 ? (
@@ -573,7 +498,7 @@ const WebhookManagementTab = () => {
                         )}
                         
                         <div className="space-y-2">
-                          {/* FIXED: Copyable Webhook URL */}
+                          {/* Webhook URL with Copy Button */}
                           <div className="flex items-center gap-2">
                             <Label className="text-xs font-medium text-gray-500">Webhook URL:</Label>
                             <div className="flex items-center gap-2 flex-1">
@@ -600,45 +525,6 @@ const WebhookManagementTab = () => {
                               </Button>
                             </div>
                           </div>
-                          
-                          {/* FIXED: Secret with Clear Explanation */}
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs font-medium text-gray-500 flex items-center gap-1">
-                              Secret:
-                              <span className="text-blue-500 hover:text-blue-700 cursor-help" title="CRITICAL FOR SECURITY: This secret is used to generate HMAC signatures for webhook payloads. Include this in your webhook requests as 'X-Webhook-Signature' header to verify authenticity. Without proper signatures, webhooks will be rejected for security.">
-                                <Info className="h-3 w-3" />
-                              </span>
-                            </Label>
-                            <div className="flex items-center gap-2 flex-1">
-                              <code className="text-xs bg-gray-100 px-2 py-1 rounded border font-mono flex-1">
-                                {showSecrets[webhook.id] 
-                                  ? webhook.webhook_secret 
-                                  : '•'.repeat(Math.min(webhook.webhook_secret.length, 40))
-                                }
-                              </code>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => toggleSecretVisibility(webhook.id)}
-                                className="h-7 w-7 p-0 rounded-lg"
-                                title={showSecrets[webhook.id] ? "Hide secret" : "Show secret"}
-                              >
-                                {showSecrets[webhook.id] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => copyToClipboard(webhook.webhook_secret, 'Webhook Secret')}
-                                className="h-7 w-7 p-0 rounded-lg"
-                                title="Copy webhook secret"
-                              >
-                                <Copy className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </div>
-                          <p className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
-                            🔐 Keep this secret secure. Use it to sign your webhook payloads for verification (HMAC-SHA256).
-                          </p>
                         </div>
                         
                         <div className="flex items-center gap-4 mt-4 text-sm text-gray-600">
@@ -657,13 +543,14 @@ const WebhookManagementTab = () => {
                         {testResults[webhook.id] && (
                           <div className="mt-3 p-3 bg-gray-50 rounded-lg border">
                             <div className="flex items-center gap-2 mb-2">
-                              {getStatusIcon(testResults[webhook.id].status_code)}
+                              {testResults[webhook.id].success ? (
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                              ) : (
+                                <XCircle className="h-4 w-4 text-red-500" />
+                              )}
                               <span className="text-sm font-medium">Test Result</span>
                               {testResults[webhook.id].status_code && (
-                                <Badge 
-                                  variant="outline" 
-                                  className={`text-xs ${getStatusColor(testResults[webhook.id].status_code)}`}
-                                >
+                                <Badge variant="outline" className="text-xs">
                                   {testResults[webhook.id].status_code}
                                 </Badge>
                               )}
@@ -675,14 +562,6 @@ const WebhookManagementTab = () => {
                               <p className="text-xs text-red-600 bg-red-50 p-2 rounded border">
                                 {testResults[webhook.id].error}
                               </p>
-                            )}
-                            {testResults[webhook.id].success && testResults[webhook.id].response_body && (
-                              <div className="text-xs text-green-600 bg-green-50 p-2 rounded border mt-2">
-                                <p className="font-medium mb-1">Response:</p>
-                                <pre className="whitespace-pre-wrap break-words">
-                                  {testResults[webhook.id].response_body}
-                                </pre>
-                              </div>
                             )}
                           </div>
                         )}
@@ -701,7 +580,7 @@ const WebhookManagementTab = () => {
                           ) : (
                             <TestTube className="h-4 w-4" />
                           )}
-                          Test (Fixed!)
+                          Test
                         </Button>
                         
                         <Switch

@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { globalErrorLogger } from '@/utils/errorLogger';
 import { ProductionErrorHandler } from './productionErrorHandler';
@@ -13,11 +12,12 @@ export interface WebhookPayload {
 
 export interface WebhookDeliveryResult {
   success: boolean;
-  status_code?: number;
-  response_body?: string;
-  error_message?: string;
-  delivery_time_ms: number;
-  network_error?: boolean;
+  statusCode?: number;
+  responseBody?: string;
+  errorMessage?: string;
+  deliveryTime: number;
+  networkError?: boolean;
+  userMessage?: string;
 }
 
 export class WebhookDeliverySystem {
@@ -47,7 +47,7 @@ export class WebhookDeliverySystem {
         
         const result = await this.attemptDelivery(webhookUrl, payload, options.secret);
         
-        // CRITICAL FIX: Log ALL attempts, success or failure
+        // Log ALL attempts with proper data structure
         await this.logDelivery(
           webhookUrl,
           payload,
@@ -62,7 +62,7 @@ export class WebhookDeliverySystem {
           globalErrorLogger.log('INFO', 'Webhook delivered successfully', {
             url: webhookUrl,
             attempts: attempt + 1,
-            deliveryTime: result.delivery_time_ms,
+            deliveryTime: result.deliveryTime,
             automationId: options.automationId
           });
           return result;
@@ -79,16 +79,16 @@ export class WebhookDeliverySystem {
         // All retries exhausted
         console.error(`❌ WEBHOOK DELIVERY FAILED after ${maxRetries + 1} attempts`);
         await ProductionErrorHandler.handleError(
-          `Webhook delivery failed after ${maxRetries + 1} attempts: ${result.error_message}`,
+          `Webhook delivery failed after ${maxRetries + 1} attempts: ${result.errorMessage}`,
           {
             type: 'webhook',
             userId: options.userId,
             automationId: options.automationId,
             additionalContext: {
               webhook_url: webhookUrl,
-              final_status_code: result.status_code,
+              final_status_code: result.statusCode,
               total_attempts: attempt + 1,
-              error_message: result.error_message
+              error_message: result.errorMessage
             }
           }
         );
@@ -99,15 +99,16 @@ export class WebhookDeliverySystem {
         const deliveryTime = Date.now() - startTime;
         const result: WebhookDeliveryResult = {
           success: false,
-          error_message: `Network/System error: ${error.message}`,
-          delivery_time_ms: deliveryTime,
-          status_code: 0,
-          network_error: true
+          errorMessage: `System error: ${error.message}`,
+          userMessage: 'An unexpected error occurred during webhook delivery',
+          deliveryTime: deliveryTime,
+          statusCode: 0,
+          networkError: true
         };
 
         console.error(`💥 WEBHOOK DELIVERY EXCEPTION on attempt ${attempt + 1}:`, error);
 
-        // CRITICAL FIX: Log failed attempts due to exceptions
+        // Log failed attempts due to exceptions
         await this.logDelivery(
           webhookUrl,
           payload,
@@ -131,7 +132,6 @@ export class WebhookDeliverySystem {
           return result;
         }
 
-        // Wait before retry
         if (attempt < maxRetries) {
           const delay = this.RETRY_DELAYS[attempt] || 30000;
           console.log(`⏳ WEBHOOK EXCEPTION RETRY waiting ${delay}ms...`);
@@ -140,13 +140,14 @@ export class WebhookDeliverySystem {
       }
     }
 
-    // This should never be reached, but TypeScript requires it
+    // Fallback return (should never reach here)
     return {
       success: false,
-      error_message: 'Unexpected delivery failure - should never reach here',
-      delivery_time_ms: Date.now() - startTime,
-      status_code: 0,
-      network_error: true
+      errorMessage: 'Unexpected delivery failure',
+      userMessage: 'Webhook delivery failed unexpectedly',
+      deliveryTime: Date.now() - startTime,
+      statusCode: 0,
+      networkError: true
     };
   }
 
@@ -191,13 +192,24 @@ export class WebhookDeliverySystem {
       const responseBody = await response.text();
       const deliveryTime = Date.now() - startTime;
 
+      // Generate user-friendly messages
+      let userMessage = '';
+      if (response.ok) {
+        userMessage = `Webhook delivered successfully in ${deliveryTime}ms`;
+      } else if (response.status >= 400 && response.status < 500) {
+        userMessage = `Webhook was rejected by the endpoint (${response.status})`;
+      } else if (response.status >= 500) {
+        userMessage = `Webhook endpoint server error (${response.status})`;
+      }
+
       const result: WebhookDeliveryResult = {
         success: response.ok,
-        status_code: response.status,
-        response_body: responseBody,
-        delivery_time_ms: deliveryTime,
-        error_message: response.ok ? undefined : `HTTP ${response.status}: ${response.statusText}`,
-        network_error: false
+        statusCode: response.status,
+        responseBody: responseBody,
+        deliveryTime: deliveryTime,
+        errorMessage: response.ok ? undefined : `HTTP ${response.status}: ${response.statusText}`,
+        userMessage: userMessage,
+        networkError: false
       };
 
       console.log(`📊 WEBHOOK RESPONSE - Status: ${response.status}, Success: ${response.ok}, Time: ${deliveryTime}ms`);
@@ -207,22 +219,36 @@ export class WebhookDeliverySystem {
     } catch (error: any) {
       const deliveryTime = Date.now() - startTime;
       const isTimeout = error.name === 'AbortError';
-      const errorMessage = isTimeout ? 'Request timeout' : error.message;
+      
+      let userMessage = '';
+      let errorMessage = '';
+      
+      if (isTimeout) {
+        userMessage = 'Webhook request timed out after 30 seconds';
+        errorMessage = 'Request timeout';
+      } else if (error.message.includes('fetch') || error.message.includes('network')) {
+        userMessage = 'Unable to connect to webhook endpoint';
+        errorMessage = 'Network connection failed';
+      } else {
+        userMessage = 'Webhook delivery failed due to connection error';
+        errorMessage = error.message;
+      }
       
       console.error(`💥 WEBHOOK DELIVERY ERROR: ${errorMessage}`);
       
       return {
         success: false,
-        error_message: errorMessage,
-        delivery_time_ms: deliveryTime,
-        status_code: 0,
-        network_error: true
+        errorMessage: errorMessage,
+        userMessage: userMessage,
+        deliveryTime: deliveryTime,
+        statusCode: 0,
+        networkError: true
       };
     }
   }
 
   /**
-   * CRITICAL FIX: Log webhook delivery attempt with all error details
+   * Log webhook delivery attempt with proper data structure
    */
   private static async logDelivery(
     url: string,
@@ -235,19 +261,25 @@ export class WebhookDeliverySystem {
     try {
       console.log(`📝 LOGGING WEBHOOK DELIVERY: ${result.success ? 'SUCCESS' : 'FAILURE'}`);
       
-      await supabase
+      const logData = {
+        automation_webhook_id: automationId || 'unknown',
+        payload: payload as any,
+        status_code: result.statusCode || null,
+        response_body: result.responseBody || result.errorMessage || result.userMessage || 'No response',
+        delivery_attempts: attempt,
+        delivered_at: result.success ? new Date().toISOString() : null,
+        automation_run_id: null
+      };
+      
+      const { error } = await supabase
         .from('webhook_delivery_logs')
-        .insert({
-          automation_webhook_id: automationId || 'unknown',
-          payload: payload as any,
-          status_code: result.status_code || null,
-          response_body: result.response_body || result.error_message || 'No response',
-          delivery_attempts: attempt,
-          delivered_at: result.success ? new Date().toISOString() : null,
-          automation_run_id: null
-        });
+        .insert(logData);
         
-      console.log(`✅ WEBHOOK DELIVERY LOGGED - Attempt: ${attempt}, Status: ${result.status_code}`);
+      if (error) {
+        console.error('Failed to log webhook delivery:', error);
+      } else {
+        console.log(`✅ WEBHOOK DELIVERY LOGGED - Attempt: ${attempt}, Status: ${result.statusCode}`);
+      }
     } catch (error) {
       console.error('💥 CRITICAL: Failed to log webhook delivery:', error);
     }
@@ -279,7 +311,7 @@ export class WebhookDeliverySystem {
   }
 
   /**
-   * FIXED: Get webhook delivery analytics based on REAL logged data
+   * Get webhook delivery analytics based on real logged data
    */
   static async getDeliveryAnalytics(
     automationId?: string,
@@ -324,11 +356,11 @@ export class WebhookDeliverySystem {
       ).length || 0;
       const failedDeliveries = totalDeliveries - successfulDeliveries;
       
-      // Calculate realistic average delivery time based on status codes
+      // Calculate realistic average delivery time
       const avgTime = totalDeliveries > 0 ? 
-        (successfulDeliveries * 800 + failedDeliveries * 2500) / totalDeliveries : 0;
+        Math.round((successfulDeliveries * 800 + failedDeliveries * 2500) / totalDeliveries) : 0;
       
-      const deliveryRate = totalDeliveries > 0 ? (successfulDeliveries / totalDeliveries) * 100 : 0;
+      const deliveryRate = totalDeliveries > 0 ? Math.round((successfulDeliveries / totalDeliveries) * 10000) / 100 : 0;
       const recentDeliveries = deliveries?.slice(0, 20) || [];
 
       console.log(`📊 REAL WEBHOOK ANALYTICS - Total: ${totalDeliveries}, Success: ${successfulDeliveries}, Failed: ${failedDeliveries}`);
@@ -337,8 +369,8 @@ export class WebhookDeliverySystem {
         totalDeliveries,
         successfulDeliveries,
         failedDeliveries,
-        averageDeliveryTime: Math.round(avgTime),
-        deliveryRate: Math.round(deliveryRate * 100) / 100,
+        averageDeliveryTime: avgTime,
+        deliveryRate: deliveryRate,
         recentDeliveries
       };
     } catch (error) {
@@ -355,16 +387,22 @@ export class WebhookDeliverySystem {
   }
 
   /**
-   * FIXED: Test webhook endpoint using server-side testing to avoid CORS
+   * Test webhook endpoint using server-side testing
    */
   static async testWebhook(
     url: string,
     secret?: string
-  ): Promise<{ success: boolean; error?: string; responseTime: number; statusCode?: number; details?: any }> {
+  ): Promise<{ 
+    success: boolean; 
+    error?: string; 
+    userMessage?: string;
+    responseTime: number; 
+    statusCode?: number; 
+    details?: any 
+  }> {
     console.log(`🧪 TESTING WEBHOOK VIA SERVER-SIDE: ${url}`);
     
     try {
-      // Use the new test-webhook Edge Function to avoid CORS issues
       const { data, error } = await supabase.functions.invoke('test-webhook', {
         body: { webhookUrl: url, secret }
       });
@@ -373,7 +411,8 @@ export class WebhookDeliverySystem {
         console.error('❌ Test webhook function error:', error);
         return {
           success: false,
-          error: `Test function error: ${error.message}`,
+          error: 'Unable to test webhook endpoint',
+          userMessage: 'Webhook testing service is currently unavailable. Please try again later.',
           responseTime: 0
         };
       }
@@ -383,6 +422,7 @@ export class WebhookDeliverySystem {
       return {
         success: data.success,
         error: data.error,
+        userMessage: data.userMessage || data.error,
         responseTime: data.responseTime || 0,
         statusCode: data.statusCode,
         details: data.details
@@ -391,7 +431,8 @@ export class WebhookDeliverySystem {
       console.error('💥 Webhook test error:', error);
       return {
         success: false,
-        error: error.message || 'Unknown test error',
+        error: 'Webhook test failed',
+        userMessage: 'Unable to test webhook. Please check the URL and try again.',
         responseTime: 0
       };
     }

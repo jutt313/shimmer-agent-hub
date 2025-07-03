@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,7 +23,8 @@ import {
   Clock, 
   ExternalLink,
   TrendingUp,
-  Activity
+  Activity,
+  AlertTriangle
 } from 'lucide-react';
 
 interface AutomationWebhook {
@@ -57,6 +57,7 @@ interface WebhookTestResult {
   response_time: number;
   error?: string;
   response_body?: string;
+  userMessage?: string;
 }
 
 const WebhookManagementTab = () => {
@@ -141,7 +142,7 @@ const WebhookManagementTab = () => {
     }
 
     try {
-      // Generate webhook URL using the database function
+      // Generate webhook URL using the updated domain generator
       const { data: urlData, error: urlError } = await supabase
         .rpc('generate_webhook_url', { automation_id: webhookForm.automation_id });
 
@@ -236,11 +237,11 @@ const WebhookManagementTab = () => {
         console.error('❌ Test webhook function error:', error);
         const result: WebhookTestResult = {
           success: false,
-          error: `Test function error: ${error.message}`,
-          response_time: 0
+          error: 'Unable to connect to webhook testing service',
+          responseTime: 0
         };
         setTestResults(prev => ({ ...prev, [webhook.id]: result }));
-        toast.error(`❌ Webhook test failed: ${result.error}`);
+        toast.error('❌ Webhook testing service unavailable');
         return;
       }
 
@@ -249,36 +250,41 @@ const WebhookManagementTab = () => {
       const testResult: WebhookTestResult = {
         success: data.success,
         error: data.error,
-        response_time: data.responseTime || 0,
-        status_code: data.statusCode
+        userMessage: data.userMessage, // Use user-friendly message
+        responseTime: data.responseTime || 0,
+        statusCode: data.statusCode
       };
 
       setTestResults(prev => ({ ...prev, [webhook.id]: testResult }));
       
       if (data.success) {
-        toast.success(`✅ Webhook test successful! (${data.responseTime || 0}ms)`);
+        toast.success(`✅ ${data.userMessage || `Webhook test successful! (${data.responseTime || 0}ms)`}`);
       } else {
-        toast.error(`❌ Webhook test failed: ${data.error}`);
+        toast.error(`❌ ${data.userMessage || data.error || 'Webhook test failed'}`);
       }
     } catch (error: any) {
       console.error('💥 Webhook test error:', error);
       
       const result: WebhookTestResult = {
         success: false,
-        response_time: 0,
-        error: error.message || 'Unknown error occurred during webhook test'
+        responseTime: 0,
+        error: 'Webhook test failed unexpectedly',
+        userMessage: 'Unable to test webhook. Please try again later.'
       };
       
       setTestResults(prev => ({ ...prev, [webhook.id]: result }));
-      toast.error(`❌ Webhook test failed: ${result.error}`);
+      toast.error('❌ Webhook test failed unexpectedly');
     } finally {
       setTestingWebhook(null);
     }
   };
 
   const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copied to clipboard`);
+    navigator.clipboard.writeText(text).then(() => {
+      toast.success(`${label} copied to clipboard`);
+    }).catch(() => {
+      toast.error(`Failed to copy ${label}`);
+    });
   };
 
   const totalWebhooks = webhooks.length;
@@ -306,7 +312,7 @@ const WebhookManagementTab = () => {
               Webhook Management
             </h1>
             <p className="text-gray-600">
-              Create and manage webhooks for your automations using yusrai.com domain
+              Create and manage webhooks for your automations
             </p>
           </div>
         </div>
@@ -497,19 +503,22 @@ const WebhookManagementTab = () => {
                           <p className="text-gray-600 text-sm mb-3">{webhook.webhook_description}</p>
                         )}
                         
-                        <div className="space-y-2">
-                          {/* Webhook URL with Copy Button */}
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs font-medium text-gray-500">Webhook URL:</Label>
-                            <div className="flex items-center gap-2 flex-1">
-                              <code className="text-xs bg-gray-100 px-2 py-1 rounded border font-mono flex-1 truncate">
+                        <div className="space-y-3">
+                          {/* Webhook URL with Copy Button - IMPROVED */}
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                              <ExternalLink className="h-4 w-4" />
+                              Webhook URL
+                            </Label>
+                            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl border">
+                              <code className="text-sm font-mono flex-1 truncate text-gray-800">
                                 {webhook.webhook_url}
                               </code>
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => copyToClipboard(webhook.webhook_url, 'Webhook URL')}
-                                className="h-7 w-7 p-0 rounded-lg"
+                                className="h-8 w-8 p-0 rounded-lg hover:bg-blue-50 hover:border-blue-200"
                                 title="Copy webhook URL"
                               >
                                 <Copy className="h-3 w-3" />
@@ -518,12 +527,38 @@ const WebhookManagementTab = () => {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => window.open(webhook.webhook_url, '_blank')}
-                                className="h-7 w-7 p-0 rounded-lg"
+                                className="h-8 w-8 p-0 rounded-lg hover:bg-green-50 hover:border-green-200"
                                 title="Open webhook URL"
                               >
                                 <ExternalLink className="h-3 w-3" />
                               </Button>
                             </div>
+                          </div>
+
+                          {/* Webhook Secret - IMPROVED with better explanation */}
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                              <AlertTriangle className="h-4 w-4 text-amber-500" />
+                              Security Secret
+                            </Label>
+                            <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-xl border border-amber-200">
+                              <code className="text-sm font-mono flex-1 truncate text-gray-800">
+                                {webhook.webhook_secret}
+                              </code>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => copyToClipboard(webhook.webhook_secret, 'Webhook Secret')}
+                                className="h-8 w-8 p-0 rounded-lg hover:bg-amber-100 hover:border-amber-300"
+                                title="Copy webhook secret"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                              <strong>Important:</strong> Use this secret to sign your webhook payloads for security verification. 
+                              Include it as 'X-Webhook-Signature' header when sending requests.
+                            </p>
                           </div>
                         </div>
                         
@@ -540,29 +575,34 @@ const WebhookManagementTab = () => {
                           )}
                         </div>
                         
+                        {/* IMPROVED Test Results Display */}
                         {testResults[webhook.id] && (
-                          <div className="mt-3 p-3 bg-gray-50 rounded-lg border">
+                          <div className={`mt-4 p-4 rounded-xl border ${
+                            testResults[webhook.id].success 
+                              ? 'bg-green-50 border-green-200' 
+                              : 'bg-red-50 border-red-200'
+                          }`}>
                             <div className="flex items-center gap-2 mb-2">
                               {testResults[webhook.id].success ? (
-                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                <CheckCircle className="h-4 w-4 text-green-600" />
                               ) : (
-                                <XCircle className="h-4 w-4 text-red-500" />
+                                <XCircle className="h-4 w-4 text-red-600" />
                               )}
                               <span className="text-sm font-medium">Test Result</span>
-                              {testResults[webhook.id].status_code && (
+                              {testResults[webhook.id].statusCode && (
                                 <Badge variant="outline" className="text-xs">
-                                  {testResults[webhook.id].status_code}
+                                  HTTP {testResults[webhook.id].statusCode}
                                 </Badge>
                               )}
                               <span className="text-xs text-gray-500">
-                                {testResults[webhook.id].response_time}ms
+                                {testResults[webhook.id].responseTime}ms
                               </span>
                             </div>
-                            {testResults[webhook.id].error && (
-                              <p className="text-xs text-red-600 bg-red-50 p-2 rounded border">
-                                {testResults[webhook.id].error}
-                              </p>
-                            )}
+                            <p className={`text-sm ${
+                              testResults[webhook.id].success ? 'text-green-700' : 'text-red-700'
+                            }`}>
+                              {testResults[webhook.id].userMessage || testResults[webhook.id].error || 'Test completed'}
+                            </p>
                           </div>
                         )}
                       </div>
@@ -573,10 +613,10 @@ const WebhookManagementTab = () => {
                           variant="outline"
                           onClick={() => testWebhook(webhook)}
                           disabled={testingWebhook === webhook.id}
-                          className="rounded-lg bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+                          className="rounded-lg bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
                         >
                           {testingWebhook === webhook.id ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                           ) : (
                             <TestTube className="h-4 w-4" />
                           )}

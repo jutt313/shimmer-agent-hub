@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { WebhookDeliverySystem } from '@/utils/webhookDeliverySystem';
 import { toast } from 'sonner';
 import { 
   Webhook, 
@@ -242,8 +244,8 @@ const WebhookManagementTab = () => {
       const testResult: WebhookTestResult = {
         success: result.success,
         error: result.error,
-        responseTime: result.responseTime,
-        statusCode: result.statusCode
+        response_time: result.responseTime,
+        status_code: result.statusCode
       };
 
       setTestResults(prev => ({ ...prev, [webhook.id]: testResult }));
@@ -258,7 +260,7 @@ const WebhookManagementTab = () => {
       
       const result: WebhookTestResult = {
         success: false,
-        responseTime: 0,
+        response_time: 0,
         error: error.message || 'Unknown error occurred during webhook test'
       };
       

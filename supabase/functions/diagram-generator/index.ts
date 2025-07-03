@@ -1,52 +1,333 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-const FIXED_DIAGRAM_GENERATOR_SYSTEM_PROMPT = `You are an expert automation flow diagram generator that creates ACCURATE visual representations of automation blueprints.
-
-=== CRITICAL RULES ===
-1. NEVER create fake "Trigger" nodes - use the ACTUAL trigger from blueprint.trigger
-2. ONE STEP = ONE NODE - each blueprint.steps[i] becomes exactly one visual node
-3. DYNAMIC CONDITIONS - extract ALL condition branches, not just yes/no
-4. SHOW ALL AGENTS - place AI agents where they belong in the flow
-5. CONNECT EVERYTHING - ensure all nodes have proper source/target connections
-
-=== NODE TYPES ===
-- platformTriggerNode: ONLY for the actual trigger (webhook, manual, scheduled)
-- actionNode: For action steps (API calls, integrations, operations)
-- conditionNode: For condition steps with DYNAMIC branches based on actual conditions
-- aiAgentNode: For AI agent steps (OpenAI, Claude, custom agents)
-- loopNode: For loop/iteration steps
-- delayNode: For delay/wait steps
-- retryNode: For retry logic steps
-- fallbackNode: For error handling steps
-
-=== FLOW ANALYSIS ===
-Analyze the blueprint step by step:
-1. Start with blueprint.trigger - create ONE platformTriggerNode
-2. For each step in blueprint.steps - create the appropriate node type
-3. For conditions - analyze ALL possible outcomes and create dynamic branches
-4. For nested steps (condition.if_true, condition.if_false, loop.steps, etc.) - process recursively
-5. Connect ALL nodes with proper edges
-
-=== POSITIONING ===
-- Start trigger at (50, 100)
-- Horizontal spacing: 300px between main flow steps
-- Vertical spacing: 200px between condition branches
-- Ensure complex flows fit in viewport when zoomed out
-
-=== OUTPUT FORMAT ===
-Return ONLY valid JSON with "nodes" and "edges" arrays.
-Each node must have: id, type, position, data
-Each edge must have: id, source, target, sourceHandle, targetHandle
-NO explanatory text, ONLY the JSON diagram data.`
-
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface BlueprintStep {
+    id?: string;
+    type: string;
+    action?: any;
+    condition?: any;
+    ai_agent_call?: any;
+    loop?: any;
+    delay?: any;
+    retry?: any;
+    fallback?: any;
+    explanation?: string;
+}
+
+interface DiagramNode {
+    id: string;
+    type: string;
+    position: { x: number; y: number };
+    data: any;
+}
+
+interface DiagramEdge {
+    id: string;
+    source: string;
+    target: string;
+    sourceHandle?: string;
+    targetHandle?: string;
+    type?: string;
+    animated?: boolean;
+    style?: any;
+}
+
+class DiagramBuilder {
+    private nodes: DiagramNode[] = [];
+    private edges: DiagramEdge[] = [];
+    private currentX = 50;
+    private currentY = 100;
+    private nodeSpacing = 350;
+    private verticalSpacing = 200;
+
+    constructor(private blueprint: any) {}
+
+    build(): { nodes: DiagramNode[]; edges: DiagramEdge[] } {
+        console.log('🔧 Building diagram for blueprint with', this.blueprint.steps?.length || 0, 'steps');
+        
+        // Step 1: Create trigger node
+        this.createTriggerNode();
+        
+        // Step 2: Process all steps
+        if (this.blueprint.steps && this.blueprint.steps.length > 0) {
+            this.processSteps(this.blueprint.steps);
+        }
+        
+        console.log('✅ Diagram built:', {
+            nodes: this.nodes.length,
+            edges: this.edges.length
+        });
+        
+        return {
+            nodes: this.nodes,
+            edges: this.edges
+        };
+    }
+
+    private createTriggerNode() {
+        const trigger = this.blueprint.trigger;
+        const triggerNode: DiagramNode = {
+            id: 'trigger-node',
+            type: 'platformTriggerNode',
+            position: { x: this.currentX, y: this.currentY },
+            data: {
+                label: trigger?.type || 'Manual Trigger',
+                platform: this.extractPlatform(trigger),
+                trigger: trigger,
+                explanation: trigger?.explanation || 'This automation starts when triggered'
+            }
+        };
+        
+        this.nodes.push(triggerNode);
+        this.currentX += this.nodeSpacing;
+        
+        console.log('📍 Created trigger node:', triggerNode.id);
+    }
+
+    private processSteps(steps: BlueprintStep[], parentId = 'trigger-node') {
+        let lastNodeId = parentId;
+        
+        for (let i = 0; i < steps.length; i++) {
+            const step = steps[i];
+            const nodeId = `step-${Date.now()}-${i}`;
+            
+            console.log(`🔄 Processing step ${i + 1}:`, step.type);
+            
+            const node = this.createNodeForStep(step, nodeId);
+            this.nodes.push(node);
+            
+            // Create edge from previous node
+            if (lastNodeId) {
+                this.createEdge(lastNodeId, nodeId);
+            }
+            
+            // Handle nested steps
+            lastNodeId = this.handleNestedSteps(step, nodeId);
+        }
+    }
+
+    private createNodeForStep(step: BlueprintStep, nodeId: string): DiagramNode {
+        const position = { x: this.currentX, y: this.currentY };
+        this.currentX += this.nodeSpacing;
+        
+        // Determine node type and data based on step
+        switch (step.type) {
+            case 'condition':
+                return {
+                    id: nodeId,
+                    type: 'conditionNode',
+                    position,
+                    data: {
+                        label: step.explanation || 'Condition Check',
+                        icon: 'branch',
+                        condition: step.condition,
+                        explanation: step.explanation,
+                        branches: this.extractConditionBranches(step.condition)
+                    }
+                };
+                
+            case 'ai_agent_call':
+                return {
+                    id: nodeId,
+                    type: 'aiAgentNode',
+                    position,
+                    data: {
+                        label: step.explanation || 'AI Agent Call',
+                        icon: 'bot',
+                        agent: step.ai_agent_call,
+                        explanation: step.explanation
+                    }
+                };
+                
+            case 'delay':
+                return {
+                    id: nodeId,
+                    type: 'delayNode',
+                    position,
+                    data: {
+                        label: step.explanation || 'Delay',
+                        icon: 'clock',
+                        delay: step.delay,
+                        explanation: step.explanation
+                    }
+                };
+                
+            case 'loop':
+                return {
+                    id: nodeId,
+                    type: 'loopNode',
+                    position,
+                    data: {
+                        label: step.explanation || 'Loop',
+                        icon: 'repeat',
+                        loop: step.loop,
+                        explanation: step.explanation
+                    }
+                };
+                
+            case 'retry':
+                return {
+                    id: nodeId,
+                    type: 'retryNode',
+                    position,
+                    data: {
+                        label: step.explanation || 'Retry Logic',
+                        icon: 'refresh',
+                        retry: step.retry,
+                        explanation: step.explanation
+                    }
+                };
+                
+            case 'fallback':
+                return {
+                    id: nodeId,
+                    type: 'fallbackNode',
+                    position,
+                    data: {
+                        label: step.explanation || 'Fallback Handler',
+                        icon: 'shield',
+                        fallback: step.fallback,
+                        explanation: step.explanation
+                    }
+                };
+                
+            default:
+                // Default to action node
+                return {
+                    id: nodeId,
+                    type: 'actionNode',
+                    position,
+                    data: {
+                        label: step.explanation || step.action?.method || 'Action Step',
+                        icon: 'settings',
+                        platform: this.extractPlatform(step.action),
+                        action: step.action,
+                        stepType: step.type,
+                        explanation: step.explanation,
+                        stepDetails: {
+                            integration: step.action?.integration,
+                            method: step.action?.method,
+                            endpoint: step.action?.endpoint,
+                            parameters: step.action?.parameters
+                        }
+                    }
+                };
+        }
+    }
+
+    private handleNestedSteps(step: BlueprintStep, nodeId: string): string {
+        let lastNodeId = nodeId;
+        
+        // Handle condition branches
+        if (step.type === 'condition' && step.condition) {
+            if (step.condition.if_true && step.condition.if_true.length > 0) {
+                const branchY = this.currentY + this.verticalSpacing;
+                const savedY = this.currentY;
+                this.currentY = branchY;
+                
+                this.processSteps(step.condition.if_true, nodeId);
+                
+                this.currentY = savedY;
+            }
+            
+            if (step.condition.if_false && step.condition.if_false.length > 0) {
+                const branchY = this.currentY + this.verticalSpacing * 2;
+                const savedY = this.currentY;
+                this.currentY = branchY;
+                
+                this.processSteps(step.condition.if_false, nodeId);
+                
+                this.currentY = savedY;
+            }
+        }
+        
+        // Handle loop steps
+        if (step.type === 'loop' && step.loop?.steps) {
+            this.processSteps(step.loop.steps, nodeId);
+        }
+        
+        // Handle retry steps
+        if (step.type === 'retry' && step.retry?.steps) {
+            this.processSteps(step.retry.steps, nodeId);
+        }
+        
+        // Handle fallback steps
+        if (step.type === 'fallback' && step.fallback) {
+            if (step.fallback.primary_steps) {
+                this.processSteps(step.fallback.primary_steps, nodeId);
+            }
+            if (step.fallback.fallback_steps) {
+                this.processSteps(step.fallback.fallback_steps, nodeId);
+            }
+        }
+        
+        return lastNodeId;
+    }
+
+    private createEdge(source: string, target: string, sourceHandle?: string, targetHandle?: string) {
+        const edge: DiagramEdge = {
+            id: `edge-${source}-${target}`,
+            source,
+            target,
+            type: 'smoothstep',
+            animated: true,
+            style: {
+                stroke: '#3b82f6',
+                strokeWidth: 2
+            }
+        };
+        
+        if (sourceHandle) edge.sourceHandle = sourceHandle;
+        if (targetHandle) edge.targetHandle = targetHandle;
+        
+        this.edges.push(edge);
+        console.log('🔗 Created edge:', edge.id);
+    }
+
+    private extractPlatform(action: any): string {
+        if (!action) return '';
+        return action.integration || action.platform || '';
+    }
+
+    private extractConditionBranches(condition: any): Array<{ label: string; handle: string; color: string }> {
+        const branches = [];
+        
+        if (condition?.if_true) {
+            branches.push({ label: 'True', handle: 'true', color: '#10b981' });
+        }
+        
+        if (condition?.if_false) {
+            branches.push({ label: 'False', handle: 'false', color: '#ef4444' });
+        }
+        
+        // Add more sophisticated condition analysis here
+        if (condition?.expression) {
+            const expr = condition.expression.toLowerCase();
+            if (expr.includes('urgent')) {
+                branches.push({ label: 'Urgent', handle: 'urgent', color: '#ef4444' });
+            }
+            if (expr.includes('task')) {
+                branches.push({ label: 'Task', handle: 'task', color: '#10b981' });
+            }
+            if (expr.includes('follow')) {
+                branches.push({ label: 'Follow-up', handle: 'followup', color: '#f59e0b' });
+            }
+        }
+        
+        return branches.length > 0 ? branches : [
+            { label: 'Yes', handle: 'yes', color: '#10b981' },
+            { label: 'No', handle: 'no', color: '#ef4444' }
+        ];
+    }
+}
+
 serve(async (req) => {
-    console.log('🚀 Fixed Diagram Generator - Request received');
+    console.log('🚀 Diagram Generator - Request received');
     
     if (req.method === 'OPTIONS') {
         return new Response(null, { headers: corsHeaders });
@@ -63,119 +344,26 @@ serve(async (req) => {
         const requestBody = await req.json();
         const { automation_blueprint } = requestBody;
 
-        if (!automation_blueprint || !automation_blueprint.steps) {
+        if (!automation_blueprint) {
             return new Response(
                 JSON.stringify({ error: 'Missing automation blueprint' }),
                 { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
-        console.log('📋 Processing blueprint with', automation_blueprint.steps.length, 'steps');
-
-        const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-        if (!openaiApiKey) {
-            return new Response(
-                JSON.stringify({ error: 'OpenAI API key not configured' }),
-                { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
-
-        // Create a focused prompt with the actual blueprint
-        const blueprintAnalysis = analyzeBlueprint(automation_blueprint);
-        const userPrompt = `Generate a complete flow diagram for this automation:
-
-TRIGGER: ${JSON.stringify(automation_blueprint.trigger)}
-STEPS: ${JSON.stringify(automation_blueprint.steps, null, 2)}
-
-ANALYSIS:
-- Total Steps: ${blueprintAnalysis.totalSteps}
-- Conditions: ${blueprintAnalysis.conditionCount}
-- AI Agents: ${blueprintAnalysis.agentCount}
-- Platforms: ${blueprintAnalysis.platforms.join(', ')}
-
-Create nodes for EVERY step and connect them properly. Start with the real trigger, not a fake one.`;
-
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${openaiApiKey}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                model: 'gpt-4o',
-                messages: [
-                    { role: "system", content: FIXED_DIAGRAM_GENERATOR_SYSTEM_PROMPT },
-                    { role: "user", content: userPrompt }
-                ],
-                response_format: { type: "json_object" },
-                temperature: 0.1,
-                max_tokens: 4000
-            }),
+        console.log('📋 Processing blueprint:', {
+            hasSteps: !!automation_blueprint.steps,
+            stepCount: automation_blueprint.steps?.length || 0,
+            hasTrigger: !!automation_blueprint.trigger
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error('❌ OpenAI API error:', errorData);
-            return new Response(
-                JSON.stringify({ error: `OpenAI API error: ${JSON.stringify(errorData)}` }),
-                { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
+        // Use deterministic diagram builder instead of AI
+        const builder = new DiagramBuilder(automation_blueprint);
+        const diagramData = builder.build();
 
-        const result = await response.json();
-        const diagramDataString = result.choices[0].message.content;
-        
-        let diagramData;
-        try {
-            diagramData = JSON.parse(diagramDataString);
-        } catch (parseError) {
-            console.error('❌ JSON parsing error:', parseError);
-            return new Response(
-                JSON.stringify({ 
-                    error: 'Failed to parse AI response as JSON',
-                    raw_content: diagramDataString.substring(0, 500)
-                }),
-                { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
-
-        if (!diagramData || !diagramData.nodes || !diagramData.edges) {
-            console.error('❌ Invalid diagram structure');
-            return new Response(
-                JSON.stringify({ error: 'Invalid diagram structure from AI' }),
-                { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
-
-        // Post-process nodes and edges to ensure they're properly formatted
-        diagramData.nodes = diagramData.nodes.map((node: any, index: number) => ({
-            ...node,
-            id: node.id || `node-${index}`,
-            draggable: true,
-            selectable: true,
-            connectable: false,
-            position: {
-                x: typeof node.position?.x === 'number' ? node.position.x : 50 + (index * 300),
-                y: typeof node.position?.y === 'number' ? node.position.y : 100
-            }
-        }));
-
-        diagramData.edges = diagramData.edges.map((edge: any, index: number) => ({
-            ...edge,
-            id: edge.id || `edge-${index}`,
-            type: 'smoothstep',
-            animated: true,
-            style: {
-                stroke: edge.style?.stroke || '#3b82f6',
-                strokeWidth: 2,
-                ...edge.style
-            }
-        }));
-
-        console.log('✅ Generated diagram:', {
+        console.log('✅ Generated diagram data:', {
             nodes: diagramData.nodes.length,
-            edges: diagramData.edges.length,
-            expectedSteps: blueprintAnalysis.totalSteps
+            edges: diagramData.edges.length
         });
 
         return new Response(JSON.stringify(diagramData), {
@@ -194,46 +382,3 @@ Create nodes for EVERY step and connect them properly. Start with the real trigg
         );
     }
 });
-
-function analyzeBlueprint(blueprint: any) {
-    let totalSteps = 0;
-    let conditionCount = 0;
-    let agentCount = 0;
-    const platforms = new Set<string>();
-
-    const analyzeSteps = (steps: any[]) => {
-        steps.forEach(step => {
-            totalSteps++;
-            
-            if (step.action?.integration) {
-                platforms.add(step.action.integration);
-            }
-            
-            if (step.type === 'condition') {
-                conditionCount++;
-                if (step.condition?.if_true) analyzeSteps(step.condition.if_true);
-                if (step.condition?.if_false) analyzeSteps(step.condition.if_false);
-            }
-            
-            if (step.type === 'ai_agent_call' || step.ai_agent_call) {
-                agentCount++;
-            }
-            
-            if (step.loop?.steps) analyzeSteps(step.loop.steps);
-            if (step.retry?.steps) analyzeSteps(step.retry.steps);
-            if (step.fallback?.primary_steps) analyzeSteps(step.fallback.primary_steps);
-            if (step.fallback?.fallback_steps) analyzeSteps(step.fallback.fallback_steps);
-        });
-    };
-
-    if (blueprint.steps) {
-        analyzeSteps(blueprint.steps);
-    }
-
-    return {
-        totalSteps,
-        conditionCount,
-        agentCount,
-        platforms: Array.from(platforms)
-    };
-}

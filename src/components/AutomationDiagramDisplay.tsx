@@ -63,71 +63,93 @@ const nodeTypes = {
 // Enhanced Layouting with better dynamic positioning
 const NODE_WIDTH = 320;
 const NODE_HEIGHT = 140;
-const HORIZONTAL_GAP = 220;
-const VERTICAL_GAP = 160;
+const HORIZONTAL_GAP = 280;
+const VERTICAL_GAP = 180;
+const START_X = 50;
+const START_Y = 100;
 
 const getDynamicLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => {
-  console.log('🎨 Starting dynamic layout calculation for', nodes.length, 'nodes and', edges.length, 'edges');
+  console.log('🎨 Starting enhanced layout calculation for', nodes.length, 'nodes');
   
   if (!nodes || nodes.length === 0) return { nodes: [], edges };
 
+  // Build adjacency graph
   const graph = new Map<string, string[]>();
   const inDegrees = new Map<string, number>();
+  const outDegrees = new Map<string, number>();
 
   nodes.forEach(node => {
     graph.set(node.id, []);
     inDegrees.set(node.id, 0);
+    outDegrees.set(node.id, 0);
   });
 
   edges.forEach(edge => {
-    graph.get(edge.source)?.push(edge.target);
-    inDegrees.set(edge.target, (inDegrees.get(edge.target) || 0) + 1);
+    if (graph.has(edge.source) && graph.has(edge.target)) {
+      graph.get(edge.source)?.push(edge.target);
+      inDegrees.set(edge.target, (inDegrees.get(edge.target) || 0) + 1);
+      outDegrees.set(edge.source, (outDegrees.get(edge.source) || 0) + 1);
+    }
   });
 
+  // Topological sort to determine layers
   const queue: string[] = [];
   const layers = new Map<string, number>();
-  let currentLayer = 0;
-
+  
+  // Find root nodes (nodes with no incoming edges)
   nodes.forEach(node => {
     if (inDegrees.get(node.id) === 0) {
       queue.push(node.id);
-      layers.set(node.id, currentLayer);
+      layers.set(node.id, 0);
     }
   });
 
   let head = 0;
   while (head < queue.length) {
     const nodeId = queue[head++];
-    const nextLayer = (layers.get(nodeId) || 0) + 1;
+    const currentLayer = layers.get(nodeId) || 0;
+    const nextLayer = currentLayer + 1;
 
     graph.get(nodeId)?.forEach(childId => {
-      inDegrees.set(childId, (inDegrees.get(childId) || 0) - 1);
-      if (inDegrees.get(childId) === 0) {
+      const newInDegree = (inDegrees.get(childId) || 0) - 1;
+      inDegrees.set(childId, newInDegree);
+      
+      if (newInDegree === 0) {
         queue.push(childId);
-        layers.set(childId, nextLayer);
+        layers.set(childId, Math.max(layers.get(childId) || 0, nextLayer));
       }
     });
   }
 
-  // Enhanced positioning for complex conditions
-  const layerNodeCounts = new Map<number, number>();
-  layers.forEach(layer => {
-    layerNodeCounts.set(layer, (layerNodeCounts.get(layer) || 0) + 1);
+  // Handle orphaned nodes
+  nodes.forEach(node => {
+    if (!layers.has(node.id)) {
+      layers.set(node.id, 0);
+    }
   });
 
-  const layerNodeOffsets = new Map<number, number>();
-  layerNodeCounts.forEach((count, layer) => {
-    const totalHeight = count * NODE_HEIGHT + (count - 1) * VERTICAL_GAP;
-    layerNodeOffsets.set(layer, -totalHeight / 2);
+  // Group nodes by layer
+  const layerGroups = new Map<number, string[]>();
+  layers.forEach((layer, nodeId) => {
+    if (!layerGroups.has(layer)) {
+      layerGroups.set(layer, []);
+    }
+    layerGroups.get(layer)?.push(nodeId);
   });
 
+  // Position calculation
   const layoutedNodes = nodes.map(node => {
     const layer = layers.get(node.id) || 0;
-    const x = layer * (NODE_WIDTH + HORIZONTAL_GAP) + 50;
-    const currentOffset = layerNodeOffsets.get(layer) || 0;
-    const y = currentOffset + 300; // Center vertically
+    const layerNodes = layerGroups.get(layer) || [];
+    const nodeIndex = layerNodes.indexOf(node.id);
     
-    layerNodeOffsets.set(layer, currentOffset + NODE_HEIGHT + VERTICAL_GAP);
+    // Calculate position
+    const x = START_X + (layer * (NODE_WIDTH + HORIZONTAL_GAP));
+    
+    // Vertical positioning: center the layer vertically
+    const layerHeight = layerNodes.length * NODE_HEIGHT + (layerNodes.length - 1) * VERTICAL_GAP;
+    const layerStartY = START_Y + (layerHeight > 0 ? -layerHeight / 2 : 0);
+    const y = layerStartY + nodeIndex * (NODE_HEIGHT + VERTICAL_GAP) + 300; // Add offset to center
     
     return { 
       ...node, 
@@ -138,23 +160,59 @@ const getDynamicLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'L
     };
   });
 
-  const layoutedEdges = edges.map(edge => ({
-    ...edge,
-    type: 'smoothstep',
-    animated: true,
-    style: {
-      stroke: edge.style?.stroke || '#3b82f6',
+  // Enhanced edge styling
+  const layoutedEdges = edges.map(edge => {
+    const sourceNode = layoutedNodes.find(n => n.id === edge.source);
+    const targetNode = layoutedNodes.find(n => n.id === edge.target);
+    
+    let edgeStyle = {
+      stroke: '#3b82f6',
       strokeWidth: 2,
       ...edge.style
-    },
-    sourceHandle: edge.sourceHandle || 'right',
-    targetHandle: edge.targetHandle || 'left',
-  }));
+    };
 
-  console.log('✅ Dynamic layout completed:', {
+    // Special styling for condition branches
+    if (edge.sourceHandle) {
+      switch (edge.sourceHandle) {
+        case 'true':
+        case 'yes':
+        case 'success':
+          edgeStyle.stroke = '#10b981';
+          break;
+        case 'false':
+        case 'no':
+        case 'error':
+          edgeStyle.stroke = '#ef4444';
+          break;
+        case 'urgent':
+          edgeStyle.stroke = '#ef4444';
+          break;
+        case 'task':
+          edgeStyle.stroke = '#10b981';
+          break;
+        case 'followup':
+          edgeStyle.stroke = '#f59e0b';
+          break;
+        default:
+          edgeStyle.stroke = '#6b7280';
+      }
+    }
+
+    return {
+      ...edge,
+      type: 'smoothstep',
+      animated: true,
+      style: edgeStyle,
+      sourceHandle: edge.sourceHandle || undefined,
+      targetHandle: edge.targetHandle || undefined,
+    };
+  });
+
+  console.log('✅ Enhanced layout completed:', {
     finalNodes: layoutedNodes.length,
     finalEdges: layoutedEdges.length,
-    layers: Math.max(...Array.from(layers.values())) + 1
+    layers: Math.max(...Array.from(layers.values())) + 1,
+    layerGroups: layerGroups.size
   });
 
   return { nodes: layoutedNodes, edges: layoutedEdges };
@@ -383,7 +441,7 @@ const DiagramFlow: React.FC<{
   );
 };
 
-// Main Component with FIXED diagram processing
+// Main Component with ENHANCED diagram processing
 const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   automationBlueprint,
   automationDiagramData,
@@ -403,7 +461,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
 
   // Enhanced debugging for data flow
   useEffect(() => {
-    console.log('📊 AutomationDiagramDisplay - Data Flow Debug:', {
+    console.log('📊 AutomationDiagramDisplay - Enhanced Data Flow Debug:', {
       hasBlueprint: !!automationBlueprint,
       blueprintSteps: automationBlueprint?.steps?.length || 0,
       hasDiagramData: !!automationDiagramData,
@@ -483,9 +541,9 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     return stats;
   }, []);
 
-  // FIXED diagram data processing with proper node type mapping
+  // ENHANCED diagram data processing with comprehensive node validation
   useEffect(() => {
-    console.log('🔄 Processing diagram data...');
+    console.log('🔄 Processing diagram data with enhanced validation...');
     setDiagramError(null);
 
     // Analyze blueprint
@@ -495,10 +553,18 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     }
 
     if (automationDiagramData?.nodes && automationDiagramData?.edges) {
-      console.log('🎨 Loading AI-generated diagram with', automationDiagramData.nodes.length, 'nodes');
+      console.log('🎨 Loading deterministic diagram with', automationDiagramData.nodes.length, 'nodes');
       
-      // FIXED: Process nodes with proper type mapping and data validation
+      // ENHANCED: Process nodes with comprehensive validation and data enhancement
       const processedNodes = automationDiagramData.nodes.map((node, index) => {
+        console.log(`🔍 Processing node ${index + 1}:`, {
+          id: node.id,
+          type: node.type,
+          hasData: !!node.data,
+          platform: node.data?.platform,
+          stepType: node.data?.stepType
+        });
+
         // Ensure node has proper type - fallback to actionNode if unknown
         const nodeType = nodeTypes[node.type as keyof typeof nodeTypes] ? node.type : 'actionNode';
         
@@ -512,17 +578,21 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           node.data.agent.agent_id === agent.name
         );
         
-        // Enhanced node data processing
+        // Enhanced node data processing with comprehensive validation
         const processedNode = {
           ...node,
-          id: node.id || `node-${index}`,
+          id: node.id || `node-${Date.now()}-${index}`,
           type: nodeType,
           position: {
-            x: typeof node.position?.x === 'number' ? node.position.x : 50 + (index * 300),
+            x: typeof node.position?.x === 'number' ? node.position.x : 50 + (index * 320),
             y: typeof node.position?.y === 'number' ? node.position.y : 100
           },
           data: {
             ...node.data,
+            // Ensure all nodes have proper labels
+            label: node.data?.label || node.data?.explanation || `Step ${index + 1}`,
+            // Ensure platform information is properly set
+            platform: node.data?.platform || node.data?.action?.integration || node.data?.stepDetails?.integration,
             // Add recommendation data if applicable
             ...(recommendation && {
               isRecommended: true,
@@ -535,45 +605,67 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           connectable: false
         };
         
+        console.log('✅ Processed node:', {
+          id: processedNode.id,
+          type: processedNode.type,
+          label: processedNode.data.label,
+          platform: processedNode.data.platform
+        });
+        
         return processedNode;
       });
       
-      // FIXED: Process edges with proper connection validation
-      const processedEdges = automationDiagramData.edges.map((edge, index) => ({
-        ...edge,
-        id: edge.id || `edge-${index}`,
-        type: edge.type || 'smoothstep',
-        animated: edge.animated !== false,
-        style: {
-          stroke: edge.style?.stroke || '#3b82f6',
-          strokeWidth: edge.style?.strokeWidth || 2,
-          ...edge.style
-        },
-        // Ensure proper handle connections
-        sourceHandle: edge.sourceHandle || 'right',
-        targetHandle: edge.targetHandle || 'left'
-      }));
+      // ENHANCED: Process edges with comprehensive connection validation
+      const processedEdges = automationDiagramData.edges.map((edge, index) => {
+        console.log(`🔗 Processing edge ${index + 1}:`, {
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          sourceHandle: edge.sourceHandle,
+          targetHandle: edge.targetHandle
+        });
+
+        return {
+          ...edge,
+          id: edge.id || `edge-${Date.now()}-${index}`,
+          type: edge.type || 'smoothstep',
+          animated: edge.animated !== false,
+          style: {
+            stroke: edge.style?.stroke || '#3b82f6',
+            strokeWidth: edge.style?.strokeWidth || 2,
+            ...edge.style
+          },
+          // Ensure proper handle connections
+          sourceHandle: edge.sourceHandle || undefined,
+          targetHandle: edge.targetHandle || undefined
+        };
+      });
       
       // Validate that all edges have valid source and target nodes
       const nodeIds = new Set(processedNodes.map(n => n.id));
-      const validEdges = processedEdges.filter(edge => 
-        nodeIds.has(edge.source) && nodeIds.has(edge.target)
-      );
+      const validEdges = processedEdges.filter(edge => {
+        const isValid = nodeIds.has(edge.source) && nodeIds.has(edge.target);
+        if (!isValid) {
+          console.warn(`⚠️ Invalid edge: ${edge.source} -> ${edge.target}`);
+        }
+        return isValid;
+      });
       
       if (validEdges.length < processedEdges.length) {
         console.warn(`⚠️ Filtered out ${processedEdges.length - validEdges.length} invalid edges`);
       }
       
-      // Apply enhanced layout if needed
+      // Apply enhanced layout
       const { nodes: layoutedNodes, edges: layoutedEdges } = getDynamicLayoutedElements(
         processedNodes, 
         validEdges
       );
       
-      console.log('✅ Setting processed diagram:', {
+      console.log('✅ Setting enhanced processed diagram:', {
         nodes: layoutedNodes.length,
         edges: layoutedEdges.length,
-        nodeTypes: [...new Set(layoutedNodes.map(n => n.type))]
+        nodeTypes: [...new Set(layoutedNodes.map(n => n.type))],
+        platforms: [...new Set(layoutedNodes.map(n => n.data?.platform).filter(Boolean))]
       });
       
       setNodes(layoutedNodes);
@@ -586,8 +678,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       }
       
     } else if (automationBlueprint?.steps?.length > 0) {
-      console.log('⚠️ No AI diagram available, blueprint exists');
-      setDiagramError('AI diagram generation failed. Click "Regenerate" to try again.');
+      console.log('⚠️ No diagram available, blueprint exists - should regenerate');
+      setDiagramError('Diagram needs to be generated. Click "Regenerate" to create a complete flow diagram.');
       setNodes([]);
       setEdges([]);
     } else {

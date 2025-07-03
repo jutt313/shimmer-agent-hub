@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -104,7 +103,7 @@ ${generalKnowledge}
 CRITICAL PLATFORM KNOWLEDGE INTEGRATION RULES:
 1. You MUST use your core platform knowledge for all recommendations.
 2. The provided 'COMPREHENSIVE PLATFORM KNOWLEDGE DATABASE (SUPPLEMENTARY)' is for ADDITIONAL details and specific configurations. It is NOT the primary or only source of truth for basic platform functionality or common credential types.
-3. You MUST identify and include ALL necessary credential requirements for every platform interaction. DO NOT state "no specific credentials required" unless a platform truly has NO authentication.
+3. You MUST identify and include ALL necessary credential requirements for every platform interaction. This includes both authentication tokens (e.g., API keys, OAuth tokens) AND essential operational identifiers (e.g., Spreadsheet ID, Channel ID, Project ID) needed for initial setup. DO NOT state "no specific credentials required" unless a platform truly has NO authentication or setup identifiers.
 4. You MUST reference specific platform capabilities and use cases based on your core knowledge, enhanced by the supplementary database.
 5. You MUST prioritize platforms that you have robust knowledge about, especially if the supplementary database provides comprehensive information.
 
@@ -114,32 +113,33 @@ ${knowledgeContext}
 MANDATORY RESPONSE REQUIREMENTS:
 
 You MUST provide detailed automation information including:
-- **Comprehensive Credential Information:** Exact credential field names, types, placeholders, links, and detailed 'why_needed' explanations for EVERY platform used. If specific fields are not in the supplementary database, infer common credential types (e.g., "OAuth 2.0 Token", "API Key", "Bearer Token") from your core knowledge and ask for specifics.
+- **Comprehensive Platform Setup & Credential Information:** For EVERY platform used, provide its name and a 'credentials' array. This array MUST include not just authentication fields (field, placeholder, link, why_needed) but also essential operational identifiers (e.g., Spreadsheet ID, Channel ID, Project ID) that are part of the platform's initial setup. If specific fields are not in the supplementary database, infer common credential/identifier types (e.g., "OAuth 2.0 Token", "API Key", "Bearer Token", "Spreadsheet ID", "Channel ID") from your core knowledge and provide them.
 - **Specific Platform Capabilities and Use Cases.**
 - **Proper API Configuration Details.**
 - **Real Implementation Examples where applicable.**
-- **All Necessary Dynamic Parameters:** For actions requiring user-defined inputs (e.g., specific messaging channels, recipient IDs, database names), you MUST identify these and generate precise clarification questions for them.
+- **All Necessary Dynamic Parameters:** For actions requiring *dynamic runtime inputs* not explicitly mentioned by the user (e.g., values that change with each automation run, like "task name from row data"), you MUST identify these and generate precise clarification questions for them. Questions about static setup identifiers (like Sheet ID, Channel ID) should NOT be in clarification_questions but in the 'platforms' array.
 
 CRITICAL THINKING PROCESS - FOLLOW EXACTLY:
 
 1. **DEEP AUTOMATION BREAKDOWN & ATOMIC STEPS:**
    - Deeply analyze the user's request.
    - Break down the entire automation into the MOST GRANULAR, ATOMIC logical steps possible. Each distinct action or decision point should be a separate step in the 'steps' array.
-   - For example: "Detect New Row" (trigger), "Extract Data" (action), "Create Task" (action), "Send Notification" (action).
+   - Example: "Step 1: Detect new row in spreadsheet service.", "Step 2: Extract task name and due date from row data.", "Step 3: Create new task in task management service.", "Step 4: Send message via communication service."
 
-2. **COMPREHENSIVE PLATFORM & CREDENTIAL IDENTIFICATION:**
+2. **COMPREHENSIVE PLATFORM & SETUP IDENTIFICATION:**
    - Identify all platforms/services required for each atomic step.
-   - For each platform, leverage your core knowledge to identify common credential types.
-   - If the supplementary 'PLATFORM KNOWLEDGE DATABASE' provides more specific credential fields (e.g., "Client ID", "Client Secret" for OAuth), use those EXACTLY.
-   - If specific fields are NOT in the supplementary database, infer the most common type (e.g., "API Key", "OAuth Token") from your core knowledge and ALWAYS include it in the 'platforms' array.
-   - **Crucially: NEVER state "no specific credentials required" unless a platform truly has NO authentication mechanism for the stated operation.**
+   - For each platform, list ALL necessary setup parameters:
+     - Authentication credentials (e.g., API Key, OAuth Token).
+     - Essential operational identifiers (e.g., Spreadsheet ID, Channel ID, Project ID, Database Name, List ID) that are needed for the platform to function in this specific automation context.
+   - Populate the `platforms` array with these details. If the supplementary database doesn't provide a specific field, infer the common type from your core knowledge.
+   - **Crucially: NEVER state "no specific credentials required" unless a platform truly has NO authentication or setup identifiers for the stated operation.**
 
-3. **DYNAMIC PARAMETER IDENTIFICATION & CLARIFICATION:**
-   - For every action, identify ALL necessary dynamic parameters (e.g., specific channels, recipient IDs, project names, sheet IDs) that would be required for a complete automation but are not explicitly provided by the user.
-   - For each missing dynamic parameter, formulate a precise clarification question.
+3. **DYNAMIC RUNTIME PARAMETER IDENTIFICATION & CLARIFICATION:**
+   - For every action, identify ONLY truly *dynamic runtime parameters* (e.g., "assigned team member's email if dynamic", "message content variable") that are not known at setup and require user input per run or are derived from previous steps.
+   - For each such missing dynamic parameter, formulate a precise `clarification_question`. Ensure these questions are generic and do NOT mention specific platform names (e.g., ask about "messaging destination" instead of "Slack channel").
 
 4. **PLATFORM SELECTION LOGIC:**
-   - Prioritize platforms with comprehensive credential information and known capabilities (from both core knowledge and supplementary database).
+   - Prioritize platforms with comprehensive setup information and known capabilities (from both core knowledge and supplementary database).
    - Use stored use cases and platform descriptions (from core knowledge and supplementary database) to recommend appropriate platforms.
    - Include integration type information (API, OAuth, etc.).
 
@@ -152,19 +152,28 @@ MANDATORY JSON STRUCTURE - EXACTLY THIS FORMAT:
     "Step 2: [GRANULAR_ATOMIC_ACTION] e.g., 'Step 2: Extract task name and due date from row data'.",
     "Step 3: [GRANULAR_ATOMIC_ACTION] e.g., 'Step 3: Create new task in task management service'.",
     "Step 4: [GRANULAR_ATOMIC_ACTION] e.g., 'Step 4: Send message via communication service'."
+    // ... continue for all atomic steps
   ],
   "platforms": [
     {
-      "name": "Platform Name (e.g., Google Sheets, Asana, Slack)",
+      "name": "Platform Name (e.g., Google Sheets, Asana, Slack)", // Use actual platform name here
       "credentials": [
         {
-          "field": "exact_credential_field_name",
-          "placeholder": "Enter credential value (e.g., your_api_key_123)",
-          "link": "direct_url_to_get_credential",
-          "why_needed": "specific_explanation_for_this_credential"
+          "field": "Authentication Token/ID (e.g., 'OAuth 2.0 Token', 'Personal Access Token', 'API Key')",
+          "placeholder": "Enter credential value (e.g., your_oauth_token_xyz)",
+          "link": "direct_url_to_get_credential_if_known",
+          "why_needed": "Authentication for API access."
+        },
+        {
+          "field": "Operational Identifier (e.g., 'Spreadsheet ID', 'Channel ID', 'Project ID')",
+          "placeholder": "Enter identifier value (e.g., spreadsheet_id_123, channel_id_abc)",
+          "link": "link_to_find_identifier_if_known", // Optional, if applicable
+          "why_needed": "Required to specify the exact resource for the automation (e.g., 'to monitor this specific sheet', 'to send message to this channel')."
         }
+        // ... include ALL required authentication and operational identifiers for this platform
       ]
     }
+    // ... include ALL required platforms and their credential/setup details
   ],
   "platforms_to_remove": [],
   "agents": [
@@ -178,10 +187,8 @@ MANDATORY JSON STRUCTURE - EXACTLY THIS FORMAT:
     }
   ],
   "clarification_questions": [
-    "To proceed with the data extraction, could you specify the exact identifier for the source data (e.g., sheet name, database ID, table name)?",
-    "For the messaging action, what is the precise destination identifier (e.g., channel ID, group name, recipient's user ID/email)?",
-    "Regarding the credential for [PLATFORM TYPE, e.g., 'data management service'], could you provide the [INFERRED CREDENTIAL TYPE, e.g., 'OAuth 2.0 Client ID and Secret'] or confirm the authentication method?",
-    "How should the system determine the 'assigned team member' for the notification (e.g., a specific name, an ID from the extracted data, or a default)?"
+    "How should the system dynamically determine the 'assigned team member' for the notification (e.g., a specific name, an ID from the extracted data, or a default)?"
+    // Removed questions about Spreadsheet ID, Channel ID, etc., as they are now expected in 'platforms' credentials
   ],
   "automation_blueprint": {
     "version": "1.0.0",
@@ -211,6 +218,7 @@ MANDATORY JSON STRUCTURE - EXACTLY THIS FORMAT:
           "platform_credential_id": "credential_reference"
         }
       }
+      // ... more granular steps
     ],
     "error_handling": {
       "retry_attempts": 3,
@@ -218,26 +226,26 @@ MANDATORY JSON STRUCTURE - EXACTLY THIS FORMAT:
     }
   },
   "conversation_updates": {
-    "knowledge_applied": "Specific platforms and inferred/identified credentials used.",
+    "knowledge_applied": "Specific platforms and inferred/identified credentials/setup details used.",
     "platform_count": "number of platforms referenced.",
-    "credential_fields_count": "total credential fields included.",
+    "credential_fields_count": "total credential/setup fields included.",
     "knowledge_entries_used": "list of specific knowledge entries referenced.",
-    "missing_parameters_identified": "List of dynamic parameters that require clarification from user."
+    "missing_parameters_identified": "List of dynamic runtime parameters that require clarification from user."
   },
   "is_update": false,
-  "recheck_status": "parameters_clarification_needed"
+  "recheck_status": "parameters_clarification_needed" // Or "ready_for_blueprint_generation" if no questions
 }
 
 CRITICAL SUCCESS METRICS:
-- MUST identify ALL platforms and their corresponding credential requirements.
+- MUST identify ALL platforms and their corresponding authentication credentials AND essential operational identifiers (e.g., Spreadsheet ID, Channel ID).
 - MUST provide granular, atomic steps in the 'steps' array.
-- MUST identify ALL missing dynamic parameters and generate precise, platform-agnostic clarification questions.
+- MUST identify ALL missing *dynamic runtime parameters* and generate precise, platform-agnostic clarification questions (excluding setup identifiers).
 - MUST never state "no specific credentials required" unless factually true for a credential-less operation.
-- MUST confine ALL credential details to the 'platforms' array.
+- MUST confine ALL credential and essential operational identifier details to the 'platforms' array.
 
 Context from comprehensive knowledge database: ${knowledgeContext}
 Previous conversation: ${JSON.stringify(messages.slice(-3))}
-Current automation context: ${JSON.stringify(automationContext)}`;
+Current automation context: ${JSON.stringify(automationContext)}`
 
     // Prepare messages for OpenAI
     const openaiMessages = [

@@ -43,8 +43,8 @@ export class AutomationRunner {
           this.errors.push(errorMessage);
           console.error(`❌ Step failed: ${step.id}`, stepError);
           
-          // Continue or stop based on step configuration
-          if (step.stopOnError !== false) {
+          // Continue or stop based on step configuration - using on_error property
+          if (step.on_error === 'stop') {
             break;
           }
         }

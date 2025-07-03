@@ -11,7 +11,7 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-// COMPREHENSIVE WEBHOOK DELIVERY TRACKING
+// COMPREHENSIVE WEBHOOK DELIVERY TRACKING - FIXED FOR REAL LOGGING
 interface WebhookDeliveryResult {
   success: boolean;
   status_code: number;
@@ -29,6 +29,8 @@ async function logWebhookDelivery(
   result: WebhookDeliveryResult
 ): Promise<void> {
   try {
+    console.log(`📊 LOGGING WEBHOOK DELIVERY - Status: ${result.status_code}, Success: ${result.success}`);
+    
     await supabase
       .from('webhook_delivery_logs')
       .insert({
@@ -36,14 +38,14 @@ async function logWebhookDelivery(
         automation_run_id: automationRunId,
         payload: payload,
         status_code: result.status_code,
-        response_body: result.response_body,
+        response_body: result.response_body || (result.error_message ? `Error: ${result.error_message}` : 'No response'),
         delivered_at: result.delivered_at || null,
         delivery_attempts: 1
       });
     
-    console.log(`📊 Webhook delivery logged: ${result.success ? 'SUCCESS' : 'FAILED'}`);
+    console.log(`✅ WEBHOOK DELIVERY LOGGED SUCCESSFULLY: ${result.success ? 'SUCCESS' : 'FAILED'}`);
   } catch (error) {
-    console.error('❌ Failed to log webhook delivery:', error);
+    console.error('❌ CRITICAL: Failed to log webhook delivery:', error);
   }
 }
 
@@ -53,6 +55,8 @@ async function updateWebhookStats(
   success: boolean
 ): Promise<void> {
   try {
+    console.log(`📈 UPDATING WEBHOOK STATS - Webhook: ${webhookId}, Success: ${success}`);
+    
     const { data: webhook } = await supabase
       .from('automation_webhooks')
       .select('trigger_count')
@@ -67,9 +71,9 @@ async function updateWebhookStats(
       })
       .eq('id', webhookId);
 
-    console.log(`📈 Webhook stats updated: ${success ? 'SUCCESS' : 'FAILED'}`);
+    console.log(`✅ WEBHOOK STATS UPDATED: Trigger count incremented, Success: ${success}`);
   } catch (error) {
-    console.error('❌ Failed to update webhook stats:', error);
+    console.error('❌ CRITICAL: Failed to update webhook stats:', error);
   }
 }
 
@@ -80,28 +84,43 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  let webhookId = 'unknown';
+  let automationId = 'unknown';
+
   try {
-    console.log('🎯 WEBHOOK TRIGGER INITIATED');
+    console.log('🎯 WEBHOOK TRIGGER INITIATED - FULL LOGGING ENABLED');
     console.log(`📡 Method: ${req.method}`);
     console.log(`🔗 URL: ${req.url}`);
     
     const url = new URL(req.url)
-    const automationId = url.searchParams.get('automation_id')
+    automationId = url.searchParams.get('automation_id') || 'missing'
     const pathSegments = url.pathname.split('/').filter(Boolean)
-    const webhookId = pathSegments[pathSegments.length - 1]
+    webhookId = pathSegments[pathSegments.length - 1] || 'missing'
 
     console.log(`🔍 Automation ID: ${automationId}`);
     console.log(`🆔 Webhook ID: ${webhookId}`);
 
-    if (!automationId || !webhookId) {
+    if (!automationId || automationId === 'missing' || !webhookId || webhookId === 'missing') {
       const errorResult: WebhookDeliveryResult = {
         success: false,
         status_code: 400,
         response_time_ms: Date.now() - startTime,
-        response_body: JSON.stringify({ error: 'Missing automation_id or webhook_id' }),
+        response_body: JSON.stringify({ 
+          error: 'Missing automation_id or webhook_id',
+          received_automation_id: automationId,
+          received_webhook_id: webhookId,
+          message: 'Both automation_id and webhook_id are required parameters'
+        }),
         error_message: 'Missing required parameters'
       };
 
+      // LOG THE FAILURE IMMEDIATELY
+      if (webhookId !== 'missing' && webhookId !== 'unknown') {
+        const supabase = createClient(supabaseUrl, supabaseServiceKey)
+        await logWebhookDelivery(supabase, webhookId, null, {}, errorResult);
+      }
+
+      console.log('❌ WEBHOOK FAILED: Missing required parameters');
       return new Response(errorResult.response_body, { 
         status: 400, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -134,10 +153,15 @@ serve(async (req) => {
           error: 'Webhook not found or inactive',
           automation_id: automationId,
           webhook_id: webhookId,
-          message: 'The requested webhook endpoint is not available or has been disabled'
+          message: 'The requested webhook endpoint is not available or has been disabled',
+          lookup_error: webhookError?.message || 'Not found'
         }),
-        error_message: 'Webhook not found'
+        error_message: `Webhook not found: ${webhookError?.message || 'Not found'}`
       };
+
+      // LOG THE FAILURE
+      await logWebhookDelivery(supabase, webhookId, null, {}, errorResult);
+      await updateWebhookStats(supabase, webhookId, false);
 
       return new Response(errorResult.response_body, { 
         status: 404, 
@@ -162,10 +186,13 @@ serve(async (req) => {
           status: webhook.automations.status,
           message: 'The target automation is not currently active'
         }),
-        error_message: 'Automation inactive'
+        error_message: `Automation inactive: ${webhook.automations.status}`
       };
 
+      // LOG THE FAILURE
       await logWebhookDelivery(supabase, webhook.id, null, {}, errorResult);
+      await updateWebhookStats(supabase, webhook.id, false);
+      
       return new Response(errorResult.response_body, { 
         status: 400, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -184,7 +211,7 @@ serve(async (req) => {
       }
     } catch (parseError) {
       console.error('⚠️ Failed to parse request body:', parseError);
-      payload = { raw_body: requestBody };
+      payload = { raw_body: requestBody, parse_error: parseError.message };
     }
 
     // SIGNATURE VALIDATION WITH DETAILED LOGGING
@@ -201,11 +228,18 @@ serve(async (req) => {
           success: false,
           status_code: 401,
           response_time_ms: Date.now() - startTime,
-          response_body: JSON.stringify({ error: 'Invalid webhook signature' }),
+          response_body: JSON.stringify({ 
+            error: 'Invalid webhook signature',
+            received_signature: signature.substring(0, 20) + '...',
+            message: 'Webhook signature validation failed'
+          }),
           error_message: 'Signature validation failed'
         };
 
+        // LOG THE FAILURE
         await logWebhookDelivery(supabase, webhook.id, null, payload, errorResult);
+        await updateWebhookStats(supabase, webhook.id, false);
+        
         return new Response(errorResult.response_body, { 
           status: 401, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -323,13 +357,13 @@ serve(async (req) => {
       delivered_at: new Date().toISOString()
     };
 
-    // LOG SUCCESSFUL DELIVERY AND UPDATE STATS
+    // LOG SUCCESSFUL DELIVERY AND UPDATE STATS - CRITICAL FIX
     await Promise.all([
       logWebhookDelivery(supabase, webhook.id, automationRun?.id || null, payload, successResult),
       updateWebhookStats(supabase, webhook.id, true)
     ]);
 
-    console.log(`🎉 Webhook processing completed successfully in ${Date.now() - startTime}ms`);
+    console.log(`🎉 WEBHOOK PROCESSING COMPLETED SUCCESSFULLY in ${Date.now() - startTime}ms`);
 
     return new Response(JSON.stringify(responseData), { 
       status: 200,
@@ -337,7 +371,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('💥 Webhook trigger error:', error)
+    console.error('💥 CRITICAL WEBHOOK ERROR:', error)
     
     const errorResult: WebhookDeliveryResult = {
       success: false,
@@ -346,10 +380,23 @@ serve(async (req) => {
       response_body: JSON.stringify({ 
         error: 'Internal server error', 
         details: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        automation_id: automationId,
+        webhook_id: webhookId
       }),
-      error_message: error.message
+      error_message: `Internal error: ${error.message}`
     };
+    
+    // LOG THE CRITICAL FAILURE
+    try {
+      if (webhookId !== 'unknown' && webhookId !== 'missing') {
+        const supabase = createClient(supabaseUrl, supabaseServiceKey)
+        await logWebhookDelivery(supabase, webhookId, null, {}, errorResult);
+        await updateWebhookStats(supabase, webhookId, false);
+      }
+    } catch (logError) {
+      console.error('💥 FAILED TO LOG CRITICAL ERROR:', logError);
+    }
     
     return new Response(errorResult.response_body, { 
       status: 500, 

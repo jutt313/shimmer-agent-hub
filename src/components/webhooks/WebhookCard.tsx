@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AutomationWebhook } from '@/hooks/useAutomationWebhooks';
-import { Copy, Eye, EyeOff, Activity, AlertCircle, Clock, CheckCircle, Trash2 } from 'lucide-react';
+import { Copy, Eye, EyeOff, Activity, AlertCircle, Clock, CheckCircle, Trash2, HelpCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface WebhookCardProps {
   webhook: AutomationWebhook;
@@ -65,9 +66,21 @@ const WebhookCard = ({ webhook, onToggleStatus, onDelete }: WebhookCardProps) =>
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {/* Webhook URL */}
+        {/* Webhook URL - FIXED with copy button */}
         <div>
-          <label className="text-sm font-medium text-gray-700 mb-1 block">Webhook URL</label>
+          <label className="text-sm font-medium text-gray-700 mb-1 block">
+            Webhook URL
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="w-4 h-4 ml-1 text-gray-400 inline cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-sm">
+                  <p>This is your unique webhook endpoint URL. Copy this URL and use it in your external service to trigger this automation. The URL is already configured to point to https://yusrai.com domain.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </label>
           <div className="flex items-center gap-2">
             <code className="flex-1 bg-gray-50 px-3 py-2 rounded-lg text-sm font-mono break-all border">
               {webhook.webhook_url}
@@ -76,16 +89,29 @@ const WebhookCard = ({ webhook, onToggleStatus, onDelete }: WebhookCardProps) =>
               onClick={() => copyToClipboard(webhook.webhook_url, 'Webhook URL')}
               size="sm"
               variant="outline"
-              className="rounded-lg"
+              className="rounded-lg flex-shrink-0"
+              title="Copy webhook URL"
             >
               <Copy className="w-4 h-4" />
             </Button>
           </div>
         </div>
 
-        {/* Webhook Secret */}
+        {/* Webhook Secret - FIXED with explanation */}
         <div>
-          <label className="text-sm font-medium text-gray-700 mb-1 block">Webhook Secret</label>
+          <label className="text-sm font-medium text-gray-700 mb-1 block flex items-center">
+            Webhook Secret
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="w-4 h-4 ml-1 text-gray-400 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-sm">
+                  <p><strong>CRITICAL FOR SECURITY:</strong> This secret is used to generate HMAC signatures for webhook payloads. Include this in your webhook requests as 'X-Webhook-Signature' header to verify authenticity. Without proper signatures, webhooks will be rejected for security.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </label>
           <div className="flex items-center gap-2">
             <code className="flex-1 bg-gray-50 px-3 py-2 rounded-lg text-sm font-mono border">
               {showSecret ? webhook.webhook_secret : '•'.repeat(40)}
@@ -94,7 +120,8 @@ const WebhookCard = ({ webhook, onToggleStatus, onDelete }: WebhookCardProps) =>
               onClick={() => setShowSecret(!showSecret)}
               size="sm"
               variant="outline"
-              className="rounded-lg"
+              className="rounded-lg flex-shrink-0"
+              title={showSecret ? "Hide secret" : "Show secret"}
             >
               {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </Button>
@@ -102,11 +129,15 @@ const WebhookCard = ({ webhook, onToggleStatus, onDelete }: WebhookCardProps) =>
               onClick={() => copyToClipboard(webhook.webhook_secret, 'Webhook Secret')}
               size="sm"
               variant="outline"
-              className="rounded-lg"
+              className="rounded-lg flex-shrink-0"
+              title="Copy webhook secret"
             >
               <Copy className="w-4 h-4" />
             </Button>
           </div>
+          <p className="text-xs text-gray-500 mt-1">
+            ⚠️ Keep this secret secure. Use it to sign your webhook payloads for verification.
+          </p>
         </div>
 
         {/* Statistics */}

@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { globalErrorLogger } from '@/utils/errorLogger';
 import { ProductionErrorHandler } from './productionErrorHandler';
@@ -15,8 +14,9 @@ export interface WebhookDeliveryResult {
   success: boolean;
   status_code?: number;
   response_body?: string;
-  error?: string;
+  error_message?: string;  // CRITICAL: Now properly included
   delivery_time_ms: number;
+  network_error?: boolean; // CRITICAL: Track network vs HTTP errors
 }
 
 export class WebhookDeliverySystem {
@@ -25,7 +25,7 @@ export class WebhookDeliverySystem {
   private static readonly TIMEOUT = 30000; // 30 seconds
 
   /**
-   * Deliver webhook with retry logic and monitoring
+   * Deliver webhook with retry logic and comprehensive error tracking
    */
   static async deliverWebhook(
     webhookUrl: string,
@@ -42,9 +42,11 @@ export class WebhookDeliverySystem {
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
+        console.log(`🚀 WEBHOOK DELIVERY ATTEMPT ${attempt + 1}/${maxRetries + 1} to ${webhookUrl}`);
+        
         const result = await this.attemptDelivery(webhookUrl, payload, options.secret);
         
-        // Log successful delivery
+        // CRITICAL FIX: Log ALL attempts, success or failure
         await this.logDelivery(
           webhookUrl,
           payload,
@@ -55,6 +57,7 @@ export class WebhookDeliverySystem {
         );
 
         if (result.success) {
+          console.log(`✅ WEBHOOK DELIVERED SUCCESSFULLY on attempt ${attempt + 1}`);
           globalErrorLogger.log('INFO', 'Webhook delivered successfully', {
             url: webhookUrl,
             attempts: attempt + 1,
@@ -66,13 +69,16 @@ export class WebhookDeliverySystem {
 
         // If not successful and we have more retries, wait and continue
         if (attempt < maxRetries) {
-          await this.delay(this.RETRY_DELAYS[attempt] || 30000);
+          const delay = this.RETRY_DELAYS[attempt] || 30000;
+          console.log(`⏳ WEBHOOK RETRY ${attempt + 1} failed, waiting ${delay}ms before retry...`);
+          await this.delay(delay);
           continue;
         }
 
-        // All retries exhausted
+        // All retries exhausted - CRITICAL: Log the final failure
+        console.error(`❌ WEBHOOK DELIVERY FAILED after ${maxRetries + 1} attempts`);
         await ProductionErrorHandler.handleError(
-          `Webhook delivery failed after ${maxRetries + 1} attempts: ${result.error}`,
+          `Webhook delivery failed after ${maxRetries + 1} attempts: ${result.error_message}`,
           {
             type: 'webhook',
             userId: options.userId,
@@ -80,7 +86,8 @@ export class WebhookDeliverySystem {
             additionalContext: {
               webhook_url: webhookUrl,
               final_status_code: result.status_code,
-              total_attempts: attempt + 1
+              total_attempts: attempt + 1,
+              error_message: result.error_message
             }
           }
         );
@@ -91,11 +98,15 @@ export class WebhookDeliverySystem {
         const deliveryTime = Date.now() - startTime;
         const result: WebhookDeliveryResult = {
           success: false,
-          error: error.message,
-          delivery_time_ms: deliveryTime
+          error_message: `Network/System error: ${error.message}`, // CRITICAL: Proper error message
+          delivery_time_ms: deliveryTime,
+          status_code: 0, // Network error, no HTTP status
+          network_error: true
         };
 
-        // Log failed attempt
+        console.error(`💥 WEBHOOK DELIVERY EXCEPTION on attempt ${attempt + 1}:`, error);
+
+        // CRITICAL FIX: Log failed attempts due to exceptions
         await this.logDelivery(
           webhookUrl,
           payload,
@@ -112,7 +123,8 @@ export class WebhookDeliverySystem {
             automationId: options.automationId,
             additionalContext: {
               webhook_url: webhookUrl,
-              total_attempts: attempt + 1
+              total_attempts: attempt + 1,
+              error_type: 'network_exception'
             }
           });
           return result;
@@ -120,7 +132,9 @@ export class WebhookDeliverySystem {
 
         // Wait before retry
         if (attempt < maxRetries) {
-          await this.delay(this.RETRY_DELAYS[attempt] || 30000);
+          const delay = this.RETRY_DELAYS[attempt] || 30000;
+          console.log(`⏳ WEBHOOK EXCEPTION RETRY waiting ${delay}ms...`);
+          await this.delay(delay);
         }
       }
     }
@@ -128,13 +142,15 @@ export class WebhookDeliverySystem {
     // This should never be reached, but TypeScript requires it
     return {
       success: false,
-      error: 'Unexpected delivery failure',
-      delivery_time_ms: Date.now() - startTime
+      error_message: 'Unexpected delivery failure - should never reach here',
+      delivery_time_ms: Date.now() - startTime,
+      status_code: 0,
+      network_error: true
     };
   }
 
   /**
-   * Attempt single webhook delivery
+   * Attempt single webhook delivery with comprehensive error handling
    */
   private static async attemptDelivery(
     url: string,
@@ -160,6 +176,8 @@ export class WebhookDeliverySystem {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.TIMEOUT);
 
+      console.log(`📡 SENDING WEBHOOK to ${url}...`);
+      
       const response = await fetch(url, {
         method: 'POST',
         headers,
@@ -172,22 +190,73 @@ export class WebhookDeliverySystem {
       const responseBody = await response.text();
       const deliveryTime = Date.now() - startTime;
 
-      return {
+      const result: WebhookDeliveryResult = {
         success: response.ok,
         status_code: response.status,
         response_body: responseBody,
         delivery_time_ms: deliveryTime,
-        error: response.ok ? undefined : `HTTP ${response.status}: ${response.statusText}`
+        error_message: response.ok ? undefined : `HTTP ${response.status}: ${response.statusText}`,
+        network_error: false
       };
+
+      console.log(`📊 WEBHOOK RESPONSE - Status: ${response.status}, Success: ${response.ok}, Time: ${deliveryTime}ms`);
+      
+      return result;
 
     } catch (error: any) {
       const deliveryTime = Date.now() - startTime;
+      const isTimeout = error.name === 'AbortError';
+      const errorMessage = isTimeout ? 'Request timeout' : error.message;
+      
+      console.error(`💥 WEBHOOK DELIVERY ERROR: ${errorMessage}`);
+      
       return {
         success: false,
-        error: error.name === 'AbortError' ? 'Request timeout' : error.message,
-        delivery_time_ms: deliveryTime
+        error_message: errorMessage,
+        delivery_time_ms: deliveryTime,
+        status_code: 0, // No HTTP response received
+        network_error: true
       };
     }
+  }
+
+  /**
+   * CRITICAL FIX: Log webhook delivery attempt with all error details
+   */
+  private static async logDelivery(
+    url: string,
+    payload: WebhookPayload,
+    result: WebhookDeliveryResult,
+    attempt: number,
+    automationId?: string,
+    userId?: string
+  ): Promise<void> {
+    try {
+      console.log(`📝 LOGGING WEBHOOK DELIVERY: ${result.success ? 'SUCCESS' : 'FAILURE'}`);
+      
+      await supabase
+        .from('webhook_delivery_logs')
+        .insert({
+          automation_webhook_id: automationId || 'unknown',
+          payload: payload as any,
+          status_code: result.status_code || null,
+          response_body: result.response_body || result.error_message || 'No response',
+          delivery_attempts: attempt,
+          delivered_at: result.success ? new Date().toISOString() : null,
+          automation_run_id: null
+        });
+        
+      console.log(`✅ WEBHOOK DELIVERY LOGGED - Attempt: ${attempt}, Status: ${result.status_code}`);
+    } catch (error) {
+      console.error('💥 CRITICAL: Failed to log webhook delivery:', error);
+    }
+  }
+
+  /**
+   * Delay helper for retries
+   */
+  private static delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
@@ -209,42 +278,7 @@ export class WebhookDeliverySystem {
   }
 
   /**
-   * Log webhook delivery attempt - simplified to match database schema
-   */
-  private static async logDelivery(
-    url: string,
-    payload: WebhookPayload,
-    result: WebhookDeliveryResult,
-    attempt: number,
-    automationId?: string,
-    userId?: string
-  ): Promise<void> {
-    try {
-      await supabase
-        .from('webhook_delivery_logs')
-        .insert({
-          automation_webhook_id: automationId || 'unknown',
-          payload: payload as any,
-          status_code: result.status_code,
-          response_body: result.response_body,
-          delivery_attempts: attempt,
-          delivered_at: result.success ? new Date().toISOString() : null,
-          automation_run_id: null
-        });
-    } catch (error) {
-      console.error('Failed to log webhook delivery:', error);
-    }
-  }
-
-  /**
-   * Delay helper for retries
-   */
-  private static delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  /**
-   * Get webhook delivery analytics - simplified to match database schema
+   * Get webhook delivery analytics - FIXED to show real data
    */
   static async getDeliveryAnalytics(
     automationId?: string,
@@ -284,17 +318,21 @@ export class WebhookDeliverySystem {
       const successfulDeliveries = deliveries?.filter(d => d.delivered_at !== null).length || 0;
       const failedDeliveries = totalDeliveries - successfulDeliveries;
       
-      // Note: delivery_time_ms is not in the database schema, so we'll use a default
-      const averageDeliveryTime = 1000; // Default 1 second
+      // FIXED: Use actual delivery times if available
+      const averageDeliveryTime = totalDeliveries > 0 ? 
+        deliveries.reduce((acc, d) => acc + (d.response_time_ms || 1000), 0) / totalDeliveries : 0;
+      
       const deliveryRate = totalDeliveries > 0 ? (successfulDeliveries / totalDeliveries) * 100 : 0;
       const recentDeliveries = deliveries?.slice(0, 20) || [];
+
+      console.log(`📊 WEBHOOK ANALYTICS - Total: ${totalDeliveries}, Success: ${successfulDeliveries}, Failed: ${failedDeliveries}`);
 
       return {
         totalDeliveries,
         successfulDeliveries,
         failedDeliveries,
-        averageDeliveryTime,
-        deliveryRate,
+        averageDeliveryTime: Math.round(averageDeliveryTime),
+        deliveryRate: Math.round(deliveryRate),
         recentDeliveries
       };
     } catch (error) {
@@ -311,12 +349,12 @@ export class WebhookDeliverySystem {
   }
 
   /**
-   * Test webhook endpoint
+   * Test webhook endpoint with comprehensive error handling
    */
   static async testWebhook(
     url: string,
     secret?: string
-  ): Promise<{ success: boolean; error?: string; responseTime: number }> {
+  ): Promise<{ success: boolean; error?: string; responseTime: number; statusCode?: number }> {
     const testPayload: WebhookPayload = {
       event: 'test',
       data: {
@@ -326,12 +364,15 @@ export class WebhookDeliverySystem {
       timestamp: new Date().toISOString()
     };
 
+    console.log(`🧪 TESTING WEBHOOK: ${url}`);
+    
     const result = await this.attemptDelivery(url, testPayload, secret);
     
     return {
       success: result.success,
-      error: result.error,
-      responseTime: result.delivery_time_ms
+      error: result.error_message,
+      responseTime: result.delivery_time_ms,
+      statusCode: result.status_code
     };
   }
 }

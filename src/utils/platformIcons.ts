@@ -49,7 +49,7 @@ import {
   Edit,
   Eye,
   Filter,
-  Sort,
+  ArrowUpDown,
   BarChart,
   PieChart,
   TrendingUp,
@@ -88,7 +88,7 @@ import {
   SkipForward,
   Play,
   Pause,
-  Stop,
+  Square,
   Volume,
   VolumeX,
   Wifi,
@@ -105,7 +105,7 @@ import {
   Train,
   Bus,
   Bike,
-  Walk
+  PersonStanding
 } from 'lucide-react';
 
 interface IconConfig {
@@ -416,7 +416,7 @@ export const getPlatformIconConfig = (platform: string, method?: string): IconCo
     'info': { icon: Info, color: '#3B82F6' },
     'help': { icon: HelpCircle, color: '#6B7280' },
     'filter': { icon: Filter, color: '#6B7280' },
-    'sort': { icon: Sort, color: '#6B7280' },
+    'sort': { icon: ArrowUpDown, color: '#6B7280' },
     'transform': { icon: RefreshCw, color: '#8B5CF6' },
     'convert': { icon: RefreshCw, color: '#8B5CF6' },
     'parse': { icon: Code, color: '#6B7280' },
@@ -447,14 +447,14 @@ export const getPlatformIconConfig = (platform: string, method?: string): IconCo
     'compile': { icon: Package, color: '#F59E0B' },
     'execute': { icon: Play, color: '#10B981' },
     'run': { icon: Play, color: '#10B981' },
-    'stop': { icon: Stop, color: '#EF4444' },
+    'stop': { icon: Square, color: '#EF4444' },
     'pause': { icon: Pause, color: '#F59E0B' },
     'resume': { icon: Play, color: '#10B981' },
     'cancel': { icon: X, color: '#EF4444' },
     'abort': { icon: X, color: '#EF4444' },
     'complete': { icon: CheckCircle, color: '#10B981' },
     'finish': { icon: CheckCircle, color: '#10B981' },
-    'end': { icon: Stop, color: '#EF4444' }
+    'end': { icon: Square, color: '#EF4444' }
   };
 
   // Method-based matching
@@ -499,7 +499,7 @@ export const getStepTypeIcon = (stepType: string) => {
     'storage': { icon: Archive, color: '#6B7280' },
     'transform': { icon: RefreshCw, color: '#8B5CF6' },
     'filter': { icon: Filter, color: '#6B7280' },
-    'sort': { icon: Sort, color: '#6B7280' },
+    'sort': { icon: ArrowUpDown, color: '#6B7280' },
     'validate': { icon: Shield, color: '#10B981' },
     'test': { icon: Target, color: '#F59E0B' },
     'monitor': { icon: Activity, color: '#8B5CF6' },
@@ -541,7 +541,7 @@ export const getStepTypeIcon = (stepType: string) => {
     'deploy': { icon: Upload, color: '#10B981' },
     'build': { icon: Package, color: '#F59E0B' },
     'test': { icon: Target, color: '#F59E0B' },
-    'debug': { icon: Bug, color: '#EF4444' },
+    'debug': { icon: AlertCircle, color: '#EF4444' },
     'version': { icon: Tag, color: '#6B7280' },
     'release': { icon: Upload, color: '#10B981' },
     'rollback': { icon: RotateCcw, color: '#EF4444' },

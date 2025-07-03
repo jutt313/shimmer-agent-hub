@@ -502,7 +502,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       steps.forEach((step) => {
         totalSteps++;
         
-        if (step.action?.integration) {
+        // Fixed: Add proper type checking for step.action
+        if (step.action && typeof step.action === 'object' && 'integration' in step.action) {
           platforms.add(step.action.integration);
         }
         
@@ -591,8 +592,10 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             ...node.data,
             // Ensure all nodes have proper labels
             label: node.data?.label || node.data?.explanation || `Step ${index + 1}`,
-            // Ensure platform information is properly set
-            platform: node.data?.platform || node.data?.action?.integration || node.data?.stepDetails?.integration,
+            // Ensure platform information is properly set - Fixed type checking
+            platform: node.data?.platform || 
+              (node.data?.action && typeof node.data.action === 'object' && 'integration' in node.data.action ? node.data.action.integration : '') ||
+              (node.data?.stepDetails && typeof node.data.stepDetails === 'object' && 'integration' in node.data.stepDetails ? node.data.stepDetails.integration : ''),
             // Add recommendation data if applicable
             ...(recommendation && {
               isRecommended: true,

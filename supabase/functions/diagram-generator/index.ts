@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const ENHANCED_DIAGRAM_GENERATOR_SYSTEM_PROMPT = `You are an EXPERT visual automation flow designer that creates comprehensive, professional, and highly interactive React Flow diagrams.
@@ -11,7 +10,7 @@ Generate a COMPLETE, perfectly aligned, and highly interactive visual diagram th
    - draggable: true (explicitly set)
    - selectable: true (explicitly set)
    - connectable: false (prevent user connections)
-   - Proper positioning with NO OVERLAPS
+   - Proper positioning with NO OVERLAPS, ensuring the entire automation fits comfortably when zoomed out.
 
 2. ALL edges MUST have:
    - type: 'smoothstep' for professional curves
@@ -21,92 +20,103 @@ Generate a COMPLETE, perfectly aligned, and highly interactive visual diagram th
 
 === ENHANCED LAYOUT REQUIREMENTS ===
 1. Node Placement (NO OVERLAPS):
-   - Start with trigger at (50, 100)
-   - Horizontal spacing: 300px minimum between node centers
-   - Vertical spacing: 200px minimum for branches
-   - Each node needs unique, non-overlapping position
+   - **PRIMARY FLOW: STRICTLY LEFT-TO-RIGHT.**
+   - Start with trigger at (50, 100).
+   - Horizontal spacing: Maintain at least 300px between node centers.
+   - Vertical spacing: Adjust as needed for clarity, especially for branches, aiming for minimum 200px.
+   - Each node needs a unique, non-overlapping position.
 
 2. Professional Styling:
-   - Use consistent color scheme per node type
-   - Ensure proper handle positioning
-   - Add meaningful labels and descriptions
-   - Include platform/integration details
+   - Use consistent color scheme per node type.
+   - Ensure proper handle positioning.
+   - **Nodes should display an icon as their primary label. Full descriptive text for details should be in the 'explanation' field, intended for hover/tooltip functionality on the frontend.**
+   - **NO EMOJIS. Use descriptive icon names (e.g., "SlackIcon", "DatabaseIcon", "AgentIcon").**
+   - Include platform/integration details within the 'explanation'.
 
 3. Edge Routing:
-   - Use proper sourceHandle/targetHandle
-   - Color-code conditional paths (green=Yes, red=No)
-   - Animate all connections
-   - Ensure smooth curves without intersections
+   - Use proper sourceHandle/targetHandle.
+   - Color-code conditional paths distinctly for each branch.
+   - Animate all connections.
+   - Ensure smooth curves without intersections.
 
 === NODE TYPE SPECIFICATIONS ===
 
 triggerNode: 
 - Color: Red theme (#dc2626)
 - Always first node at (50, 100)
-- Include trigger type, schedule, platform details
-- Must have RIGHT output handle
+- Label: Concise, usually an icon (e.g., "TriggerIcon")
+- Explanation: Include trigger type, schedule, platform details.
+- Must have RIGHT output handle.
 
 platformNode:
 - Color: Blue theme (#3b82f6) 
-- Include platform name, connection details
-- Clear integration information
+- Label: Concise, usually an icon representing the platform (e.g., "GmailIcon", "StripeIcon").
+- Explanation: Include platform name, connection details, clear integration information.
+- **Placement: Integrate contextually within the main flow where the platform action occurs.**
 
 actionNode:
 - Color: Neutral Blue (#60a5fa)
-- Include action description, parameters
-- Show what the step accomplishes
+- Label: Concise, usually an icon representing the action or associated platform (e.g., "ActionIcon", "SlackIcon").
+- Explanation: Include action description, parameters, and what the step accomplishes.
+- **Placement: Systematically in the left-to-right flow.**
 
 conditionNode:
 - Color: Orange theme (#f97316)
-- MUST have TWO output paths:
-  - sourceHandle: "success" → Green edge (#10b981)
-  - sourceHandle: "error" → Red edge (#ef4444)
-- Label paths clearly as "Yes" and "No"
+- Label: Concise, usually an icon (e.g., "ConditionIcon").
+- Explanation: Brief description of the condition.
+- **Output Paths: Handle MULTIPLE, DYNAMIC output paths. Each path must have a unique, descriptive sourceHandle (e.g., "status_success", "status_failure", "status_pending"). Paths should flow clearly, potentially branching vertically (up/down) to maintain horizontal flow for the main sequence.**
+- **Edge Styling: Each conditional path should have a distinct color for clarity (e.g., green for success-like, red for failure-like, or other distinct colors for different conditions).**
 
 aiAgentNode:
 - Color: Emerald Green (#10b981)
-- Include agent name, purpose, model details
-- Show AI integration clearly
+- Label: Concise, usually an icon (e.g., "AgentIcon").
+- Explanation: Include agent name, purpose, model details, and any AI integration specifics.
+- **Placement: Integrate contextually where the AI agent is called within the automation flow.**
 
 loopNode:
 - Color: Purple theme (#8b5cf6)
-- Show iteration details, conditions
-- Include loop scope and limits
+- Label: Concise, usually an icon (e.g., "LoopIcon").
+- Explanation: Show iteration details, conditions, loop scope and limits.
 
 delayNode:
 - Color: Slate Gray (#64748b)
-- Include timing information
-- Show delay duration clearly
+- Label: Concise, usually an icon (e.g., "DelayIcon").
+- Explanation: Include timing information, show delay duration clearly.
 
 retryNode:
 - Color: Amber (#f59e0b)
-- Include retry count, conditions
-- Show error handling strategy
+- Label: Concise, usually an icon (e.g., "RetryIcon").
+- Explanation: Include retry count, conditions, show error handling strategy.
 
 fallbackNode:
 - Color: Indigo (#6366f1)
-- Include fallback strategy details
-- Show alternative path clearly
+- Label: Concise, usually an icon (e.g., "FallbackIcon").
+- Explanation: Include fallback strategy details, show alternative path clearly.
 
 === ENHANCED DATA STRUCTURE ===
 Each node data object MUST include:
-- label: Clear, descriptive name
-- explanation: Brief description of function
-- stepType: Original blueprint type
-- platform/agent/condition/etc: Relevant specific data
-- icon: Appropriate icon name
-- Interactive properties for UI enhancement
+- id: A unique identifier for runtime highlighting/tracking.
+- label: CONCISE, primary display (ideally just an icon or short name).
+- explanation: DETAILED description of function, parameters, platform/agent specifics (for hover/tooltip).
+- stepType: Original blueprint type.
+- platform/agent/condition/etc: Relevant specific data.
+- icon: APPROPRIATE ICON NAME (e.g., "SlackIcon", "AgentIcon", "TriggerIcon"). NO EMOJIS.
+- Interactive properties for UI enhancement (draggable, selectable, connectable set to false).
+
+=== VISUALIZATION REQUIREMENTS FOR RUNTIME (Frontend will use 'id' field): ===
+- Ensure each node has a unique 'id' to allow frontend to visually indicate active steps (e.g., glow, loading circle) during live execution.
 
 === VALIDATION CHECKLIST ===
-✓ Every node has unique, non-overlapping position
-✓ All nodes are draggable and selectable
-✓ All edges are animated smoothstep type
-✓ Conditional nodes have proper branching
-✓ Professional color scheme throughout
-✓ Complete flow from trigger to end
-✓ All integrations represented as nodes
-✓ Clear visual hierarchy and spacing
-✓ Proper handle positioning and IDs
+✓ Every node has unique, non-overlapping position, optimized for left-to-right flow and "full automation in frame" visibility.
+✓ All nodes are draggable and selectable.
+✓ All edges are animated smoothstep type.
+✓ Conditional nodes have proper branching for multiple, dynamic paths, with distinct edges.
+✓ Professional color scheme throughout.
+✓ Complete logical flow from trigger to end.
+✓ All integrations (platforms, AI agents) are represented as nodes contextually within the flow.
+✓ Clear visual hierarchy and spacing.
+✓ Proper handle positioning and unique IDs.
+✓ Nodes display concise labels (icons preferred) with full details in 'explanation' for hover.
 
 RETURN: Complete JSON with "nodes" and "edges" arrays optimized for maximum interactivity and professional appearance.`
 

@@ -1224,9 +1224,12 @@ export type Database = {
         Row: {
           category: string
           created_at: string
+          credential_fields: Json | null
           details: Json
           id: string
           last_used: string | null
+          platform_description: string | null
+          platform_name: string | null
           priority: number | null
           source_type: string | null
           summary: string | null
@@ -1234,13 +1237,17 @@ export type Database = {
           title: string
           updated_at: string
           usage_count: number | null
+          use_cases: string[] | null
         }
         Insert: {
           category: string
           created_at?: string
+          credential_fields?: Json | null
           details?: Json
           id?: string
           last_used?: string | null
+          platform_description?: string | null
+          platform_name?: string | null
           priority?: number | null
           source_type?: string | null
           summary?: string | null
@@ -1248,13 +1255,17 @@ export type Database = {
           title: string
           updated_at?: string
           usage_count?: number | null
+          use_cases?: string[] | null
         }
         Update: {
           category?: string
           created_at?: string
+          credential_fields?: Json | null
           details?: Json
           id?: string
           last_used?: string | null
+          platform_description?: string | null
+          platform_name?: string | null
           priority?: number | null
           source_type?: string | null
           summary?: string | null
@@ -1262,6 +1273,7 @@ export type Database = {
           title?: string
           updated_at?: string
           usage_count?: number | null
+          use_cases?: string[] | null
         }
         Relationships: []
       }

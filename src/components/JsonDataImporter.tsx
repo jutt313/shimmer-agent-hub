@@ -90,11 +90,16 @@ const JsonDataImporter = ({ onImportSuccess }: JsonDataImporterProps) => {
     const existingPlatforms = new Set();
     
     // Get existing platform names from database
-    const { data: existing } = await supabase
+    const { data: existing, error } = await supabase
       .from('universal_knowledge_store')
       .select('platform_name')
       .eq('category', 'platform_knowledge')
       .not('platform_name', 'is', null);
+
+    if (error) {
+      console.error('Error checking duplicates:', error);
+      return [];
+    }
 
     if (existing) {
       existing.forEach(item => {

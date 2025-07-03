@@ -74,7 +74,7 @@ const KnowledgeAdmin = () => {
       console.log('🔄 Fetching comprehensive knowledge data...');
       setLoading(true);
 
-      // Fetch all knowledge entries
+      // Fetch all knowledge entries with new columns
       const { data: knowledgeData, error: knowledgeError } = await supabase
         .from('universal_knowledge_store')
         .select('*')
@@ -105,7 +105,7 @@ const KnowledgeAdmin = () => {
           entry.last_used && new Date(entry.last_used) > sevenDaysAgo
         ).length;
 
-        // Top platforms by usage
+        // Top platforms by usage using the new platform_name column
         const platformUsage: { [key: string]: number } = {};
         platformEntries.forEach(entry => {
           if (entry.platform_name) {
@@ -161,6 +161,56 @@ const KnowledgeAdmin = () => {
       title: "Import Successful",
       description: `Successfully imported ${importedCount} platform entries. UI updated!`,
     });
+  };
+
+  // Handle platform save from PlatformCredentialManager
+  const handlePlatformSave = async (platformData: any) => {
+    try {
+      const knowledgeEntry = {
+        category: 'platform_knowledge',
+        title: `${platformData.platform_name} Integration`,
+        summary: platformData.summary,
+        platform_name: platformData.platform_name,
+        credential_fields: platformData.credential_fields || [],
+        platform_description: platformData.platform_description,
+        use_cases: platformData.use_cases || [],
+        details: {
+          credential_count: platformData.credential_fields?.length || 0,
+          integration_type: 'API',
+          created_via: 'manual_entry',
+          created_at: new Date().toISOString()
+        },
+        tags: [
+          platformData.platform_name.toLowerCase().replace(/\s+/g, '-'), 
+          'platform', 
+          'integration',
+          'manually-created'
+        ],
+        priority: 4,
+        source_type: 'manual_entry'
+      };
+
+      const { error } = await supabase
+        .from('universal_knowledge_store')
+        .insert([knowledgeEntry]);
+
+      if (error) {
+        throw error;
+      }
+
+      await fetchKnowledge();
+      toast({
+        title: "Platform Added",
+        description: `${platformData.platform_name} has been added to the knowledge base`,
+      });
+    } catch (error: any) {
+      console.error('Error saving platform:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save platform data",
+        variant: "destructive",
+      });
+    }
   };
 
   useEffect(() => {
@@ -339,7 +389,7 @@ const KnowledgeAdmin = () => {
 
           {/* Platform Manager Tab */}
           <TabsContent value="platforms" className="mt-6">
-            <PlatformCredentialManager />
+            <PlatformCredentialManager onSave={handlePlatformSave} />
           </TabsContent>
 
           {/* Browse Knowledge Tab */}

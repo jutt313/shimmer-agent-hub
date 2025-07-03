@@ -143,11 +143,16 @@ const WebhookManagementTab = () => {
     }
 
     try {
-      // Generate webhook URL using the updated domain generator
-      const { data: urlData, error: urlError } = await supabase
-        .rpc('generate_webhook_url', { automation_id: webhookForm.automation_id });
-
-      if (urlError) throw urlError;
+      // Generate webhook URL using the proper domain
+      const webhookId = crypto.randomUUID();
+      const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname.includes('lovable');
+      
+      const baseUrl = isDevelopment 
+        ? 'https://zorwtyijosgdcckljmqd.supabase.co/functions/v1/webhook-trigger'
+        : 'https://yusrai.com/api/webhooks';
+        
+      const webhookUrl = `${baseUrl}/${webhookId}?automation_id=${webhookForm.automation_id}`;
+      const webhookSecret = crypto.randomUUID();
 
       const { data, error } = await supabase
         .from('automation_webhooks')
@@ -155,7 +160,8 @@ const WebhookManagementTab = () => {
           automation_id: webhookForm.automation_id,
           webhook_name: webhookForm.webhook_name,
           webhook_description: webhookForm.webhook_description,
-          webhook_url: urlData,
+          webhook_url: webhookUrl,
+          webhook_secret: webhookSecret,
           expected_events: webhookForm.expected_events
         })
         .select(`
@@ -175,7 +181,7 @@ const WebhookManagementTab = () => {
         expected_events: []
       });
       
-      toast.success('Webhook created successfully');
+      toast.success('Webhook created successfully with proper yusrai.com domain');
     } catch (error) {
       console.error('Error creating webhook:', error);
       toast.error('Failed to create webhook');

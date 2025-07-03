@@ -23,6 +23,7 @@ import KnowledgeChat from "@/components/KnowledgeChat";
 import JsonDataImporter from "@/components/JsonDataImporter";
 import PlatformCredentialManager from "@/components/PlatformCredentialManager";
 import { supabase } from "@/integrations/supabase/client";
+import { Json } from "@/integrations/supabase/types";
 
 interface KnowledgeEntry {
   id: string;
@@ -30,10 +31,10 @@ interface KnowledgeEntry {
   title: string;
   summary: string;
   platform_name?: string;
-  credential_fields?: any[];
+  credential_fields?: Json;
   platform_description?: string;
   use_cases?: string[];
-  details: any;
+  details: Json;
   tags: string[];
   priority: number;
   usage_count: number;
@@ -440,7 +441,7 @@ const KnowledgeAdmin = () => {
                             <div className="flex gap-2 mt-2">
                               <Badge variant="outline">{entry.category}</Badge>
                               <Badge variant="outline">Used {entry.usage_count} times</Badge>
-                              {entry.credential_fields && (
+                              {entry.credential_fields && Array.isArray(entry.credential_fields) && (
                                 <Badge variant="outline">{entry.credential_fields.length} credentials</Badge>
                               )}
                             </div>

@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -135,7 +136,7 @@ CRITICAL THINKING PROCESS - FOLLOW EXACTLY:
 
 3. **DYNAMIC PARAMETER IDENTIFICATION & CLARIFICATION:**
    - For every action, identify ALL necessary dynamic parameters (e.g., specific channels, recipient IDs, project names, sheet IDs) that would be required for a complete automation but are not explicitly provided by the user.
-   - For each missing dynamic parameter, formulate a precise `clarification_question`.
+   - For each missing dynamic parameter, formulate a precise clarification question.
 
 4. **PLATFORM SELECTION LOGIC:**
    - Prioritize platforms with comprehensive credential information and known capabilities (from both core knowledge and supplementary database).
@@ -151,21 +152,19 @@ MANDATORY JSON STRUCTURE - EXACTLY THIS FORMAT:
     "Step 2: [GRANULAR_ATOMIC_ACTION] e.g., 'Step 2: Extract task name and due date from row data'.",
     "Step 3: [GRANULAR_ATOMIC_ACTION] e.g., 'Step 3: Create new task in task management service'.",
     "Step 4: [GRANULAR_ATOMIC_ACTION] e.g., 'Step 4: Send message via communication service'."
-    // ... continue for all atomic steps
   ],
   "platforms": [
     {
-      "name": "Platform Name (e.g., Google Sheets, Asana, Slack)", // Use actual platform name here
+      "name": "Platform Name (e.g., Google Sheets, Asana, Slack)",
       "credentials": [
         {
-          "field": "exact_credential_field_name", // E.g., "API Key", "Client ID", "Access Token"
+          "field": "exact_credential_field_name",
           "placeholder": "Enter credential value (e.g., your_api_key_123)",
-          "link": "direct_url_to_get_credential", // If available from knowledge base
-          "why_needed": "specific_explanation_for_this_credential" // E.g., "Required for API authentication"
+          "link": "direct_url_to_get_credential",
+          "why_needed": "specific_explanation_for_this_credential"
         }
       ]
     }
-    // ... include ALL required platforms and their credential details
   ],
   "platforms_to_remove": [],
   "agents": [
@@ -179,9 +178,9 @@ MANDATORY JSON STRUCTURE - EXACTLY THIS FORMAT:
     }
   ],
   "clarification_questions": [
-    "To proceed with the data extraction, could you specify the exact identifier for the source data (e.g., sheet name, database ID, table name)?" ,
-    "For the messaging action, what is the precise destination identifier (e.g., channel ID, group name, recipient's user ID/email)?" ,
-    "Regarding the credential for [PLATFORM TYPE, e.g., 'data management service'], could you provide the [INFERRED CREDENTIAL TYPE, e.g., 'OAuth 2.0 Client ID and Secret'] or confirm the authentication method?" ,
+    "To proceed with the data extraction, could you specify the exact identifier for the source data (e.g., sheet name, database ID, table name)?",
+    "For the messaging action, what is the precise destination identifier (e.g., channel ID, group name, recipient's user ID/email)?",
+    "Regarding the credential for [PLATFORM TYPE, e.g., 'data management service'], could you provide the [INFERRED CREDENTIAL TYPE, e.g., 'OAuth 2.0 Client ID and Secret'] or confirm the authentication method?",
     "How should the system determine the 'assigned team member' for the notification (e.g., a specific name, an ID from the extracted data, or a default)?"
   ],
   "automation_blueprint": {
@@ -212,7 +211,6 @@ MANDATORY JSON STRUCTURE - EXACTLY THIS FORMAT:
           "platform_credential_id": "credential_reference"
         }
       }
-      // ... more granular steps
     ],
     "error_handling": {
       "retry_attempts": 3,
@@ -227,7 +225,7 @@ MANDATORY JSON STRUCTURE - EXACTLY THIS FORMAT:
     "missing_parameters_identified": "List of dynamic parameters that require clarification from user."
   },
   "is_update": false,
-  "recheck_status": "parameters_clarification_needed" // Or "ready_for_blueprint_generation" if no questions
+  "recheck_status": "parameters_clarification_needed"
 }
 
 CRITICAL SUCCESS METRICS:
@@ -239,7 +237,7 @@ CRITICAL SUCCESS METRICS:
 
 Context from comprehensive knowledge database: ${knowledgeContext}
 Previous conversation: ${JSON.stringify(messages.slice(-3))}
-Current automation context: ${JSON.stringify(automationContext)}`
+Current automation context: ${JSON.stringify(automationContext)}`;
 
     // Prepare messages for OpenAI
     const openaiMessages = [

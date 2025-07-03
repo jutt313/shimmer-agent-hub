@@ -6,13 +6,15 @@ import { GitBranch, ChevronDown, ChevronUp } from 'lucide-react';
 interface DynamicConditionNodeData {
   label: string;
   icon: string;
-  condition?: any;
+  condition?: {
+    expression: string;
+    branches?: Array<{
+      label: string;
+      handle: string;
+      color: string;
+    }>;
+  };
   explanation?: string;
-  branches?: Array<{
-    label: string;
-    handle: string;
-    color: string;
-  }>;
 }
 
 interface DynamicConditionNodeProps {
@@ -23,21 +25,12 @@ interface DynamicConditionNodeProps {
 const DynamicConditionNode: React.FC<DynamicConditionNodeProps> = ({ data, selected }) => {
   const [expanded, setExpanded] = useState(false);
   
-  // Dynamic branch colors
-  const branchColors = [
-    '#10b981', // emerald
-    '#f59e0b', // amber  
-    '#ef4444', // red
-    '#8b5cf6', // violet
-    '#06b6d4', // cyan
-    '#84cc16', // lime
-    '#f97316', // orange
-    '#ec4899', // pink
-  ];
-
-  const branches = data.branches || [
-    { label: 'True', handle: 'success', color: '#10b981' },
-    { label: 'False', handle: 'error', color: '#ef4444' }
+  // Extract branches from condition data or create default ones
+  const branches = data.condition?.branches || [
+    { label: 'Urgent', handle: 'urgent', color: '#ef4444' },
+    { label: 'Task', handle: 'task', color: '#10b981' },
+    { label: 'Follow-up', handle: 'followup', color: '#f59e0b' },
+    { label: 'Default', handle: 'default', color: '#6b7280' }
   ];
 
   const handleExpansion = () => {
@@ -94,12 +87,12 @@ const DynamicConditionNode: React.FC<DynamicConditionNodeProps> = ({ data, selec
         </div>
       </div>
       
-      {/* Dynamic output handles */}
+      {/* Dynamic output handles based on actual conditions */}
       {branches.map((branch, index) => {
         const totalBranches = branches.length;
-        const verticalSpacing = Math.max(60 / totalBranches, 15);
-        const startY = totalBranches === 1 ? 50 : 20;
-        const yPosition = startY + (index * verticalSpacing);
+        const spacing = Math.min(60 / totalBranches, 20);
+        const startY = totalBranches === 1 ? 50 : 25;
+        const yPosition = startY + (index * spacing);
         
         return (
           <React.Fragment key={branch.handle}>
@@ -119,13 +112,14 @@ const DynamicConditionNode: React.FC<DynamicConditionNodeProps> = ({ data, selec
             <div 
               className="absolute text-xs font-medium px-2 py-1 rounded-full border shadow-sm bg-white"
               style={{ 
-                right: '-8px',
-                top: `calc(${yPosition}% - 12px)`,
+                right: '-12px',
+                top: `calc(${yPosition}% - 10px)`,
                 color: branch.color,
                 borderColor: branch.color + '40',
                 fontSize: '10px',
                 minWidth: 'fit-content',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                zIndex: 10
               }}
             >
               {branch.label}

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { getPlatformIconConfig } from '@/utils/platformIcons';
-import { ChevronDown, ChevronUp, Settings } from 'lucide-react';
+import { ChevronDown, ChevronUp, Settings, Zap } from 'lucide-react';
 
 interface ActionNodeData {
   label: string;
@@ -11,6 +11,12 @@ interface ActionNodeData {
   action?: any;
   stepType?: string;
   explanation?: string;
+  stepDetails?: {
+    integration?: string;
+    method?: string;
+    endpoint?: string;
+    parameters?: any;
+  };
 }
 
 interface ActionNodeProps {
@@ -21,8 +27,12 @@ interface ActionNodeProps {
 const ActionNode: React.FC<ActionNodeProps> = ({ data, selected }) => {
   const [expanded, setExpanded] = useState(false);
   
-  const iconConfig = getPlatformIconConfig(data.platform || '', data.action?.method);
-  const IconComponent = iconConfig.icon || Settings;
+  // Get platform info from action or stepDetails
+  const platform = data.platform || data.action?.integration || data.stepDetails?.integration;
+  const method = data.action?.method || data.stepDetails?.method;
+  
+  const iconConfig = getPlatformIconConfig(platform || '', method);
+  const IconComponent = iconConfig.icon || (data.stepType === 'ai_agent_call' ? Zap : Settings);
 
   const handleExpansion = () => {
     setExpanded(!expanded);
@@ -67,22 +77,27 @@ const ActionNode: React.FC<ActionNodeProps> = ({ data, selected }) => {
             {expanded ? <ChevronUp className="w-4 h-4 text-slate-600" /> : <ChevronDown className="w-4 h-4 text-slate-600" />}
           </div>
           
-          {data.platform && (
+          {platform && (
             <div className="text-xs text-slate-500 font-medium mb-1 px-2 py-1 bg-slate-100 rounded border border-slate-200 inline-block">
-              {data.platform}
+              {platform}
             </div>
           )}
           
-          {expanded && data.action && (
+          {expanded && (
             <div className="space-y-2 mb-2">
-              {data.action.method && (
+              {method && (
                 <div className="text-xs text-slate-700 bg-slate-50 px-2 py-1 rounded border border-slate-200">
-                  <span className="font-medium">Method:</span> {data.action.method}
+                  <span className="font-medium">Method:</span> {method}
                 </div>
               )}
-              {data.action.endpoint && (
+              {(data.action?.endpoint || data.stepDetails?.endpoint) && (
                 <div className="text-xs text-slate-700 bg-slate-50 px-2 py-1 rounded border border-slate-200">
-                  <span className="font-medium">Endpoint:</span> {data.action.endpoint}
+                  <span className="font-medium">Endpoint:</span> {data.action?.endpoint || data.stepDetails?.endpoint}
+                </div>
+              )}
+              {(data.action?.parameters || data.stepDetails?.parameters) && (
+                <div className="text-xs text-slate-700 bg-slate-50 px-2 py-1 rounded border border-slate-200">
+                  <span className="font-medium">Parameters:</span> {JSON.stringify(data.action?.parameters || data.stepDetails?.parameters).substring(0, 100)}...
                 </div>
               )}
             </div>

@@ -44,7 +44,7 @@ interface AutomationDiagramDisplayProps {
   onRegenerateDiagram?: () => void;
 }
 
-// Enhanced Node Types Mapping with new components
+// Enhanced Node Types Mapping with proper node type handling
 const nodeTypes = {
   actionNode: ActionNode,
   platformNode: PlatformNode,
@@ -56,6 +56,8 @@ const nodeTypes = {
   fallbackNode: FallbackNode,
   triggerNode: TriggerNode,
   platformTriggerNode: PlatformTriggerNode,
+  // Add fallback mapping for any unknown types
+  default: ActionNode
 };
 
 // Enhanced Layouting with better dynamic positioning
@@ -381,7 +383,7 @@ const DiagramFlow: React.FC<{
   );
 };
 
-// Main Component with enhanced dynamic processing
+// Main Component with FIXED diagram processing
 const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   automationBlueprint,
   automationDiagramData,
@@ -481,7 +483,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     return stats;
   }, []);
 
-  // Enhanced diagram data processing
+  // FIXED diagram data processing with proper node type mapping
   useEffect(() => {
     console.log('🔄 Processing diagram data...');
     setDiagramError(null);
@@ -495,8 +497,12 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     if (automationDiagramData?.nodes && automationDiagramData?.edges) {
       console.log('🎨 Loading AI-generated diagram with', automationDiagramData.nodes.length, 'nodes');
       
-      // Enhanced node processing with agent recommendations
-      const processedNodes = automationDiagramData.nodes.map(node => {
+      // FIXED: Process nodes with proper type mapping and data validation
+      const processedNodes = automationDiagramData.nodes.map((node, index) => {
+        // Ensure node has proper type - fallback to actionNode if unknown
+        const nodeType = nodeTypes[node.type as keyof typeof nodeTypes] ? node.type : 'actionNode';
+        
+        // Find AI agent recommendations for this node
         const recommendation = aiAgentRecommendations.find(agent => 
           node.type === 'aiAgentNode' && 
           agent?.name && 
@@ -506,26 +512,69 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           node.data.agent.agent_id === agent.name
         );
         
-        if (recommendation) {
-          return {
-            ...node,
-            data: {
-              ...node.data,
+        // Enhanced node data processing
+        const processedNode = {
+          ...node,
+          id: node.id || `node-${index}`,
+          type: nodeType,
+          position: {
+            x: typeof node.position?.x === 'number' ? node.position.x : 50 + (index * 300),
+            y: typeof node.position?.y === 'number' ? node.position.y : 100
+          },
+          data: {
+            ...node.data,
+            // Add recommendation data if applicable
+            ...(recommendation && {
               isRecommended: true,
               onAdd: () => onAgentAdd?.(recommendation),
               onDismiss: () => onAgentDismiss?.(recommendation.name)
-            }
-          };
-        }
+            })
+          },
+          draggable: true,
+          selectable: true,
+          connectable: false
+        };
         
-        return node;
+        return processedNode;
       });
       
-      // Apply enhanced layout with better spacing
+      // FIXED: Process edges with proper connection validation
+      const processedEdges = automationDiagramData.edges.map((edge, index) => ({
+        ...edge,
+        id: edge.id || `edge-${index}`,
+        type: edge.type || 'smoothstep',
+        animated: edge.animated !== false,
+        style: {
+          stroke: edge.style?.stroke || '#3b82f6',
+          strokeWidth: edge.style?.strokeWidth || 2,
+          ...edge.style
+        },
+        // Ensure proper handle connections
+        sourceHandle: edge.sourceHandle || 'right',
+        targetHandle: edge.targetHandle || 'left'
+      }));
+      
+      // Validate that all edges have valid source and target nodes
+      const nodeIds = new Set(processedNodes.map(n => n.id));
+      const validEdges = processedEdges.filter(edge => 
+        nodeIds.has(edge.source) && nodeIds.has(edge.target)
+      );
+      
+      if (validEdges.length < processedEdges.length) {
+        console.warn(`⚠️ Filtered out ${processedEdges.length - validEdges.length} invalid edges`);
+      }
+      
+      // Apply enhanced layout if needed
       const { nodes: layoutedNodes, edges: layoutedEdges } = getDynamicLayoutedElements(
         processedNodes, 
-        automationDiagramData.edges
+        validEdges
       );
+      
+      console.log('✅ Setting processed diagram:', {
+        nodes: layoutedNodes.length,
+        edges: layoutedEdges.length,
+        nodeTypes: [...new Set(layoutedNodes.map(n => n.type))]
+      });
       
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
@@ -538,7 +587,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       
     } else if (automationBlueprint?.steps?.length > 0) {
       console.log('⚠️ No AI diagram available, blueprint exists');
-      setDiagramError('AI diagram generation failed or is not available. Please regenerate.');
+      setDiagramError('AI diagram generation failed. Click "Regenerate" to try again.');
       setNodes([]);
       setEdges([]);
     } else {
@@ -546,7 +595,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       setNodes([]);
       setEdges([]);
     }
-  }, [automationDiagramData, automationBlueprint, aiAgentRecommendations, analyzeBlueprint]);
+  }, [automationDiagramData, automationBlueprint, aiAgentRecommendations, analyzeBlueprint, onAgentAdd, onAgentDismiss]);
 
   const onConnect = useCallback((params: any) => {
     console.log('🔗 Connection attempt (read-only):', params);
@@ -573,16 +622,16 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             </div>
             <div className="space-y-4">
               <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                AI is Creating Your Flow Diagram
+                Generating Complete Flow Diagram
               </h3>
               <p className="text-gray-600 max-w-md mx-auto leading-relaxed">
-                Generating an interactive visual representation of your automation workflow with enhanced interactivity...
+                Creating nodes for all automation steps with proper connections...
               </p>
               {componentStats && (
                 <div className="text-sm text-gray-500 space-y-2 bg-white/50 rounded-lg p-4 border border-gray-200">
-                  <div>Expected nodes: <span className="font-medium">{componentStats.expectedNodes}</span></div>
-                  <div>Platforms: <span className="font-medium">{componentStats.platforms.join(', ')}</span></div>
-                  <div>Flow complexity: <span className="font-medium">{componentStats.conditions} conditions, {componentStats.loops} loops</span></div>
+                  <div>Expected steps: <span className="font-medium">{componentStats.totalSteps}</span></div>
+                  <div>Conditions: <span className="font-medium">{componentStats.conditions}</span></div>
+                  <div>AI Agents: <span className="font-medium">{componentStats.agents.length}</span></div>
                 </div>
               )}
             </div>
@@ -604,10 +653,10 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             </div>
             <div className="space-y-4">
               <h3 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                No Automation Flow Yet
+                Ready to Build Your Flow
               </h3>
               <p className="text-gray-600 leading-relaxed">
-                Start building your automation in the chat, and a beautiful interactive flow diagram will be generated automatically with full drag-and-drop functionality.
+                Start describing your automation in the chat, and I'll generate a complete visual flow diagram showing every step, condition, and connection.
               </p>
             </div>
           </div>

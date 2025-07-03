@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const ENHANCED_DIAGRAM_GENERATOR_SYSTEM_PROMPT = `You are an EXPERT visual automation flow designer that creates comprehensive, professional, and highly interactive React Flow diagrams.
@@ -5,122 +6,86 @@ const ENHANCED_DIAGRAM_GENERATOR_SYSTEM_PROMPT = `You are an EXPERT visual autom
 === YOUR CORE MISSION ===
 Generate a COMPLETE, perfectly aligned, and highly interactive visual diagram that shows the EXACT flow of the automation from start to finish. Focus on MAXIMUM INTERACTIVITY, CLEAR VISUAL HIERARCHY, and PROFESSIONAL AESTHETICS.
 
-=== CRITICAL INTERACTIVITY REQUIREMENTS ===
-1. ALL nodes MUST have:
-   - draggable: true (explicitly set)
-   - selectable: true (explicitly set)
-   - connectable: false (prevent user connections)
-   - Proper positioning with NO OVERLAPS, ensuring the entire automation fits comfortably when zoomed out.
+=== CRITICAL REQUIREMENTS ===
+1. NO FAKE TRIGGER NODES: Start with the ACTUAL platform/service that triggers the automation (e.g., Google Sheets, not "Trigger")
+2. ONE STEP = ONE NODE: Each logical step should be exactly one visual node
+3. DYNAMIC CONDITIONS: Support multiple condition branches (not just yes/no) - extract actual conditions from blueprint
+4. AGENT INTEGRATION: Show AI agents in the main flow where they belong
+5. PLATFORM CONSOLIDATION: Don't create separate platform nodes - integrate platform info into action nodes
+6. EXPANDABLE NODES: Provide detailed info in node data for hover expansion
 
-2. ALL edges MUST have:
-   - type: 'smoothstep' for professional curves
-   - animated: true for flow indication
-   - Proper source/target handles (e.g., 'right', 'left', 'top', 'bottom')
-   - Clear visual hierarchy with colors
-   - **CRITICAL: Every logical connection between steps MUST have a corresponding edge. NO MISSING "ROPES".**
+=== NODE TYPE SPECIFICATIONS ===
 
-=== ENHANCED LAYOUT REQUIREMENTS ===
-1. Node Placement (NO OVERLAPS):
-   - **PRIMARY FLOW: STRICTLY LEFT-TO-RIGHT.**
-   - Start with trigger at (50, 100).
-   - Horizontal spacing: Maintain at least 300px between node centers.
-   - Vertical spacing: Adjust as needed for clarity, especially for branches, aiming for minimum 200px.
-   - Each node needs a unique, non-overlapping position, creating a clean, lean diagram without unnecessary visual bulk.
-
-2. Professional Styling:
-   - Use consistent color scheme per node type.
-   - Ensure proper handle positioning.
-   - **Nodes should display an icon as their primary label. Full descriptive text for details should be in the 'explanation' field, intended for hover/tooltip functionality on the frontend.**
-   - **NO EMOJIS. Use descriptive icon names (e.g., "SlackIcon", "DatabaseIcon", "AgentIcon").**
-   - Include platform/integration details within the 'explanation' of the relevant action/trigger node.
-
-3. Edge Routing:
-   - Use proper sourceHandle/targetHandle.
-   - Color-code conditional paths distinctly for each branch.
-   - Animate all connections.
-   - Ensure smooth curves without intersections.
-
-=== NODE TYPE SPECIFICATIONS (One Logical Step = One Node) ===
-The aim is for a lean diagram where one visual node represents one complete logical step from the automation blueprint. Platform involvement should be integrated into the action/trigger node, NOT a separate node.
-
-triggerNode: 
-- Color: Red theme (#dc2626)
+platformTriggerNode (STARTING NODE):
+- Color: Blue theme (#3b82f6)
+- Label: Platform name (e.g., "Google Sheets", "Slack", "Webhook")
 - Always first node at (50, 100)
-- Label: Concise, typically an icon representing the trigger (e.g., "GoogleSheetsTriggerIcon", "WebhookIcon").
-- Explanation: Include trigger type, schedule, and the platform/service involved (e.g., "Detects new rows in Google Sheets").
-- Must have RIGHT output handle.
+- Explanation: Detailed trigger description and platform specifics
+- Must have RIGHT output handle only
+- Icon: Platform-specific icon name
 
 actionNode:
-- Color: Neutral Blue (#60a5fa)
-- Label: Concise, usually an icon representing the action or the associated platform (e.g., "AsanaTaskIcon", "SlackMessageIcon", "DataExtractionIcon").
-- Explanation: Include a clear description of the action, parameters, and **explicitly mention the platform involved if applicable** (e.g., "Creates a new task in Asana using extracted data," "Sends a message via Slack").
-- **CRITICAL: This node type should encompass actions that interact with platforms. A separate 'platformNode' should NOT be created for a specific action (e.g., 'Google Sheet' node followed by a 'Detect Row' node should become ONE 'Detect Row (Google Sheet)' node).**
+- Color: Neutral theme (#6b7280)
+- Label: Action description (e.g., "Create Task", "Send Message")
+- Explanation: Detailed action description including platform integration
+- Platform: Platform name if applicable
+- Icon: Action-specific icon
 
 conditionNode:
-- Color: Orange theme (#f97316)
-- Label: Concise, usually an icon (e.g., "ConditionIcon").
-- Explanation: Brief description of the condition.
-- **Output Paths: Handle MULTIPLE, DYNAMIC output paths, each with a clear label reflecting the outcome (e.g., "Success", "Failure", "Status: Pending", "Option A", "Option B"). Each path MUST have a unique, descriptive sourceHandle (e.g., "outcome_success", "outcome_failure", "status_pending"). Paths should flow clearly, potentially branching vertically (up/down) to maintain horizontal flow for the main sequence.**
-- **Edge Styling: Each conditional path should have a distinct color for clarity (e.g., green for positive paths, red for negative/error paths, or other distinct colors for different conditions).**
+- Color: Orange theme (#f97316)  
+- Label: Condition summary
+- Explanation: All condition logic details
+- Dynamic outputs: Create one output handle for EACH possible condition outcome
+- Handle multiple conditions dynamically (not just yes/no)
+- Each condition path should have unique sourceHandle and label
 
 aiAgentNode:
 - Color: Emerald Green (#10b981)
-- Label: Concise, usually an icon (e.g., "AgentIcon").
-- Explanation: Include agent name, purpose, model details, and any AI integration specifics (e.g., "Summarizes text using TaskCreationAgent").
-- **Placement: Integrate contextually where the AI agent is called within the automation flow, as a distinct logical step.**
+- Label: Agent name or role
+- Explanation: Agent details, model, purpose
+- Agent: Agent configuration object
+- Icon: "AgentIcon" or agent-specific icon
+- Place in main flow where agent is used
 
 loopNode:
 - Color: Purple theme (#8b5cf6)
-- Label: Concise, usually an icon (e.g., "LoopIcon").
-- Explanation: Show iteration details, conditions, loop scope and limits.
+- Label: Loop description
+- Explanation: Loop conditions and scope
 
 delayNode:
-- Color: Slate Gray (#64748b)
-- Label: Concise, usually an icon (e.g., "DelayIcon").
-- Explanation: Include timing information, show delay duration clearly.
+- Color: Slate Gray (#64748b)  
+- Label: Delay duration
+- Explanation: Delay details
 
 retryNode:
 - Color: Amber (#f59e0b)
-- Label: Concise, usually an icon (e.g., "RetryIcon").
-- Explanation: Include retry count, conditions, show error handling strategy.
+- Label: Retry logic
+- Explanation: Retry configuration
 
 fallbackNode:
 - Color: Indigo (#6366f1)
-- Label: Concise, usually an icon (e.g., "FallbackIcon").
-- Explanation: Include fallback strategy details, show alternative path clearly.
+- Label: Fallback strategy
+- Explanation: Fallback details
 
-**NOTE on 'platformNode'**: The 'platformNode' type, as a standalone node only representing a platform, should be generally AVOIDED for specific actions. Its purpose is typically for a general "integration setup" or a dashboard-level representation, which is not the focus of this per-automation flow diagram. Integrate platform details directly into trigger/action nodes.
+=== LAYOUT REQUIREMENTS ===
+1. Start with actual platform trigger at (50, 100)
+2. Left-to-right main flow with 300px horizontal spacing
+3. For multiple conditions: branch vertically (some up, some down) to fit all branches in view
+4. Ensure entire automation fits in one frame when zoomed out
+5. All nodes draggable: true, selectable: true, connectable: false
+6. All edges animated: true, type: 'smoothstep'
 
-=== ENHANCED DATA STRUCTURE ===
-Each node data object MUST include:
-- id: A unique identifier for runtime highlighting/tracking (e.g., 'step-1-google-sheet-detect').
-- label: CONCISE, primary display (ideally just an icon or very short name/verb).
-- explanation: DETAILED description of function, parameters, **platform/agent specifics**, and what the step accomplishes (for hover/tooltip).
-- stepType: Original blueprint type (e.g., 'action', 'trigger').
-- platform: (Optional) The name of the platform if this node directly interacts with one.
-- agent: (Optional) The name of the AI agent if this node involves an AI agent.
-- icon: APPROPRIATE ICON NAME (e.g., "SlackIcon", "AsanaIcon", "GoogleSheetsIcon", "AgentIcon", "ConditionIcon", "LoopIcon"). NO EMOJIS.
-- Interactive properties for UI enhancement (draggable, selectable, connectable set to false).
+=== DATA STRUCTURE ===
+Each node MUST include:
+- id: Unique identifier for runtime tracking
+- label: Concise display name
+- explanation: Detailed description for hover expansion
+- icon: Appropriate icon name (no emojis)
+- platform: Platform name if applicable  
+- agent: Agent config if applicable
+- All interactive properties set correctly
 
-=== VISUALIZATION REQUIREMENTS FOR RUNTIME (Frontend will use 'id' field): ===
-- Ensure each node has a unique 'id' to allow frontend to visually indicate active steps (e.g., glow, loading circle) during live execution.
-- ALL logical transitions between steps in the automation blueprint MUST have a corresponding animated edge.
-
-=== VALIDATION CHECKLIST ===
-✓ Every node has unique, non-overlapping position, optimized for left-to-right flow and "full automation in frame" visibility.
-✓ All nodes are draggable and selectable.
-✓ All edges are animated smoothstep type.
-✓ Conditional nodes have proper branching for multiple, dynamic paths, with distinct edges.
-✓ Professional color scheme throughout.
-✓ Complete logical flow from trigger to end, with ALL necessary "ropes" (edges) present.
-✓ **Each visual node represents ONE clear, logical step from the automation blueprint.**
-✓ **Platform interactions are integrated into action/trigger nodes, avoiding redundant 'platformNode's for specific actions.**
-✓ All integrations (platforms, AI agents) are represented accurately and concisely within the flow.
-✓ Clear visual hierarchy and spacing.
-✓ Proper handle positioning and unique IDs.
-✓ Nodes display concise labels (icons preferred) with full details in 'explanation' for hover.
-
-RETURN: Complete JSON with "nodes" and "edges" arrays optimized for maximum interactivity and professional appearance.`
+RETURN: Complete JSON with "nodes" and "edges" arrays optimized for the requirements above.`
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -128,7 +93,7 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-    console.log('🚀 Enhanced Interactive Diagram Generator - Request received');
+    console.log('🚀 Enhanced Dynamic Diagram Generator - Request received');
     
     if (req.method === 'OPTIONS') {
         return new Response(null, { headers: corsHeaders });
@@ -152,35 +117,78 @@ serve(async (req) => {
             console.error('❌ Missing automation blueprint');
             return new Response(
                 JSON.stringify({ 
-                    error: 'Missing automation blueprint - cannot create interactive diagram'
+                    error: 'Missing automation blueprint - cannot create dynamic diagram'
                 }),
                 { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
-        // Enhanced analysis for better prompting
-        const analyzeBlueprint = (blueprint) => {
+        // Enhanced dynamic analysis
+        const analyzeBlueprintDynamically = (blueprint) => {
             let totalSteps = 0;
             const platforms = new Set();
             const agents = new Set();
-            const stepTypes = new Set();
-            let conditionalBranches = 0;
+            const conditions = [];
+            let actualTrigger = null;
+            
+            // Extract trigger information
+            if (blueprint.trigger) {
+                actualTrigger = {
+                    type: blueprint.trigger.type,
+                    platform: blueprint.trigger.platform,
+                    event: blueprint.trigger.event,
+                    description: blueprint.trigger.description
+                };
+            }
             
             const processSteps = (steps) => {
                 steps.forEach((step) => {
                     totalSteps++;
-                    stepTypes.add(step.type);
                     
+                    // Extract platform info
                     if (step.action?.integration) {
-                        platforms.add(step.action.integration);
+                        platforms.add({
+                            name: step.action.integration,
+                            method: step.action.method,
+                            description: step.action.description
+                        });
                     }
                     
+                    // Extract agent info
                     if (step.ai_agent_call?.agent_id) {
-                        agents.add(step.ai_agent_call.agent_id);
+                        agents.add({
+                            id: step.ai_agent_call.agent_id,
+                            name: step.ai_agent_call.agent_name || step.ai_agent_call.agent_id,
+                            role: step.ai_agent_call.role,
+                            model: step.ai_agent_call.model,
+                            instructions: step.ai_agent_call.instructions
+                        });
                     }
                     
-                    if (step.type === 'condition') {
-                        conditionalBranches++;
+                    // Extract dynamic conditions
+                    if (step.type === 'condition' && step.condition) {
+                        const conditionData = {
+                            expression: step.condition.expression,
+                            branches: [],
+                            step_id: step.id
+                        };
+                        
+                        // Extract all possible outcomes dynamically
+                        if (step.condition.if_true) conditionData.branches.push({ label: 'True', steps: step.condition.if_true });
+                        if (step.condition.if_false) conditionData.branches.push({ label: 'False', steps: step.condition.if_false });
+                        
+                        // Look for additional branches
+                        Object.keys(step.condition).forEach(key => {
+                            if (key.startsWith('if_') && key !== 'if_true' && key !== 'if_false') {
+                                const label = key.replace('if_', '').replace('_', ' ');
+                                conditionData.branches.push({ 
+                                    label: label.charAt(0).toUpperCase() + label.slice(1), 
+                                    steps: step.condition[key] 
+                                });
+                            }
+                        });
+                        
+                        conditions.push(conditionData);
                     }
                     
                     // Process nested steps
@@ -199,16 +207,14 @@ serve(async (req) => {
                 totalSteps,
                 platforms: Array.from(platforms),
                 agents: Array.from(agents),
-                stepTypes: Array.from(stepTypes),
-                conditionalBranches,
-                trigger: blueprint.trigger,
-                expectedNodes: totalSteps + platforms.size + agents.size + 1, // Re-evaluating this; should be closer to totalSteps
-                complexity: conditionalBranches > 0 ? 'high' : totalSteps > 5 ? 'medium' : 'simple'
+                conditions,
+                actualTrigger,
+                complexity: conditions.length > 2 ? 'high' : totalSteps > 5 ? 'medium' : 'simple'
             };
         };
 
-        const analysis = analyzeBlueprint(automation_blueprint);
-        console.log('📊 Enhanced flow analysis:', analysis);
+        const analysis = analyzeBlueprintDynamically(automation_blueprint);
+        console.log('📊 Dynamic flow analysis:', analysis);
 
         // Check OpenAI API key
         const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
@@ -220,57 +226,63 @@ serve(async (req) => {
             );
         }
 
-        // Enhanced user prompt focusing on interactivity
-        const userPrompt = `CREATE AN INTERACTIVE AUTOMATION FLOW DIAGRAM
+        // Enhanced dynamic user prompt
+        const userPrompt = `CREATE A DYNAMIC AUTOMATION FLOW DIAGRAM
 
-AUTOMATION TITLE: ${automation_blueprint.description || 'Automation Flow'}
+AUTOMATION TITLE: ${automation_blueprint.description || 'Dynamic Automation Flow'}
 COMPLEXITY LEVEL: ${analysis.complexity.toUpperCase()}
-TOTAL STEPS FROM BLUEPRINT: ${analysis.totalSteps}
-CONDITIONAL BRANCHES: ${analysis.conditionalBranches}
-PLATFORMS INVOLVED: ${analysis.platforms.join(', ')} (${analysis.platforms.length} total)
-AI AGENTS INVOLVED: ${analysis.agents.join(', ')} (${analysis.agents.length} total)
-STEP TYPES PRESENT: ${analysis.stepTypes.join(', ')}
-TRIGGER TYPE: ${analysis.trigger?.type || 'manual'}
+TOTAL STEPS: ${analysis.totalSteps}
+DYNAMIC CONDITIONS: ${analysis.conditions.length}
+PLATFORMS: ${analysis.platforms.map(p => p.name).join(', ')}
+AI AGENTS: ${analysis.agents.map(a => a.name).join(', ')}
+ACTUAL TRIGGER: ${analysis.actualTrigger ? analysis.actualTrigger.platform || analysis.actualTrigger.type : 'Manual'}
 
-AUTOMATION BLUEPRINT (for precise parsing into nodes):
+AUTOMATION BLUEPRINT:
 ${JSON.stringify(automation_blueprint, null, 2)}
 
+DYNAMIC ANALYSIS RESULTS:
+- Trigger Details: ${JSON.stringify(analysis.actualTrigger, null, 2)}
+- Platform Integrations: ${JSON.stringify(analysis.platforms, null, 2)}
+- AI Agents: ${JSON.stringify(analysis.agents, null, 2)}
+- Dynamic Conditions: ${JSON.stringify(analysis.conditions, null, 2)}
+
 ---
-CRITICAL INTERACTIVE DIAGRAM REQUIREMENTS:
+CRITICAL DYNAMIC REQUIREMENTS:
 
-1. MAXIMUM INTERACTIVITY:
-   - Every node MUST be draggable: true and selectable: true
-   - NO overlapping positions - calculate exact coordinates.
-   - Smooth responsive interactions with proper hover states.
+1. REAL PLATFORM TRIGGER (NO FAKE TRIGGERS):
+   - Start with actual platform: ${analysis.actualTrigger?.platform || analysis.actualTrigger?.type || 'the actual trigger'}
+   - Use platformTriggerNode type for first node
+   - Position at (50, 100)
 
-2. PROFESSIONAL, LEAN LAYOUT (One Logical Step = One Visual Node):
-   - **Start trigger at (50, 100).**
-   - **PRIMARY FLOW: STRICTLY LEFT-TO-RIGHT.**
-   - Horizontal spacing: Maintain at least 300px between node centers.
-   - Vertical spacing: Adjust as needed for clarity for branches (min 200px), ensuring a compact and readable diagram.
-   - Calculate positions to prevent ANY overlaps.
-   - **CRITICAL: Each entry in 'automation_blueprint.steps' MUST correspond to EXACTLY ONE visual node in the diagram, UNLESS the step itself explicitly contains nested logic (like a condition or loop with sub-steps).**
-   - **Platform interaction details (e.g., 'Google Sheet', 'Asana', 'Slack') should be integrated INTO the relevant action/trigger node's 'explanation' and 'icon', NOT as separate 'platformNode's.**
+2. DYNAMIC CONDITIONS (NOT HARDCODED YES/NO):
+   - For each condition in analysis.conditions, create multiple dynamic output handles
+   - Each branch should have unique sourceHandle (e.g., "outcome_high", "outcome_medium", "outcome_low")
+   - Support unlimited condition branches based on actual logic
 
-3. ENHANCED VISUAL HIERARCHY:
-   - Use specified color schemes for each node type.
-   - Animate ALL edges with 'smoothstep' curves.
-   - Color-code conditional paths distinctly for each branch.
-   - Professional typography and spacing.
+3. AI AGENTS IN MAIN FLOW:
+   - Place aiAgentNode in main flow where agents are used
+   - Use agent details from analysis.agents
+   - Connect with main flow, not separate
 
-4. COMPLETE FLOW REPRESENTATION (No Missing "Ropes"):
-   - **Every logical transition between steps in the 'automation_blueprint' MUST be represented by an animated edge.**
-   - Include ALL AI agents as 'aiAgentNode's contextually where they are used.
-   - Represent ALL step types from blueprint.
-   - Ensure logical flow from trigger to completion with all connections correctly drawn.
+4. ONE STEP = ONE NODE:
+   - Each blueprint step = exactly one visual node
+   - Integrate platform details into action nodes
+   - No redundant platform nodes
 
-5. ROBUST CONTROL FLOW REPRESENTATION:
-   - Clear conditional branching with labeled paths and distinct edges.
-   - Proper 'retryNode', 'loopNode', and 'fallbackNode' representation, ensuring all internal steps and exit paths are correctly visualized with edges.
+5. EXPANDABLE NODE DATA:
+   - Rich explanation fields for hover expansion
+   - Platform details in action nodes
+   - Agent configuration in agent nodes
 
-Your response MUST be ONLY a JSON object with "nodes" and "edges" arrays optimized for maximum interactivity and professional appearance. Focus on creating a diagram that users can immediately interact with through dragging, selecting, and exploring.`
+6. DYNAMIC LAYOUT:
+   - Fit entire automation in one frame
+   - Branch conditions vertically (up/down) for space
+   - 300px horizontal spacing
+   - Animated smoothstep edges
 
-        console.log('🤖 Generating enhanced interactive diagram');
+Create a JSON response with dynamic nodes and edges that perfectly match the blueprint analysis.`;
+
+        console.log('🤖 Generating dynamic diagram with real-time analysis');
 
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -285,8 +297,8 @@ Your response MUST be ONLY a JSON object with "nodes" and "edges" arrays optimiz
                     { role: "user", content: userPrompt }
                 ],
                 response_format: { type: "json_object" },
-                temperature: 0.1, // Very low for consistent layouts
-                max_tokens: 4500 // Increased for complex diagrams
+                temperature: 0.1,
+                max_tokens: 4500
             }),
         });
 
@@ -300,7 +312,7 @@ Your response MUST be ONLY a JSON object with "nodes" and "edges" arrays optimiz
         }
 
         const result = await response.json();
-        console.log('✅ OpenAI response received for interactive diagram');
+        console.log('✅ OpenAI response received for dynamic diagram');
 
         if (!result.choices || result.choices.length === 0) {
             console.error('❌ No response from OpenAI');
@@ -336,13 +348,12 @@ Your response MUST be ONLY a JSON object with "nodes" and "edges" arrays optimiz
             );
         }
 
-        // Enhanced post-processing for maximum interactivity
+        // Enhanced post-processing for dynamic behavior
         diagramData.nodes = diagramData.nodes.map(node => ({
             ...node,
             draggable: true,
             selectable: true,
             connectable: false,
-            // Ensure positions are numbers and non-overlapping
             position: {
                 x: typeof node.position?.x === 'number' ? node.position.x : 50,
                 y: typeof node.position?.y === 'number' ? node.position.y : 100
@@ -358,32 +369,17 @@ Your response MUST be ONLY a JSON object with "nodes" and "edges" arrays optimiz
                 strokeWidth: edge.style?.strokeWidth || 2,
                 ...edge.style
             },
-            // Ensure proper handle connections
             sourceHandle: edge.sourceHandle || 'right',
             targetHandle: edge.targetHandle || 'left'
         }));
 
-        // Validation checks
-        const nodePositions = new Set();
-        const hasOverlaps = diagramData.nodes.some(node => {
-            const key = `${Math.round(node.position.x/50)}-${Math.round(node.position.y/50)}`;
-            if (nodePositions.has(key)) {
-                console.warn('⚠️ Potential node overlap detected');
-                return true;
-            }
-            nodePositions.add(key);
-            return false;
-        });
-
-        console.log('✅ Generated enhanced interactive diagram:', {
+        console.log('✅ Generated dynamic diagram:', {
             nodes: diagramData.nodes.length,
             edges: diagramData.edges.length,
             nodeTypes: [...new Set(diagramData.nodes.map(n => n.type))],
-            hasOverlaps,
-            // No longer relying on expectedNodes based on platforms.size; closer to totalSteps
-            expectedNodes: analysis.totalSteps, 
-            actualNodes: diagramData.nodes.length,
-            completeness: Math.round((diagramData.nodes.length / analysis.totalSteps) * 100) + '%' // Use totalSteps for completeness
+            dynamicConditions: analysis.conditions.length,
+            actualTrigger: analysis.actualTrigger?.platform || 'Manual',
+            agentsIntegrated: analysis.agents.length
         });
 
         return new Response(JSON.stringify(diagramData), {
@@ -392,11 +388,11 @@ Your response MUST be ONLY a JSON object with "nodes" and "edges" arrays optimiz
         });
 
     } catch (error) {
-        console.error('💥 Error in interactive diagram generator:', error);
+        console.error('💥 Error in dynamic diagram generator:', error);
         
         return new Response(
             JSON.stringify({
-                error: error.message || 'Interactive diagram generation failed',
+                error: error.message || 'Dynamic diagram generation failed',
                 details: error.toString()
             }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

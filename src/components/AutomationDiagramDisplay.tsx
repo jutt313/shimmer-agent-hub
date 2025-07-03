@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ReactFlow, 
@@ -21,16 +20,17 @@ import { Badge } from "@/components/ui/badge";
 import { Sparkles, Zap, AlertCircle, RefreshCw, Eye, EyeOff, LayoutTemplate } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
-// Import your custom node components
+// Import enhanced node components
 import ActionNode from './diagram/ActionNode';
 import PlatformNode from './diagram/PlatformNode';
-import ConditionNode from './diagram/ConditionNode';
+import DynamicConditionNode from './diagram/DynamicConditionNode';
 import LoopNode from './diagram/LoopNode';
 import DelayNode from './diagram/DelayNode';
 import AIAgentNode from './diagram/AIAgentNode';
 import RetryNode from './diagram/RetryNode';
 import FallbackNode from './diagram/FallbackNode';
 import TriggerNode from './diagram/TriggerNode';
+import PlatformTriggerNode from './diagram/PlatformTriggerNode';
 import { AutomationBlueprint } from "@/types/automation";
 
 interface AutomationDiagramDisplayProps {
@@ -44,27 +44,28 @@ interface AutomationDiagramDisplayProps {
   onRegenerateDiagram?: () => void;
 }
 
-// --- Node Types Mapping ---
+// Enhanced Node Types Mapping with new components
 const nodeTypes = {
   actionNode: ActionNode,
   platformNode: PlatformNode,
-  conditionNode: ConditionNode,
+  conditionNode: DynamicConditionNode,
   loopNode: LoopNode,
   delayNode: DelayNode,
   aiAgentNode: AIAgentNode,
   retryNode: RetryNode,
   fallbackNode: FallbackNode,
   triggerNode: TriggerNode,
+  platformTriggerNode: PlatformTriggerNode,
 };
 
-// --- Enhanced Layouting Utility with Better Spacing ---
-const NODE_WIDTH = 280;
-const NODE_HEIGHT = 120;
-const HORIZONTAL_GAP = 200;
-const VERTICAL_GAP = 150;
+// Enhanced Layouting with better dynamic positioning
+const NODE_WIDTH = 320;
+const NODE_HEIGHT = 140;
+const HORIZONTAL_GAP = 220;
+const VERTICAL_GAP = 160;
 
-const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => {
-  console.log('🎨 Starting layout calculation for', nodes.length, 'nodes and', edges.length, 'edges');
+const getDynamicLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => {
+  console.log('🎨 Starting dynamic layout calculation for', nodes.length, 'nodes and', edges.length, 'edges');
   
   if (!nodes || nodes.length === 0) return { nodes: [], edges };
 
@@ -106,14 +107,25 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
     });
   }
 
+  // Enhanced positioning for complex conditions
+  const layerNodeCounts = new Map<number, number>();
+  layers.forEach(layer => {
+    layerNodeCounts.set(layer, (layerNodeCounts.get(layer) || 0) + 1);
+  });
+
   const layerNodeOffsets = new Map<number, number>();
-  layers.forEach(layer => layerNodeOffsets.set(layer, 0));
+  layerNodeCounts.forEach((count, layer) => {
+    const totalHeight = count * NODE_HEIGHT + (count - 1) * VERTICAL_GAP;
+    layerNodeOffsets.set(layer, -totalHeight / 2);
+  });
 
   const layoutedNodes = nodes.map(node => {
     const layer = layers.get(node.id) || 0;
     const x = layer * (NODE_WIDTH + HORIZONTAL_GAP) + 50;
-    const y = (layerNodeOffsets.get(layer) || 0) + 100;
-    layerNodeOffsets.set(layer, y + NODE_HEIGHT + VERTICAL_GAP);
+    const currentOffset = layerNodeOffsets.get(layer) || 0;
+    const y = currentOffset + 300; // Center vertically
+    
+    layerNodeOffsets.set(layer, currentOffset + NODE_HEIGHT + VERTICAL_GAP);
     
     return { 
       ...node, 
@@ -129,7 +141,7 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
     type: 'smoothstep',
     animated: true,
     style: {
-      stroke: '#3b82f6',
+      stroke: edge.style?.stroke || '#3b82f6',
       strokeWidth: 2,
       ...edge.style
     },
@@ -137,7 +149,7 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
     targetHandle: edge.targetHandle || 'left',
   }));
 
-  console.log('✅ Layout completed:', {
+  console.log('✅ Dynamic layout completed:', {
     finalNodes: layoutedNodes.length,
     finalEdges: layoutedEdges.length,
     layers: Math.max(...Array.from(layers.values())) + 1
@@ -146,7 +158,7 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
   return { nodes: layoutedNodes, edges: layoutedEdges };
 };
 
-// --- Internal Flow Component ---
+// Internal Flow Component with enhanced interactivity
 const DiagramFlow: React.FC<{
   nodes: Node[];
   edges: Edge[];
@@ -174,30 +186,30 @@ const DiagramFlow: React.FC<{
 }) => {
   const { fitView } = useReactFlow();
 
-  // Enhanced auto-fit with better parameters
+  // Enhanced auto-fit with better parameters for dynamic content
   useEffect(() => {
     if (nodes.length > 0) {
-      console.log('🔍 Fitting view for', nodes.length, 'nodes');
+      console.log('🔍 Fitting view for', nodes.length, 'dynamic nodes');
       const timer = setTimeout(() => {
         fitView({ 
-          padding: 0.3, 
-          minZoom: 0.3, 
-          maxZoom: 1.2,
-          duration: 800
+          padding: 0.2, 
+          minZoom: 0.2, 
+          maxZoom: 1.0,
+          duration: 1000
         });
-      }, 100);
+      }, 200);
       return () => clearTimeout(timer);
     }
   }, [nodes, fitView]);
 
   return (
     <div className="w-full h-full relative">
-      {/* Enhanced header with better positioning */}
+      {/* Enhanced header with dynamic stats */}
       <div className="absolute top-4 left-4 right-4 z-20 flex items-start justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3 flex-wrap">
           <Badge variant="secondary" className="bg-white/95 text-gray-700 border border-gray-200/50 shadow-md backdrop-blur">
             <Sparkles className="w-3 h-3 mr-1" />
-            Interactive Flow
+            Dynamic Flow
           </Badge>
           
           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 shadow-sm">
@@ -245,7 +257,7 @@ const DiagramFlow: React.FC<{
         </div>
       </div>
 
-      {/* Enhanced details panel */}
+      {/* Enhanced details panel with dynamic info */}
       {showDetails && componentStats && (
         <div className="absolute top-16 left-4 z-20 bg-white/95 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-xl max-w-sm">
           <div className="space-y-3">
@@ -257,6 +269,14 @@ const DiagramFlow: React.FC<{
               <div>
                 <span className="font-medium text-gray-700">Platforms:</span>
                 <span className="ml-2 text-gray-600">{componentStats.platforms.length}</span>
+              </div>
+              <div>
+                <span className="font-medium text-gray-700">Agents:</span>
+                <span className="ml-2 text-gray-600">{componentStats.agents.length}</span>
+              </div>
+              <div>
+                <span className="font-medium text-gray-700">Conditions:</span>
+                <span className="ml-2 text-gray-600">{componentStats.conditions}</span>
               </div>
             </div>
             {componentStats.platforms.length > 0 && (
@@ -285,7 +305,7 @@ const DiagramFlow: React.FC<{
         </div>
       )}
 
-      {/* Enhanced React Flow with better interactivity */}
+      {/* Enhanced React Flow with dynamic node support */}
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -295,7 +315,7 @@ const DiagramFlow: React.FC<{
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{
-          padding: 0.3,
+          padding: 0.2,
           minZoom: 0.1,
           maxZoom: 1.5,
         }}
@@ -337,6 +357,7 @@ const DiagramFlow: React.FC<{
           }}
           nodeColor={(node) => {
             switch (node.type) {
+              case 'platformTriggerNode': return '#3b82f6';
               case 'platformNode': return '#3b82f6';
               case 'conditionNode': return '#f97316';
               case 'loopNode': return '#8b5cf6';
@@ -360,7 +381,7 @@ const DiagramFlow: React.FC<{
   );
 };
 
-// --- Main Component ---
+// Main Component with enhanced dynamic processing
 const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   automationBlueprint,
   automationDiagramData,
@@ -501,7 +522,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       });
       
       // Apply enhanced layout with better spacing
-      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
+      const { nodes: layoutedNodes, edges: layoutedEdges } = getDynamicLayoutedElements(
         processedNodes, 
         automationDiagramData.edges
       );
@@ -531,10 +552,10 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     console.log('🔗 Connection attempt (read-only):', params);
   }, []);
 
-  // Enhanced manual layout function
+  // Enhanced manual layout function with dynamic positioning
   const onLayout = useCallback(() => {
-    console.log('🎯 Manual re-layout triggered');
-    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(nodes, edges);
+    console.log('🎯 Manual re-layout triggered for dynamic nodes');
+    const { nodes: layoutedNodes, edges: layoutedEdges } = getDynamicLayoutedElements(nodes, edges);
     setNodes(layoutedNodes);
     setEdges(layoutedEdges);
   }, [nodes, edges, setNodes, setEdges]);

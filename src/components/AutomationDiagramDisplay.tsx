@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ReactFlow, 
@@ -44,7 +45,7 @@ interface AutomationDiagramDisplayProps {
   onRegenerateDiagram?: () => void;
 }
 
-// Enhanced Node Types Mapping with proper node type handling
+// Enhanced Node Types Mapping
 const nodeTypes = {
   actionNode: ActionNode,
   platformNode: PlatformNode,
@@ -56,11 +57,10 @@ const nodeTypes = {
   fallbackNode: FallbackNode,
   triggerNode: TriggerNode,
   platformTriggerNode: PlatformTriggerNode,
-  // Add fallback mapping for any unknown types
   default: ActionNode
 };
 
-// Enhanced Layouting with better dynamic positioning
+// Enhanced Layouting with better positioning
 const NODE_WIDTH = 320;
 const NODE_HEIGHT = 140;
 const HORIZONTAL_GAP = 280;
@@ -69,34 +69,32 @@ const START_X = 50;
 const START_Y = 100;
 
 const getDynamicLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => {
-  console.log('🎨 Starting enhanced layout calculation for', nodes.length, 'nodes');
+  console.log('🎨 Enhanced layout calculation for', nodes.length, 'nodes');
   
   if (!nodes || nodes.length === 0) return { nodes: [], edges };
 
-  // Build adjacency graph
+  // Build adjacency graph for better positioning
   const graph = new Map<string, string[]>();
   const inDegrees = new Map<string, number>();
-  const outDegrees = new Map<string, number>();
+  const processed = new Set<string>();
 
   nodes.forEach(node => {
     graph.set(node.id, []);
     inDegrees.set(node.id, 0);
-    outDegrees.set(node.id, 0);
   });
 
   edges.forEach(edge => {
     if (graph.has(edge.source) && graph.has(edge.target)) {
       graph.get(edge.source)?.push(edge.target);
       inDegrees.set(edge.target, (inDegrees.get(edge.target) || 0) + 1);
-      outDegrees.set(edge.source, (outDegrees.get(edge.source) || 0) + 1);
     }
   });
 
-  // Topological sort to determine layers
+  // Topological sort for layers
   const queue: string[] = [];
   const layers = new Map<string, number>();
   
-  // Find root nodes (nodes with no incoming edges)
+  // Find root nodes
   nodes.forEach(node => {
     if (inDegrees.get(node.id) === 0) {
       queue.push(node.id);
@@ -108,15 +106,14 @@ const getDynamicLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'L
   while (head < queue.length) {
     const nodeId = queue[head++];
     const currentLayer = layers.get(nodeId) || 0;
-    const nextLayer = currentLayer + 1;
-
+    
     graph.get(nodeId)?.forEach(childId => {
       const newInDegree = (inDegrees.get(childId) || 0) - 1;
       inDegrees.set(childId, newInDegree);
       
       if (newInDegree === 0) {
         queue.push(childId);
-        layers.set(childId, Math.max(layers.get(childId) || 0, nextLayer));
+        layers.set(childId, Math.max(layers.get(childId) || 0, currentLayer + 1));
       }
     });
   }
@@ -137,19 +134,16 @@ const getDynamicLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'L
     layerGroups.get(layer)?.push(nodeId);
   });
 
-  // Position calculation
+  // Enhanced positioning
   const layoutedNodes = nodes.map(node => {
     const layer = layers.get(node.id) || 0;
     const layerNodes = layerGroups.get(layer) || [];
     const nodeIndex = layerNodes.indexOf(node.id);
     
-    // Calculate position
     const x = START_X + (layer * (NODE_WIDTH + HORIZONTAL_GAP));
-    
-    // Vertical positioning: center the layer vertically
     const layerHeight = layerNodes.length * NODE_HEIGHT + (layerNodes.length - 1) * VERTICAL_GAP;
     const layerStartY = START_Y + (layerHeight > 0 ? -layerHeight / 2 : 0);
-    const y = layerStartY + nodeIndex * (NODE_HEIGHT + VERTICAL_GAP) + 300; // Add offset to center
+    const y = layerStartY + nodeIndex * (NODE_HEIGHT + VERTICAL_GAP) + 300;
     
     return { 
       ...node, 
@@ -162,21 +156,19 @@ const getDynamicLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'L
 
   // Enhanced edge styling
   const layoutedEdges = edges.map(edge => {
-    const sourceNode = layoutedNodes.find(n => n.id === edge.source);
-    const targetNode = layoutedNodes.find(n => n.id === edge.target);
-    
     let edgeStyle = {
       stroke: '#3b82f6',
       strokeWidth: 2,
       ...edge.style
     };
 
-    // Special styling for condition branches
+    // Enhanced edge colors based on handles
     if (edge.sourceHandle) {
       switch (edge.sourceHandle) {
         case 'true':
         case 'yes':
         case 'success':
+        case 'existing':
           edgeStyle.stroke = '#10b981';
           break;
         case 'false':
@@ -188,6 +180,7 @@ const getDynamicLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'L
           edgeStyle.stroke = '#ef4444';
           break;
         case 'task':
+        case 'new':
           edgeStyle.stroke = '#10b981';
           break;
         case 'followup':
@@ -211,14 +204,13 @@ const getDynamicLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'L
   console.log('✅ Enhanced layout completed:', {
     finalNodes: layoutedNodes.length,
     finalEdges: layoutedEdges.length,
-    layers: Math.max(...Array.from(layers.values())) + 1,
-    layerGroups: layerGroups.size
+    layers: Math.max(...Array.from(layers.values())) + 1
   });
 
   return { nodes: layoutedNodes, edges: layoutedEdges };
 };
 
-// Internal Flow Component with enhanced interactivity
+// Internal Flow Component
 const DiagramFlow: React.FC<{
   nodes: Node[];
   edges: Edge[];
@@ -246,10 +238,9 @@ const DiagramFlow: React.FC<{
 }) => {
   const { fitView } = useReactFlow();
 
-  // Enhanced auto-fit with better parameters for dynamic content
   useEffect(() => {
     if (nodes.length > 0) {
-      console.log('🔍 Fitting view for', nodes.length, 'dynamic nodes');
+      console.log('🔍 Fitting view for', nodes.length, 'enhanced nodes');
       const timer = setTimeout(() => {
         fitView({ 
           padding: 0.2, 
@@ -264,12 +255,12 @@ const DiagramFlow: React.FC<{
 
   return (
     <div className="w-full h-full relative">
-      {/* Enhanced header with dynamic stats */}
+      {/* Enhanced header */}
       <div className="absolute top-4 left-4 right-4 z-20 flex items-start justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3 flex-wrap">
           <Badge variant="secondary" className="bg-white/95 text-gray-700 border border-gray-200/50 shadow-md backdrop-blur">
             <Sparkles className="w-3 h-3 mr-1" />
-            Dynamic Flow
+            Enhanced Flow
           </Badge>
           
           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 shadow-sm">
@@ -317,7 +308,7 @@ const DiagramFlow: React.FC<{
         </div>
       </div>
 
-      {/* Enhanced details panel with dynamic info */}
+      {/* Enhanced details panel */}
       {showDetails && componentStats && (
         <div className="absolute top-16 left-4 z-20 bg-white/95 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-xl max-w-sm">
           <div className="space-y-3">
@@ -365,7 +356,7 @@ const DiagramFlow: React.FC<{
         </div>
       )}
 
-      {/* Enhanced React Flow with dynamic node support */}
+      {/* Enhanced React Flow */}
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -441,7 +432,7 @@ const DiagramFlow: React.FC<{
   );
 };
 
-// Main Component with ENHANCED diagram processing
+// Main Enhanced Component
 const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   automationBlueprint,
   automationDiagramData,
@@ -459,9 +450,9 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   const [showDetails, setShowDetails] = useState(false);
   const [componentStats, setComponentStats] = useState<any>(null);
 
-  // Enhanced debugging for data flow
+  // Enhanced debugging
   useEffect(() => {
-    console.log('📊 AutomationDiagramDisplay - Enhanced Data Flow Debug:', {
+    console.log('📊 Enhanced AutomationDiagramDisplay - Data Flow:', {
       hasBlueprint: !!automationBlueprint,
       blueprintSteps: automationBlueprint?.steps?.length || 0,
       hasDiagramData: !!automationDiagramData,
@@ -472,7 +463,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     });
   }, [automationBlueprint, automationDiagramData, messages, isGenerating]);
 
-  // Extract AI agent recommendations from messages
+  // Extract AI agent recommendations
   useEffect(() => {
     const recommendations: any[] = [];
     messages.forEach(message => {
@@ -484,7 +475,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         });
       }
     });
-    console.log('🤖 Extracted AI agent recommendations:', recommendations.length);
+    console.log('🤖 Enhanced AI agent recommendations:', recommendations.length);
     setAiAgentRecommendations(recommendations);
   }, [messages, dismissedAgents]);
 
@@ -502,9 +493,10 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       steps.forEach((step) => {
         totalSteps++;
         
-        // Fixed: Add proper type checking for step.action
-        if (step.action && typeof step.action === 'object' && 'integration' in step.action) {
-          platforms.add(step.action.integration);
+        // Enhanced platform detection
+        if (step.action && typeof step.action === 'object') {
+          const platform = step.action.integration || step.action.platform || step.action.service;
+          if (platform) platforms.add(platform);
         }
         
         if (step.ai_agent_call?.agent_id) {
@@ -538,13 +530,13 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       expectedNodes: totalSteps + platforms.size + agents.size + 1 
     };
 
-    console.log('📈 Blueprint analysis completed:', stats);
+    console.log('📈 Enhanced blueprint analysis:', stats);
     return stats;
   }, []);
 
-  // ENHANCED diagram data processing with comprehensive node validation
+  // Enhanced diagram data processing
   useEffect(() => {
-    console.log('🔄 Processing diagram data with enhanced validation...');
+    console.log('🔄 Processing enhanced diagram data...');
     setDiagramError(null);
 
     // Analyze blueprint
@@ -554,11 +546,11 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     }
 
     if (automationDiagramData?.nodes && automationDiagramData?.edges) {
-      console.log('🎨 Loading deterministic diagram with', automationDiagramData.nodes.length, 'nodes');
+      console.log('🎨 Loading enhanced diagram with', automationDiagramData.nodes.length, 'nodes');
       
-      // ENHANCED: Process nodes with comprehensive validation and data enhancement
+      // Enhanced node processing
       const processedNodes = automationDiagramData.nodes.map((node, index) => {
-        console.log(`🔍 Processing node ${index + 1}:`, {
+        console.log(`🔍 Enhanced processing node ${index + 1}:`, {
           id: node.id,
           type: node.type,
           hasData: !!node.data,
@@ -566,10 +558,10 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           stepType: node.data?.stepType
         });
 
-        // Ensure node has proper type - fallback to actionNode if unknown
+        // Enhanced node type validation
         const nodeType = nodeTypes[node.type as keyof typeof nodeTypes] ? node.type : 'actionNode';
         
-        // Find AI agent recommendations for this node
+        // Find AI agent recommendations
         const recommendation = aiAgentRecommendations.find(agent => 
           node.type === 'aiAgentNode' && 
           agent?.name && 
@@ -579,7 +571,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           node.data.agent.agent_id === agent.name
         );
         
-        // Enhanced node data processing with comprehensive validation
+        // Enhanced node data processing
         const processedNode = {
           ...node,
           id: node.id || `node-${Date.now()}-${index}`,
@@ -590,13 +582,10 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           },
           data: {
             ...node.data,
-            // Ensure all nodes have proper labels
             label: node.data?.label || node.data?.explanation || `Step ${index + 1}`,
-            // Ensure platform information is properly set - Fixed type checking
             platform: node.data?.platform || 
               (node.data?.action && typeof node.data.action === 'object' && 'integration' in node.data.action ? node.data.action.integration : '') ||
               (node.data?.stepDetails && typeof node.data.stepDetails === 'object' && 'integration' in node.data.stepDetails ? node.data.stepDetails.integration : ''),
-            // Add recommendation data if applicable
             ...(recommendation && {
               isRecommended: true,
               onAdd: () => onAgentAdd?.(recommendation),
@@ -608,7 +597,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           connectable: false
         };
         
-        console.log('✅ Processed node:', {
+        console.log('✅ Enhanced processed node:', {
           id: processedNode.id,
           type: processedNode.type,
           label: processedNode.data.label,
@@ -618,9 +607,9 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         return processedNode;
       });
       
-      // ENHANCED: Process edges with comprehensive connection validation
+      // Enhanced edge processing
       const processedEdges = automationDiagramData.edges.map((edge, index) => {
-        console.log(`🔗 Processing edge ${index + 1}:`, {
+        console.log(`🔗 Enhanced processing edge ${index + 1}:`, {
           id: edge.id,
           source: edge.source,
           target: edge.target,
@@ -638,13 +627,12 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             strokeWidth: edge.style?.strokeWidth || 2,
             ...edge.style
           },
-          // Ensure proper handle connections
           sourceHandle: edge.sourceHandle || undefined,
           targetHandle: edge.targetHandle || undefined
         };
       });
       
-      // Validate that all edges have valid source and target nodes
+      // Enhanced edge validation
       const nodeIds = new Set(processedNodes.map(n => n.id));
       const validEdges = processedEdges.filter(edge => {
         const isValid = nodeIds.has(edge.source) && nodeIds.has(edge.target);
@@ -664,7 +652,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         validEdges
       );
       
-      console.log('✅ Setting enhanced processed diagram:', {
+      console.log('✅ Setting enhanced diagram:', {
         nodes: layoutedNodes.length,
         edges: layoutedEdges.length,
         nodeTypes: [...new Set(layoutedNodes.map(n => n.type))],
@@ -674,15 +662,14 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
       
-      // Check for warnings
       if (automationDiagramData.warning) {
         console.warn('⚠️ Diagram warning:', automationDiagramData.warning);
         setDiagramError(automationDiagramData.warning);
       }
       
     } else if (automationBlueprint?.steps?.length > 0) {
-      console.log('⚠️ No diagram available, blueprint exists - should regenerate');
-      setDiagramError('Diagram needs to be generated. Click "Regenerate" to create a complete flow diagram.');
+      console.log('⚠️ No diagram available - should regenerate');
+      setDiagramError('Enhanced diagram needs to be generated. Click "Regenerate" to create a complete flow diagram.');
       setNodes([]);
       setEdges([]);
     } else {
@@ -696,9 +683,9 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     console.log('🔗 Connection attempt (read-only):', params);
   }, []);
 
-  // Enhanced manual layout function with dynamic positioning
+  // Enhanced manual layout
   const onLayout = useCallback(() => {
-    console.log('🎯 Manual re-layout triggered for dynamic nodes');
+    console.log('🎯 Manual enhanced re-layout triggered');
     const { nodes: layoutedNodes, edges: layoutedEdges } = getDynamicLayoutedElements(nodes, edges);
     setNodes(layoutedNodes);
     setEdges(layoutedEdges);
@@ -717,14 +704,15 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             </div>
             <div className="space-y-4">
               <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Generating Complete Flow Diagram
+                Generating Enhanced Flow Diagram
               </h3>
               <p className="text-gray-600 max-w-md mx-auto leading-relaxed">
-                Creating nodes for all automation steps with proper connections...
+                Creating all automation nodes with proper connections and platform icons...
               </p>
               {componentStats && (
                 <div className="text-sm text-gray-500 space-y-2 bg-white/50 rounded-lg p-4 border border-gray-200">
                   <div>Expected steps: <span className="font-medium">{componentStats.totalSteps}</span></div>
+                  <div>Platforms: <span className="font-medium">{componentStats.platforms.length}</span></div>
                   <div>Conditions: <span className="font-medium">{componentStats.conditions}</span></div>
                   <div>AI Agents: <span className="font-medium">{componentStats.agents.length}</span></div>
                 </div>
@@ -748,10 +736,10 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             </div>
             <div className="space-y-4">
               <h3 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                Ready to Build Your Flow
+                Ready to Build Enhanced Flow
               </h3>
               <p className="text-gray-600 leading-relaxed">
-                Start describing your automation in the chat, and I'll generate a complete visual flow diagram showing every step, condition, and connection.
+                Start describing your automation, and I'll generate a complete visual flow diagram with all steps, conditions, and platform integrations.
               </p>
             </div>
           </div>
@@ -767,7 +755,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             minHeight: '600px'
           }}>
       
-      {/* Enhanced React Flow with proper provider wrapper */}
+      {/* Enhanced React Flow */}
       <ReactFlowProvider>
         <DiagramFlow
           nodes={nodes}

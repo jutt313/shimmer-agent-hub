@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -53,10 +54,10 @@ interface Automation {
 
 interface WebhookTestResult {
   success: boolean;
-  status_code?: number;
-  response_time: number;
+  statusCode?: number;
+  responseTime: number;
   error?: string;
-  response_body?: string;
+  responseBody?: string;
   userMessage?: string;
 }
 
@@ -250,7 +251,7 @@ const WebhookManagementTab = () => {
       const testResult: WebhookTestResult = {
         success: data.success,
         error: data.error,
-        userMessage: data.userMessage, // Use user-friendly message
+        userMessage: data.userMessage,
         responseTime: data.responseTime || 0,
         statusCode: data.statusCode
       };
@@ -504,7 +505,7 @@ const WebhookManagementTab = () => {
                         )}
                         
                         <div className="space-y-3">
-                          {/* Webhook URL with Copy Button - IMPROVED */}
+                          {/* Webhook URL with Copy Button */}
                           <div className="space-y-2">
                             <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                               <ExternalLink className="h-4 w-4" />
@@ -535,7 +536,7 @@ const WebhookManagementTab = () => {
                             </div>
                           </div>
 
-                          {/* Webhook Secret - IMPROVED with better explanation */}
+                          {/* Webhook Secret */}
                           <div className="space-y-2">
                             <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                               <AlertTriangle className="h-4 w-4 text-amber-500" />
@@ -575,7 +576,7 @@ const WebhookManagementTab = () => {
                           )}
                         </div>
                         
-                        {/* IMPROVED Test Results Display */}
+                        {/* Test Results Display */}
                         {testResults[webhook.id] && (
                           <div className={`mt-4 p-4 rounded-xl border ${
                             testResults[webhook.id].success 

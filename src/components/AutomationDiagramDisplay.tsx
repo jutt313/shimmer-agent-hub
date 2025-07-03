@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ReactFlow, 
@@ -33,6 +32,8 @@ import FallbackNode from './diagram/FallbackNode';
 import TriggerNode from './diagram/TriggerNode';
 import PlatformTriggerNode from './diagram/PlatformTriggerNode';
 import { AutomationBlueprint } from "@/types/automation";
+import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
+import ExpandableNode from './diagram/ExpandableNode';
 
 interface AutomationDiagramDisplayProps {
   automationBlueprint?: AutomationBlueprint | null;
@@ -47,29 +48,29 @@ interface AutomationDiagramDisplayProps {
 
 // Enhanced Node Types Mapping
 const nodeTypes = {
-  actionNode: ActionNode,
-  platformNode: PlatformNode,
-  conditionNode: DynamicConditionNode,
-  loopNode: LoopNode,
+  actionNode: ExpandableNode,
+  platformNode: ExpandableNode,
+  conditionNode: ExpandableNode,
+  loopNode: ExpandableNode,
   delayNode: DelayNode,
-  aiAgentNode: AIAgentNode,
-  retryNode: RetryNode,
-  fallbackNode: FallbackNode,
-  triggerNode: TriggerNode,
-  platformTriggerNode: PlatformTriggerNode,
-  default: ActionNode
+  aiAgentNode: ExpandableNode,
+  retryNode: ExpandableNode,
+  fallbackNode: ExpandableNode,
+  triggerNode: ExpandableNode,
+  platformTriggerNode: ExpandableNode,
+  default: ExpandableNode
 };
 
 // Enhanced Layouting with better positioning
-const NODE_WIDTH = 320;
-const NODE_HEIGHT = 140;
-const HORIZONTAL_GAP = 280;
-const VERTICAL_GAP = 180;
+const NODE_WIDTH = 280;  // Reduced from 320
+const NODE_HEIGHT = 120; // Reduced from 140
+const HORIZONTAL_GAP = 200; // Reduced from 280
+const VERTICAL_GAP = 150;   // Reduced from 180
 const START_X = 50;
 const START_Y = 100;
 
 const getDynamicLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => {
-  console.log('🎨 Enhanced layout calculation for', nodes.length, 'nodes');
+  console.log('🎨 Compact layout calculation for', nodes.length, 'nodes');
   
   if (!nodes || nodes.length === 0) return { nodes: [], edges };
 
@@ -134,7 +135,7 @@ const getDynamicLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'L
     layerGroups.get(layer)?.push(nodeId);
   });
 
-  // Enhanced positioning
+  // Enhanced positioning with tighter spacing
   const layoutedNodes = nodes.map(node => {
     const layer = layers.get(node.id) || 0;
     const layerNodes = layerGroups.get(layer) || [];
@@ -143,7 +144,7 @@ const getDynamicLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'L
     const x = START_X + (layer * (NODE_WIDTH + HORIZONTAL_GAP));
     const layerHeight = layerNodes.length * NODE_HEIGHT + (layerNodes.length - 1) * VERTICAL_GAP;
     const layerStartY = START_Y + (layerHeight > 0 ? -layerHeight / 2 : 0);
-    const y = layerStartY + nodeIndex * (NODE_HEIGHT + VERTICAL_GAP) + 300;
+    const y = layerStartY + nodeIndex * (NODE_HEIGHT + VERTICAL_GAP) + 200; // Reduced offset
     
     return { 
       ...node, 
@@ -240,27 +241,27 @@ const DiagramFlow: React.FC<{
 
   useEffect(() => {
     if (nodes.length > 0) {
-      console.log('🔍 Fitting view for', nodes.length, 'enhanced nodes');
+      console.log('🔍 Fitting view for', nodes.length, 'compact nodes');
       const timer = setTimeout(() => {
         fitView({ 
-          padding: 0.2, 
-          minZoom: 0.2, 
-          maxZoom: 1.0,
-          duration: 1000
+          padding: 0.15, // Tighter padding for compact view
+          minZoom: 0.3, 
+          maxZoom: 1.2,
+          duration: 800
         });
-      }, 200);
+      }, 150);
       return () => clearTimeout(timer);
     }
   }, [nodes, fitView]);
 
   return (
     <div className="w-full h-full relative">
-      {/* Enhanced header */}
+      {/* Enhanced header with compact layout info */}
       <div className="absolute top-4 left-4 right-4 z-20 flex items-start justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3 flex-wrap">
           <Badge variant="secondary" className="bg-white/95 text-gray-700 border border-gray-200/50 shadow-md backdrop-blur">
             <Sparkles className="w-3 h-3 mr-1" />
-            Enhanced Flow
+            Compact Flow
           </Badge>
           
           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 shadow-sm">
@@ -270,6 +271,18 @@ const DiagramFlow: React.FC<{
           <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 shadow-sm">
             {edges.length} Connections
           </Badge>
+          
+          {nodes.filter(n => n.data?.stepType === 'condition').length > 0 && (
+            <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 shadow-sm">
+              {nodes.filter(n => n.data?.stepType === 'condition').length} Conditions
+            </Badge>
+          )}
+          
+          {nodes.filter(n => n.data?.stepType === 'ai_agent_call').length > 0 && (
+            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm">
+              {nodes.filter(n => n.data?.stepType === 'ai_agent_call').length} AI Agents
+            </Badge>
+          )}
 
           {componentStats && (
             <Button
@@ -292,7 +305,7 @@ const DiagramFlow: React.FC<{
             className="bg-white/90 hover:bg-white text-gray-700 shadow-sm"
           >
             <LayoutTemplate className="w-3 h-3 mr-1" />
-            Re-layout
+            Compact Layout
           </Button>
           
           {onRegenerateDiagram && (
@@ -308,13 +321,14 @@ const DiagramFlow: React.FC<{
         </div>
       </div>
 
-      {/* Enhanced details panel */}
+      {/* Enhanced details panel with compact layout info */}
       {showDetails && componentStats && (
         <div className="absolute top-16 left-4 z-20 bg-white/95 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-xl max-w-sm">
           <div className="space-y-3">
+            <div className="text-sm font-medium text-gray-800 mb-2">Compact Layout Details</div>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="font-medium text-gray-700">Steps:</span>
+                <span className="font-medium text-gray-700">Total Steps:</span>
                 <span className="ml-2 text-gray-600">{componentStats.totalSteps}</span>
               </div>
               <div>
@@ -322,13 +336,16 @@ const DiagramFlow: React.FC<{
                 <span className="ml-2 text-gray-600">{componentStats.platforms.length}</span>
               </div>
               <div>
-                <span className="font-medium text-gray-700">Agents:</span>
+                <span className="font-medium text-gray-700">AI Agents:</span>
                 <span className="ml-2 text-gray-600">{componentStats.agents.length}</span>
               </div>
               <div>
                 <span className="font-medium text-gray-700">Conditions:</span>
                 <span className="ml-2 text-gray-600">{componentStats.conditions}</span>
               </div>
+            </div>
+            <div className="text-xs text-gray-500 mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+              💡 Click on any node to expand and see detailed information
             </div>
             {componentStats.platforms.length > 0 && (
               <div>
@@ -356,7 +373,7 @@ const DiagramFlow: React.FC<{
         </div>
       )}
 
-      {/* Enhanced React Flow */}
+      {/* Enhanced React Flow with compact settings */}
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -366,8 +383,8 @@ const DiagramFlow: React.FC<{
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{
-          padding: 0.2,
-          minZoom: 0.1,
+          padding: 0.15, // Tighter padding
+          minZoom: 0.2,
           maxZoom: 1.5,
         }}
         className="bg-gradient-to-br from-slate-50/30 to-blue-50/20"
@@ -386,8 +403,8 @@ const DiagramFlow: React.FC<{
       >
         <Background 
           color="#e2e8f0" 
-          gap={25} 
-          size={1.5}
+          gap={20}  // Smaller gap for compact view
+          size={1}   // Smaller dots
           variant={BackgroundVariant.Dots}
         />
         <Controls 
@@ -399,24 +416,22 @@ const DiagramFlow: React.FC<{
         />
         <MiniMap 
           style={{
-            height: 140,
-            width: 200,
+            height: 120, // Smaller minimap
+            width: 180,
             backgroundColor: '#f8fafc',
             borderRadius: '12px',
             border: '1px solid #e2e8f0',
             boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
           }}
           nodeColor={(node) => {
-            switch (node.type) {
-              case 'platformTriggerNode': return '#3b82f6';
-              case 'platformNode': return '#3b82f6';
-              case 'conditionNode': return '#f97316';
-              case 'loopNode': return '#8b5cf6';
-              case 'aiAgentNode': return '#10b981';
-              case 'delayNode': return '#64748b';
-              case 'retryNode': return '#f59e0b';
-              case 'fallbackNode': return '#6366f1';
-              case 'triggerNode': return '#dc2626';
+            if (node.data?.branchContext) {
+              return node.data.branchContext.type === 'csv' ? '#10b981' : '#3b82f6';
+            }
+            switch (node.data?.stepType) {
+              case 'condition': return '#f97316';
+              case 'ai_agent_call': return '#10b981';
+              case 'retry': return '#f59e0b';
+              case 'notification': return '#a855f7';
               default: return '#6b7280';
             }
           }}
@@ -536,7 +551,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
 
   // Enhanced diagram data processing
   useEffect(() => {
-    console.log('🔄 Processing enhanced diagram data...');
+    console.log('🔄 Processing enhanced diagram data with AI agents...');
     setDiagramError(null);
 
     // Analyze blueprint
@@ -546,9 +561,9 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     }
 
     if (automationDiagramData?.nodes && automationDiagramData?.edges) {
-      console.log('🎨 Loading enhanced diagram with', automationDiagramData.nodes.length, 'nodes');
+      console.log('🎨 Loading compact diagram with', automationDiagramData.nodes.length, 'nodes');
       
-      // Enhanced node processing
+      // Enhanced node processing with AI agent integration
       const processedNodes = automationDiagramData.nodes.map((node, index) => {
         console.log(`🔍 Enhanced processing node ${index + 1}:`, {
           id: node.id,
@@ -561,35 +576,37 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         // Enhanced node type validation
         const nodeType = nodeTypes[node.type as keyof typeof nodeTypes] ? node.type : 'actionNode';
         
-        // Find AI agent recommendations
-        const recommendation = aiAgentRecommendations.find(agent => 
-          node.type === 'aiAgentNode' && 
-          agent?.name && 
-          node.data?.agent && 
-          typeof node.data.agent === 'object' && 
-          'agent_id' in node.data.agent &&
-          node.data.agent.agent_id === agent.name
-        );
+        // Enhanced AI agent integration
+        const isAIAgentNode = node.type === 'aiAgentNode' || node.data?.stepType === 'ai_agent_call';
+        let aiAgentRecommendation = null;
         
-        // Enhanced node data processing
+        if (isAIAgentNode) {
+          // Look for FileProcessingAgent or similar recommendations
+          aiAgentRecommendation = aiAgentRecommendations.find(agent => 
+            agent?.name && (
+              agent.name.toLowerCase().includes('fileprocessing') ||
+              agent.name.toLowerCase().includes('processing') ||
+              node.data?.agent?.agent_id === agent.name
+            )
+          );
+        }
+        
         const processedNode = {
           ...node,
           id: node.id || `node-${Date.now()}-${index}`,
           type: nodeType,
           position: {
-            x: typeof node.position?.x === 'number' ? node.position.x : 50 + (index * 320),
+            x: typeof node.position?.x === 'number' ? node.position.x : 50 + (index * NODE_WIDTH),
             y: typeof node.position?.y === 'number' ? node.position.y : 100
           },
           data: {
             ...node.data,
             label: node.data?.label || node.data?.explanation || `Step ${index + 1}`,
-            platform: node.data?.platform || 
-              (node.data?.action && typeof node.data.action === 'object' && 'integration' in node.data.action ? node.data.action.integration : '') ||
-              (node.data?.stepDetails && typeof node.data.stepDetails === 'object' && 'integration' in node.data.stepDetails ? node.data.stepDetails.integration : ''),
-            ...(recommendation && {
+            clickToExpand: true,
+            ...(aiAgentRecommendation && {
               isRecommended: true,
-              onAdd: () => onAgentAdd?.(recommendation),
-              onDismiss: () => onAgentDismiss?.(recommendation.name)
+              onAdd: () => onAgentAdd?.(aiAgentRecommendation),
+              onDismiss: () => onAgentDismiss?.(aiAgentRecommendation.name)
             })
           },
           draggable: true,
@@ -646,17 +663,16 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         console.warn(`⚠️ Filtered out ${processedEdges.length - validEdges.length} invalid edges`);
       }
       
-      // Apply enhanced layout
+      // Apply compact layout
       const { nodes: layoutedNodes, edges: layoutedEdges } = getDynamicLayoutedElements(
         processedNodes, 
         validEdges
       );
       
-      console.log('✅ Setting enhanced diagram:', {
+      console.log('✅ Setting compact diagram with AI integration:', {
         nodes: layoutedNodes.length,
         edges: layoutedEdges.length,
-        nodeTypes: [...new Set(layoutedNodes.map(n => n.type))],
-        platforms: [...new Set(layoutedNodes.map(n => n.data?.platform).filter(Boolean))]
+        aiAgentNodes: layoutedNodes.filter(n => n.data?.stepType === 'ai_agent_call').length
       });
       
       setNodes(layoutedNodes);
@@ -668,12 +684,11 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       }
       
     } else if (automationBlueprint?.steps?.length > 0) {
-      console.log('⚠️ No diagram available - should regenerate');
-      setDiagramError('Enhanced diagram needs to be generated. Click "Regenerate" to create a complete flow diagram.');
+      console.log('⚠️ No diagram available - should regenerate with compact layout');
+      setDiagramError('Compact diagram needs to be generated. Click "Regenerate" to create a complete flow diagram with proper spacing and expandable nodes.');
       setNodes([]);
       setEdges([]);
     } else {
-      console.log('📋 No blueprint or diagram data available');
       setNodes([]);
       setEdges([]);
     }

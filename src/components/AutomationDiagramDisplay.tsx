@@ -51,7 +51,7 @@ interface AIAgent {
 }
 
 interface NodeData {
-  label: string;
+  label?: string; // Make label optional to fix casting issues
   platform?: string;
   explanation?: string;
   stepType?: string;
@@ -97,6 +97,23 @@ const HORIZONTAL_GAP = 200;
 const VERTICAL_GAP = 150;
 const START_X = 50;
 const START_Y = 100;
+
+// Helper function to safely cast node data
+const safeNodeData = (data: Record<string, any>): NodeData => {
+  return {
+    label: data.label || data.explanation || 'Unknown Step',
+    platform: data.platform,
+    explanation: data.explanation,
+    stepType: data.stepType,
+    expandedData: data.expandedData,
+    branchContext: data.branchContext,
+    clickToExpand: data.clickToExpand !== false,
+    agent: data.agent,
+    isRecommended: data.isRecommended,
+    onAdd: data.onAdd,
+    onDismiss: data.onDismiss
+  };
+};
 
 const getDynamicLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => {
   console.log('🎨 Compact layout calculation for', nodes.length, 'nodes');
@@ -300,15 +317,27 @@ const DiagramFlow: React.FC<{
             {edges.length} Connections
           </Badge>
           
-          {nodes.filter(n => n.data?.stepType === 'condition').length > 0 && (
+          {nodes.filter(n => {
+            const nodeData = safeNodeData(n.data || {});
+            return nodeData.stepType === 'condition';
+          }).length > 0 && (
             <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 shadow-sm">
-              {nodes.filter(n => n.data?.stepType === 'condition').length} Conditions
+              {nodes.filter(n => {
+                const nodeData = safeNodeData(n.data || {});
+                return nodeData.stepType === 'condition';
+              }).length} Conditions
             </Badge>
           )}
           
-          {nodes.filter(n => n.data?.stepType === 'ai_agent_call').length > 0 && (
+          {nodes.filter(n => {
+            const nodeData = safeNodeData(n.data || {});
+            return nodeData.stepType === 'ai_agent_call';
+          }).length > 0 && (
             <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm">
-              {nodes.filter(n => n.data?.stepType === 'ai_agent_call').length} AI Agents
+              {nodes.filter(n => {
+                const nodeData = safeNodeData(n.data || {});
+                return nodeData.stepType === 'ai_agent_call';
+              }).length} AI Agents
             </Badge>
           )}
 
@@ -452,7 +481,7 @@ const DiagramFlow: React.FC<{
             boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
           }}
           nodeColor={(node) => {
-            const nodeData = node.data as NodeData;
+            const nodeData = safeNodeData(node.data || {});
             if (nodeData?.branchContext) {
               return nodeData.branchContext.type === 'csv' ? '#10b981' : '#3b82f6';
             }
@@ -598,15 +627,16 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           id: node.id,
           type: node.type,
           hasData: !!node.data,
-          platform: (node.data as NodeData)?.platform,
-          stepType: (node.data as NodeData)?.stepType
+          platform: node.data?.platform,
+          stepType: node.data?.stepType
         });
 
         // Enhanced node type validation
         const nodeType = nodeTypes[node.type as keyof typeof nodeTypes] ? node.type : 'actionNode';
         
         // Enhanced AI agent integration
-        const nodeData = node.data as NodeData;
+        const rawNodeData = node.data || {};
+        const nodeData = safeNodeData(rawNodeData);
         const isAIAgentNode = node.type === 'aiAgentNode' || nodeData?.stepType === 'ai_agent_call';
         let aiAgentRecommendation = null;
         
@@ -647,8 +677,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         console.log('✅ Enhanced processed node:', {
           id: processedNode.id,
           type: processedNode.type,
-          label: (processedNode.data as NodeData).label,
-          platform: (processedNode.data as NodeData).platform
+          label: safeNodeData(processedNode.data).label,
+          platform: safeNodeData(processedNode.data).platform
         });
         
         return processedNode;
@@ -702,7 +732,10 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       console.log('✅ Setting compact diagram with AI integration:', {
         nodes: layoutedNodes.length,
         edges: layoutedEdges.length,
-        aiAgentNodes: layoutedNodes.filter(n => (n.data as NodeData)?.stepType === 'ai_agent_call').length
+        aiAgentNodes: layoutedNodes.filter(n => {
+          const nodeData = safeNodeData(n.data || {});
+          return nodeData?.stepType === 'ai_agent_call';
+        }).length
       });
       
       setNodes(layoutedNodes);

@@ -15,8 +15,9 @@ Generate a COMPLETE, perfectly aligned, and highly interactive visual diagram th
 2. ALL edges MUST have:
    - type: 'smoothstep' for professional curves
    - animated: true for flow indication
-   - Proper source/target handles
+   - Proper source/target handles (e.g., 'right', 'left', 'top', 'bottom')
    - Clear visual hierarchy with colors
+   - **CRITICAL: Every logical connection between steps MUST have a corresponding edge. NO MISSING "ROPES".**
 
 === ENHANCED LAYOUT REQUIREMENTS ===
 1. Node Placement (NO OVERLAPS):
@@ -24,14 +25,14 @@ Generate a COMPLETE, perfectly aligned, and highly interactive visual diagram th
    - Start with trigger at (50, 100).
    - Horizontal spacing: Maintain at least 300px between node centers.
    - Vertical spacing: Adjust as needed for clarity, especially for branches, aiming for minimum 200px.
-   - Each node needs a unique, non-overlapping position.
+   - Each node needs a unique, non-overlapping position, creating a clean, lean diagram without unnecessary visual bulk.
 
 2. Professional Styling:
    - Use consistent color scheme per node type.
    - Ensure proper handle positioning.
    - **Nodes should display an icon as their primary label. Full descriptive text for details should be in the 'explanation' field, intended for hover/tooltip functionality on the frontend.**
    - **NO EMOJIS. Use descriptive icon names (e.g., "SlackIcon", "DatabaseIcon", "AgentIcon").**
-   - Include platform/integration details within the 'explanation'.
+   - Include platform/integration details within the 'explanation' of the relevant action/trigger node.
 
 3. Edge Routing:
    - Use proper sourceHandle/targetHandle.
@@ -39,39 +40,34 @@ Generate a COMPLETE, perfectly aligned, and highly interactive visual diagram th
    - Animate all connections.
    - Ensure smooth curves without intersections.
 
-=== NODE TYPE SPECIFICATIONS ===
+=== NODE TYPE SPECIFICATIONS (One Logical Step = One Node) ===
+The aim is for a lean diagram where one visual node represents one complete logical step from the automation blueprint. Platform involvement should be integrated into the action/trigger node, NOT a separate node.
 
 triggerNode: 
 - Color: Red theme (#dc2626)
 - Always first node at (50, 100)
-- Label: Concise, usually an icon (e.g., "TriggerIcon")
-- Explanation: Include trigger type, schedule, platform details.
+- Label: Concise, typically an icon representing the trigger (e.g., "GoogleSheetsTriggerIcon", "WebhookIcon").
+- Explanation: Include trigger type, schedule, and the platform/service involved (e.g., "Detects new rows in Google Sheets").
 - Must have RIGHT output handle.
-
-platformNode:
-- Color: Blue theme (#3b82f6) 
-- Label: Concise, usually an icon representing the platform (e.g., "GmailIcon", "StripeIcon").
-- Explanation: Include platform name, connection details, clear integration information.
-- **Placement: Integrate contextually within the main flow where the platform action occurs.**
 
 actionNode:
 - Color: Neutral Blue (#60a5fa)
-- Label: Concise, usually an icon representing the action or associated platform (e.g., "ActionIcon", "SlackIcon").
-- Explanation: Include action description, parameters, and what the step accomplishes.
-- **Placement: Systematically in the left-to-right flow.**
+- Label: Concise, usually an icon representing the action or the associated platform (e.g., "AsanaTaskIcon", "SlackMessageIcon", "DataExtractionIcon").
+- Explanation: Include a clear description of the action, parameters, and **explicitly mention the platform involved if applicable** (e.g., "Creates a new task in Asana using extracted data," "Sends a message via Slack").
+- **CRITICAL: This node type should encompass actions that interact with platforms. A separate 'platformNode' should NOT be created for a specific action (e.g., 'Google Sheet' node followed by a 'Detect Row' node should become ONE 'Detect Row (Google Sheet)' node).**
 
 conditionNode:
 - Color: Orange theme (#f97316)
 - Label: Concise, usually an icon (e.g., "ConditionIcon").
 - Explanation: Brief description of the condition.
-- **Output Paths: Handle MULTIPLE, DYNAMIC output paths. Each path must have a unique, descriptive sourceHandle (e.g., "status_success", "status_failure", "status_pending"). Paths should flow clearly, potentially branching vertically (up/down) to maintain horizontal flow for the main sequence.**
-- **Edge Styling: Each conditional path should have a distinct color for clarity (e.g., green for success-like, red for failure-like, or other distinct colors for different conditions).**
+- **Output Paths: Handle MULTIPLE, DYNAMIC output paths, each with a clear label reflecting the outcome (e.g., "Success", "Failure", "Status: Pending", "Option A", "Option B"). Each path MUST have a unique, descriptive sourceHandle (e.g., "outcome_success", "outcome_failure", "status_pending"). Paths should flow clearly, potentially branching vertically (up/down) to maintain horizontal flow for the main sequence.**
+- **Edge Styling: Each conditional path should have a distinct color for clarity (e.g., green for positive paths, red for negative/error paths, or other distinct colors for different conditions).**
 
 aiAgentNode:
 - Color: Emerald Green (#10b981)
 - Label: Concise, usually an icon (e.g., "AgentIcon").
-- Explanation: Include agent name, purpose, model details, and any AI integration specifics.
-- **Placement: Integrate contextually where the AI agent is called within the automation flow.**
+- Explanation: Include agent name, purpose, model details, and any AI integration specifics (e.g., "Summarizes text using TaskCreationAgent").
+- **Placement: Integrate contextually where the AI agent is called within the automation flow, as a distinct logical step.**
 
 loopNode:
 - Color: Purple theme (#8b5cf6)
@@ -93,18 +89,22 @@ fallbackNode:
 - Label: Concise, usually an icon (e.g., "FallbackIcon").
 - Explanation: Include fallback strategy details, show alternative path clearly.
 
+**NOTE on 'platformNode'**: The 'platformNode' type, as a standalone node only representing a platform, should be generally AVOIDED for specific actions. Its purpose is typically for a general "integration setup" or a dashboard-level representation, which is not the focus of this per-automation flow diagram. Integrate platform details directly into trigger/action nodes.
+
 === ENHANCED DATA STRUCTURE ===
 Each node data object MUST include:
-- id: A unique identifier for runtime highlighting/tracking.
-- label: CONCISE, primary display (ideally just an icon or short name).
-- explanation: DETAILED description of function, parameters, platform/agent specifics (for hover/tooltip).
-- stepType: Original blueprint type.
-- platform/agent/condition/etc: Relevant specific data.
-- icon: APPROPRIATE ICON NAME (e.g., "SlackIcon", "AgentIcon", "TriggerIcon"). NO EMOJIS.
+- id: A unique identifier for runtime highlighting/tracking (e.g., 'step-1-google-sheet-detect').
+- label: CONCISE, primary display (ideally just an icon or very short name/verb).
+- explanation: DETAILED description of function, parameters, **platform/agent specifics**, and what the step accomplishes (for hover/tooltip).
+- stepType: Original blueprint type (e.g., 'action', 'trigger').
+- platform: (Optional) The name of the platform if this node directly interacts with one.
+- agent: (Optional) The name of the AI agent if this node involves an AI agent.
+- icon: APPROPRIATE ICON NAME (e.g., "SlackIcon", "AsanaIcon", "GoogleSheetsIcon", "AgentIcon", "ConditionIcon", "LoopIcon"). NO EMOJIS.
 - Interactive properties for UI enhancement (draggable, selectable, connectable set to false).
 
 === VISUALIZATION REQUIREMENTS FOR RUNTIME (Frontend will use 'id' field): ===
 - Ensure each node has a unique 'id' to allow frontend to visually indicate active steps (e.g., glow, loading circle) during live execution.
+- ALL logical transitions between steps in the automation blueprint MUST have a corresponding animated edge.
 
 === VALIDATION CHECKLIST ===
 ✓ Every node has unique, non-overlapping position, optimized for left-to-right flow and "full automation in frame" visibility.
@@ -112,8 +112,10 @@ Each node data object MUST include:
 ✓ All edges are animated smoothstep type.
 ✓ Conditional nodes have proper branching for multiple, dynamic paths, with distinct edges.
 ✓ Professional color scheme throughout.
-✓ Complete logical flow from trigger to end.
-✓ All integrations (platforms, AI agents) are represented as nodes contextually within the flow.
+✓ Complete logical flow from trigger to end, with ALL necessary "ropes" (edges) present.
+✓ **Each visual node represents ONE clear, logical step from the automation blueprint.**
+✓ **Platform interactions are integrated into action/trigger nodes, avoiding redundant 'platformNode's for specific actions.**
+✓ All integrations (platforms, AI agents) are represented accurately and concisely within the flow.
 ✓ Clear visual hierarchy and spacing.
 ✓ Proper handle positioning and unique IDs.
 ✓ Nodes display concise labels (icons preferred) with full details in 'explanation' for hover.
@@ -200,7 +202,7 @@ serve(async (req) => {
                 stepTypes: Array.from(stepTypes),
                 conditionalBranches,
                 trigger: blueprint.trigger,
-                expectedNodes: totalSteps + platforms.size + agents.size + 1,
+                expectedNodes: totalSteps + platforms.size + agents.size + 1, // Re-evaluating this; should be closer to totalSteps
                 complexity: conditionalBranches > 0 ? 'high' : totalSteps > 5 ? 'medium' : 'simple'
             };
         };
@@ -223,15 +225,14 @@ serve(async (req) => {
 
 AUTOMATION TITLE: ${automation_blueprint.description || 'Automation Flow'}
 COMPLEXITY LEVEL: ${analysis.complexity.toUpperCase()}
-EXPECTED NODES: ${analysis.expectedNodes}
-TOTAL STEPS: ${analysis.totalSteps}
+TOTAL STEPS FROM BLUEPRINT: ${analysis.totalSteps}
 CONDITIONAL BRANCHES: ${analysis.conditionalBranches}
-PLATFORMS: ${analysis.platforms.join(', ')} (${analysis.platforms.length} total)
-AI AGENTS: ${analysis.agents.join(', ')} (${analysis.agents.length} total)
-STEP TYPES: ${analysis.stepTypes.join(', ')}
+PLATFORMS INVOLVED: ${analysis.platforms.join(', ')} (${analysis.platforms.length} total)
+AI AGENTS INVOLVED: ${analysis.agents.join(', ')} (${analysis.agents.length} total)
+STEP TYPES PRESENT: ${analysis.stepTypes.join(', ')}
 TRIGGER TYPE: ${analysis.trigger?.type || 'manual'}
 
-AUTOMATION BLUEPRINT (for precise parsing):
+AUTOMATION BLUEPRINT (for precise parsing into nodes):
 ${JSON.stringify(automation_blueprint, null, 2)}
 
 ---
@@ -239,33 +240,35 @@ CRITICAL INTERACTIVE DIAGRAM REQUIREMENTS:
 
 1. MAXIMUM INTERACTIVITY:
    - Every node MUST be draggable: true and selectable: true
-   - NO overlapping positions - calculate exact coordinates
-   - Smooth responsive interactions with proper hover states
+   - NO overlapping positions - calculate exact coordinates.
+   - Smooth responsive interactions with proper hover states.
 
-2. PROFESSIONAL LAYOUT:
-   - Start trigger at (50, 100)
-   - Horizontal spacing: 300px minimum between centers
-   - Vertical spacing: 200px for branches
-   - Calculate positions to prevent ANY overlaps
+2. PROFESSIONAL, LEAN LAYOUT (One Logical Step = One Visual Node):
+   - **Start trigger at (50, 100).**
+   - **PRIMARY FLOW: STRICTLY LEFT-TO-RIGHT.**
+   - Horizontal spacing: Maintain at least 300px between node centers.
+   - Vertical spacing: Adjust as needed for clarity for branches (min 200px), ensuring a compact and readable diagram.
+   - Calculate positions to prevent ANY overlaps.
+   - **CRITICAL: Each entry in 'automation_blueprint.steps' MUST correspond to EXACTLY ONE visual node in the diagram, UNLESS the step itself explicitly contains nested logic (like a condition or loop with sub-steps).**
+   - **Platform interaction details (e.g., 'Google Sheet', 'Asana', 'Slack') should be integrated INTO the relevant action/trigger node's 'explanation' and 'icon', NOT as separate 'platformNode's.**
 
 3. ENHANCED VISUAL HIERARCHY:
-   - Use specified color schemes for each node type
-   - Animate ALL edges with smoothstep curves
-   - Color-code conditional paths (green/red)
-   - Professional typography and spacing
+   - Use specified color schemes for each node type.
+   - Animate ALL edges with 'smoothstep' curves.
+   - Color-code conditional paths distinctly for each branch.
+   - Professional typography and spacing.
 
-4. COMPLETE FLOW REPRESENTATION:
-   - Include ALL platforms as dedicated platformNodes
-   - Include ALL AI agents as aiAgentNodes
-   - Represent ALL step types from blueprint
-   - Ensure logical flow from trigger to completion
+4. COMPLETE FLOW REPRESENTATION (No Missing "Ropes"):
+   - **Every logical transition between steps in the 'automation_blueprint' MUST be represented by an animated edge.**
+   - Include ALL AI agents as 'aiAgentNode's contextually where they are used.
+   - Represent ALL step types from blueprint.
+   - Ensure logical flow from trigger to completion with all connections correctly drawn.
 
-5. ROBUST ERROR HANDLING:
-   - Clear conditional branching with labeled paths
-   - Proper retry/fallback node representation
-   - Comprehensive edge routing without intersections
+5. ROBUST CONTROL FLOW REPRESENTATION:
+   - Clear conditional branching with labeled paths and distinct edges.
+   - Proper 'retryNode', 'loopNode', and 'fallbackNode' representation, ensuring all internal steps and exit paths are correctly visualized with edges.
 
-Your response MUST be ONLY a JSON object with "nodes" and "edges" arrays optimized for maximum interactivity and professional appearance. Focus on creating a diagram that users can immediately interact with through dragging, selecting, and exploring.`;
+Your response MUST be ONLY a JSON object with "nodes" and "edges" arrays optimized for maximum interactivity and professional appearance. Focus on creating a diagram that users can immediately interact with through dragging, selecting, and exploring.`
 
         console.log('🤖 Generating enhanced interactive diagram');
 
@@ -276,7 +279,7 @@ Your response MUST be ONLY a JSON object with "nodes" and "edges" arrays optimiz
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: 'gpt-4.1-2025-04-14',
+                model: 'gpt-4o',
                 messages: [
                     { role: "system", content: ENHANCED_DIAGRAM_GENERATOR_SYSTEM_PROMPT },
                     { role: "user", content: userPrompt }
@@ -377,9 +380,10 @@ Your response MUST be ONLY a JSON object with "nodes" and "edges" arrays optimiz
             edges: diagramData.edges.length,
             nodeTypes: [...new Set(diagramData.nodes.map(n => n.type))],
             hasOverlaps,
-            expectedNodes: analysis.expectedNodes,
+            // No longer relying on expectedNodes based on platforms.size; closer to totalSteps
+            expectedNodes: analysis.totalSteps, 
             actualNodes: diagramData.nodes.length,
-            completeness: Math.round((diagramData.nodes.length / analysis.expectedNodes) * 100) + '%'
+            completeness: Math.round((diagramData.nodes.length / analysis.totalSteps) * 100) + '%' // Use totalSteps for completeness
         });
 
         return new Response(JSON.stringify(diagramData), {

@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useMemo } from "react";
 import { Send, Bot } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -62,7 +61,6 @@ const Index = () => {
       console.log('🚀 Sending message via ChatAIConnectionService:', currentMessage);
       
       const result = await executeChatRequest(async () => {
-        // Use the ChatAIConnectionService for consistent request handling
         const response = await chatAIConnectionService.processConnectionRequest({
           userId: user?.id || 'anonymous',
           message: currentMessage,
@@ -86,30 +84,30 @@ const Index = () => {
         additionalContext: `Message: "${currentMessage}"`
       });
 
-      // Enhanced response handling - prevent null display
+      console.log('🔍 Processing result:', result);
+      
+      // Fixed response processing - directly use the response text and structured data
       let responseText = "I'm here to help you build comprehensive automations.";
       let structuredData = null;
       
-      if (result && typeof result === 'object') {
-        console.log('🔍 Processing result:', result);
-        
-        if (result.response && typeof result.response === 'string' && result.response.trim() !== 'null') {
+      if (result) {
+        // Use the response directly from the service
+        if (result.response && typeof result.response === 'string' && result.response.trim() !== 'null' && result.response.trim() !== '') {
           responseText = result.response;
-        } else if (result.structuredData) {
-          // If response is null but we have structured data, use summary
-          if (result.structuredData.summary) {
-            responseText = result.structuredData.summary;
-          } else if (result.structuredData.steps && result.structuredData.steps.length > 0) {
-            responseText = "I've created an automation plan with " + result.structuredData.steps.length + " steps.";
-          }
         }
         
+        // Use structured data if available
         if (result.structuredData) {
           structuredData = result.structuredData;
+          
+          // If we have structured data but no good response text, use the summary
+          if ((!result.response || result.response.trim() === 'null' || result.response.trim() === '') && structuredData.summary) {
+            responseText = structuredData.summary;
+          }
         }
       }
       
-      // Final safety check - never display "null"
+      // Final safety check
       if (!responseText || responseText.trim() === '' || responseText.toLowerCase() === 'null') {
         responseText = "I'm processing your request. Let me help you create a comprehensive automation.";
       }

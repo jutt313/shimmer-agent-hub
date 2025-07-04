@@ -371,7 +371,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       )}
 
       {/* Custom CSS for animated edges */}
-      <style jsx>{`
+      <style>
+        {`
         @keyframes dash {
           to {
             stroke-dashoffset: -12;
@@ -393,7 +394,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         .react-flow__minimap {
           border-radius: 12px !important;
         }
-      `}</style>
+        `}
+      </style>
     </div>
   );
 };

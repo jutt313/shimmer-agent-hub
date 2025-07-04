@@ -1,6 +1,5 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { platformConnectionService, ConnectionButton } from './platformConnectionService';
 
 export interface ChatAIConnectionRequest {
   userId: string;
@@ -14,7 +13,6 @@ export interface ChatAIConnectionRequest {
 
 export interface ChatAIConnectionResponse {
   response: string;
-  connectionButtons?: ConnectionButton[];
   requiresAuth?: boolean;
   authMessage?: string;
   structuredData?: any;
@@ -39,13 +37,13 @@ export class ChatAIConnectionService {
         automationId: request.automationId
       });
 
-      // Direct call to chat AI without platform keyword extraction
+      // Direct call to chat AI with enhanced processing
       return await this.callChatAI(request);
       
     } catch (error) {
       console.error('❌ ChatAIConnectionService: Error processing request:', error);
       return {
-        response: "I apologize, but I encountered an error while processing your request. Please try again.",
+        response: "I apologize, but I encountered an error while processing your request. Please try again, and I'll make sure to collect all necessary platform credentials for your automation.",
         requiresAuth: false
       };
     }
@@ -53,7 +51,7 @@ export class ChatAIConnectionService {
 
   private async callChatAI(request: ChatAIConnectionRequest): Promise<ChatAIConnectionResponse> {
     try {
-      console.log('📡 ChatAIConnectionService: Calling chat-ai edge function...');
+      console.log('📡 ChatAIConnectionService: Calling enhanced chat-ai edge function...');
 
       const requestBody = {
         message: request.message,
@@ -64,10 +62,11 @@ export class ChatAIConnectionService {
         userId: request.userId
       };
 
-      console.log('📋 Request body:', {
+      console.log('📋 Enhanced request body:', {
         hasMessage: !!requestBody.message,
         messageLength: requestBody.message?.length || 0,
-        messagesCount: requestBody.messages?.length || 0
+        messagesCount: requestBody.messages?.length || 0,
+        hasAutomationContext: !!requestBody.automationContext
       });
 
       const { data, error } = await supabase.functions.invoke('chat-ai', {
@@ -79,21 +78,42 @@ export class ChatAIConnectionService {
         throw error;
       }
 
-      console.log('✅ Chat AI response received:', {
+      console.log('✅ Enhanced Chat AI response received:', {
         hasSummary: !!data?.summary,
         stepsCount: data?.steps?.length || 0,
-        platformsCount: data?.platforms?.length || 0
+        platformsCount: data?.platforms?.length || 0,
+        hasUniversalKnowledge: !!data?.conversation_updates?.universal_knowledge_applied,
+        credentialFieldsCount: data?.platforms?.reduce((acc: number, p: any) => acc + (p.credentials?.length || 0), 0) || 0
       });
 
+      // Enhanced response processing
+      let responseText = data?.summary || "I'm here to help you build comprehensive automations with complete platform credentials.";
+      
+      // Ensure we have structured data
+      if (data && typeof data === 'object') {
+        // Add enhanced summary if available
+        if (data.summary && typeof data.summary === 'string') {
+          responseText = data.summary;
+        }
+        
+        // If we have platforms, mention credential requirements
+        if (data.platforms && Array.isArray(data.platforms) && data.platforms.length > 0) {
+          const credentialCount = data.platforms.reduce((acc: number, p: any) => acc + (p.credentials?.length || 0), 0);
+          if (credentialCount > 0) {
+            responseText += ` I've identified ${data.platforms.length} platform(s) requiring ${credentialCount} credential(s) for complete setup.`;
+          }
+        }
+      }
+
       return {
-        response: data?.summary || "I'm here to help you with your automations.",
+        response: responseText,
         requiresAuth: false,
         structuredData: data
       };
     } catch (error) {
-      console.error('❌ ChatAIConnectionService: Error calling chat AI:', error);
+      console.error('❌ ChatAIConnectionService: Error calling enhanced chat AI:', error);
       return {
-        response: "I'm currently unable to process your request. Please try again in a moment.",
+        response: "I'm currently unable to process your request. Please try again, and I'll ensure to collect all necessary platform credentials for your automation.",
         requiresAuth: false
       };
     }
@@ -110,7 +130,7 @@ export class ChatAIConnectionService {
         
         return {
           success: true,
-          message: `Redirecting you to connect with ${platform}...`,
+          message: `Redirecting you to connect with ${platform} - I'll collect all necessary credentials for complete integration...`,
           authUrl
         };
       } else {

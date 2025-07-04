@@ -115,7 +115,11 @@ const AutomationDetail = () => {
 
       const totalSteps = countAllSteps(blueprint.steps);
       const conditionSteps = blueprint.steps.filter(step => step.type === 'condition').length;
-      const aiAgentSteps = blueprint.steps.filter(step => step.is_recommended || step.type === 'ai_agent_call').length;
+      const aiAgentSteps = blueprint.steps.filter(step => 
+        step.type === 'ai_agent_call' || 
+        (step as any).ai_recommended === true ||
+        (step.ai_agent_call && (step.ai_agent_call as any).is_recommended)
+      ).length;
       const retrySteps = blueprint.steps.filter(step => step.type === 'retry').length;
       
       console.log('🎨 Generating ENHANCED AI diagram for automation:', automationId);

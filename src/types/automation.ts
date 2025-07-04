@@ -1,4 +1,5 @@
 
+
 export type AutomationBlueprint = {
   version: string;
   description?: string;
@@ -41,6 +42,7 @@ export type AutomationBlueprint = {
       agent_id: string;
       input_prompt: string;
       output_variable: string;
+      is_recommended?: boolean;
     };
 
     retry?: {
@@ -54,6 +56,7 @@ export type AutomationBlueprint = {
     };
 
     on_error?: 'continue' | 'stop' | 'retry';
+    ai_recommended?: boolean; // Add this for marking AI-recommended steps
   }>;
 
   variables?: Record<string, any>;
@@ -81,3 +84,4 @@ export type AutomationDiagramData = {
     labelBgStyle?: Record<string, any>;
   }>;
 };
+

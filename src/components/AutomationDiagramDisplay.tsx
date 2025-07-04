@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { 
   ReactFlow, 
@@ -317,10 +318,9 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             panOnScroll
             selectionOnDrag
             panOnDrag={[1, 2]}
-            selectionMode="partial"
           >
             <Background 
-              variant="dots" 
+              variant="dot" 
               gap={20} 
               size={1}
               color="#e2e8f0"

@@ -39,26 +39,7 @@ export class ChatAIConnectionService {
         automationId: request.automationId
       });
 
-      // Check if the message contains platform connection requests
-      const platformKeywords = this.extractPlatformKeywords(request.message);
-      
-      if (platformKeywords.length > 0 || request.requestedPlatforms?.length) {
-        const platforms = request.requestedPlatforms || platformKeywords;
-        const connectionData = await platformConnectionService.requestConnectionButtons(
-          request.userId, 
-          platforms, 
-          request.context
-        );
-
-        return {
-          response: connectionData.message,
-          connectionButtons: connectionData.buttons,
-          requiresAuth: connectionData.buttons.some(b => !b.connected),
-          authMessage: "You'll need to connect to these platforms to use them in your automations."
-        };
-      }
-
-      // Call the chat AI function
+      // Direct call to chat AI without platform keyword extraction
       return await this.callChatAI(request);
       
     } catch (error) {
@@ -116,45 +97,6 @@ export class ChatAIConnectionService {
         requiresAuth: false
       };
     }
-  }
-
-  private extractPlatformKeywords(message: string): string[] {
-    const platformMap: { [key: string]: string[] } = {
-      gmail: ['gmail', 'email', 'google mail'],
-      slack: ['slack', 'team chat'],
-      discord: ['discord'],
-      twitter: ['twitter', 'tweet', 'x.com'],
-      facebook: ['facebook', 'fb'],
-      instagram: ['instagram', 'insta'],
-      linkedin: ['linkedin'],
-      github: ['github', 'git'],
-      notion: ['notion'],
-      trello: ['trello', 'boards'],
-      asana: ['asana', 'project management'],
-      monday: ['monday', 'monday.com'],
-      hubspot: ['hubspot', 'crm'],
-      salesforce: ['salesforce'],
-      pipedrive: ['pipedrive'],
-      mailchimp: ['mailchimp'],
-      sendgrid: ['sendgrid'],
-      stripe: ['stripe', 'payments'],
-      paypal: ['paypal'],
-      shopify: ['shopify', 'ecommerce'],
-      woocommerce: ['woocommerce'],
-      zapier: ['zapier', 'automation'],
-      make: ['make', 'integromat']
-    };
-
-    const lowerMessage = message.toLowerCase();
-    const foundPlatforms: string[] = [];
-
-    Object.entries(platformMap).forEach(([platform, keywords]) => {
-      if (keywords.some(keyword => lowerMessage.includes(keyword))) {
-        foundPlatforms.push(platform);
-      }
-    });
-
-    return foundPlatforms;
   }
 
   async handlePlatformConnection(userId: string, platform: string, action: 'connect' | 'disconnect'): Promise<{

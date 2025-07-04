@@ -46,41 +46,43 @@ serve(async (req) => {
       throw new Error('Message is required')
     }
 
-    console.log('🔍 Searching for platform knowledge...')
+    console.log('🔍 Searching for universal knowledge...')
 
-    // Get platform knowledge from universal store
-    const { data: platformKnowledge } = await supabase
+    // Get universal knowledge from knowledge store (SEPARATE MEMORY)
+    const { data: universalKnowledge } = await supabase
       .from('universal_knowledge_store')
       .select('*')
-      .eq('category', 'platform_knowledge')
       .order('usage_count', { ascending: false })
-      .limit(20);
+      .limit(50);
 
-    console.log('📚 Platform knowledge found:', platformKnowledge?.length || 0)
+    console.log('📚 Universal knowledge found:', universalKnowledge?.length || 0)
 
-    // Build knowledge context
-    let knowledgeContext = '';
-    if (platformKnowledge && platformKnowledge.length > 0) {
-      const platformData = platformKnowledge
+    // Build separate universal knowledge context
+    let universalKnowledgeContext = '';
+    if (universalKnowledge && universalKnowledge.length > 0) {
+      const knowledgeData = universalKnowledge
         .map(k => {
           const credentialFields = k.credential_fields || [];
           return `
 🔧 PLATFORM: ${k.platform_name || k.title}
 📋 CREDENTIALS: ${credentialFields.map(c => `${c.field} (${c.type || 'string'})`).join(', ')}
 📝 DESCRIPTION: ${k.platform_description || k.summary}
+🔗 API CONFIG: ${JSON.stringify(k.api_config || {})}
 `;
         }).join('\n');
 
-      knowledgeContext = `
-AVAILABLE PLATFORM KNOWLEDGE:
-${platformData}
+      universalKnowledgeContext = `
+UNIVERSAL KNOWLEDGE BASE (SEPARATE MEMORY):
+${knowledgeData}
 `;
     }
 
-    // Simple, focused system prompt
+    // Enhanced system prompt with credential requirements
     const systemPrompt = `You are YusrAI, an advanced automation architect. Create practical automation workflows.
 
-${knowledgeContext}
+IMPORTANT: Always simplify the credentials and make sure you ask for ALL credentials about that platform needed to perform the task. Be comprehensive in credential requirements.
+
+${universalKnowledgeContext}
 
 RESPONSE FORMAT - Return valid JSON only:
 {

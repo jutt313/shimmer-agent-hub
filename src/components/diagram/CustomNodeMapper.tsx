@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { 
@@ -67,6 +66,13 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
     setExpanded(!expanded);
   };
 
+  // Enhanced base node styling
+  const baseNodeClasses = `
+    relative px-6 py-5 shadow-xl rounded-2xl border-2 transition-all duration-300 
+    cursor-pointer hover:shadow-2xl backdrop-blur-sm min-w-[320px] max-w-[400px]
+    ${selected ? 'scale-105 shadow-2xl' : 'hover:scale-102'}
+  `;
+
   // TRIGGER / PLATFORM TRIGGER NODE - Starting point of automation
   const TriggerNodeComponent = () => {
     const platform = data.platform || data.trigger?.integration || data.stepDetails?.integration || '';
@@ -76,19 +82,19 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
     return (
       <div 
         onClick={handleExpansion}
-        className={`relative px-6 py-5 shadow-xl rounded-3xl border-3 transition-all duration-300 bg-gradient-to-br from-red-50 to-orange-50 cursor-pointer hover:shadow-2xl ${
-          selected ? 'border-red-400 shadow-red-200 shadow-2xl scale-105' : 'border-red-300 hover:border-red-400'
-        } min-w-[320px] max-w-[400px]`}
+        className={`${baseNodeClasses} bg-gradient-to-br from-red-50 to-orange-50 ${
+          selected ? 'border-red-400 shadow-red-200' : 'border-red-300 hover:border-red-400'
+        }`}
       >
         <Handle
           type="source"
           position={Position.Right}
-          className="w-4 h-4 !bg-red-200 !border-3 !border-red-400 !rounded-full"
+          className="w-4 h-4 !bg-red-200 !border-2 !border-red-400 !rounded-full shadow-lg"
         />
         
         <div className="flex items-start space-x-4">
           <div 
-            className="flex-shrink-0 w-14 h-14 rounded-3xl flex items-center justify-center shadow-lg border-2"
+            className="flex-shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg border-2 backdrop-blur-sm"
             style={{ 
               backgroundColor: `${iconConfig.color}20`,
               borderColor: `${iconConfig.color}40`
@@ -103,7 +109,7 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-2">
               <div className="text-lg font-bold text-red-800 leading-tight">
-                TRIGGER
+                🚀 TRIGGER
               </div>
               <div className="flex items-center space-x-1">
                 {expanded ? (
@@ -121,7 +127,7 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
             {platform && (
               <div className="flex items-center space-x-2 mb-2">
                 <div 
-                  className="text-sm font-medium px-3 py-1 rounded-full border inline-flex items-center space-x-2"
+                  className="text-sm font-medium px-3 py-1 rounded-full border inline-flex items-center space-x-2 backdrop-blur-sm"
                   style={{ 
                     backgroundColor: `${iconConfig.color}15`,
                     borderColor: `${iconConfig.color}30`,
@@ -135,7 +141,7 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
             )}
             
             {expanded && data.explanation && (
-              <div className="text-sm text-red-700 leading-relaxed p-3 bg-red-100 rounded-lg border border-red-200 mt-3">
+              <div className="text-sm text-red-700 leading-relaxed p-3 bg-red-100/80 rounded-xl border border-red-200 mt-3 backdrop-blur-sm">
                 <span className="font-semibold text-red-800">Trigger Details:</span>
                 <div className="mt-1">{data.explanation}</div>
                 
@@ -168,24 +174,24 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
     return (
       <div 
         onClick={handleExpansion}
-        className={`relative px-6 py-5 shadow-xl rounded-3xl border-3 transition-all duration-300 bg-gradient-to-br from-blue-50 to-indigo-50 cursor-pointer hover:shadow-2xl ${
-          selected ? 'border-blue-400 shadow-blue-200 shadow-2xl scale-105' : 'border-blue-300 hover:border-blue-400'
-        } min-w-[320px] max-w-[450px]`}
+        className={`${baseNodeClasses} bg-gradient-to-br from-blue-50 to-indigo-50 ${
+          selected ? 'border-blue-400 shadow-blue-200' : 'border-blue-300 hover:border-blue-400'
+        }`}
       >
         <Handle
           type="target"
           position={Position.Left}
-          className="w-4 h-4 !bg-blue-200 !border-3 !border-blue-400 !rounded-full"
+          className="w-4 h-4 !bg-blue-200 !border-2 !border-blue-400 !rounded-full shadow-lg"
         />
         <Handle
           type="source"
           position={Position.Right}
-          className="w-4 h-4 !bg-blue-200 !border-3 !border-blue-400 !rounded-full"
+          className="w-4 h-4 !bg-blue-200 !border-2 !border-blue-400 !rounded-full shadow-lg"
         />
         
         <div className="flex items-start space-x-4">
           <div 
-            className="flex-shrink-0 w-14 h-14 rounded-3xl flex items-center justify-center shadow-lg border-2"
+            className="flex-shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg border-2 backdrop-blur-sm"
             style={{ 
               backgroundColor: `${iconConfig.color}20`,
               borderColor: `${iconConfig.color}40`
@@ -200,7 +206,7 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-2">
               <div className="text-lg font-bold text-blue-800 leading-tight">
-                ACTION
+                ⚡ ACTION
               </div>
               <div className="flex items-center space-x-1">
                 {expanded ? (
@@ -218,7 +224,7 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
             {platform && (
               <div className="flex items-center space-x-2 mb-2">
                 <div 
-                  className="text-sm font-medium px-3 py-1 rounded-full border inline-flex items-center space-x-2"
+                  className="text-sm font-medium px-3 py-1 rounded-full border inline-flex items-center space-x-2 backdrop-blur-sm"
                   style={{ 
                     backgroundColor: `${iconConfig.color}15`,
                     borderColor: `${iconConfig.color}30`,
@@ -232,7 +238,7 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
             )}
             
             {expanded && data.explanation && (
-              <div className="text-sm text-blue-700 leading-relaxed p-3 bg-blue-100 rounded-lg border border-blue-200 mt-3">
+              <div className="text-sm text-blue-700 leading-relaxed p-3 bg-blue-100/80 rounded-xl border border-blue-200 mt-3 backdrop-blur-sm">
                 <span className="font-semibold text-blue-800">Action Details:</span>
                 <div className="mt-1">{data.explanation}</div>
                 
@@ -242,7 +248,7 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
                     {data.action.parameters && (
                       <div>
                         <span className="font-medium">Parameters:</span>
-                        <pre className="mt-1 p-2 bg-blue-50 rounded text-xs overflow-x-auto">
+                        <pre className="mt-1 p-2 bg-blue-50 rounded text-xs overflow-x-auto backdrop-blur-sm">
                           {JSON.stringify(data.action.parameters, null, 2)}
                         </pre>
                       </div>
@@ -266,25 +272,25 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
 
     return (
       <div 
-        className={`relative px-6 py-5 shadow-xl rounded-3xl border-3 transition-all duration-300 bg-gradient-to-br from-orange-50 to-yellow-50 cursor-pointer hover:shadow-2xl ${
-          selected ? 'border-orange-400 shadow-orange-200 shadow-2xl scale-105' : 'border-orange-300 hover:border-orange-400'
-        } min-w-[320px] max-w-[400px]`}
+        className={`${baseNodeClasses} bg-gradient-to-br from-orange-50 to-yellow-50 ${
+          selected ? 'border-orange-400 shadow-orange-200' : 'border-orange-300 hover:border-orange-400'
+        }`}
         onClick={handleExpansion}
       >
         <Handle
           type="target"
           position={Position.Left}
-          className="w-4 h-4 !bg-orange-200 !border-3 !border-orange-400 !rounded-full"
+          className="w-4 h-4 !bg-orange-200 !border-2 !border-orange-400 !rounded-full shadow-lg"
         />
         
         <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0 w-14 h-14 rounded-3xl bg-gradient-to-br from-orange-100 to-yellow-100 flex items-center justify-center shadow-lg border-2 border-orange-200">
+          <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-100 to-yellow-100 flex items-center justify-center shadow-lg border-2 border-orange-200 backdrop-blur-sm">
             <GitBranch className="w-7 h-7 text-orange-600" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-2">
               <div className="text-lg font-bold text-orange-800 leading-tight">
-                CONDITION
+                🔀 CONDITION
               </div>
               {expanded ? <ChevronUp className="w-5 h-5 text-orange-600" /> : <ChevronDown className="w-5 h-5 text-orange-600" />}
             </div>
@@ -294,13 +300,13 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
             </div>
 
             {data.condition?.expression && (
-              <div className="text-sm text-orange-600 font-medium mb-2 p-2 bg-orange-100 rounded-lg border border-orange-200">
+              <div className="text-sm text-orange-600 font-medium mb-2 p-2 bg-orange-100/80 rounded-xl border border-orange-200 backdrop-blur-sm">
                 {data.condition.expression}
               </div>
             )}
             
             {expanded && data.explanation && (
-              <div className="text-sm text-orange-700 leading-relaxed p-3 bg-orange-100 rounded-lg border border-orange-200 mt-3">
+              <div className="text-sm text-orange-700 leading-relaxed p-3 bg-orange-100/80 rounded-xl border border-orange-200 mt-3 backdrop-blur-sm">
                 <span className="font-semibold text-orange-800">Condition Logic:</span>
                 <div className="mt-1">{data.explanation}</div>
                 
@@ -321,7 +327,7 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
           </div>
         </div>
         
-        {/* Multiple outgoing paths for branches */}
+        {/* Multiple outgoing paths for branches with enhanced styling */}
         {branches.map((branch, index) => {
           const totalBranches = branches.length;
           const topPosition = totalBranches === 1 ? 50 : 20 + (index * (60 / (totalBranches - 1 || 1)));
@@ -332,7 +338,7 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
                 type="source"
                 position={Position.Right}
                 id={branch.handle}
-                className="w-4 h-4 !rounded-full !border-3"
+                className="w-4 h-4 !rounded-full !border-2 shadow-lg"
                 style={{ 
                   top: `${topPosition}%`,
                   backgroundColor: `${branch.color}40`,
@@ -340,10 +346,10 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
                 }}
               />
               <div 
-                className="absolute text-sm font-bold px-3 py-1 rounded-full border-2 shadow-md"
+                className="absolute text-sm font-bold px-3 py-1 rounded-full border-2 shadow-lg backdrop-blur-sm"
                 style={{ 
                   top: `${topPosition - 12}%`,
-                  right: '-55px',
+                  right: '-60px',
                   backgroundColor: `${branch.color}20`,
                   borderColor: `${branch.color}50`,
                   color: branch.color

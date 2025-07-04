@@ -21,13 +21,16 @@ import {
   AlertCircle,
   CheckCircle,
   Loader2,
-  Zap
+  Zap,
+  Code
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import CustomNodeMapper from './diagram/CustomNodeMapper';
+import JsonDebugModal from './diagram/JsonDebugModal';
 import { AutomationBlueprint, AutomationDiagramData } from '@/types/automation';
+import { calculateEnhancedLayout } from '@/utils/diagramLayout';
 
 const nodeTypes = {
   // All node types use the same CustomNodeMapper component
@@ -71,6 +74,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [diagramError, setDiagramError] = useState<string | null>(null);
+  const [showJsonDebug, setShowJsonDebug] = useState(false);
   const [diagramStats, setDiagramStats] = useState({
     totalNodes: 0,
     totalEdges: 0,
@@ -136,22 +140,36 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           })
           .filter(Boolean) as Node[];
 
-        setNodes(processedNodes);
-        setEdges(automationDiagramData.edges);
+        // Apply enhanced layout with better positioning
+        const { nodes: layoutedNodes, edges: layoutedEdges } = calculateEnhancedLayout(
+          processedNodes, 
+          automationDiagramData.edges,
+          {
+            nodeWidth: 320,
+            nodeHeight: 120,
+            horizontalGap: 200,
+            verticalGap: 150,
+            startX: 100,
+            startY: 50
+          }
+        );
+
+        setNodes(layoutedNodes);
+        setEdges(layoutedEdges);
         
         // Calculate diagram statistics
         const stats = {
-          totalNodes: processedNodes.length,
-          totalEdges: automationDiagramData.edges.length,
-          conditionNodes: processedNodes.filter(n => n.type?.includes('condition')).length,
-          aiAgentNodes: processedNodes.filter(n => n.data?.isRecommended || n.type === 'aiAgentNode').length,
-          platformNodes: processedNodes.filter(n => n.data?.platform).length
+          totalNodes: layoutedNodes.length,
+          totalEdges: layoutedEdges.length,
+          conditionNodes: layoutedNodes.filter(n => n.type?.includes('condition')).length,
+          aiAgentNodes: layoutedNodes.filter(n => n.data?.isRecommended || n.type === 'aiAgentNode').length,
+          platformNodes: layoutedNodes.filter(n => n.data?.platform).length
         };
         
         setDiagramStats(stats);
         setDiagramError(null);
         
-        console.log('📊 Diagram statistics:', stats);
+        console.log('📊 Enhanced diagram statistics:', stats);
         
       } else if (automationBlueprint?.steps?.length > 0) {
         console.log('⚠️ No diagram data available, but blueprint exists');
@@ -183,61 +201,199 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     [setEdges]
   );
 
-  // Always show fullscreen diagram without headers
+  // Custom edge styles with animated colorful dotted lines
+  const edgeOptions = {
+    style: {
+      strokeWidth: 3,
+      strokeDasharray: '8,4',
+      animation: 'dash 2s linear infinite',
+    },
+  };
+
   return (
-    <div className="h-full w-full bg-gradient-to-br from-gray-50 to-blue-50">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        nodeTypes={nodeTypes}
-        connectionMode={ConnectionMode.Loose}
-        fitView
-        fitViewOptions={{
-          padding: 0.2,
-          minZoom: 0.1,
-          maxZoom: 1.5
-        }}
-        defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
-        attributionPosition="bottom-left"
-        className="bg-gradient-to-br from-gray-50 to-blue-50"
-        panOnScroll
-        panOnDrag={[1, 2]}
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background 
-          variant={BackgroundVariant.Dots}
-          gap={12} 
-          size={3}
-          color="#1e293b"
-          style={{ opacity: 0.4 }}
-        />
-        <Controls 
-          position="bottom-right"
-          showInteractive={false}
-          style={{ 
-            right: '20px',
-            bottom: '20px'
+    <div className="h-full w-full relative">
+      {/* Header with JSON Debug Button */}
+      <div className="absolute top-4 right-4 z-10 flex gap-2">
+        <Button
+          onClick={() => setShowJsonDebug(true)}
+          size="sm"
+          variant="outline"
+          className="bg-white/90 backdrop-blur-sm shadow-lg hover:bg-white border-purple-200 hover:border-purple-300"
+        >
+          <Code className="w-4 h-4 mr-2" />
+          View JSON
+        </Button>
+        {onRegenerateDiagram && (
+          <Button
+            onClick={onRegenerateDiagram}
+            size="sm"
+            disabled={isGenerating}
+            className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white shadow-lg"
+          >
+            {isGenerating ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            {isGenerating ? 'Generating...' : 'Regenerate'}
+          </Button>
+        )}
+      </div>
+
+      {/* Main Diagram */}
+      <div className="h-full w-full rounded-2xl overflow-hidden shadow-xl border border-gray-200">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          nodeTypes={nodeTypes}
+          connectionMode={ConnectionMode.Loose}
+          fitView
+          fitViewOptions={{
+            padding: 0.3,
+            minZoom: 0.2,
+            maxZoom: 1.2
           }}
-        />
-        <MiniMap 
-          nodeStrokeColor="#374151"
-          nodeColor="#f3f4f6"
-          nodeBorderRadius={8}
-          maskColor="rgba(0, 0, 0, 0.2)"
-          position="bottom-right"
-          pannable
-          zoomable
-          style={{
-            right: '20px',
-            bottom: '80px',
-            width: '200px',
-            height: '120px'
+          defaultViewport={{ x: 0, y: 0, zoom: 0.6 }}
+          attributionPosition="bottom-left"
+          className="bg-white"
+          panOnScroll
+          panOnDrag={[1, 2]}
+          proOptions={{ hideAttribution: true }}
+          defaultEdgeOptions={{
+            type: 'smoothstep',
+            animated: true,
+            style: {
+              strokeWidth: 3,
+              strokeDasharray: '8,4',
+              stroke: 'url(#gradient)',
+            },
           }}
+        >
+          {/* Animated gradient definition for colorful lines */}
+          <defs>
+            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#8b5cf6" />
+              <stop offset="25%" stopColor="#3b82f6" />
+              <stop offset="50%" stopColor="#10b981" />
+              <stop offset="75%" stopColor="#f59e0b" />
+              <stop offset="100%" stopColor="#ef4444" />
+              <animateTransform
+                attributeName="gradientTransform"
+                type="translate"
+                values="0 0;100 0;0 0"
+                dur="3s"
+                repeatCount="indefinite"
+              />
+            </linearGradient>
+          </defs>
+          
+          {/* Subtle background dots */}
+          <Background 
+            variant={BackgroundVariant.Dots}
+            gap={20} 
+            size={2}
+            color="#e5e7eb"
+            style={{ opacity: 0.3 }}
+          />
+          
+          {/* Enhanced controls */}
+          <Controls 
+            position="bottom-right"
+            showInteractive={false}
+            className="bg-white/90 backdrop-blur-sm shadow-lg rounded-lg border border-gray-200"
+            style={{ 
+              right: '20px',
+              bottom: '20px'
+            }}
+          />
+          
+          {/* Beautiful minimap */}
+          <MiniMap 
+            nodeStrokeColor="#8b5cf6"
+            nodeColor="#f8fafc"
+            nodeBorderRadius={12}
+            maskColor="rgba(139, 92, 246, 0.1)"
+            position="bottom-left"
+            pannable
+            zoomable
+            className="bg-white/90 backdrop-blur-sm shadow-lg rounded-lg border border-gray-200"
+            style={{
+              left: '20px',
+              bottom: '20px',
+              width: '240px',
+              height: '140px'
+            }}
+          />
+        </ReactFlow>
+      </div>
+
+      {/* Statistics Badge */}
+      {diagramStats.totalNodes > 0 && (
+        <div className="absolute top-4 left-4 z-10">
+          <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm shadow-lg text-gray-700 px-3 py-1">
+            {diagramStats.totalNodes} nodes, {diagramStats.totalEdges} connections
+          </Badge>
+        </div>
+      )}
+
+      {/* Error State */}
+      {diagramError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/95 backdrop-blur-sm rounded-2xl">
+          <Card className="max-w-md mx-4 shadow-xl border-orange-200">
+            <CardHeader className="text-center">
+              <AlertCircle className="w-12 h-12 text-orange-500 mx-auto mb-2" />
+              <CardTitle className="text-orange-800">Diagram Loading</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center">
+              <p className="text-gray-600 mb-4">{diagramError}</p>
+              {isGenerating && (
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
+                  <span className="text-sm text-purple-600">Generating diagram...</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* JSON Debug Modal */}
+      {showJsonDebug && (
+        <JsonDebugModal
+          isOpen={showJsonDebug}
+          onClose={() => setShowJsonDebug(false)}
+          diagramData={automationDiagramData}
+          blueprintData={automationBlueprint}
         />
-      </ReactFlow>
+      )}
+
+      {/* Custom CSS for animated edges */}
+      <style jsx>{`
+        @keyframes dash {
+          to {
+            stroke-dashoffset: -12;
+          }
+        }
+        
+        .react-flow__edge-path {
+          animation: dash 2s linear infinite;
+        }
+        
+        .react-flow__node {
+          border-radius: 16px !important;
+        }
+        
+        .react-flow__controls {
+          border-radius: 12px !important;
+        }
+        
+        .react-flow__minimap {
+          border-radius: 12px !important;
+        }
+      `}</style>
     </div>
   );
 };

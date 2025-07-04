@@ -12,10 +12,10 @@ export interface LayoutOptions {
 
 const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
   nodeWidth: 320,
-  nodeHeight: 140,
-  horizontalGap: 280,
-  verticalGap: 180,
-  startX: 50,
+  nodeHeight: 120,
+  horizontalGap: 200,
+  verticalGap: 150,
+  startX: 100,
   startY: 100
 };
 
@@ -26,38 +26,42 @@ export const calculateEnhancedLayout = (
 ): { nodes: Node[]; edges: Edge[] } => {
   const opts = { ...DEFAULT_LAYOUT_OPTIONS, ...options };
   
-  console.log('🎨 Calculating enhanced layout for', nodes.length, 'nodes');
+  console.log('🎨 Calculating enhanced left-to-right layout for', nodes.length, 'nodes');
   
   if (!nodes || nodes.length === 0) return { nodes: [], edges };
 
-  // Build adjacency graph for topological sorting
+  // Build adjacency graph for proper left-to-right flow
   const graph = new Map<string, string[]>();
   const inDegrees = new Map<string, number>();
+  const outDegrees = new Map<string, number>();
 
   nodes.forEach(node => {
     graph.set(node.id, []);
     inDegrees.set(node.id, 0);
+    outDegrees.set(node.id, 0);
   });
 
   edges.forEach(edge => {
     if (graph.has(edge.source) && graph.has(edge.target)) {
       graph.get(edge.source)?.push(edge.target);
       inDegrees.set(edge.target, (inDegrees.get(edge.target) || 0) + 1);
+      outDegrees.set(edge.source, (outDegrees.get(edge.source) || 0) + 1);
     }
   });
 
-  // Topological sort to determine layers
+  // Topological sort for left-to-right positioning
   const queue: string[] = [];
   const layers = new Map<string, number>();
   
-  // Find root nodes (nodes with no incoming edges)
+  // Find root nodes (triggers or nodes with no incoming edges)
   nodes.forEach(node => {
-    if (inDegrees.get(node.id) === 0) {
+    if (inDegrees.get(node.id) === 0 || node.type === 'triggerNode') {
       queue.push(node.id);
       layers.set(node.id, 0);
     }
   });
 
+  // Process nodes layer by layer
   let head = 0;
   while (head < queue.length) {
     const nodeId = queue[head++];
@@ -74,14 +78,19 @@ export const calculateEnhancedLayout = (
     });
   }
 
-  // Handle orphaned nodes
+  // Handle orphaned nodes by placing them in appropriate layers
   nodes.forEach(node => {
     if (!layers.has(node.id)) {
-      layers.set(node.id, 0);
+      // Place orphaned nodes based on their type
+      if (node.type === 'triggerNode') {
+        layers.set(node.id, 0);
+      } else {
+        layers.set(node.id, 1);
+      }
     }
   });
 
-  // Group nodes by layer
+  // Group nodes by layer for better vertical distribution
   const layerGroups = new Map<number, string[]>();
   layers.forEach((layer, nodeId) => {
     if (!layerGroups.has(layer)) {
@@ -90,48 +99,97 @@ export const calculateEnhancedLayout = (
     layerGroups.get(layer)?.push(nodeId);
   });
 
-  // Position calculation with enhanced spacing
+  // Calculate positions with proper spacing
   const layoutedNodes = nodes.map(node => {
     const layer = layers.get(node.id) || 0;
     const layerNodes = layerGroups.get(layer) || [];
     const nodeIndex = layerNodes.indexOf(node.id);
     
-    // Calculate horizontal position
+    // Horizontal position (left to right)
     const x = opts.startX + (layer * (opts.nodeWidth + opts.horizontalGap));
     
-    // Calculate vertical position with centering
-    const layerHeight = layerNodes.length * opts.nodeHeight + (layerNodes.length - 1) * opts.verticalGap;
-    const layerStartY = opts.startY + (layerHeight > 0 ? -layerHeight / 2 : 0);
-    const y = layerStartY + nodeIndex * (opts.nodeHeight + opts.verticalGap) + 300;
+    // Vertical position with centered distribution
+    const totalLayerHeight = Math.max(1, layerNodes.length) * opts.nodeHeight + 
+                             Math.max(0, layerNodes.length - 1) * opts.verticalGap;
+    const layerStartY = opts.startY - (totalLayerHeight / 2);
+    const y = layerStartY + nodeIndex * (opts.nodeHeight + opts.verticalGap);
     
     return { 
       ...node, 
       position: { x, y },
       draggable: true,
       selectable: true,
-      connectable: false
+      connectable: false,
+      style: {
+        ...node.style,
+        borderRadius: '16px',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+        border: '2px solid rgba(139, 92, 246, 0.2)',
+      }
     };
   });
 
-  // Enhanced edge styling with smart colors
-  const layoutedEdges = edges.map(edge => {
+  // Enhanced edge styling with smooth curves and animations
+  const layoutedEdges = edges.map((edge, index) => {
+    // Create animated gradient colors
+    const colors = [
+      '#8b5cf6', // Purple
+      '#3b82f6', // Blue  
+      '#10b981', // Green
+      '#f59e0b', // Amber
+      '#ef4444', // Red
+    ];
+    
+    const colorIndex = index % colors.length;
+    const baseColor = colors[colorIndex];
+    
     const edgeStyle = {
-      stroke: getEdgeColor(edge.sourceHandle),
-      strokeWidth: 2,
+      stroke: baseColor,
+      strokeWidth: 3,
+      strokeDasharray: '8,4',
+      filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))',
       ...edge.style
     };
+
+    // Handle condition branch labels
+    let label = edge.label;
+    if (edge.sourceHandle) {
+      if (edge.sourceHandle === 'true') {
+        label = '✓ True';
+      } else if (edge.sourceHandle === 'false') {
+        label = '✗ False';
+      } else if (edge.sourceHandle === 'success') {
+        label = '✓ Success';
+      } else if (edge.sourceHandle === 'error') {
+        label = '⚠ Error';
+      }
+    }
 
     return {
       ...edge,
       type: 'smoothstep',
       animated: true,
       style: edgeStyle,
+      label,
+      labelStyle: {
+        fontWeight: 'bold',
+        fontSize: '12px',
+        color: baseColor,
+        background: 'rgba(255, 255, 255, 0.9)',
+        padding: '4px 8px',
+        borderRadius: '12px',
+        border: `1px solid ${baseColor}40`,
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+      },
+      labelBgStyle: {
+        fill: 'transparent',
+      },
       sourceHandle: edge.sourceHandle || undefined,
       targetHandle: edge.targetHandle || undefined,
     };
   });
 
-  console.log('✅ Enhanced layout completed:', {
+  console.log('✅ Enhanced left-to-right layout completed:', {
     finalNodes: layoutedNodes.length,
     finalEdges: layoutedEdges.length,
     layers: Math.max(...Array.from(layers.values())) + 1,
@@ -139,29 +197,6 @@ export const calculateEnhancedLayout = (
   });
 
   return { nodes: layoutedNodes, edges: layoutedEdges };
-};
-
-const getEdgeColor = (sourceHandle?: string): string => {
-  switch (sourceHandle) {
-    case 'true':
-    case 'yes':
-    case 'success':
-    case 'existing':
-      return '#10b981'; // Green
-    case 'false':
-    case 'no':
-    case 'error':
-      return '#ef4444'; // Red
-    case 'urgent':
-      return '#ef4444'; // Red
-    case 'task':
-    case 'new':
-      return '#10b981'; // Green
-    case 'followup':
-      return '#f59e0b'; // Amber
-    default:
-      return '#3b82f6'; // Blue
-  }
 };
 
 export const validateNodesAndEdges = (nodes: Node[], edges: Edge[]): { validNodes: Node[]; validEdges: Edge[] } => {

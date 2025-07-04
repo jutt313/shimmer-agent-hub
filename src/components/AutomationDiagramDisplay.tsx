@@ -18,9 +18,6 @@ import '@xyflow/react/dist/style.css';
 import { Button } from '@/components/ui/button';
 import { 
   RefreshCw, 
-  Maximize2, 
-  Download, 
-  Settings, 
   AlertCircle,
   CheckCircle,
   Loader2,
@@ -187,35 +184,53 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     [setEdges]
   );
 
-  const handleFullscreen = () => {
-    setIsFullscreen(!isFullscreen);
-  };
-
-  const handleDownload = () => {
-    toast({
-      title: "Download Started",
-      description: "Diagram download functionality will be available soon.",
-    });
-  };
-
   // Empty state when no data
   if (!automationBlueprint && !automationDiagramData) {
     return (
-      <Card className="h-full">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="w-5 h-5" />
-            Automation Diagram
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center h-64">
-          <div className="text-center text-gray-500">
-            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-            <p className="text-lg font-medium">No automation configured</p>
-            <p className="text-sm">Create an automation to see its visual workflow</p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="h-full w-full">
+        <div className="h-full w-full">
+          <ReactFlow
+            nodes={[]}
+            edges={[]}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            nodeTypes={nodeTypes}
+            connectionMode={ConnectionMode.Loose}
+            fitView
+            fitViewOptions={{
+              padding: 0.2,
+              minZoom: 0.1,
+              maxZoom: 1.5
+            }}
+            defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+            attributionPosition="bottom-left"
+            className="bg-gradient-to-br from-gray-50 to-blue-50"
+            panOnScroll
+            panOnDrag={[1, 2]}
+          >
+            <Background 
+              variant={BackgroundVariant.Dots}
+              gap={16} 
+              size={2}
+              color="#94a3b8"
+            />
+            <Controls 
+              position="bottom-right"
+              showInteractive={false}
+            />
+            <MiniMap 
+              nodeStrokeColor="#374151"
+              nodeColor="#f3f4f6"
+              nodeBorderRadius={8}
+              maskColor="rgba(0, 0, 0, 0.2)"
+              position="bottom-right"
+              pannable
+              zoomable
+            />
+          </ReactFlow>
+        </div>
+      </div>
     );
   }
 
@@ -266,13 +281,6 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
               )}
               {isGenerating ? 'Generating...' : 'Regenerate'}
             </Button>
-            
-            <Button onClick={handleDownload} size="sm" variant="outline">
-              <Download className="w-4 h-4" />
-            </Button>
-            <Button onClick={handleFullscreen} size="sm" variant="outline">
-              <Maximize2 className="w-4 h-4" />
-            </Button>
           </div>
         </div>
         
@@ -317,14 +325,13 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             attributionPosition="bottom-left"
             className="bg-gradient-to-br from-gray-50 to-blue-50"
             panOnScroll
-            selectionOnDrag
             panOnDrag={[1, 2]}
           >
             <Background 
               variant={BackgroundVariant.Dots}
-              gap={20} 
-              size={1}
-              color="#e2e8f0"
+              gap={16} 
+              size={2}
+              color="#94a3b8"
             />
             <Controls 
               position="bottom-right"
@@ -335,7 +342,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
               nodeColor="#f3f4f6"
               nodeBorderRadius={8}
               maskColor="rgba(0, 0, 0, 0.2)"
-              position="top-right"
+              position="bottom-right"
               pannable
               zoomable
             />

@@ -34,26 +34,13 @@ export class ChatAIConnectionService {
         hasMessage: !!request.message,
         messageLength: request.message?.length || 0,
         userId: request.userId,
-        automationId: request.automationId
+        automationId: request.automationId,
+        hasMessages: !!request.messages,
+        messagesCount: request.messages?.length || 0
       });
 
-      // Direct call to chat AI with enhanced processing
-      return await this.callChatAI(request);
-      
-    } catch (error) {
-      console.error('❌ ChatAIConnectionService: Error processing request:', error);
-      return {
-        response: "I apologize, but I encountered an error while processing your request. Please try again, and I'll make sure to collect all necessary platform credentials for your automation.",
-        requiresAuth: false
-      };
-    }
-  }
-
-  private async callChatAI(request: ChatAIConnectionRequest): Promise<ChatAIConnectionResponse> {
-    try {
-      console.log('📡 ChatAIConnectionService: Calling enhanced chat-ai edge function...');
-
-      const requestBody = {
+      // Ensure we have the required payload structure
+      const payload = {
         message: request.message,
         messages: request.messages || [],
         automationId: request.automationId,
@@ -62,15 +49,17 @@ export class ChatAIConnectionService {
         userId: request.userId
       };
 
-      console.log('📋 Enhanced request body:', {
-        hasMessage: !!requestBody.message,
-        messageLength: requestBody.message?.length || 0,
-        messagesCount: requestBody.messages?.length || 0,
-        hasAutomationContext: !!requestBody.automationContext
+      console.log('📋 Calling chat-ai with payload:', {
+        hasMessage: !!payload.message,
+        messageLength: payload.message?.length || 0,
+        messagesCount: payload.messages?.length || 0,
+        hasAutomationContext: !!payload.automationContext,
+        context: payload.context,
+        userId: payload.userId
       });
 
       const { data, error } = await supabase.functions.invoke('chat-ai', {
-        body: requestBody
+        body: payload
       });
 
       if (error) {
@@ -78,30 +67,30 @@ export class ChatAIConnectionService {
         throw error;
       }
 
-      console.log('✅ Enhanced Chat AI response received:', {
+      console.log('✅ Chat AI response received:', {
+        hasData: !!data,
+        dataType: typeof data,
         hasSummary: !!data?.summary,
         stepsCount: data?.steps?.length || 0,
-        platformsCount: data?.platforms?.length || 0,
-        hasUniversalKnowledge: !!data?.conversation_updates?.universal_knowledge_applied,
-        credentialFieldsCount: data?.platforms?.reduce((acc: number, p: any) => acc + (p.credentials?.length || 0), 0) || 0
+        platformsCount: data?.platforms?.length || 0
       });
 
-      // Enhanced response processing
-      let responseText = data?.summary || "I'm here to help you build comprehensive automations with complete platform credentials.";
+      // Process the response
+      let responseText = "I'm here to help you build comprehensive automations.";
       
-      // Ensure we have structured data
       if (data && typeof data === 'object') {
-        // Add enhanced summary if available
-        if (data.summary && typeof data.summary === 'string') {
+        // Handle clarification-only responses
+        if (data.clarification_questions && Array.isArray(data.clarification_questions) && data.clarification_questions.length > 0) {
+          responseText = "I need some clarification:\n\n" + 
+            data.clarification_questions.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n');
+        }
+        // Handle full responses with summary
+        else if (data.summary && typeof data.summary === 'string') {
           responseText = data.summary;
         }
-        
-        // If we have platforms, mention credential requirements
-        if (data.platforms && Array.isArray(data.platforms) && data.platforms.length > 0) {
-          const credentialCount = data.platforms.reduce((acc: number, p: any) => acc + (p.credentials?.length || 0), 0);
-          if (credentialCount > 0) {
-            responseText += ` I've identified ${data.platforms.length} platform(s) requiring ${credentialCount} credential(s) for complete setup.`;
-          }
+        // Handle direct string responses
+        else if (typeof data === 'string') {
+          responseText = data;
         }
       }
 
@@ -110,10 +99,11 @@ export class ChatAIConnectionService {
         requiresAuth: false,
         structuredData: data
       };
+
     } catch (error) {
-      console.error('❌ ChatAIConnectionService: Error calling enhanced chat AI:', error);
+      console.error('❌ ChatAIConnectionService: Error processing request:', error);
       return {
-        response: "I'm currently unable to process your request. Please try again, and I'll ensure to collect all necessary platform credentials for your automation.",
+        response: "I apologize, but I encountered an error while processing your request. Please try again.",
         requiresAuth: false
       };
     }
@@ -130,11 +120,10 @@ export class ChatAIConnectionService {
         
         return {
           success: true,
-          message: `Redirecting you to connect with ${platform} - I'll collect all necessary credentials for complete integration...`,
+          message: `Redirecting you to connect with ${platform}...`,
           authUrl
         };
       } else {
-        // Disconnect
         const { error } = await supabase
           .from('platform_credentials')
           .delete()

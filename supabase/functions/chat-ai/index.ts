@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -122,7 +123,7 @@ CRITICAL THINKING PROCESS - FOLLOW EXACTLY:
     - For each identified platform, list ALL necessary setup parameters and credentials.
     - If specific credential fields are not available in the UNIVERSAL KNOWLEDGE STORE, infer and provide common types (e.g., 'API Key', 'OAuth Client ID/Secret', 'Access Token', 'Service Account Key', 'Username', 'Password', 'URL', 'Endpoint').
     - NEVER SIMPLIFY CREDENTIALS REQUIREMENT - ALWAYS ASK FOR ALL POTENTIALLY NEEDED CREDENTIALS FOR EACH PLATFORM.
-    - Populate the `platforms` array with complete and detailed credential information.
+    - Populate the platforms array with complete and detailed credential information.
 
 3. **DYNAMIC RUNTIME PARAMETER IDENTIFICATION:**
     - Identify truly dynamic runtime parameters that require user input.
@@ -144,12 +145,12 @@ MANDATORY JSON STRUCTURE - EXACTLY THIS FORMAT:
   ],
   "platforms": [
     {
-      "name": "Platform Name", // e.g., "Slack", "Google Drive", "Salesforce"
+      "name": "Platform Name",
       "credentials": [
         {
-          "field": "Credential Field Name", // e.g., "API Token", "OAuth Token", "Username"
-          "placeholder": "Enter credential value", // e.g., "your_slack_api_token", "your_google_oauth_token"
-          "link": "direct_url_to_get_credential", // if available, otherwise "#"
+          "field": "Credential Field Name",
+          "placeholder": "Enter credential value",
+          "link": "direct_url_to_get_credential",
           "why_needed": "Explanation of why this credential is needed for this platform's functionality."
         }
       ]
@@ -175,11 +176,7 @@ MANDATORY JSON STRUCTURE - EXACTLY THIS FORMAT:
       "schedule": "cron expression if scheduled",
       "webhook_url": "if webhook trigger"
     },
-    "variables": {
-      "platform_configs": "object with platform-specific settings",
-      "credential_mappings": "object mapping credentials to platforms",
-      "universal_knowledge_references": "array of knowledge base entries used"
-    },
+    "variables": {},
     "steps": [
       {
         "id": "granular_step_1",
@@ -188,23 +185,17 @@ MANDATORY JSON STRUCTURE - EXACTLY THIS FORMAT:
         "action": {
           "integration": "platform_name",
           "method": "specific_api_method",
-          "parameters": {
-            "input_data": "mapped_from_previous_step"
-          },
-          "platform_credential_id": "credential_reference"
+          "parameters": {}
         }
       }
     ],
     "error_handling": {
-      "retry_attempts": 3,
-      "platform_specific_fallbacks": "from knowledge base"
+      "retry_attempts": 3
     }
   },
   "conversation_updates": {
     "knowledge_applied": "Universal knowledge entries used",
-    "platform_count": "number of platforms referenced",
-    "credential_fields_count": "total credential fields included",
-    "universal_knowledge_entries_used": "list of knowledge entries referenced"
+    "platform_count": "number of platforms referenced"
   },
   "is_update": false,
   "recheck_status": "parameters_clarification_needed"
@@ -241,7 +232,7 @@ Current automation context: ${JSON.stringify(automationContext)}`
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-4.1-2025-04-14',
         messages: openaiMessages,
         max_tokens: 4000,
         temperature: 0.3,
@@ -287,11 +278,9 @@ Current automation context: ${JSON.stringify(automationContext)}`
       console.error('❌ JSON parse error:', parseError)
       console.error('❌ Raw OpenAI response:', aiResponse)
       
-      // Try to extract meaningful content from malformed response
+      // Fallback response structure
       const fallbackResponse = {
-        summary: aiResponse.includes('automation') ? 
-          "I understand your automation request and I'm processing the platform requirements." :
-          "I'm analyzing your request to create the best automation solution.",
+        summary: "I understand your automation request and I'm processing the platform requirements.",
         steps: [
           "Step 1: Analyze your automation requirements",
           "Step 2: Identify all necessary platforms and their complete credentials",
@@ -321,8 +310,7 @@ Current automation context: ${JSON.stringify(automationContext)}`
         },
         conversation_updates: {
           universal_knowledge_applied: `${universalKnowledge?.length || 0} universal knowledge entries available`,
-          context_acknowledged: "Processing request with complete credential requirements",
-          response_saved: "Fallback response with enhanced credential collection"
+          context_acknowledged: "Processing request with complete credential requirements"
         },
         is_update: false,
         recheck_status: "processing_with_universal_knowledge"
@@ -340,7 +328,7 @@ Current automation context: ${JSON.stringify(automationContext)}`
       credentialFieldsIncluded: parsedResponse.platforms?.reduce((acc: number, p: any) => acc + (p.credentials?.length || 0), 0) || 0
     });
     
-    // Structure response with universal knowledge integration and enhanced credential requirements
+    // Structure response with universal knowledge integration
     const structuredResponse = {
       summary: parsedResponse.summary || "Comprehensive automation analysis with complete platform credential requirements",
       steps: Array.isArray(parsedResponse.steps) ? parsedResponse.steps : [],
@@ -373,9 +361,7 @@ Current automation context: ${JSON.stringify(automationContext)}`
       conversation_updates: {
         ...parsedResponse.conversation_updates,
         universal_knowledge_applied: `Applied ${universalKnowledge?.length || 0} universal knowledge entries`,
-        credential_requirements_enforced: "Complete credential collection enforced, no simplification allowed",
-        context_acknowledged: "Universal knowledge store successfully accessed with enhanced credential requirements",
-        response_saved: "Enhanced response with mandatory complete platform credentials"
+        credential_requirements_enforced: "Complete credential collection enforced, no simplification allowed"
       },
       is_update: Boolean(parsedResponse.is_update),
       recheck_status: parsedResponse.recheck_status || "universal_knowledge_integration_complete"
@@ -436,9 +422,7 @@ Current automation context: ${JSON.stringify(automationContext)}`
       },
       conversation_updates: {
         universal_knowledge_applied: "Universal knowledge store ready for comprehensive automation building",
-        credential_requirements_enforced: "Complete credential collection ready for next request",
-        context_acknowledged: "Error occurred, but enhanced credential collection remains available",
-        response_saved: "Error response with comprehensive credential integration capability"
+        credential_requirements_enforced: "Complete credential collection ready for next request"
       },
       is_update: false,
       recheck_status: "error_recovery_with_complete_credentials"

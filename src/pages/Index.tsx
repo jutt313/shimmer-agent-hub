@@ -19,7 +19,7 @@ const Index = () => {
   const [currentAgentConfig, setCurrentAgentConfig] = useState<any>(null);
   const [messages, setMessages] = useState([{
     id: 1,
-    text: "I am YusrAI, your AI assistant powered by OpenAI. How can I help you today?",
+    text: "I am YusrAI, your AI assistant powered by OpenAI. I'll help you create comprehensive automations with specific platform integrations. How can I help you today?",
     isBot: true,
     timestamp: new Date()
   }]);
@@ -86,30 +86,70 @@ const Index = () => {
 
       console.log('🔍 Processing result:', result);
       
-      // Fixed response processing - directly use the response text and structured data
-      let responseText = "I'm here to help you build comprehensive automations.";
+      // Enhanced response processing with comprehensive null prevention
+      let responseText = "I'm here to help you build comprehensive automations with specific platform integrations.";
       let structuredData = null;
       
-      if (result) {
-        // Use the response directly from the service
-        if (result.response && typeof result.response === 'string' && result.response.trim() !== 'null' && result.response.trim() !== '') {
+      if (result && typeof result === 'object') {
+        console.log('📊 Result analysis:', {
+          hasResponse: !!result.response,
+          responseType: typeof result.response,
+          responseLength: result.response?.length || 0,
+          hasStructuredData: !!result.structuredData,
+          responsePreview: result.response?.substring(0, 50)
+        });
+        
+        // Primary: Use response text if available and valid
+        if (result.response && 
+            typeof result.response === 'string' && 
+            result.response.trim() !== '' && 
+            result.response.trim() !== 'null' && 
+            result.response.toLowerCase() !== 'null' &&
+            !result.response.includes('undefined')) {
           responseText = result.response;
+          console.log('✅ Using response text from service');
         }
         
-        // Use structured data if available
-        if (result.structuredData) {
+        // Store structured data
+        if (result.structuredData && typeof result.structuredData === 'object') {
           structuredData = result.structuredData;
+          console.log('✅ Structured data available');
           
-          // If we have structured data but no good response text, use the summary
-          if ((!result.response || result.response.trim() === 'null' || result.response.trim() === '') && structuredData.summary) {
+          // Fallback: If response is null/empty but we have structured data summary
+          if ((!result.response || 
+               result.response.trim() === '' || 
+               result.response.trim() === 'null' || 
+               result.response.toLowerCase() === 'null') && 
+              structuredData.summary && 
+              typeof structuredData.summary === 'string' &&
+              structuredData.summary.trim() !== '') {
             responseText = structuredData.summary;
+            console.log('✅ Using summary from structured data as fallback');
+          }
+          
+          // Additional fallback: Use clarification questions if available
+          else if ((!result.response || 
+                    result.response.trim() === '' || 
+                    result.response.trim() === 'null') && 
+                   structuredData.clarification_questions && 
+                   Array.isArray(structuredData.clarification_questions) && 
+                   structuredData.clarification_questions.length > 0) {
+            responseText = "I need some clarification to provide the best solution:\n\n" + 
+              structuredData.clarification_questions.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n');
+            console.log('✅ Using clarification questions as fallback');
           }
         }
       }
       
-      // Final safety check
-      if (!responseText || responseText.trim() === '' || responseText.toLowerCase() === 'null') {
-        responseText = "I'm processing your request. Let me help you create a comprehensive automation.";
+      // Final comprehensive safety check
+      if (!responseText || 
+          responseText.trim() === '' || 
+          responseText.toLowerCase().includes('null') || 
+          responseText === 'null' ||
+          responseText === 'undefined' ||
+          responseText.toLowerCase() === 'undefined') {
+        console.warn('⚠️ Final safety check triggered - using emergency fallback response');
+        responseText = "I'm ready to help you create a comprehensive automation. Please specify the exact platforms you'd like to integrate (like Gmail, Slack, HubSpot, Salesforce, etc.) and I'll provide complete setup instructions.";
       }
       
       const botResponse = {
@@ -121,7 +161,8 @@ const Index = () => {
       };
       
       console.log('📤 Adding bot response:', {
-        text: botResponse.text.substring(0, 100),
+        textLength: botResponse.text.length,
+        textPreview: botResponse.text.substring(0, 100),
         hasStructuredData: !!botResponse.structuredData
       });
       
@@ -133,7 +174,7 @@ const Index = () => {
       
       const errorResponse = {
         id: Date.now() + 1,
-        text: "I'm experiencing technical difficulties. Please try again in a moment.",
+        text: "I encountered a technical issue, but I'm ready to help you create your automation. Please rephrase your request with specific platform names (like Gmail, Slack, HubSpot, etc.) and I'll provide a complete solution.",
         isBot: true,
         timestamp: new Date()
       };

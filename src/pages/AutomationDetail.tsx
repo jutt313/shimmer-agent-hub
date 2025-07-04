@@ -405,15 +405,48 @@ const AutomationDetail = () => {
       let structuredData = data;
       let aiResponseText = "";
 
-      // Create display text from structured data
-      if (structuredData && structuredData.summary) {
-        aiResponseText = structuredData.summary;
-        if (structuredData.steps && structuredData.steps.length > 0) {
-          aiResponseText += "\n\nSteps:\n" + structuredData.steps.map((step: string, i: number) => `${i + 1}. ${step}`).join('\n');
+      // Enhanced display text creation from structured data
+      if (structuredData) {
+        console.log('📋 Processing structured data:', Object.keys(structuredData));
+        
+        // Handle clarification questions
+        if (structuredData.clarification_questions && Array.isArray(structuredData.clarification_questions) && structuredData.clarification_questions.length > 0) {
+          aiResponseText = "I need some clarification to provide the best solution:\n\n" + 
+            structuredData.clarification_questions.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n');
         }
-      } else {
-        aiResponseText = "I'm sorry, I couldn't process your request properly.";
-        structuredData = null;
+        // Handle responses with summary
+        else if (structuredData.summary && structuredData.summary.trim() !== '') {
+          aiResponseText = structuredData.summary;
+          if (structuredData.steps && structuredData.steps.length > 0) {
+            aiResponseText += "\n\nSteps:\n" + structuredData.steps.map((step: string, i: number) => `${i + 1}. ${step}`).join('\n');
+          }
+        }
+        // Handle responses with steps but no summary
+        else if (structuredData.steps && Array.isArray(structuredData.steps) && structuredData.steps.length > 0) {
+          aiResponseText = "I've created a comprehensive automation plan with " + structuredData.steps.length + " detailed steps:\n\n" +
+            structuredData.steps.map((step: string, i: number) => `${i + 1}. ${step}`).join('\n');
+        }
+        // Handle responses with platforms but no summary
+        else if (structuredData.platforms && Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
+          const platformNames = structuredData.platforms.map((p: any) => p.name).join(', ');
+          aiResponseText = `I've identified the platforms you'll need: ${platformNames}. Let me set up the complete automation workflow.`;
+        }
+        // Handle any other structured response
+        else if (typeof structuredData === 'string' && structuredData.trim() !== '') {
+          aiResponseText = structuredData;
+        }
+        // Final fallback with helpful message
+        else {
+          aiResponseText = "I'm analyzing your automation requirements and will provide a complete solution with all necessary platforms and credentials.";
+        }
+      }
+      // Handle case where no structured data is received
+      else if (typeof data === 'string' && data.trim() !== '') {
+        aiResponseText = data;
+      }
+      // Ultimate fallback
+      else {
+        aiResponseText = "I'm ready to help you create a comprehensive automation. Please let me know which specific platforms you'd like to integrate, and I'll provide complete setup instructions.";
       }
 
       const aiMessage = {

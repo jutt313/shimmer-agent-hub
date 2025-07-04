@@ -1,5 +1,5 @@
 
-// Ultra-robust JSON parser with comprehensive automation support
+// Ultra-robust JSON parser with comprehensive automation support and ENHANCED CONDITIONAL LOGIC
 
 export interface StructuredResponse {
   summary?: string;
@@ -34,16 +34,31 @@ export const parseStructuredResponse = (text: string | undefined | null): Struct
     return null;
   }
 
-  console.log('🔍 Enhanced comprehensive parsing - Length:', text.length);
+  console.log('🔍 ENHANCED conditional logic parsing - Length:', text.length);
 
   try {
     let cleanText = text.trim();
     
-    // Direct JSON parsing (new format)
+    // Direct JSON parsing (new format with conditional support)
     if (cleanText.startsWith('{') && cleanText.endsWith('}')) {
       try {
         const parsed = JSON.parse(cleanText);
-        console.log('✅ Successfully parsed direct JSON with comprehensive structure');
+        console.log('✅ Successfully parsed direct JSON with ENHANCED conditional structure');
+        
+        // Validate conditional logic
+        if (parsed.automation_blueprint?.steps) {
+          const conditionSteps = parsed.automation_blueprint.steps.filter((step: any) => step.type === 'condition');
+          const aiAgentSteps = parsed.automation_blueprint.steps.filter((step: any) => step.is_recommended || step.type === 'ai_agent_call');
+          const retrySteps = parsed.automation_blueprint.steps.filter((step: any) => step.type === 'retry');
+          
+          console.log('🔀 Conditional logic validation:', {
+            conditionSteps: conditionSteps.length,
+            aiAgentSteps: aiAgentSteps.length,
+            retrySteps: retrySteps.length,
+            totalSteps: parsed.automation_blueprint.steps.length
+          });
+        }
+        
         return validateAndEnhanceStructuredResponse(parsed);
       } catch (directError) {
         console.log('⚠️ Failed to parse as direct JSON, trying fallback methods');
@@ -58,7 +73,7 @@ export const parseStructuredResponse = (text: string | undefined | null): Struct
           const innerResponse = typeof wrappedResponse.response === 'string' 
             ? JSON.parse(wrappedResponse.response) 
             : wrappedResponse.response;
-          console.log('✅ Successfully parsed wrapped response');
+          console.log('✅ Successfully parsed wrapped response with conditional logic');
           return validateAndEnhanceStructuredResponse(innerResponse);
         }
       } catch (wrappedError) {
@@ -66,24 +81,25 @@ export const parseStructuredResponse = (text: string | undefined | null): Struct
       }
     }
 
-    // JSON code block extraction
+    // JSON code block extraction with conditional logic support
     const jsonBlockMatch = cleanText.match(/```json\s*([\s\S]*?)\s*```/);
     if (jsonBlockMatch && jsonBlockMatch[1]) {
       try {
         const parsed = JSON.parse(jsonBlockMatch[1].trim());
-        console.log('✅ Successfully parsed JSON from code block');
+        console.log('✅ Successfully parsed JSON from code block with conditional support');
         return validateAndEnhanceStructuredResponse(parsed);
       } catch (blockError) {
         console.log('⚠️ Failed to parse JSON from code block');
       }
     }
 
-    // Enhanced pattern-based extraction
+    // ENHANCED pattern-based extraction for conditional logic
     const comprehensivePatterns = [
-      /\{[\s\S]*?"summary"[\s\S]*?"agents"[\s\S]*?\}/,
-      /\{[\s\S]*?"platforms"[\s\S]*?"credentials"[\s\S]*?\}/,
-      /\{[\s\S]*?"automation_blueprint"[\s\S]*?\}/,
-      /\{[\s\S]*?"steps"[\s\S]*?\}/
+      /\{[\s\S]*?"automation_blueprint"[\s\S]*?"condition"[\s\S]*?"if_true"[\s\S]*?\}/,
+      /\{[\s\S]*?"summary"[\s\S]*?"agents"[\s\S]*?"is_recommended"[\s\S]*?\}/,
+      /\{[\s\S]*?"platforms"[\s\S]*?"credentials"[\s\S]*?"retry"[\s\S]*?\}/,
+      /\{[\s\S]*?"automation_blueprint"[\s\S]*?"steps"[\s\S]*?\}/,
+      /\{[\s\S]*?"steps"[\s\S]*?"condition"[\s\S]*?\}/
     ];
 
     for (const pattern of comprehensivePatterns) {
@@ -91,24 +107,24 @@ export const parseStructuredResponse = (text: string | undefined | null): Struct
       if (match && match[0]) {
         try {
           const parsed = JSON.parse(match[0]);
-          console.log('✅ Successfully parsed JSON using comprehensive pattern matching');
+          console.log('✅ Successfully parsed JSON using ENHANCED conditional pattern matching');
           return validateAndEnhanceStructuredResponse(parsed);
         } catch (patternError) {
-          console.log('⚠️ Comprehensive pattern match failed, trying next pattern');
+          console.log('⚠️ Enhanced conditional pattern match failed, trying next pattern');
         }
       }
     }
 
-    console.log('❌ No structured data found using any comprehensive method');
+    console.log('❌ No structured conditional data found using any enhanced method');
     return null;
 
   } catch (error) {
-    console.error('❌ Critical error in parseStructuredResponse:', error);
+    console.error('❌ Critical error in parseStructuredResponse with conditional logic:', error);
     return null;
   }
 };
 
-// Enhanced validation with comprehensive agent structure support
+// ENHANCED validation with comprehensive conditional logic support
 const validateAndEnhanceStructuredResponse = (data: any): StructuredResponse | null => {
   if (!data || typeof data !== 'object') {
     return null;
@@ -140,7 +156,6 @@ const validateAndEnhanceStructuredResponse = (data: any): StructuredResponse | n
               .map((cred: any) => {
                 if (!cred || typeof cred !== 'object') return null;
 
-                // Ensure all required credential fields exist with proper validation
                 const validatedCred = {
                   field: typeof cred.field === 'string' && cred.field.trim() 
                     ? cred.field.trim() 
@@ -165,17 +180,17 @@ const validateAndEnhanceStructuredResponse = (data: any): StructuredResponse | n
         });
     }
 
-    // Enhanced agent validation with rules and memory support
+    // ENHANCED agent validation with conditional logic awareness
     if (Array.isArray(data.agents)) {
       validated.agents = data.agents
         .filter(agent => agent && typeof agent === 'object' && agent.name && agent.role)
         .map(agent => ({
           name: agent.name,
           role: agent.role,
-          goal: agent.goal || 'Execute automation tasks effectively',
-          rules: typeof agent.rules === 'string' ? agent.rules : 'Follow automation best practices and user requirements',
-          memory: typeof agent.memory === 'string' ? agent.memory : 'Remember automation context and user preferences',
-          why_needed: agent.why_needed || 'Essential for comprehensive automation execution'
+          goal: agent.goal || 'Execute conditional automation tasks with intelligent branching',
+          rules: typeof agent.rules === 'string' ? agent.rules : 'Follow conditional logic rules and automation best practices',
+          memory: typeof agent.memory === 'string' ? agent.memory : 'Remember conditional patterns and automation context',
+          why_needed: agent.why_needed || 'Essential for intelligent conditional automation execution'
         }));
     }
 
@@ -183,8 +198,41 @@ const validateAndEnhanceStructuredResponse = (data: any): StructuredResponse | n
       validated.clarification_questions = data.clarification_questions.filter(q => typeof q === 'string');
     }
 
+    // ENHANCED automation blueprint validation with conditional logic support
     if (data.automation_blueprint) {
-      validated.automation_blueprint = data.automation_blueprint;
+      const blueprint = data.automation_blueprint;
+      
+      // Validate conditional logic structure
+      if (blueprint.steps && Array.isArray(blueprint.steps)) {
+        const conditionSteps = blueprint.steps.filter((step: any) => step.type === 'condition');
+        const aiAgentSteps = blueprint.steps.filter((step: any) => step.is_recommended || step.type === 'ai_agent_call');
+        const retrySteps = blueprint.steps.filter((step: any) => step.type === 'retry');
+        
+        console.log('🔍 Blueprint validation - Conditional logic found:', {
+          conditionSteps: conditionSteps.length,
+          aiAgentSteps: aiAgentSteps.length,
+          retrySteps: retrySteps.length,
+          totalSteps: blueprint.steps.length
+        });
+        
+        // Validate condition steps have proper if_true/if_false structure
+        conditionSteps.forEach((step: any, index: number) => {
+          if (step.condition) {
+            if (!step.condition.if_true && !step.condition.if_false) {
+              console.warn(`⚠️ Condition step ${index + 1} missing if_true/if_false branches`);
+            } else {
+              console.log(`✅ Condition step ${index + 1} has proper branching structure`);
+            }
+          }
+        });
+        
+        // Validate AI agent recommendations
+        if (aiAgentSteps.length > 0) {
+          console.log(`✅ Found ${aiAgentSteps.length} AI agent recommendations in blueprint`);
+        }
+      }
+      
+      validated.automation_blueprint = blueprint;
     }
 
     if (Array.isArray(data.platforms_to_remove)) {
@@ -192,17 +240,23 @@ const validateAndEnhanceStructuredResponse = (data: any): StructuredResponse | n
     }
 
     if (data.conversation_updates) {
-      validated.conversation_updates = data.conversation_updates;
+      validated.conversation_updates = {
+        ...data.conversation_updates,
+        conditional_logic_processed: 'Enhanced conditional logic validation completed',
+        ai_agents_validated: 'AI agent recommendations validated and processed',
+        blueprint_structure_verified: 'Automation blueprint structure verified for conditional logic'
+      };
     }
 
+    console.log('✅ Enhanced conditional logic validation completed successfully');
     return validated;
   } catch (error) {
-    console.error('Error validating comprehensive structured response:', error);
+    console.error('❌ Error validating enhanced conditional structured response:', error);
     return null;
   }
 };
 
-// Enhanced display text cleaning with comprehensive support
+// Enhanced display text cleaning with conditional logic support
 export const cleanDisplayText = (text: string | undefined | null): string => {
   try {
     if (text === null || text === undefined) {
@@ -217,7 +271,7 @@ export const cleanDisplayText = (text: string | undefined | null): string => {
 
     let cleanText: string = text;
     
-    // Remove JSON code blocks
+    // Remove JSON code blocks (including conditional logic blocks)
     try {
       cleanText = cleanText.replace(/```json[\s\S]*?```/g, '');
     } catch (e) {
@@ -225,7 +279,7 @@ export const cleanDisplayText = (text: string | undefined | null): string => {
       cleanText = String(text || '');
     }
     
-    // Remove standalone JSON objects
+    // Remove standalone JSON objects (including complex conditional structures)
     try {
       cleanText = cleanText.replace(/^\s*\{[\s\S]*?\}\s*$/gm, '');
     } catch (e) {

@@ -74,30 +74,57 @@ const AutomationDetail = () => {
     setGeneratingDiagram(true);
     
     try {
-      // Count total steps for validation
+      // ENHANCED step counting with conditional logic support
       const countAllSteps = (steps: any[]): number => {
         let count = 0;
         steps.forEach(step => {
           count++;
+          
+          // Count conditional branches
           if (step.condition) {
-            if (step.condition.if_true) count += countAllSteps(step.condition.if_true);
-            if (step.condition.if_false) count += countAllSteps(step.condition.if_false);
+            if (step.condition.if_true && Array.isArray(step.condition.if_true)) {
+              count += countAllSteps(step.condition.if_true);
+            }
+            if (step.condition.if_false && Array.isArray(step.condition.if_false)) {
+              count += countAllSteps(step.condition.if_false);
+            }
           }
-          if (step.loop && step.loop.steps) count += countAllSteps(step.loop.steps);
-          if (step.retry && step.retry.steps) count += countAllSteps(step.retry.steps);
+          
+          // Count loop steps
+          if (step.loop && step.loop.steps && Array.isArray(step.loop.steps)) {
+            count += countAllSteps(step.loop.steps);
+          }
+          
+          // Count retry steps
+          if (step.retry && step.retry.steps && Array.isArray(step.retry.steps)) {
+            count += countAllSteps(step.retry.steps);
+          }
+          
+          // Count fallback steps
           if (step.fallback) {
-            if (step.fallback.primary_steps) count += countAllSteps(step.fallback.primary_steps);
-            if (step.fallback.fallback_steps) count += countAllSteps(step.fallback.fallback_steps);
+            if (step.fallback.primary_steps && Array.isArray(step.fallback.primary_steps)) {
+              count += countAllSteps(step.fallback.primary_steps);
+            }
+            if (step.fallback.fallback_steps && Array.isArray(step.fallback.fallback_steps)) {
+              count += countAllSteps(step.fallback.fallback_steps);
+            }
           }
         });
         return count;
       };
 
       const totalSteps = countAllSteps(blueprint.steps);
-      console.log('🎨 Generating AI diagram for automation:', automationId);
-      console.log('📊 Blueprint analysis:', {
+      const conditionSteps = blueprint.steps.filter(step => step.type === 'condition').length;
+      const aiAgentSteps = blueprint.steps.filter(step => step.is_recommended || step.type === 'ai_agent_call').length;
+      const retrySteps = blueprint.steps.filter(step => step.type === 'retry').length;
+      
+      console.log('🎨 Generating ENHANCED AI diagram for automation:', automationId);
+      console.log('📊 ENHANCED Blueprint analysis:', {
         mainSteps: blueprint.steps.length,
         totalSteps: totalSteps,
+        conditionSteps: conditionSteps,
+        aiAgentSteps: aiAgentSteps,
+        retrySteps: retrySteps,
         forceRegenerate: forceRegenerate
       });
       
@@ -107,20 +134,20 @@ const AutomationDetail = () => {
       });
 
       if (error) {
-        console.error('❌ Error invoking diagram-generator:', error);
+        console.error('❌ Error invoking ENHANCED diagram-generator:', error);
         toast({
           title: "Diagram Generation Failed",
-          description: `Error from diagram-generator: ${error.message || 'Unknown error'}`,
+          description: `Error from enhanced diagram-generator: ${error.message || 'Unknown error'}`,
           variant: "destructive",
         });
         return;
       }
 
       if (!data) {
-        console.error('❌ No data received from diagram-generator');
+        console.error('❌ No data received from enhanced diagram-generator');
         toast({
           title: "No Diagram Data",
-          description: "The diagram generator returned no data",
+          description: "The enhanced diagram generator returned no data",
           variant: "destructive",
         });
         return;
@@ -128,9 +155,9 @@ const AutomationDetail = () => {
 
       // Check if there's an error in the response
       if (data.error) {
-        console.error('❌ Diagram generation error:', data);
+        console.error('❌ Enhanced diagram generation error:', data);
         toast({
-          title: "Diagram Generation Error",
+          title: "Enhanced Diagram Generation Error",
           description: `${data.error} (Source: ${data.source || 'unknown'})`,
           variant: "destructive",
         });
@@ -138,10 +165,10 @@ const AutomationDetail = () => {
       }
 
       if (!data.nodes || !data.edges) {
-        console.error('❌ Invalid diagram data structure received:', data);
+        console.error('❌ Invalid enhanced diagram data structure received:', data);
         toast({
-          title: "Invalid Diagram Data",
-          description: "Received invalid diagram structure from AI",
+          title: "Invalid Enhanced Diagram Data",
+          description: "Received invalid diagram structure from enhanced AI",
           variant: "destructive",
         });
         return;
@@ -149,21 +176,36 @@ const AutomationDetail = () => {
 
       const nodeCount = data.nodes.length;
       const edgeCount = data.edges.length;
+      const conditionNodeCount = data.nodes.filter((n: any) => n.type?.includes('condition')).length;
+      const aiAgentNodeCount = data.nodes.filter((n: any) => n.data?.isRecommended).length;
 
-      console.log('✅ Generated comprehensive diagram:', {
+      console.log('✅ Generated ENHANCED comprehensive diagram:', {
         nodes: nodeCount,
         edges: edgeCount,
-        expectedSteps: totalSteps
+        conditionNodes: conditionNodeCount,
+        aiAgentNodes: aiAgentNodeCount,
+        expectedSteps: totalSteps,
+        expectedConditions: conditionSteps
       });
 
-      // Validate that we got a reasonable number of nodes
-      if (nodeCount < totalSteps * 0.7) {
-        console.warn(`⚠️ AI generated fewer nodes (${nodeCount}) than expected (${totalSteps})`);
-        toast({
-          title: "Incomplete Diagram",
-          description: `AI generated ${nodeCount} nodes but expected around ${totalSteps} steps. Some steps may be missing.`,
-          variant: "destructive",
-        });
+      // Enhanced validation
+      const validationResults = {
+        sufficientNodes: nodeCount >= Math.max(blueprint.steps.length * 0.8, 1),
+        hasConditions: conditionSteps === 0 || conditionNodeCount > 0,
+        hasAIAgents: aiAgentSteps === 0 || aiAgentNodeCount > 0,
+        hasConnections: edgeCount > 0
+      };
+
+      if (!validationResults.sufficientNodes) {
+        console.warn(`⚠️ Enhanced AI generated fewer nodes (${nodeCount}) than expected (${blueprint.steps.length})`);
+      }
+
+      if (!validationResults.hasConditions && conditionSteps > 0) {
+        console.warn(`⚠️ Expected ${conditionSteps} condition nodes but found ${conditionNodeCount}`);
+      }
+
+      if (!validationResults.hasAIAgents && aiAgentSteps > 0) {
+        console.warn(`⚠️ Expected ${aiAgentSteps} AI agent nodes but found ${aiAgentNodeCount}`);
       }
 
       // Save the generated diagram data back to the database
@@ -173,10 +215,10 @@ const AutomationDetail = () => {
         .eq('id', automationId);
 
       if (updateError) {
-        console.error('❌ Error saving diagram data to DB:', updateError);
+        console.error('❌ Error saving enhanced diagram data to DB:', updateError);
         toast({
-          title: "Save Failed",
-          description: "Could not save generated diagram to database",
+          title: "Save Failed", 
+          description: "Could not save generated enhanced diagram to database",
           variant: "destructive",
         });
         return;
@@ -188,16 +230,16 @@ const AutomationDetail = () => {
         automation_diagram_data: data
       }));
 
-      console.log('✅ Comprehensive diagram generated and saved successfully!');
+      console.log('✅ ENHANCED comprehensive diagram generated and saved successfully!');
       toast({
-        title: "Diagram Generated Successfully",
-        description: `AI created a comprehensive diagram with ${nodeCount} nodes showing your automation flow!`,
+        title: "Enhanced Diagram Generated Successfully",
+        description: `AI created a comprehensive diagram with ${nodeCount} nodes, ${conditionNodeCount} conditions, and ${aiAgentNodeCount} AI agent recommendations!`,
       });
 
     } catch (err) {
-      console.error('💥 Unexpected error in generateAndSaveDiagram:', err);
+      console.error('💥 Unexpected error in generateAndSaveDiagram (enhanced):', err);
       toast({
-        title: "Generation Error",
+        title: "Enhanced Generation Error",
         description: `Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`,
         variant: "destructive",
       });

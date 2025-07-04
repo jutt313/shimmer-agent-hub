@@ -138,6 +138,18 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
               <div className="text-sm text-red-700 leading-relaxed p-3 bg-red-100 rounded-lg border border-red-200 mt-3">
                 <span className="font-semibold text-red-800">Trigger Details:</span>
                 <div className="mt-1">{data.explanation}</div>
+                
+                {data.trigger && (
+                  <div className="mt-2 text-xs text-red-600 space-y-1">
+                    <div><span className="font-medium">Type:</span> {data.trigger.type}</div>
+                    {data.trigger.cron_expression && (
+                      <div><span className="font-medium">Schedule:</span> {data.trigger.cron_expression}</div>
+                    )}
+                    {data.trigger.webhook_endpoint && (
+                      <div><span className="font-medium">Webhook:</span> {data.trigger.webhook_endpoint}</div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -223,9 +235,18 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
               <div className="text-sm text-blue-700 leading-relaxed p-3 bg-blue-100 rounded-lg border border-blue-200 mt-3">
                 <span className="font-semibold text-blue-800">Action Details:</span>
                 <div className="mt-1">{data.explanation}</div>
-                {method && (
-                  <div className="mt-2 text-xs text-blue-600">
-                    <span className="font-medium">Method:</span> {method}
+                
+                {data.action && (
+                  <div className="mt-2 text-xs text-blue-600 space-y-1">
+                    {method && <div><span className="font-medium">Method:</span> {method}</div>}
+                    {data.action.parameters && (
+                      <div>
+                        <span className="font-medium">Parameters:</span>
+                        <pre className="mt-1 p-2 bg-blue-50 rounded text-xs overflow-x-auto">
+                          {JSON.stringify(data.action.parameters, null, 2)}
+                        </pre>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -239,8 +260,8 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
   // CONDITION NODE - Decision point with multiple branches
   const ConditionNodeComponent = () => {
     const branches = data.branches || [
-      { label: 'Yes', handle: 'true', color: '#10b981' },
-      { label: 'No', handle: 'false', color: '#ef4444' }
+      { label: 'True', handle: 'true', color: '#10b981' },
+      { label: 'False', handle: 'false', color: '#ef4444' }
     ];
 
     return (
@@ -282,6 +303,19 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
               <div className="text-sm text-orange-700 leading-relaxed p-3 bg-orange-100 rounded-lg border border-orange-200 mt-3">
                 <span className="font-semibold text-orange-800">Condition Logic:</span>
                 <div className="mt-1">{data.explanation}</div>
+                
+                {data.condition && (
+                  <div className="mt-2 text-xs text-orange-600 space-y-1">
+                    <div><span className="font-medium">Expression:</span> {data.condition.expression}</div>
+                    <div><span className="font-medium">Branches:</span> {branches.length} paths</div>
+                    {data.condition.if_true && (
+                      <div><span className="font-medium">True Path:</span> {data.condition.if_true.length} steps</div>
+                    )}
+                    {data.condition.if_false && (
+                      <div><span className="font-medium">False Path:</span> {data.condition.if_false.length} steps</div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -309,7 +343,7 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
                 className="absolute text-sm font-bold px-3 py-1 rounded-full border-2 shadow-md"
                 style={{ 
                   top: `${topPosition - 12}%`,
-                  right: '-45px',
+                  right: '-55px',
                   backgroundColor: `${branch.color}20`,
                   borderColor: `${branch.color}50`,
                   color: branch.color
@@ -324,52 +358,102 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
     );
   };
 
-  // LOOP NODE - Repetitive section
-  const LoopNodeComponent = () => {
+  // AI AGENT NODE - AI interaction with enhanced recommendation display
+  const AIAgentNodeComponent = () => {
+    const isRecommended = data.isRecommended;
+
     return (
       <div 
+        className={`relative px-6 py-5 shadow-xl rounded-3xl border-3 transition-all duration-300 cursor-pointer ${
+          isRecommended 
+            ? 'bg-gradient-to-br from-emerald-50/70 to-teal-50/70 border-emerald-200/70 animate-pulse' 
+            : 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-300'
+        } hover:shadow-2xl ${
+          selected ? 'shadow-emerald-200 shadow-2xl scale-105' : 'hover:border-emerald-400'
+        } min-w-[320px] max-w-[450px]`}
         onClick={handleExpansion}
-        className={`relative px-6 py-5 shadow-xl rounded-3xl border-3 transition-all duration-300 bg-gradient-to-br from-purple-50 to-violet-50 cursor-pointer hover:shadow-2xl ${
-          selected ? 'border-purple-400 shadow-purple-200 shadow-2xl scale-105' : 'border-purple-300 hover:border-purple-400'
-        } min-w-[320px] max-w-[400px]`}
+        style={{ opacity: isRecommended ? 0.95 : 1 }}
       >
+        {isRecommended && (
+          <div className="absolute -top-3 -right-3 flex gap-2">
+            <div className="bg-emerald-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-bounce">
+              RECOMMENDED
+            </div>
+            <Button
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onAdd?.();
+              }}
+              className="h-8 w-8 p-0 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg"
+            >
+              <Plus className="w-4 h-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onDismiss?.();
+              }}
+              className="h-8 w-8 p-0 bg-white hover:bg-gray-50 text-gray-500 border-gray-300 rounded-full shadow-lg"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
+        
         <Handle
           type="target"
           position={Position.Left}
-          className="w-4 h-4 !bg-purple-200 !border-3 !border-purple-400 !rounded-full"
+          className="w-4 h-4 !bg-emerald-200 !border-3 !border-emerald-400 !rounded-full"
         />
         <Handle
           type="source"
           position={Position.Right}
-          className="w-4 h-4 !bg-purple-200 !border-3 !border-purple-400 !rounded-full"
+          className="w-4 h-4 !bg-emerald-200 !border-3 !border-emerald-400 !rounded-full"
         />
         
         <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0 w-14 h-14 rounded-3xl bg-gradient-to-br from-purple-100 to-violet-100 flex items-center justify-center shadow-lg border-2 border-purple-200">
-            <Repeat className="w-7 h-7 text-purple-600" />
+          <div className="flex-shrink-0 w-14 h-14 rounded-3xl bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center shadow-lg border-2 border-emerald-200">
+            <Bot className="w-7 h-7 text-emerald-600" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-lg font-bold text-purple-800 leading-tight">
-                LOOP
+              <div className="text-lg font-bold text-emerald-800 leading-tight">
+                AI AGENT
               </div>
-              {expanded ? <ChevronUp className="w-5 h-5 text-purple-600" /> : <ChevronDown className="w-5 h-5 text-purple-600" />}
+              {expanded ? <ChevronUp className="w-5 h-5 text-emerald-600" /> : <ChevronDown className="w-5 h-5 text-emerald-600" />}
             </div>
             
-            <div className="text-sm font-semibold text-purple-700 mb-1">
+            <div className="text-sm font-semibold text-emerald-700 mb-1">
               {data.label}
             </div>
-
-            {data.loop?.array_source && (
-              <div className="text-sm text-purple-600 font-medium mb-2 p-2 bg-purple-100 rounded-lg border border-purple-200">
-                Iterating: {data.loop.array_source}
+            
+            {expanded && data.agent?.agent_id && (
+              <div className="text-sm text-emerald-600 font-medium mb-2 p-2 bg-emerald-100 rounded-lg border border-emerald-200">
+                Agent ID: {data.agent.agent_id}
               </div>
             )}
             
             {expanded && data.explanation && (
-              <div className="text-sm text-purple-700 leading-relaxed p-3 bg-purple-100 rounded-lg border border-purple-200 mt-3">
-                <span className="font-semibold text-purple-800">Loop Details:</span>
+              <div className="text-sm text-emerald-700 leading-relaxed p-3 bg-emerald-100 rounded-lg border border-emerald-200 mt-3">
+                <span className="font-semibold text-emerald-800">Agent Purpose:</span>
                 <div className="mt-1">{data.explanation}</div>
+                
+                {data.agent && (
+                  <div className="mt-2 text-xs text-emerald-600 space-y-1">
+                    {data.agent.input_prompt && (
+                      <div><span className="font-medium">Input:</span> {data.agent.input_prompt}</div>
+                    )}
+                    {data.agent.output_variable && (
+                      <div><span className="font-medium">Output:</span> {data.agent.output_variable}</div>
+                    )}
+                    {isRecommended && (
+                      <div className="text-emerald-700 font-semibold">✨ This AI agent is recommended for optimal performance</div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -378,7 +462,7 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
     );
   };
 
-  // RETRY NODE - Re-attempt logic
+  // RETRY NODE - Re-attempt logic with enhanced display
   const RetryNodeComponent = () => {
     const maxAttempts = data.retry?.max_attempts || 3;
 
@@ -427,6 +511,142 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
               <div className="text-sm text-amber-700 leading-relaxed p-3 bg-amber-100 rounded-lg border border-amber-200 mt-3">
                 <span className="font-semibold text-amber-800">Retry Configuration:</span>
                 <div className="mt-1">{data.explanation}</div>
+                
+                {data.retry && (
+                  <div className="mt-2 text-xs text-amber-600 space-y-1">
+                    <div><span className="font-medium">Max Attempts:</span> {data.retry.max_attempts}</div>
+                    {data.retry.steps && (
+                      <div><span className="font-medium">Retry Steps:</span> {data.retry.steps.length} actions</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // LOOP NODE - Repetitive section with enhanced display
+  const LoopNodeComponent = () => {
+    return (
+      <div 
+        onClick={handleExpansion}
+        className={`relative px-6 py-5 shadow-xl rounded-3xl border-3 transition-all duration-300 bg-gradient-to-br from-purple-50 to-violet-50 cursor-pointer hover:shadow-2xl ${
+          selected ? 'border-purple-400 shadow-purple-200 shadow-2xl scale-105' : 'border-purple-300 hover:border-purple-400'
+        } min-w-[320px] max-w-[400px]`}
+      >
+        <Handle
+          type="target"
+          position={Position.Left}
+          className="w-4 h-4 !bg-purple-200 !border-3 !border-purple-400 !rounded-full"
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="w-4 h-4 !bg-purple-200 !border-3 !border-purple-400 !rounded-full"
+        />
+        
+        <div className="flex items-start space-x-4">
+          <div className="flex-shrink-0 w-14 h-14 rounded-3xl bg-gradient-to-br from-purple-100 to-violet-100 flex items-center justify-center shadow-lg border-2 border-purple-200">
+            <Repeat className="w-7 h-7 text-purple-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-lg font-bold text-purple-800 leading-tight">
+                LOOP
+              </div>
+              {expanded ? <ChevronUp className="w-5 h-5 text-purple-600" /> : <ChevronDown className="w-5 h-5 text-purple-600" />}
+            </div>
+            
+            <div className="text-sm font-semibold text-purple-700 mb-1">
+              {data.label}
+            </div>
+
+            {data.loop?.array_source && (
+              <div className="text-sm text-purple-600 font-medium mb-2 p-2 bg-purple-100 rounded-lg border border-purple-200">
+                Iterating: {data.loop.array_source}
+              </div>
+            )}
+            
+            {expanded && data.explanation && (
+              <div className="text-sm text-purple-700 leading-relaxed p-3 bg-purple-100 rounded-lg border border-purple-200 mt-3">
+                <span className="font-semibold text-purple-800">Loop Details:</span>
+                <div className="mt-1">{data.explanation}</div>
+                
+                {data.loop && (
+                  <div className="mt-2 text-xs text-purple-600 space-y-1">
+                    {data.loop.array_source && (
+                      <div><span className="font-medium">Source:</span> {data.loop.array_source}</div>
+                    )}
+                    {data.loop.steps && (
+                      <div><span className="font-medium">Loop Steps:</span> {data.loop.steps.length} actions</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // DELAY NODE - Time delays with enhanced display
+  const DelayNodeComponent = () => {
+    const delaySeconds = data.delay?.duration_seconds || 0;
+    const delayDisplay = delaySeconds >= 60 ? `${Math.floor(delaySeconds / 60)}m ${delaySeconds % 60}s` : `${delaySeconds}s`;
+
+    return (
+      <div 
+        onClick={handleExpansion}
+        className={`relative px-6 py-5 shadow-xl rounded-3xl border-3 transition-all duration-300 bg-gradient-to-br from-slate-50 to-gray-50 cursor-pointer hover:shadow-2xl ${
+          selected ? 'border-slate-400 shadow-slate-200 shadow-2xl scale-105' : 'border-slate-300 hover:border-slate-400'
+        } min-w-[320px] max-w-[400px]`}
+      >
+        <Handle
+          type="target"
+          position={Position.Left}
+          className="w-4 h-4 !bg-slate-200 !border-3 !border-slate-400 !rounded-full"
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="w-4 h-4 !bg-slate-200 !border-3 !border-slate-400 !rounded-full"
+        />
+        
+        <div className="flex items-start space-x-4">
+          <div className="flex-shrink-0 w-14 h-14 rounded-3xl bg-gradient-to-br from-slate-100 to-gray-100 flex items-center justify-center shadow-lg border-2 border-slate-200">
+            <Clock className="w-7 h-7 text-slate-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-lg font-bold text-slate-800 leading-tight">
+                DELAY
+              </div>
+              {expanded ? <ChevronUp className="w-5 h-5 text-slate-600" /> : <ChevronDown className="w-5 h-5 text-slate-600" />}
+            </div>
+            
+            <div className="text-sm font-semibold text-slate-700 mb-1">
+              {data.label}
+            </div>
+
+            <div className="text-sm text-slate-600 font-medium mb-2 p-2 bg-slate-100 rounded-lg border border-slate-200">
+              Duration: {delayDisplay}
+            </div>
+            
+            {expanded && data.explanation && (
+              <div className="text-sm text-slate-700 leading-relaxed p-3 bg-slate-100 rounded-lg border border-slate-200 mt-3">
+                <span className="font-semibold text-slate-800">Delay Details:</span>
+                <div className="mt-1">{data.explanation}</div>
+                
+                {data.delay && (
+                  <div className="mt-2 text-xs text-slate-600 space-y-1">
+                    <div><span className="font-medium">Duration:</span> {data.delay.duration_seconds} seconds</div>
+                    <div><span className="font-medium">Purpose:</span> Wait before next action</div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -470,6 +690,17 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
               <div className="text-sm text-indigo-700 leading-relaxed p-3 bg-indigo-100 rounded-lg border border-indigo-200 mt-3">
                 <span className="font-semibold text-indigo-800">Fallback Strategy:</span>
                 <div className="mt-1">{data.explanation}</div>
+                
+                {data.fallback && (
+                  <div className="mt-2 text-xs text-indigo-600 space-y-1">
+                    {data.fallback.primary_steps && (
+                      <div><span className="font-medium">Primary Steps:</span> {data.fallback.primary_steps.length} actions</div>
+                    )}
+                    {data.fallback.fallback_steps && (
+                      <div><span className="font-medium">Fallback Steps:</span> {data.fallback.fallback_steps.length} actions</div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -522,154 +753,6 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
           }}
         >
           Fallback
-        </div>
-      </div>
-    );
-  };
-
-  // AI AGENT NODE - AI interaction
-  const AIAgentNodeComponent = () => {
-    const isRecommended = data.isRecommended;
-
-    return (
-      <div 
-        className={`relative px-6 py-5 shadow-xl rounded-3xl border-3 transition-all duration-300 cursor-pointer ${
-          isRecommended 
-            ? 'bg-gradient-to-br from-emerald-50/70 to-teal-50/70 border-emerald-200/70' 
-            : 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-300'
-        } hover:shadow-2xl ${
-          selected ? 'shadow-emerald-200 shadow-2xl scale-105' : 'hover:border-emerald-400'
-        } min-w-[320px] max-w-[450px]`}
-        onClick={handleExpansion}
-        style={{ opacity: isRecommended ? 0.85 : 1 }}
-      >
-        {isRecommended && (
-          <div className="absolute -top-3 -right-3 flex gap-2">
-            <Button
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                data.onAdd?.();
-              }}
-              className="h-8 w-8 p-0 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg"
-            >
-              <Plus className="w-4 h-4" />
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={(e) => {
-                e.stopPropagation();
-                data.onDismiss?.();
-              }}
-              className="h-8 w-8 p-0 bg-white hover:bg-gray-50 text-gray-500 border-gray-300 rounded-full shadow-lg"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-        )}
-        
-        <Handle
-          type="target"
-          position={Position.Left}
-          className="w-4 h-4 !bg-emerald-200 !border-3 !border-emerald-400 !rounded-full"
-        />
-        <Handle
-          type="source"
-          position={Position.Right}
-          className="w-4 h-4 !bg-emerald-200 !border-3 !border-emerald-400 !rounded-full"
-        />
-        
-        <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0 w-14 h-14 rounded-3xl bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center shadow-lg border-2 border-emerald-200">
-            <Bot className="w-7 h-7 text-emerald-600" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-lg font-bold text-emerald-800 leading-tight">
-                AI AGENT
-              </div>
-              {expanded ? <ChevronUp className="w-5 h-5 text-emerald-600" /> : <ChevronDown className="w-5 h-5 text-emerald-600" />}
-            </div>
-            
-            <div className="text-sm font-semibold text-emerald-700 mb-1">
-              {data.label}
-            </div>
-            
-            {isRecommended && (
-              <div className="text-sm text-emerald-600 font-bold mb-2 px-3 py-1 bg-emerald-200 rounded-lg border border-emerald-300 inline-block">
-                RECOMMENDED
-              </div>
-            )}
-            
-            {expanded && data.agent?.agent_id && (
-              <div className="text-sm text-emerald-600 font-medium mb-2 p-2 bg-emerald-100 rounded-lg border border-emerald-200">
-                Agent ID: {data.agent.agent_id}
-              </div>
-            )}
-            
-            {expanded && data.explanation && (
-              <div className="text-sm text-emerald-700 leading-relaxed p-3 bg-emerald-100 rounded-lg border border-emerald-200 mt-3">
-                <span className="font-semibold text-emerald-800">Agent Purpose:</span>
-                <div className="mt-1">{data.explanation}</div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // DELAY NODE - Time delays
-  const DelayNodeComponent = () => {
-    const delaySeconds = data.delay?.duration_seconds || 0;
-    const delayDisplay = delaySeconds >= 60 ? `${Math.floor(delaySeconds / 60)}m ${delaySeconds % 60}s` : `${delaySeconds}s`;
-
-    return (
-      <div 
-        onClick={handleExpansion}
-        className={`relative px-6 py-5 shadow-xl rounded-3xl border-3 transition-all duration-300 bg-gradient-to-br from-slate-50 to-gray-50 cursor-pointer hover:shadow-2xl ${
-          selected ? 'border-slate-400 shadow-slate-200 shadow-2xl scale-105' : 'border-slate-300 hover:border-slate-400'
-        } min-w-[320px] max-w-[400px]`}
-      >
-        <Handle
-          type="target"
-          position={Position.Left}
-          className="w-4 h-4 !bg-slate-200 !border-3 !border-slate-400 !rounded-full"
-        />
-        <Handle
-          type="source"
-          position={Position.Right}
-          className="w-4 h-4 !bg-slate-200 !border-3 !border-slate-400 !rounded-full"
-        />
-        
-        <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0 w-14 h-14 rounded-3xl bg-gradient-to-br from-slate-100 to-gray-100 flex items-center justify-center shadow-lg border-2 border-slate-200">
-            <Clock className="w-7 h-7 text-slate-600" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-lg font-bold text-slate-800 leading-tight">
-                DELAY
-              </div>
-              {expanded ? <ChevronUp className="w-5 h-5 text-slate-600" /> : <ChevronDown className="w-5 h-5 text-slate-600" />}
-            </div>
-            
-            <div className="text-sm font-semibold text-slate-700 mb-1">
-              {data.label}
-            </div>
-
-            <div className="text-sm text-slate-600 font-medium mb-2 p-2 bg-slate-100 rounded-lg border border-slate-200">
-              Duration: {delayDisplay}
-            </div>
-            
-            {expanded && data.explanation && (
-              <div className="text-sm text-slate-700 leading-relaxed p-3 bg-slate-100 rounded-lg border border-slate-200 mt-3">
-                <span className="font-semibold text-slate-800">Delay Details:</span>
-                <div className="mt-1">{data.explanation}</div>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     );

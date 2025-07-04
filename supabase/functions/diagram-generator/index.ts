@@ -1,690 +1,451 @@
 
-// supabase/functions/diagram-generator/index.ts
-
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-interface BlueprintStep {
-    id?: string;
-    type: string;
-    action?: any;
-    condition?: any;
-    ai_agent_call?: any;
-    loop?: any;
-    delay?: any;
-    retry?: any;
-    fallback?: any;
-    explanation?: string;
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 interface DiagramNode {
-    id: string;
-    type: string;
-    position?: { x: number; y: number };
-    data: any;
-    draggable?: boolean;
-    selectable?: boolean;
-    connectable?: boolean;
+  id: string;
+  type: string;
+  position: { x: number; y: number };
+  data: {
+    label: string;
+    icon?: string;
+    platform?: string;
+    stepType?: string;
+    explanation?: string;
+    isRecommended?: boolean;
+    branches?: Array<{
+      label: string;
+      handle: string;
+      color: string;
+      stepsKey?: string;
+    }>;
+    onAdd?: () => void;
+    onDismiss?: () => void;
+    [key: string]: any;
+  };
+  sourcePosition?: string;
+  targetPosition?: string;
 }
 
 interface DiagramEdge {
-    id: string;
-    source: string;
-    target: string;
-    sourceHandle?: string;
-    targetHandle?: string;
-    type?: string;
-    animated?: boolean;
-    style?: any;
-}
-
-interface LayoutOptions {
-    nodeWidth: number;
-    nodeHeight: number;
-    horizontalGap: number;
-    verticalGap: number;
-    startX: number;
-    startY: number;
-}
-
-// Enhanced layout calculation function
-const calculateEnhancedLayout = (
-    nodes: DiagramNode[], 
-    edges: DiagramEdge[], 
-    options: LayoutOptions
-): { nodes: DiagramNode[]; edges: DiagramEdge[] } => {
-    console.log('🎨 Calculating enhanced layout for', nodes.length, 'nodes');
-    
-    if (!nodes || nodes.length === 0) return { nodes: [], edges };
-
-    // Build adjacency graph for topological sorting
-    const graph = new Map<string, string[]>();
-    const inDegrees = new Map<string, number>();
-
-    nodes.forEach(node => {
-        graph.set(node.id, []);
-        inDegrees.set(node.id, 0);
-    });
-
-    edges.forEach(edge => {
-        if (graph.has(edge.source) && graph.has(edge.target)) {
-            graph.get(edge.source)?.push(edge.target);
-            inDegrees.set(edge.target, (inDegrees.get(edge.target) || 0) + 1);
-        }
-    });
-
-    // Topological sort to determine layers
-    const queue: string[] = [];
-    const layers = new Map<string, number>();
-    
-    // Find root nodes (nodes with no incoming edges)
-    nodes.forEach(node => {
-        if (inDegrees.get(node.id) === 0) {
-            queue.push(node.id);
-            layers.set(node.id, 0);
-        }
-    });
-
-    let head = 0;
-    while (head < queue.length) {
-        const nodeId = queue[head++];
-        const currentLayer = layers.get(nodeId) || 0;
-        
-        graph.get(nodeId)?.forEach(childId => {
-            const newInDegree = (inDegrees.get(childId) || 0) - 1;
-            inDegrees.set(childId, newInDegree);
-            
-            if (newInDegree === 0) {
-                queue.push(childId);
-                layers.set(childId, Math.max(layers.get(childId) || 0, currentLayer + 1));
-            }
-        });
-    }
-
-    // Handle orphaned nodes
-    nodes.forEach(node => {
-        if (!layers.has(node.id)) {
-            layers.set(node.id, 0);
-        }
-    });
-
-    // Group nodes by layer
-    const layerGroups = new Map<number, string[]>();
-    layers.forEach((layer, nodeId) => {
-        if (!layerGroups.has(layer)) {
-            layerGroups.set(layer, []);
-        }
-        layerGroups.get(layer)?.push(nodeId);
-    });
-
-    // Position calculation with enhanced spacing
-    const layoutedNodes = nodes.map(node => {
-        const layer = layers.get(node.id) || 0;
-        const layerNodes = layerGroups.get(layer) || [];
-        const nodeIndex = layerNodes.indexOf(node.id);
-        
-        // Calculate horizontal position
-        const x = options.startX + (layer * (options.nodeWidth + options.horizontalGap));
-        
-        // Calculate vertical position with centering
-        const layerHeight = layerNodes.length * options.nodeHeight + (layerNodes.length - 1) * options.verticalGap;
-        const layerStartY = options.startY + (layerHeight > 0 ? -layerHeight / 2 : 0);
-        const y = layerStartY + nodeIndex * (options.nodeHeight + options.verticalGap) + 300;
-        
-        return { 
-            ...node, 
-            position: { x, y },
-            draggable: true,
-            selectable: true,
-            connectable: false
-        };
-    });
-
-    // Enhanced edge styling with smart colors
-    const layoutedEdges = edges.map(edge => {
-        const edgeStyle = {
-            stroke: getEdgeColor(edge.sourceHandle),
-            strokeWidth: 2,
-            ...edge.style
-        };
-
-        return {
-            ...edge,
-            type: 'smoothstep',
-            animated: true,
-            style: edgeStyle,
-            sourceHandle: edge.sourceHandle || undefined,
-            targetHandle: edge.targetHandle || undefined,
-        };
-    });
-
-    console.log('✅ Enhanced layout completed:', {
-        finalNodes: layoutedNodes.length,
-        finalEdges: layoutedEdges.length,
-        layers: Math.max(...Array.from(layers.values())) + 1,
-        layerGroups: layerGroups.size
-    });
-
-    return { nodes: layoutedNodes, edges: layoutedEdges };
-};
-
-const getEdgeColor = (sourceHandle?: string): string => {
-    switch (sourceHandle) {
-        case 'true':
-        case 'yes':
-        case 'success':
-        case 'existing':
-        case 'she': 
-        case 'task':
-        case 'new':
-            return '#10b981'; // Green
-        case 'false':
-        case 'no':
-        case 'error':
-        case 'he': 
-            return '#ef4444'; // Red
-        case 'urgent':
-            return '#ef4444'; // Red
-        case 'followup':
-            return '#f59e0b'; // Amber
-        case 'goat': 
-            return '#8B5CF6'; // Purple for unique cases
-        case 'primary': // For fallback primary path
-            return '#10b981';
-        case 'fallback': // For fallback alternative path
-            return '#f59e0b';
-        default:
-            return '#3b82f6';
-    }
-};
-
-class EnhancedDiagramBuilder {
-    private nodes: DiagramNode[] = [];
-    private edges: DiagramEdge[] = [];
-    private nodeIndex = 0;
-    private readonly NODE_WIDTH = 320;
-    private readonly NODE_HEIGHT = 140;
-    private readonly HORIZONTAL_GAP = 350;
-    private readonly VERTICAL_GAP = 200;
-    private readonly START_X = 50;
-    private readonly START_Y = 100;
-
-    constructor(private blueprint: any) {}
-
-    build(): { nodes: DiagramNode[]; edges: DiagramEdge[] } {
-        console.log('🔧 Enhanced Diagram Builder - Processing blueprint:', {
-            hasSteps: !!this.blueprint.steps,
-            stepCount: this.blueprint.steps?.length || 0,
-            hasTrigger: !!this.blueprint.trigger,
-            triggerType: this.blueprint.trigger?.type
-        });
-        
-        // Step 1: Create trigger node
-        this.createTriggerNode();
-        
-        // Step 2: Process all steps sequentially
-        if (this.blueprint.steps && this.blueprint.steps.length > 0) {
-            this.processAllSteps(this.blueprint.steps);
-        }
-        
-        console.log('Applying enhanced layout algorithm...');
-        const layoutedData = calculateEnhancedLayout(this.nodes, this.edges, {
-            nodeWidth: this.NODE_WIDTH,
-            nodeHeight: this.NODE_HEIGHT,
-            horizontalGap: this.HORIZONTAL_GAP,
-            verticalGap: this.VERTICAL_GAP,
-            startX: this.START_X,
-            startY: this.START_Y,
-        });
-        this.nodes = layoutedData.nodes;
-        this.edges = layoutedData.edges;
-
-        console.log('✅ Enhanced diagram built and layouted:', {
-            totalNodes: this.nodes.length,
-            totalEdges: this.edges.length,
-            nodeTypes: [...new Set(this.nodes.map(n => n.type))],
-            platforms: [...new Set(this.nodes.map(n => n.data?.platform).filter(Boolean))]
-        });
-        
-        return {
-            nodes: this.nodes,
-            edges: this.edges
-        };
-    }
-
-    private createTriggerNode() {
-        const trigger = this.blueprint.trigger;
-        const platform = this.extractPlatform(trigger);
-        
-        const triggerNode: DiagramNode = {
-            id: 'trigger-node',
-            type: platform ? 'platformTriggerNode' : 'triggerNode',
-            data: {
-                label: trigger?.explanation || trigger?.type || 'Manual Trigger',
-                platform: platform,
-                trigger: trigger,
-                explanation: trigger?.explanation || 'This automation starts when triggered',
-                stepType: 'trigger'
-            }
-        };
-        
-        this.nodes.push(triggerNode);
-        console.log('📍 Created trigger node:', {
-            id: triggerNode.id,
-            type: triggerNode.type,
-            platform: platform
-        });
-    }
-
-    private processAllSteps(steps: BlueprintStep[], parentId: string = 'trigger-node', isNested: boolean = false) {
-        let previousNodeId = parentId;
-
-        for (let i = 0; i < steps.length; i++) {
-            const step = steps[i];
-            console.log(`🔄 Processing step ${i + 1}/${steps.length} (Nested: ${isNested}):`, {
-                type: step.type,
-                hasAction: !!step.action,
-                hasCondition: !!step.condition,
-                hasAiAgent: !!step.ai_agent_call,
-                previousNode: previousNodeId
-            });
-            
-            const nodeId = `step-${this.nodeIndex++}`;
-            const node = this.createEnhancedNodeForStep(step, nodeId);
-            this.nodes.push(node);
-            
-            // Create edge from previous node in the sequence
-            this.createEdge(previousNodeId, nodeId, undefined, 'target');
-
-            // If it's a conditional or branching step, handle nested flows
-            if (step.type === 'condition' || step.type === 'loop' || step.type === 'retry' || step.type === 'fallback') {
-                this.handleNestedSteps(step, nodeId);
-            }
-            
-            previousNodeId = nodeId;
-        }
-    }
-
-    private createEnhancedNodeForStep(step: BlueprintStep, nodeId: string): DiagramNode {
-        console.log(`🎨 Creating node for step type: ${step.type}`);
-        
-        switch (step.type) {
-            case 'condition':
-                return this.createConditionNode(step, nodeId);
-                
-            case 'ai_agent_call':
-                return this.createAIAgentNode(step, nodeId);
-                
-            case 'delay':
-                return this.createDelayNode(step, nodeId);
-                
-            case 'loop':
-                return this.createLoopNode(step, nodeId);
-                
-            case 'retry':
-                return this.createRetryNode(step, nodeId);
-                
-            case 'fallback':
-                return this.createFallbackNode(step, nodeId);
-                
-            default:
-                return this.createActionNode(step, nodeId);
-        }
-    }
-
-    private createConditionNode(step: BlueprintStep, nodeId: string): DiagramNode {
-        const branches = this.extractConditionBranches(step.condition);
-        
-        return {
-            id: nodeId,
-            type: 'conditionNode',
-            data: {
-                label: step.explanation || 'Condition Check',
-                icon: 'branch',
-                condition: step.condition,
-                explanation: step.explanation,
-                branches: branches,
-                stepType: 'condition'
-            }
-        };
-    }
-
-    private createAIAgentNode(step: BlueprintStep, nodeId: string): DiagramNode {
-        const isRecommended = step.ai_agent_call?.is_recommended || false;
-        
-        return {
-            id: nodeId,
-            type: 'aiAgentNode',
-            data: {
-                label: step.explanation || `AI Agent: ${step.ai_agent_call?.agent_id || 'Unknown'}`,
-                icon: 'bot',
-                agent: step.ai_agent_call,
-                explanation: step.explanation,
-                stepType: 'ai_agent_call',
-                isRecommended: isRecommended
-            }
-        };
-    }
-
-    private createDelayNode(step: BlueprintStep, nodeId: string): DiagramNode {
-        return {
-            id: nodeId,
-            type: 'delayNode',
-            data: {
-                label: step.explanation || `Delay: ${step.delay?.duration || 'Unknown'}`,
-                icon: 'clock',
-                delay: step.delay,
-                explanation: step.explanation,
-                stepType: 'delay'
-            }
-        };
-    }
-
-    private createLoopNode(step: BlueprintStep, nodeId: string): DiagramNode {
-        return {
-            id: nodeId,
-            type: 'loopNode',
-            data: {
-                label: step.explanation || 'Loop',
-                icon: 'repeat',
-                loop: step.loop,
-                explanation: step.explanation,
-                stepType: 'loop'
-            }
-        };
-    }
-
-    private createRetryNode(step: BlueprintStep, nodeId: string): DiagramNode {
-        return {
-            id: nodeId,
-            type: 'retryNode',
-            data: {
-                label: step.explanation || 'Retry Logic',
-                icon: 'refresh',
-                retry: step.retry,
-                explanation: step.explanation,
-                stepType: 'retry'
-            }
-        };
-    }
-
-    private createFallbackNode(step: BlueprintStep, nodeId: string): DiagramNode {
-        return {
-            id: nodeId,
-            type: 'fallbackNode',
-            data: {
-                label: step.explanation || 'Fallback Handler',
-                icon: 'shield',
-                fallback: step.fallback,
-                explanation: step.explanation,
-                stepType: 'fallback'
-            }
-        };
-    }
-
-    private createActionNode(step: BlueprintStep, nodeId: string): DiagramNode {
-        const platform = this.extractPlatform(step.action);
-        const method = step.action?.method || '';
-        
-        const nodeType = platform ? 'platformNode' : 'actionNode';
-        
-        return {
-            id: nodeId,
-            type: nodeType,
-            data: {
-                label: step.explanation || method || 'Action Step',
-                icon: 'settings',
-                platform: platform,
-                action: step.action,
-                stepType: step.type,
-                explanation: step.explanation,
-                stepDetails: {
-                    integration: platform,
-                    method: method,
-                    endpoint: step.action?.endpoint,
-                    parameters: step.action?.parameters
-                }
-            }
-        };
-    }
-
-    private handleNestedSteps(step: BlueprintStep, parentNodeId: string) {
-        // Handle condition branches
-        if (step.type === 'condition' && step.condition) {
-            const branches = this.extractConditionBranches(step.condition);
-            branches.forEach(branch => {
-                const branchSteps = step.condition[branch.stepsKey || branch.handle]; 
-                if (branchSteps && branchSteps.length > 0) {
-                    console.log(`🌿 Processing branch '${branch.label}' with ${branchSteps.length} steps`);
-                    const firstBranchNodeId = `branch-${branch.handle}-${this.nodeIndex++}`;
-                    const firstBranchNode = this.createEnhancedNodeForStep(branchSteps[0], firstBranchNodeId);
-                    this.nodes.push(firstBranchNode);
-                    this.createEdge(parentNodeId, firstBranchNodeId, branch.handle, 'target');
-
-                    this.processAllSteps(branchSteps.slice(1), firstBranchNodeId, true);
-                }
-            });
-        }
-        
-        // Handle loop steps
-        if (step.type === 'loop' && step.loop?.steps) {
-            console.log('🔄 Processing loop with', step.loop.steps.length, 'steps');
-            this.processAllSteps(step.loop.steps, parentNodeId, true);
-        }
-        
-        // Handle retry steps
-        if (step.type === 'retry' && step.retry?.steps) {
-            console.log('🔄 Processing retry with', step.retry.steps.length, 'steps');
-            this.processAllSteps(step.retry.steps, parentNodeId, true);
-        }
-        
-        // Handle fallback steps
-        if (step.type === 'fallback' && step.fallback) {
-            if (step.fallback.primary_steps && step.fallback.primary_steps.length > 0) {
-                console.log('🔄 Processing primary fallback with', step.fallback.primary_steps.length, 'steps');
-                const primaryNodeId = `fallback-primary-${this.nodeIndex++}`;
-                const primaryNode = this.createEnhancedNodeForStep(step.fallback.primary_steps[0], primaryNodeId);
-                this.nodes.push(primaryNode);
-                this.createEdge(parentNodeId, primaryNodeId, 'primary', 'target');
-                this.processAllSteps(step.fallback.primary_steps.slice(1), primaryNodeId, true);
-            }
-            if (step.fallback.fallback_steps && step.fallback.fallback_steps.length > 0) {
-                console.log('🔄 Processing fallback steps with', step.fallback.fallback_steps.length, 'steps');
-                const fallbackNodeId = `fallback-secondary-${this.nodeIndex++}`;
-                const fallbackNode = this.createEnhancedNodeForStep(step.fallback.fallback_steps[0], fallbackNodeId);
-                this.nodes.push(fallbackNode);
-                this.createEdge(parentNodeId, fallbackNodeId, 'fallback', 'target');
-                this.processAllSteps(step.fallback.fallback_steps.slice(1), fallbackNodeId, true);
-            }
-        }
-    }
-
-    private createEdge(source: string, target: string, sourceHandle?: string, targetHandle?: string) {
-        const edgeId = `edge-${source}-${target}${sourceHandle ? `-${sourceHandle}` : ''}`;
-        
-        const edge: DiagramEdge = {
-            id: edgeId,
-            source,
-            target,
-            type: 'smoothstep',
-            animated: true,
-            style: {
-                stroke: this.getEdgeColor(sourceHandle),
-                strokeWidth: 2
-            }
-        };
-        
-        if (sourceHandle) edge.sourceHandle = sourceHandle;
-        if (targetHandle) edge.targetHandle = targetHandle;
-        
-        this.edges.push(edge);
-        console.log('🔗 Created edge:', { source, target, sourceHandle });
-    }
-
-    private getEdgeColor(sourceHandle?: string): string {
-        switch (sourceHandle) {
-            case 'true':
-            case 'yes':
-            case 'success':
-            case 'existing':
-            case 'she': 
-            case 'task':
-            case 'new':
-                return '#10b981'; // Green
-            case 'false':
-            case 'no':
-            case 'error':
-            case 'he': 
-                return '#ef4444'; // Red
-            case 'urgent':
-                return '#ef4444'; // Red
-            case 'followup':
-                return '#f59e0b'; // Amber
-            case 'goat': 
-                return '#8B5CF6'; // Purple for unique cases
-            case 'primary': // For fallback primary path
-                return '#10b981';
-            case 'fallback': // For fallback alternative path
-                return '#f59e0b';
-            default:
-                return '#3b82f6';
-        }
-    }
-
-    private extractPlatform(actionOrTrigger: any): string {
-        if (!actionOrTrigger) return '';
-        
-        return actionOrTrigger.integration || 
-               actionOrTrigger.platform || 
-               actionOrTrigger.service || 
-               actionOrTrigger.provider || 
-               '';
-    }
-
-    private extractConditionBranches(condition: any): Array<{ label: string; handle: string; color: string; stepsKey?: string }> {
-        const branches = [];
-        
-        if (!condition) {
-            return [
-                { label: 'Yes', handle: 'true', color: '#10b981', stepsKey: 'if_true' },
-                { label: 'No', handle: 'false', color: '#ef4444', stepsKey: 'if_false' }
-            ];
-        }
-        
-        // Check for explicit branches as named properties
-        if (condition.if_true) {
-            branches.push({ label: 'True', handle: 'true', color: '#10b981', stepsKey: 'if_true' });
-        }
-        
-        if (condition.if_false) {
-            branches.push({ label: 'False', handle: 'false', color: '#ef4444', stepsKey: 'if_false' });
-        }
-        
-        // Analyze condition expression for specific cases
-        if (condition.expression && typeof condition.expression === 'string') {
-            const expr = condition.expression.toLowerCase();
-            if (expr.includes('name contains she')) {
-                branches.push({ label: 'Name: She', handle: 'she', color: '#10b981', stepsKey: 'if_name_she' });
-            }
-            if (expr.includes('name contains he')) {
-                branches.push({ label: 'Name: He', handle: 'he', color: '#ef4444', stepsKey: 'if_name_he' });
-            }
-            if (expr.includes('name contains goat')) {
-                branches.push({ label: 'Name: Goat', handle: 'goat', color: '#8B5CF6', stepsKey: 'if_name_goat' });
-            }
-            if (expr.includes('urgent')) {
-                branches.push({ label: 'Urgent', handle: 'urgent', color: '#ef4444', stepsKey: 'if_urgent' });
-            }
-            if (expr.includes('task')) {
-                branches.push({ label: 'Task', handle: 'task', color: '#10b981', stepsKey: 'if_task' });
-            }
-            if (expr.includes('follow')) {
-                branches.push({ label: 'Follow-up', handle: 'followup', color: '#f59e0b', stepsKey: 'if_followup' });
-            }
-            if (expr.includes('existing') || expr.includes('found')) {
-                branches.push({ label: 'Existing', handle: 'existing', color: '#3b82f6', stepsKey: 'if_existing' });
-            }
-            if (expr.includes('new') || expr.includes('not found')) {
-                branches.push({ label: 'New', handle: 'new', color: '#10b981', stepsKey: 'if_new' });
-            }
-        }
-        
-        // Filter out duplicate handles
-        const uniqueBranches = Array.from(new Map(branches.map(item => [item.handle, item])).values());
-
-        // Default branches if none found
-        if (uniqueBranches.length === 0) {
-            return [
-                { label: 'Yes', handle: 'true', color: '#10b981', stepsKey: 'if_true' },
-                { label: 'No', handle: 'false', color: '#ef4444', stepsKey: 'if_false' }
-            ];
-        }
-
-        return uniqueBranches;
-    }
+  id: string;
+  source: string;
+  target: string;
+  animated?: boolean;
+  type?: string;
+  style?: Record<string, any>;
+  label?: string;
+  sourceHandle?: string;
+  labelStyle?: Record<string, any>;
+  labelBgStyle?: Record<string, any>;
 }
 
 serve(async (req) => {
-    console.log('🚀 Enhanced Diagram Generator - Request received');
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  try {
+    console.log('🎨 Starting ENHANCED diagram generation with conditional logic support')
     
-    if (req.method === 'OPTIONS') {
-        return new Response(null, { headers: corsHeaders });
+    const { automation_blueprint } = await req.json()
+    
+    if (!automation_blueprint || !automation_blueprint.steps) {
+      console.error('❌ No automation blueprint or steps provided')
+      return new Response(JSON.stringify({ 
+        error: 'No automation blueprint provided',
+        source: 'diagram-generator'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    if (req.method !== 'POST') {
-        return new Response(
-            JSON.stringify({ error: 'Method Not Allowed' }),
-            { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+    console.log('📊 Blueprint analysis:', {
+      totalSteps: automation_blueprint.steps.length,
+      triggerType: automation_blueprint.trigger?.type,
+      version: automation_blueprint.version
+    })
+
+    const nodes: DiagramNode[] = []
+    const edges: DiagramEdge[] = []
+    
+    let yPosition = 100
+    const xSpacing = 400
+    const ySpacing = 200
+    let nodeCounter = 0
+
+    // Helper function to get node type mapping
+    const getNodeType = (step: any): string => {
+      if (step.type === 'condition') return 'conditionNode'
+      if (step.type === 'ai_agent_call' || step.is_recommended) return 'aiAgentNode'
+      if (step.type === 'retry') return 'retryNode'
+      if (step.type === 'fallback') return 'fallbackNode'
+      if (step.type === 'delay') return 'delayNode'
+      if (step.type === 'loop') return 'loopNode'
+      if (step.action?.integration) return 'platformNode'
+      return 'actionNode'
     }
 
-    try {
-        const requestBody = await req.json();
-        const { automation_blueprint } = requestBody;
+    // Helper function to get detailed node data
+    const getNodeData = (step: any) => {
+      const baseData = {
+        label: step.name || 'Automation Step',
+        stepType: step.type,
+        explanation: step.description || generateExplanation(step),
+        isRecommended: Boolean(step.is_recommended)
+      }
 
-        if (!automation_blueprint) {
-            return new Response(
-                JSON.stringify({ error: 'Missing automation blueprint' }),
-                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
+      // Add platform-specific data
+      if (step.action?.integration) {
+        baseData.platform = step.action.integration
+        baseData.action = step.action
+        baseData.stepDetails = step.action
+      }
+
+      // Add condition-specific data
+      if (step.type === 'condition' && step.condition) {
+        baseData.condition = step.condition
+        baseData.branches = generateConditionBranches(step.condition)
+      }
+
+      // Add AI agent data
+      if (step.type === 'ai_agent_call' && step.ai_agent_call) {
+        baseData.agent = step.ai_agent_call
+      }
+
+      // Add retry data
+      if (step.type === 'retry' && step.retry) {
+        baseData.retry = step.retry
+      }
+
+      // Add delay data
+      if (step.type === 'delay' && step.delay) {
+        baseData.delay = step.delay
+      }
+
+      // Add loop data
+      if (step.type === 'loop' && step.loop) {
+        baseData.loop = step.loop
+      }
+
+      return baseData
+    }
+
+    // Helper function to generate explanation
+    const generateExplanation = (step: any): string => {
+      if (step.type === 'condition') {
+        return `Evaluates: ${step.condition?.expression || 'conditional logic'} and routes to different paths based on the result.`
+      }
+      if (step.type === 'ai_agent_call') {
+        return `AI Agent processes: ${step.ai_agent_call?.input_prompt || 'intelligent analysis'} and provides intelligent insights.`
+      }
+      if (step.action?.integration) {
+        return `Performs ${step.action.method || 'action'} in ${step.action.integration} with parameters: ${JSON.stringify(step.action.parameters || {}).substring(0, 100)}`
+      }
+      return `Executes ${step.type} step: ${step.name}`
+    }
+
+    // Helper function to generate condition branches
+    const generateConditionBranches = (condition: any) => {
+      const branches = []
+      
+      if (condition.if_true) {
+        branches.push({
+          label: 'True',
+          handle: 'true',
+          color: '#10b981',
+          stepsKey: 'if_true'
+        })
+      }
+      
+      if (condition.if_false) {
+        branches.push({
+          label: 'False', 
+          handle: 'false',
+          color: '#ef4444',
+          stepsKey: 'if_false'
+        })
+      }
+
+      // For complex conditions, add more specific labels
+      if (condition.expression) {
+        const expr = condition.expression.toLowerCase()
+        if (expr.includes('urgent')) {
+          branches[0] = { ...branches[0], label: 'Urgent' }
+          branches[1] = { ...branches[1], label: 'Normal' }
+        } else if (expr.includes('billing')) {
+          branches[0] = { ...branches[0], label: 'Billing' }
+          branches[1] = { ...branches[1], label: 'Other' }
+        } else if (expr.includes('technical')) {
+          branches[0] = { ...branches[0], label: 'Technical' }
+          branches[1] = { ...branches[1], label: 'Other' }
+        } else if (expr.includes('premium')) {
+          branches[0] = { ...branches[0], label: 'Premium' }
+          branches[1] = { ...branches[1], label: 'Standard' }
+        }
+      }
+      
+      return branches
+    }
+
+    // Process steps recursively to handle conditional branching
+    const processSteps = (steps: any[], parentId: string | null = null, xOffset: number = 0, yStart: number = yPosition): string[] => {
+      const processedNodeIds: string[] = []
+      let currentY = yStart
+
+      for (let i = 0; i < steps.length; i++) {
+        const step = steps[i]
+        nodeCounter++
+        const nodeId = `node-${nodeCounter}`
+        
+        // Create node
+        const node: DiagramNode = {
+          id: nodeId,
+          type: getNodeType(step),
+          position: { x: 200 + xOffset, y: currentY },
+          data: getNodeData(step),
+          sourcePosition: 'right',
+          targetPosition: 'left'
         }
 
-        console.log('📋 Processing enhanced blueprint:', {
-            hasSteps: !!automation_blueprint.steps,
-            stepCount: automation_blueprint.steps?.length || 0,
-            hasTrigger: !!automation_blueprint.trigger,
-            triggerType: automation_blueprint.trigger?.type,
-            stepTypes: automation_blueprint.steps?.map((s: any) => s.type) || []
-        });
+        nodes.push(node)
+        processedNodeIds.push(nodeId)
 
-        // Use enhanced diagram builder
-        const builder = new EnhancedDiagramBuilder(automation_blueprint);
-        const diagramData = builder.build();
+        // Connect to parent if exists
+        if (parentId) {
+          edges.push({
+            id: `edge-${parentId}-${nodeId}`,
+            source: parentId,
+            target: nodeId,
+            type: 'smoothstep',
+            animated: step.is_recommended || false
+          })
+        }
 
-        console.log('✅ Generated enhanced diagram data:', {
-            nodes: diagramData.nodes.length,
-            edges: diagramData.edges.length,
-            nodeTypes: [...new Set(diagramData.nodes.map(n => n.type))],
-            platforms: [...new Set(diagramData.nodes.map(n => n.data?.platform).filter(Boolean))]
-        });
+        // Handle conditional branching
+        if (step.type === 'condition' && step.condition) {
+          let branchY = currentY + ySpacing
+          let branchIndex = 0
 
-        return new Response(JSON.stringify(diagramData), {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+          // Process if_true branch
+          if (step.condition.if_true && Array.isArray(step.condition.if_true)) {
+            console.log(`🔀 Processing TRUE branch for condition: ${step.name}`)
+            const trueBranchIds = processSteps(
+              step.condition.if_true, 
+              nodeId, 
+              xOffset + xSpacing, 
+              branchY
+            )
+            
+            // Connect condition to first node of true branch
+            if (trueBranchIds.length > 0) {
+              edges.push({
+                id: `edge-${nodeId}-true-${trueBranchIds[0]}`,
+                source: nodeId,
+                target: trueBranchIds[0],
+                sourceHandle: 'true',
+                type: 'smoothstep',
+                label: 'True',
+                labelStyle: { fill: '#10b981', fontWeight: 'bold' },
+                labelBgStyle: { fill: '#10b98120' },
+                style: { stroke: '#10b981', strokeWidth: 2 }
+              })
+            }
+            
+            branchY += (trueBranchIds.length * ySpacing) + ySpacing
+            branchIndex++
+          }
 
-    } catch (error) {
-        console.error('💥 Error in enhanced diagram generator:', error);
-        return new Response(
-            JSON.stringify({
-                error: error.message || 'Enhanced diagram generation failed',
-                details: error.toString()
-            }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+          // Process if_false branch
+          if (step.condition.if_false && Array.isArray(step.condition.if_false)) {
+            console.log(`🔀 Processing FALSE branch for condition: ${step.name}`)
+            const falseBranchIds = processSteps(
+              step.condition.if_false, 
+              nodeId, 
+              xOffset + xSpacing, 
+              branchY
+            )
+            
+            // Connect condition to first node of false branch
+            if (falseBranchIds.length > 0) {
+              edges.push({
+                id: `edge-${nodeId}-false-${falseBranchIds[0]}`,
+                source: nodeId,
+                target: falseBranchIds[0],
+                sourceHandle: 'false',
+                type: 'smoothstep',
+                label: 'False',
+                labelStyle: { fill: '#ef4444', fontWeight: 'bold' },
+                labelBgStyle: { fill: '#ef444420' },
+                style: { stroke: '#ef4444', strokeWidth: 2 }
+              })
+            }
+          }
+
+          currentY = branchY + ySpacing
+        }
+        // Handle retry logic
+        else if (step.type === 'retry' && step.retry?.steps) {
+          console.log(`🔄 Processing RETRY steps for: ${step.name}`)
+          const retryIds = processSteps(
+            step.retry.steps,
+            nodeId,
+            xOffset + xSpacing,
+            currentY + ySpacing
+          )
+          
+          // Connect retry to its steps
+          if (retryIds.length > 0) {
+            edges.push({
+              id: `edge-${nodeId}-retry-${retryIds[0]}`,
+              source: nodeId,
+              target: retryIds[0],
+              type: 'smoothstep',
+              label: 'Retry',
+              labelStyle: { fill: '#f59e0b', fontWeight: 'bold' },
+              style: { stroke: '#f59e0b', strokeWidth: 2, strokeDasharray: '5,5' }
+            })
+          }
+          
+          currentY += (retryIds.length * ySpacing) + ySpacing
+        }
+        // Handle loop logic
+        else if (step.type === 'loop' && step.loop?.steps) {
+          console.log(`🔁 Processing LOOP steps for: ${step.name}`)
+          const loopIds = processSteps(
+            step.loop.steps,
+            nodeId,
+            xOffset + xSpacing,
+            currentY + ySpacing
+          )
+          
+          // Connect loop to its steps
+          if (loopIds.length > 0) {
+            edges.push({
+              id: `edge-${nodeId}-loop-${loopIds[0]}`,
+              source: nodeId,  
+              target: loopIds[0],
+              type: 'smoothstep',
+              label: 'Loop',
+              labelStyle: { fill: '#8b5cf6', fontWeight: 'bold' },
+              style: { stroke: '#8b5cf6', strokeWidth: 2 }
+            })
+          }
+          
+          currentY += (loopIds.length * ySpacing) + ySpacing
+        }
+        else {
+          currentY += ySpacing
+        }
+
+        // Connect sequential nodes (non-branching)
+        if (i < steps.length - 1 && step.type !== 'condition' && step.type !== 'retry' && step.type !== 'loop') {
+          // Will be connected to next node in sequence
+        }
+      }
+
+      return processedNodeIds
     }
-});
+
+    // Add trigger node if trigger exists
+    if (automation_blueprint.trigger) {
+      const triggerNode: DiagramNode = {
+        id: 'trigger-node',
+        type: 'triggerNode',
+        position: { x: 200, y: 50 },
+        data: {
+          label: `${automation_blueprint.trigger.type?.toUpperCase() || 'MANUAL'} TRIGGER`,
+          stepType: 'trigger',
+          explanation: `Automation starts when ${automation_blueprint.trigger.type || 'manually triggered'}`,
+          trigger: automation_blueprint.trigger
+        },
+        sourcePosition: 'right',
+        targetPosition: 'left'
+      }
+      
+      nodes.push(triggerNode)
+      
+      // Process main steps starting from trigger
+      const mainStepIds = processSteps(automation_blueprint.steps, 'trigger-node', 0, yPosition)
+      
+      console.log(`✅ Processed ${mainStepIds.length} main steps from trigger`)
+    } else {
+      // Process steps without trigger
+      const mainStepIds = processSteps(automation_blueprint.steps, null, 0, yPosition)
+      console.log(`✅ Processed ${mainStepIds.length} steps without trigger`)
+    }
+
+    // Add AI agent recommendation nodes
+    const aiAgentSteps = automation_blueprint.steps.filter((step: any) => step.is_recommended || step.type === 'ai_agent_call')
+    console.log(`🤖 Found ${aiAgentSteps.length} AI agent recommendations`)
+
+    // Ensure proper connections between sequential steps
+    for (let i = 0; i < nodes.length - 1; i++) {
+      const currentNode = nodes[i]
+      const nextNode = nodes[i + 1]
+      
+      // Skip if this is a condition node (already handled) or if edge already exists
+      if (currentNode.type === 'conditionNode' || 
+          edges.some(edge => edge.source === currentNode.id && edge.target === nextNode.id)) {
+        continue
+      }
+      
+      // Create sequential connection
+      if (currentNode.id.includes('node-') && nextNode.id.includes('node-')) {
+        const currentIndex = parseInt(currentNode.id.split('-')[1])
+        const nextIndex = parseInt(nextNode.id.split('-')[1])
+        
+        if (nextIndex === currentIndex + 1) {
+          edges.push({
+            id: `edge-seq-${currentNode.id}-${nextNode.id}`,
+            source: currentNode.id,
+            target: nextNode.id,
+            type: 'smoothstep'
+          })
+        }
+      }
+    }
+
+    console.log('🎨 ENHANCED diagram generation completed!', {
+      totalNodes: nodes.length,
+      totalEdges: edges.length,
+      conditionNodes: nodes.filter(n => n.type === 'conditionNode').length,
+      aiAgentNodes: nodes.filter(n => n.data.isRecommended).length,
+      retryNodes: nodes.filter(n => n.type === 'retryNode').length,
+      platformNodes: nodes.filter(n => n.type === 'platformNode').length
+    })
+
+    const result = {
+      nodes,
+      edges,
+      metadata: {
+        totalSteps: automation_blueprint.steps.length,
+        conditionalBranches: nodes.filter(n => n.type === 'conditionNode').length,
+        aiAgentRecommendations: nodes.filter(n => n.data.isRecommended).length,
+        platforms: [...new Set(nodes.map(n => n.data.platform).filter(Boolean))],
+        generatedAt: new Date().toISOString()
+      }
+    }
+
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+
+  } catch (error) {
+    console.error('💥 Error in ENHANCED diagram generation:', error)
+    
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      source: 'diagram-generator',
+      timestamp: new Date().toISOString()
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+})

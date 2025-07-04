@@ -18,6 +18,9 @@ import '@xyflow/react/dist/style.css';
 import { Button } from '@/components/ui/button';
 import { 
   RefreshCw, 
+  Maximize2, 
+  Download, 
+  Settings, 
   AlertCircle,
   CheckCircle,
   Loader2,
@@ -70,6 +73,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   const { toast } = useToast();
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [diagramError, setDiagramError] = useState<string | null>(null);
   const [diagramStats, setDiagramStats] = useState({
     totalNodes: 0,
@@ -183,62 +187,162 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     [setEdges]
   );
 
-  // Always show fullscreen diagram without headers
+  const handleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+  };
+
+  const handleDownload = () => {
+    toast({
+      title: "Download Started",
+      description: "Diagram download functionality will be available soon.",
+    });
+  };
+
+  // Empty state when no data
+  if (!automationBlueprint && !automationDiagramData) {
+    return (
+      <Card className="h-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="w-5 h-5" />
+            Automation Diagram
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center h-64">
+          <div className="text-center text-gray-500">
+            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+            <p className="text-lg font-medium">No automation configured</p>
+            <p className="text-sm">Create an automation to see its visual workflow</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <div className="h-full w-full bg-gradient-to-br from-gray-50 to-blue-50">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        nodeTypes={nodeTypes}
-        connectionMode={ConnectionMode.Loose}
-        fitView
-        fitViewOptions={{
-          padding: 0.2,
-          minZoom: 0.1,
-          maxZoom: 1.5
-        }}
-        defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
-        attributionPosition="bottom-left"
-        className="bg-gradient-to-br from-gray-50 to-blue-50"
-        panOnScroll
-        panOnDrag={[1, 2]}
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background 
-          variant={BackgroundVariant.Dots}
-          gap={12} 
-          size={3}
-          color="#1e293b"
-          style={{ opacity: 0.4 }}
-        />
-        <Controls 
-          position="bottom-right"
-          showInteractive={false}
-          style={{ 
-            right: '20px',
-            bottom: '20px'
-          }}
-        />
-        <MiniMap 
-          nodeStrokeColor="#374151"
-          nodeColor="#f3f4f6"
-          nodeBorderRadius={8}
-          maskColor="rgba(0, 0, 0, 0.2)"
-          position="bottom-right"
-          pannable
-          zoomable
-          style={{
-            right: '20px',
-            bottom: '80px',
-            width: '200px',
-            height: '120px'
-          }}
-        />
-      </ReactFlow>
-    </div>
+    <Card className={`${isFullscreen ? 'fixed inset-0 z-50' : 'h-full'} overflow-hidden`}>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-blue-600" />
+              Automation Flow Diagram
+            </CardTitle>
+            
+            {/* Diagram Statistics */}
+            <div className="flex items-center gap-2 ml-4">
+              <Badge variant="outline" className="text-xs">
+                {diagramStats.totalNodes} nodes
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                {diagramStats.totalEdges} connections
+              </Badge>
+              {diagramStats.conditionNodes > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {diagramStats.conditionNodes} conditions
+                </Badge>
+              )}
+              {diagramStats.aiAgentNodes > 0 && (
+                <Badge variant="default" className="text-xs bg-emerald-500">
+                  {diagramStats.aiAgentNodes} AI agents
+                </Badge>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {/* Regenerate Button */}
+            <Button
+              onClick={onRegenerateDiagram}
+              disabled={isGenerating || !automationBlueprint}
+              size="sm"
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              {isGenerating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+              {isGenerating ? 'Generating...' : 'Regenerate'}
+            </Button>
+            
+            <Button onClick={handleDownload} size="sm" variant="outline">
+              <Download className="w-4 h-4" />
+            </Button>
+            <Button onClick={handleFullscreen} size="sm" variant="outline">
+              <Maximize2 className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+        
+        {/* Status Indicator */}
+        <div className="flex items-center gap-2 text-sm">
+          {diagramError ? (
+            <div className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="w-4 h-4" />
+              <span>{diagramError}</span>
+            </div>
+          ) : isGenerating ? (
+            <div className="flex items-center gap-2 text-blue-600">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Generating enhanced diagram with AI recommendations...</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-green-600">
+              <CheckCircle className="w-4 h-4" />
+              <span>Diagram ready - Click nodes to expand details</span>
+            </div>
+          )}
+        </div>
+      </CardHeader>
+      
+      <CardContent className="p-0 h-full">
+        <div className={`${isFullscreen ? 'h-screen' : 'h-96'} w-full`}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            nodeTypes={nodeTypes}
+            connectionMode={ConnectionMode.Loose}
+            fitView
+            fitViewOptions={{
+              padding: 0.2,
+              minZoom: 0.1,
+              maxZoom: 1.5
+            }}
+            defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+            attributionPosition="bottom-left"
+            className="bg-gradient-to-br from-gray-50 to-blue-50"
+            panOnScroll
+            selectionOnDrag
+            panOnDrag={[1, 2]}
+          >
+            <Background 
+              variant={BackgroundVariant.Dots}
+              gap={20} 
+              size={1}
+              color="#e2e8f0"
+            />
+            <Controls 
+              position="bottom-right"
+              showInteractive={false}
+            />
+            <MiniMap 
+              nodeStrokeColor="#374151"
+              nodeColor="#f3f4f6"
+              nodeBorderRadius={8}
+              maskColor="rgba(0, 0, 0, 0.2)"
+              position="top-right"
+              pannable
+              zoomable
+            />
+          </ReactFlow>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

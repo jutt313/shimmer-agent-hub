@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ReactFlow, 
@@ -18,20 +17,12 @@ import {
 import '@xyflow/react/dist/style.css';
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Zap, AlertCircle, RefreshCw, Eye, EyeOff, LayoutTemplate } from 'lucide-react';
+import { Sparkles, Zap, AlertCircle, RefreshCw, Eye, EyeOff, LayoutTemplate, FileJson } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
-// Import enhanced node components
-import ActionNode from './diagram/ActionNode';
-import PlatformNode from './diagram/PlatformNode';
-import DynamicConditionNode from './diagram/DynamicConditionNode';
-import LoopNode from './diagram/LoopNode';
-import DelayNode from './diagram/DelayNode';
-import AIAgentNode from './diagram/AIAgentNode';
-import RetryNode from './diagram/RetryNode';
-import FallbackNode from './diagram/FallbackNode';
-import TriggerNode from './diagram/TriggerNode';
-import PlatformTriggerNode from './diagram/PlatformTriggerNode';
+// Import consolidated node component and JSON debug modal
+import CustomNodeMapper from './diagram/CustomNodeMapper';
+import JsonDebugModal from './diagram/JsonDebugModal';
 import { AutomationBlueprint } from "@/types/automation";
 
 interface AutomationDiagramDisplayProps {
@@ -45,19 +36,19 @@ interface AutomationDiagramDisplayProps {
   onRegenerateDiagram?: () => void;
 }
 
-// Enhanced Node Types Mapping
+// Enhanced Node Types Mapping - now using single CustomNodeMapper
 const nodeTypes = {
-  actionNode: ActionNode,
-  platformNode: PlatformNode,
-  conditionNode: DynamicConditionNode,
-  loopNode: LoopNode,
-  delayNode: DelayNode,
-  aiAgentNode: AIAgentNode,
-  retryNode: RetryNode,
-  fallbackNode: FallbackNode,
-  triggerNode: TriggerNode,
-  platformTriggerNode: PlatformTriggerNode,
-  default: ActionNode
+  actionNode: CustomNodeMapper,
+  platformNode: CustomNodeMapper,
+  conditionNode: CustomNodeMapper,
+  loopNode: CustomNodeMapper,
+  delayNode: CustomNodeMapper,
+  aiAgentNode: CustomNodeMapper,
+  retryNode: CustomNodeMapper,
+  fallbackNode: CustomNodeMapper,
+  triggerNode: CustomNodeMapper,
+  platformTriggerNode: CustomNodeMapper,
+  default: CustomNodeMapper
 };
 
 // Enhanced Layouting with better positioning
@@ -223,6 +214,8 @@ const DiagramFlow: React.FC<{
   diagramError: string | null;
   onRegenerateDiagram?: () => void;
   onLayout: () => void;
+  automationBlueprint?: AutomationBlueprint | null;
+  automationDiagramData?: { nodes: Node[]; edges: Edge[]; warning?: string } | null;
 }> = ({
   nodes,
   edges,
@@ -234,9 +227,12 @@ const DiagramFlow: React.FC<{
   setShowDetails,
   diagramError,
   onRegenerateDiagram,
-  onLayout
+  onLayout,
+  automationBlueprint,
+  automationDiagramData
 }) => {
   const { fitView } = useReactFlow();
+  const [showJsonDebug, setShowJsonDebug] = useState(false);
 
   useEffect(() => {
     if (nodes.length > 0) {
@@ -285,6 +281,16 @@ const DiagramFlow: React.FC<{
         </div>
 
         <div className="flex gap-2">
+          <Button 
+            onClick={() => setShowJsonDebug(true)}
+            size="sm"
+            variant="outline"
+            className="bg-white/90 hover:bg-white text-gray-700 shadow-sm"
+          >
+            <FileJson className="w-3 h-3 mr-1" />
+            JSON
+          </Button>
+          
           <Button 
             onClick={onLayout}
             size="sm"
@@ -428,6 +434,14 @@ const DiagramFlow: React.FC<{
           pannable
         />
       </ReactFlow>
+
+      {/* JSON Debug Modal */}
+      <JsonDebugModal
+        isOpen={showJsonDebug}
+        onClose={() => setShowJsonDebug(false)}
+        diagramData={automationDiagramData}
+        blueprintData={automationBlueprint}
+      />
     </div>
   );
 };
@@ -444,7 +458,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   onRegenerateDiagram
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [edges, setEdges, onEdgesState] = useEdgesState([]);
   const [aiAgentRecommendations, setAiAgentRecommendations] = useState<any[]>([]);
   const [diagramError, setDiagramError] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
@@ -769,6 +783,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           diagramError={diagramError}
           onRegenerateDiagram={onRegenerateDiagram}
           onLayout={onLayout}
+          automationBlueprint={automationBlueprint}
+          automationDiagramData={automationDiagramData}
         />
       </ReactFlowProvider>
     </Card>

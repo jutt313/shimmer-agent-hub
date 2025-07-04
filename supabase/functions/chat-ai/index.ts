@@ -1,4 +1,5 @@
 
+import "https://deno.land/x/xhr@0.1.0/mod.ts"
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -25,7 +26,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🔄 Processing chat request with universal knowledge integration')
+    console.log('🔄 Processing chat request')
     
     const { message, messages = [], automationId, automationContext } = await req.json()
     
@@ -33,8 +34,8 @@ serve(async (req) => {
       throw new Error('Message is required')
     }
 
-    console.log('📚 Conversation history length:', messages.length)
-    console.log('🔧 Automation context:', automationId)
+    console.log('📚 Processing message:', message.substring(0, 100) + '...')
+    console.log('🔧 Messages history length:', messages.length)
 
     // Get universal knowledge as separate memory
     console.log('🔍 Accessing universal knowledge store...')
@@ -80,7 +81,7 @@ ${generalKnowledge}
 `;
     }
 
-    console.log('📖 Universal knowledge memory length:', universalKnowledgeMemory.length);
+    console.log('📖 Universal knowledge memory prepared');
 
     // Your exact system prompt
     const systemPrompt = `You are YusrAI, the world's most advanced automation architect with access to a universal knowledge store.
@@ -286,32 +287,20 @@ Current automation context: ${JSON.stringify(automationContext)}`
       throw new Error('No response from OpenAI')
     }
 
-    console.log('✅ Received OpenAI response, parsing JSON...')
+    console.log('✅ Received OpenAI response')
 
     // Parse JSON response
     let parsedResponse
     try {
       parsedResponse = JSON.parse(aiResponse)
       console.log('✅ JSON validation successful')
-
-      // Handle clarification-only responses
-      if (parsedResponse.clarification_questions && parsedResponse.clarification_questions.length > 0) {
-        console.log('🔍 Detected clarification questions. Returning clarification-only response.')
-        const clarificationOnlyResponse = {
-          clarification_questions: parsedResponse.clarification_questions,
-          recheck_status: "awaiting_clarification_response"
-        };
-        return new Response(JSON.stringify(clarificationOnlyResponse), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
       
     } catch (parseError) {
       console.error('❌ JSON parse error:', parseError)
-      console.error('❌ Raw OpenAI response:', aiResponse)
+      console.error('❌ Raw OpenAI response:', aiResponse.substring(0, 500))
       
-      // Fallback response structure
-      const fallbackResponse = {
+      // Return a structured fallback response instead of throwing
+      parsedResponse = {
         summary: "I understand your automation request and I'm processing the platform requirements.",
         steps: [
           "Step 1: Analyze your automation requirements",
@@ -347,53 +336,20 @@ Current automation context: ${JSON.stringify(automationContext)}`
         is_update: false,
         recheck_status: "processing_with_universal_knowledge"
       }
+    }
 
-      return new Response(JSON.stringify(fallbackResponse), {
+    // Handle clarification-only responses
+    if (parsedResponse.clarification_questions && parsedResponse.clarification_questions.length > 0) {
+      console.log('🔍 Detected clarification questions. Returning clarification-only response.')
+      const clarificationOnlyResponse = {
+        clarification_questions: parsedResponse.clarification_questions,
+        recheck_status: "awaiting_clarification_response"
+      };
+      return new Response(JSON.stringify(clarificationOnlyResponse), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      });
     }
 
-    // Structure response
-    const structuredResponse = {
-      summary: parsedResponse.summary || "Comprehensive automation analysis with complete platform credential requirements",
-      steps: Array.isArray(parsedResponse.steps) ? parsedResponse.steps : [],
-      platforms: Array.isArray(parsedResponse.platforms) ? parsedResponse.platforms.map(platform => ({
-        name: platform.name || 'Unknown Platform',
-        credentials: Array.isArray(platform.credentials) ? platform.credentials.map(cred => ({
-          field: cred.field || 'api_key',
-          placeholder: cred.placeholder || 'Enter complete credential value',
-          link: cred.link || '#',
-          why_needed: cred.why_needed || 'Required for complete platform integration - never simplified'
-        })) : []
-      })) : [],
-      platforms_to_remove: Array.isArray(parsedResponse.platforms_to_remove) ? parsedResponse.platforms_to_remove : [],
-      agents: Array.isArray(parsedResponse.agents) ? parsedResponse.agents.map(agent => ({
-        name: agent.name || 'AutomationAgent',
-        role: agent.role || 'Platform integration specialist with complete credential access',
-        goal: agent.goal || 'Build comprehensive automations with all required platform credentials',
-        rules: agent.rules || 'Always collect ALL platform credentials, never simplify requirements',
-        memory: agent.memory || 'Universal knowledge store access with complete credential requirements',
-        why_needed: agent.why_needed || 'Essential for comprehensive automation solutions with complete platform setup'
-      })) : [],
-      clarification_questions: Array.isArray(parsedResponse.clarification_questions) ? parsedResponse.clarification_questions : [],
-      automation_blueprint: parsedResponse.automation_blueprint || {
-        version: "1.0.0",
-        description: "Universal knowledge integrated automation with complete credential requirements",
-        trigger: { type: "manual" },
-        steps: [],
-        variables: {}
-      },
-      conversation_updates: {
-        ...parsedResponse.conversation_updates,
-        universal_knowledge_applied: `Applied ${universalKnowledge?.length || 0} universal knowledge entries`,
-        credential_requirements_enforced: "Complete credential collection enforced, no simplification allowed"
-      },
-      is_update: Boolean(parsedResponse.is_update),
-      recheck_status: parsedResponse.recheck_status || "universal_knowledge_integration_complete"
-    }
-
-    console.log('🎯 Returning structured response with enhanced universal knowledge and credential requirements')
-    
     // Update universal knowledge usage
     if (universalKnowledge && universalKnowledge.length > 0) {
       console.log(`📈 Updating usage count for ${universalKnowledge.length} universal knowledge entries`);
@@ -409,7 +365,9 @@ Current automation context: ${JSON.stringify(automationContext)}`
       console.log('✅ Successfully updated all universal knowledge usage counts');
     }
 
-    return new Response(JSON.stringify(structuredResponse), {
+    console.log('🎯 Returning final response');
+    
+    return new Response(JSON.stringify(parsedResponse), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 
@@ -427,7 +385,7 @@ Current automation context: ${JSON.stringify(automationContext)}`
       platforms: [],
       platforms_to_remove: [],
       agents: [{
-        name: "ErrorRecoveryAgentWithCompleteCredentials",
+        name: "ErrorRecoveryAgent",
         role: "Error handling specialist with comprehensive credential collection",
         goal: "Recover from errors while ensuring complete platform credential requirements",
         rules: "Always collect ALL platform credentials, provide helpful error messages, never simplify requirements",

@@ -72,13 +72,18 @@ export class ChatAIConnectionService {
         dataType: typeof data,
         hasSummary: !!data?.summary,
         stepsCount: data?.steps?.length || 0,
-        platformsCount: data?.platforms?.length || 0
+        platformsCount: data?.platforms?.length || 0,
+        rawDataPreview: JSON.stringify(data).substring(0, 200)
       });
 
-      // Process the response - handle both structured and simple responses
+      // Enhanced response processing
       let responseText = "I'm here to help you build comprehensive automations.";
+      let structuredData = null;
       
       if (data && typeof data === 'object') {
+        // Store the entire structured data
+        structuredData = data;
+        
         // Handle clarification-only responses
         if (data.clarification_questions && Array.isArray(data.clarification_questions) && data.clarification_questions.length > 0) {
           responseText = "I need some clarification:\n\n" + 
@@ -92,14 +97,24 @@ export class ChatAIConnectionService {
         else if (typeof data === 'string') {
           responseText = data;
         }
+        // Handle case where data exists but no summary
+        else if (data.steps && Array.isArray(data.steps)) {
+          responseText = "I've created an automation plan for you with " + data.steps.length + " steps.";
+        }
       } else if (typeof data === 'string') {
         responseText = data;
       }
 
+      console.log('📤 Final response processing:', {
+        responseText: responseText.substring(0, 100),
+        hasStructuredData: !!structuredData,
+        structuredDataKeys: structuredData ? Object.keys(structuredData) : []
+      });
+
       return {
         response: responseText,
         requiresAuth: false,
-        structuredData: data
+        structuredData: structuredData
       };
 
     } catch (error) {

@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useMemo } from "react";
 import { Send, Bot } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -6,7 +7,7 @@ import AIAgentForm from "@/components/AIAgentForm";
 import SettingsDropdown from "@/components/SettingsDropdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useErrorRecovery } from "@/hooks/useErrorRecovery";
 import { useAsyncOperation } from "@/hooks/useAsyncOperation";
@@ -85,17 +86,32 @@ const Index = () => {
         additionalContext: `Message: "${currentMessage}"`
       });
 
-      // Handle the response from ChatAIConnectionService
-      let responseText = "I apologize, but I couldn't process your request properly. Please try again.";
+      // Enhanced response handling - prevent null display
+      let responseText = "I'm here to help you build comprehensive automations.";
       let structuredData = null;
       
       if (result && typeof result === 'object') {
-        if (result.response && typeof result.response === 'string') {
+        console.log('🔍 Processing result:', result);
+        
+        if (result.response && typeof result.response === 'string' && result.response.trim() !== 'null') {
           responseText = result.response;
+        } else if (result.structuredData) {
+          // If response is null but we have structured data, use summary
+          if (result.structuredData.summary) {
+            responseText = result.structuredData.summary;
+          } else if (result.structuredData.steps && result.structuredData.steps.length > 0) {
+            responseText = "I've created an automation plan with " + result.structuredData.steps.length + " steps.";
+          }
         }
+        
         if (result.structuredData) {
           structuredData = result.structuredData;
         }
+      }
+      
+      // Final safety check - never display "null"
+      if (!responseText || responseText.trim() === '' || responseText.toLowerCase() === 'null') {
+        responseText = "I'm processing your request. Let me help you create a comprehensive automation.";
       }
       
       const botResponse = {
@@ -105,6 +121,11 @@ const Index = () => {
         timestamp: new Date(),
         structuredData: structuredData
       };
+      
+      console.log('📤 Adding bot response:', {
+        text: botResponse.text.substring(0, 100),
+        hasStructuredData: !!botResponse.structuredData
+      });
       
       setMessages(prev => [...prev, botResponse]);
 

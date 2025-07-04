@@ -113,11 +113,16 @@ ${knowledgeContext}
 MANDATORY RESPONSE REQUIREMENTS:
 
 You MUST provide detailed automation information including:
-- **Comprehensive Platform Setup & Credential Information:** For EVERY platform used, provide its name and a 'credentials' array. This array MUST include not just authentication fields (field, placeholder, link, why_needed) but also essential operational identifiers (e.g., Spreadsheet ID, Channel ID, Project ID) that are part of the platform's initial setup. If specific fields are not in the supplementary database, infer common credential/identifier types (e.g., "OAuth 2.0 Token", "API Key", "Bearer Token", "Spreadsheet ID", "Channel ID") from your core knowledge and provide them.
+- **Comprehensive Platform Setup & Credential Information:** For EVERY platform used, provide its name and a 'credentials' array. This array MUST include not just authentication fields (field, placeholder, link, why_needed) but also essential operational identifiers (e.g., Spreadsheet ID, Channel ID, Project ID, Database Name, List ID, User Email, Google Sheet Name, Slack Channel Name, Notion Database ID) that are part of the platform's initial setup. DO NOT simplify or omit any necessary credential/identifier. If specific fields are not in the supplementary database, infer common credential/identifier types (e.g., "OAuth 2.0 Token", "API Key", "Bearer Token", "Spreadsheet ID", "Channel ID") from your core knowledge and provide them.
 - **Specific Platform Capabilities and Use Cases.**
 - **Proper API Configuration Details.**
 - **Real Implementation Examples where applicable.**
-- **All Necessary Dynamic Parameters:** For actions requiring *dynamic runtime inputs* not explicitly mentioned by the user (e.g., values that change with each automation run, like "task name from row data"), you MUST identify these and generate precise clarification questions for them. Questions about static setup identifiers (like Sheet ID, Channel ID) should NOT be in clarification_questions but in the 'platforms' array.
+- **All Necessary Dynamic Parameters:** For actions requiring *dynamic runtime inputs* not explicitly mentioned by the user (e.g., values that change with each automation run, like "task name from row data"), you MUST identify these and generate precise clarification questions for them.
+
+CRITICAL CLARIFICATION QUESTION BEHAVIOR:
+- If the `clarification_questions` array is NOT empty, you MUST ONLY return the `clarification_questions` array and set `recheck_status` to `"awaiting_clarification_response"`. In this case, DO NOT return `summary`, `steps`, `platforms`, `agents`, or `automation_blueprint`.
+- ONLY once all clarification questions have been answered in subsequent turns, should you then return the full step-by-step summary, platforms, agents, and automation blueprint.
+- Questions about static setup identifiers (like Gmail address, Google sheet sheet name, Slack channel, Notion Database ID, etc.) should **NEVER** be in `clarification_questions` but **MUST** be in the 'platforms' array as 'Operational Identifiers'. `clarification_questions` are strictly for dynamic runtime parameters.
 
 CRITICAL THINKING PROCESS - FOLLOW EXACTLY:
 
@@ -130,7 +135,7 @@ CRITICAL THINKING PROCESS - FOLLOW EXACTLY:
    - Identify all platforms/services required for each atomic step.
    - For each platform, list ALL necessary setup parameters:
      - Authentication credentials (e.g., API Key, OAuth Token).
-     - Essential operational identifiers (e.g., Spreadsheet ID, Channel ID, Project ID, Database Name, List ID) that are needed for the platform to function in this specific automation context.
+     - Essential operational identifiers (e.g., Spreadsheet ID, Channel ID, Project ID, Database Name, List ID, User Email, Google Sheet Name, Slack Channel Name, Notion Database ID) that are needed for the platform to function in this specific automation context. DO NOT simplify or omit any necessary credential/identifier.
    - Populate the platforms array with these details. If the supplementary database doesn't provide a specific field, infer the common type from your core knowledge.
    - **Crucially: NEVER state "no specific credentials required" unless a platform truly has NO authentication or setup identifiers for the stated operation.**
 
@@ -290,6 +295,19 @@ Current automation context: ${JSON.stringify(automationContext)}`
     try {
       parsedResponse = JSON.parse(aiResponse)
       console.log('✅ JSON validation successful')
+
+      // --- START: New logic for handling clarification-only responses ---
+      if (parsedResponse.clarification_questions && parsedResponse.clarification_questions.length > 0) {
+        console.log('Detected clarification questions. Returning only clarification_questions and recheck_status.')
+        const clarificationOnlyResponse = {
+          clarification_questions: parsedResponse.clarification_questions,
+          recheck_status: "awaiting_clarification_response" // New status for this state
+        };
+        return new Response(JSON.stringify(clarificationOnlyResponse), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      // --- END: New logic for handling clarification-only responses ---
       
       // Log knowledge integration success metrics
       console.log('📊 Knowledge Integration Metrics:', {
@@ -314,11 +332,11 @@ Current automation context: ${JSON.stringify(automationContext)}`
         platforms_to_remove: Array.isArray(parsedResponse.platforms_to_remove) ? parsedResponse.platforms_to_remove : [],
         agents: Array.isArray(parsedResponse.agents) ? parsedResponse.agents.map(agent => ({
           name: agent.name || 'AutomationAgent',
-          role: agent.role || 'Automation assistant with platform knowledge',
-          goal: agent.goal || 'Specific objective referencing platform capabilities',
-          rules: agent.rules || 'Follow automation best practices and platform constraints',
+          role: agent.role || 'Platform integration specialist with access to comprehensive knowledge database', // Updated default role
+          goal: agent.goal || 'Leverage stored platform knowledge to build perfect automations', // Updated default goal
+          rules: agent.rules || 'Use exact credential requirements from knowledge database and prioritize platforms with complete integration details', // Updated default rules
           memory: agent.memory || 'Remember automation context and platform configurations',
-          why_needed: agent.why_needed || 'Essential for automation execution with platform knowledge'
+          why_needed: agent.why_needed || 'Essential for utilizing the comprehensive platform knowledge database effectively' // Updated default why_needed
         })) : [],
         clarification_questions: Array.isArray(parsedResponse.clarification_questions) ? parsedResponse.clarification_questions : [],
         automation_blueprint: parsedResponse.automation_blueprint || {

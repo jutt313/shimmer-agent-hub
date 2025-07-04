@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Sparkles, Zap, AlertCircle, RefreshCw, Eye, EyeOff, LayoutTemplate, FileJson } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
-// Import consolidated node component and JSON debug modal
+// Import ONLY the consolidated node component and JSON debug modal
 import CustomNodeMapper from './diagram/CustomNodeMapper';
 import JsonDebugModal from './diagram/JsonDebugModal';
 import { AutomationBlueprint } from "@/types/automation";
@@ -36,11 +36,13 @@ interface AutomationDiagramDisplayProps {
   onRegenerateDiagram?: () => void;
 }
 
-// Enhanced Node Types Mapping - now using single CustomNodeMapper
+// SINGLE NODE TYPE MAPPING - Everything uses CustomNodeMapper
 const nodeTypes = {
+  // All node types point to the same CustomNodeMapper component
   actionNode: CustomNodeMapper,
   platformNode: CustomNodeMapper,
   conditionNode: CustomNodeMapper,
+  dynamicConditionNode: CustomNodeMapper,
   loopNode: CustomNodeMapper,
   delayNode: CustomNodeMapper,
   aiAgentNode: CustomNodeMapper,
@@ -236,7 +238,7 @@ const DiagramFlow: React.FC<{
 
   useEffect(() => {
     if (nodes.length > 0) {
-      console.log('🔍 Fitting view for', nodes.length, 'enhanced nodes');
+      console.log('🔍 Fitting view for', nodes.length, 'nodes with CustomNodeMapper');
       const timer = setTimeout(() => {
         fitView({ 
           padding: 0.2, 
@@ -362,7 +364,7 @@ const DiagramFlow: React.FC<{
         </div>
       )}
 
-      {/* Enhanced React Flow */}
+      {/* Enhanced React Flow with ONLY CustomNodeMapper */}
       <ReactFlow
         nodes={nodes}
         edges={edges}

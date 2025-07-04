@@ -458,7 +458,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   onRegenerateDiagram
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesState] = useEdgesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [aiAgentRecommendations, setAiAgentRecommendations] = useState<any[]>([]);
   const [diagramError, setDiagramError] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);

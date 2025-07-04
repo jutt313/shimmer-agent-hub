@@ -8,6 +8,7 @@ import {
   useEdgesState, 
   Controls, 
   Background, 
+  BackgroundVariant,
   MiniMap,
   ConnectionMode,
   addEdge,
@@ -320,7 +321,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             panOnDrag={[1, 2]}
           >
             <Background 
-              variant="dot" 
+              variant={BackgroundVariant.Dots}
               gap={20} 
               size={1}
               color="#e2e8f0"

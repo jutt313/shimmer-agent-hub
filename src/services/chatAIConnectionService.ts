@@ -75,7 +75,7 @@ export class ChatAIConnectionService {
         platformsCount: data?.platforms?.length || 0
       });
 
-      // Process the response
+      // Process the response - handle both structured and simple responses
       let responseText = "I'm here to help you build comprehensive automations.";
       
       if (data && typeof data === 'object') {
@@ -92,6 +92,8 @@ export class ChatAIConnectionService {
         else if (typeof data === 'string') {
           responseText = data;
         }
+      } else if (typeof data === 'string') {
+        responseText = data;
       }
 
       return {

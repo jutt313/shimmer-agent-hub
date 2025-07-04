@@ -70,7 +70,6 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   const { toast } = useToast();
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [diagramError, setDiagramError] = useState<string | null>(null);
   const [diagramStats, setDiagramStats] = useState({
     totalNodes: 0,
@@ -184,172 +183,62 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     [setEdges]
   );
 
-  // Empty state when no data
-  if (!automationBlueprint && !automationDiagramData) {
-    return (
-      <div className="h-full w-full">
-        <div className="h-full w-full">
-          <ReactFlow
-            nodes={[]}
-            edges={[]}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            nodeTypes={nodeTypes}
-            connectionMode={ConnectionMode.Loose}
-            fitView
-            fitViewOptions={{
-              padding: 0.2,
-              minZoom: 0.1,
-              maxZoom: 1.5
-            }}
-            defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
-            attributionPosition="bottom-left"
-            className="bg-gradient-to-br from-gray-50 to-blue-50"
-            panOnScroll
-            panOnDrag={[1, 2]}
-          >
-            <Background 
-              variant={BackgroundVariant.Dots}
-              gap={16} 
-              size={2}
-              color="#94a3b8"
-            />
-            <Controls 
-              position="bottom-right"
-              showInteractive={false}
-            />
-            <MiniMap 
-              nodeStrokeColor="#374151"
-              nodeColor="#f3f4f6"
-              nodeBorderRadius={8}
-              maskColor="rgba(0, 0, 0, 0.2)"
-              position="bottom-right"
-              pannable
-              zoomable
-            />
-          </ReactFlow>
-        </div>
-      </div>
-    );
-  }
-
+  // Always show fullscreen diagram without headers
   return (
-    <Card className={`${isFullscreen ? 'fixed inset-0 z-50' : 'h-full'} overflow-hidden`}>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CardTitle className="flex items-center gap-2">
-              <Zap className="w-5 h-5 text-blue-600" />
-              Automation Flow Diagram
-            </CardTitle>
-            
-            {/* Diagram Statistics */}
-            <div className="flex items-center gap-2 ml-4">
-              <Badge variant="outline" className="text-xs">
-                {diagramStats.totalNodes} nodes
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                {diagramStats.totalEdges} connections
-              </Badge>
-              {diagramStats.conditionNodes > 0 && (
-                <Badge variant="secondary" className="text-xs">
-                  {diagramStats.conditionNodes} conditions
-                </Badge>
-              )}
-              {diagramStats.aiAgentNodes > 0 && (
-                <Badge variant="default" className="text-xs bg-emerald-500">
-                  {diagramStats.aiAgentNodes} AI agents
-                </Badge>
-              )}
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            {/* Regenerate Button */}
-            <Button
-              onClick={onRegenerateDiagram}
-              disabled={isGenerating || !automationBlueprint}
-              size="sm"
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              {isGenerating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <RefreshCw className="w-4 h-4" />
-              )}
-              {isGenerating ? 'Generating...' : 'Regenerate'}
-            </Button>
-          </div>
-        </div>
-        
-        {/* Status Indicator */}
-        <div className="flex items-center gap-2 text-sm">
-          {diagramError ? (
-            <div className="flex items-center gap-2 text-red-600">
-              <AlertCircle className="w-4 h-4" />
-              <span>{diagramError}</span>
-            </div>
-          ) : isGenerating ? (
-            <div className="flex items-center gap-2 text-blue-600">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Generating enhanced diagram with AI recommendations...</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-green-600">
-              <CheckCircle className="w-4 h-4" />
-              <span>Diagram ready - Click nodes to expand details</span>
-            </div>
-          )}
-        </div>
-      </CardHeader>
-      
-      <CardContent className="p-0 h-full">
-        <div className={`${isFullscreen ? 'h-screen' : 'h-96'} w-full`}>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            nodeTypes={nodeTypes}
-            connectionMode={ConnectionMode.Loose}
-            fitView
-            fitViewOptions={{
-              padding: 0.2,
-              minZoom: 0.1,
-              maxZoom: 1.5
-            }}
-            defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
-            attributionPosition="bottom-left"
-            className="bg-gradient-to-br from-gray-50 to-blue-50"
-            panOnScroll
-            panOnDrag={[1, 2]}
-          >
-            <Background 
-              variant={BackgroundVariant.Dots}
-              gap={16} 
-              size={2}
-              color="#94a3b8"
-            />
-            <Controls 
-              position="bottom-right"
-              showInteractive={false}
-            />
-            <MiniMap 
-              nodeStrokeColor="#374151"
-              nodeColor="#f3f4f6"
-              nodeBorderRadius={8}
-              maskColor="rgba(0, 0, 0, 0.2)"
-              position="bottom-right"
-              pannable
-              zoomable
-            />
-          </ReactFlow>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="h-full w-full bg-gradient-to-br from-gray-50 to-blue-50">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        nodeTypes={nodeTypes}
+        connectionMode={ConnectionMode.Loose}
+        fitView
+        fitViewOptions={{
+          padding: 0.2,
+          minZoom: 0.1,
+          maxZoom: 1.5
+        }}
+        defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+        attributionPosition="bottom-left"
+        className="bg-gradient-to-br from-gray-50 to-blue-50"
+        panOnScroll
+        panOnDrag={[1, 2]}
+        proOptions={{ hideAttribution: true }}
+      >
+        <Background 
+          variant={BackgroundVariant.Dots}
+          gap={12} 
+          size={3}
+          color="#1e293b"
+          style={{ opacity: 0.4 }}
+        />
+        <Controls 
+          position="bottom-right"
+          showInteractive={false}
+          style={{ 
+            right: '20px',
+            bottom: '20px'
+          }}
+        />
+        <MiniMap 
+          nodeStrokeColor="#374151"
+          nodeColor="#f3f4f6"
+          nodeBorderRadius={8}
+          maskColor="rgba(0, 0, 0, 0.2)"
+          position="bottom-right"
+          pannable
+          zoomable
+          style={{
+            right: '20px',
+            bottom: '80px',
+            width: '200px',
+            height: '120px'
+          }}
+        />
+      </ReactFlow>
+    </div>
   );
 };
 

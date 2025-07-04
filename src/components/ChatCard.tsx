@@ -56,17 +56,43 @@ const ChatCard = ({
 
   const optimizedMessages = optimizeMessages(messages);
 
-  // Ultra-safe text formatting with bulletproof error recovery
+  // ENHANCED safe text formatting with bulletproof error recovery
   const safeFormatMessageText = (inputText: string | undefined | null): React.ReactNode[] => {
     try {
       if (!inputText || typeof inputText !== 'string') {
         return [<span key="fallback-input-error">Message content unavailable.</span>];
       }
 
+      // Check if the text looks like broken JSON and try to clean it
+      if (inputText.includes('{') && inputText.includes('}')) {
+        try {
+          // Try to parse as structured response first
+          const structured = parseStructuredResponse(inputText);
+          if (structured) {
+            // If we can parse it as structured data, don't show raw JSON
+            return [<span key="structured-content">Processing automation details...</span>];
+          }
+        } catch (e) {
+          // If it's broken JSON, try to extract readable parts
+          const cleanText = inputText
+            .replace(/\{[\s\S]*?\}/g, '') // Remove JSON blocks
+            .replace(/```json[\s\S]*?```/g, '') // Remove JSON code blocks
+            .replace(/^[\s\n]*/, '') // Remove leading whitespace
+            .replace(/[\s\n]*$/, '') // Remove trailing whitespace
+            .trim();
+          
+          if (cleanText && cleanText.length > 0) {
+            inputText = cleanText;
+          } else {
+            return [<span key="processing-message">Processing your automation request...</span>];
+          }
+        }
+      }
+
       const cleanHtmlString = cleanDisplayText(inputText);
       
       if (typeof cleanHtmlString !== 'string') {
-        return [<span key="processing-error">Error displaying message content.</span>];
+        return [<span key="processing-error">Processing automation details...</span>];
       }
 
       const processedText = cleanHtmlString.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -81,7 +107,7 @@ const ChatCard = ({
 
     } catch (error: any) {
       handleError(error, 'Text formatting in ChatCard');
-      return [<span key="processing-error">Error displaying message content.</span>];
+      return [<span key="processing-error">Processing your automation request...</span>];
     }
   };
 
@@ -240,7 +266,7 @@ const ChatCard = ({
     } catch (error: any) {
       console.error('Critical error in renderStructuredContent:', error);
       handleError(error, 'Structured content rendering');
-      return [<div key="error" className="text-red-600 p-4 bg-red-50 rounded-lg">Error rendering content. Please refresh and regenerate the automation.</div>];
+      return [<div key="error" className="text-blue-600 p-4 bg-blue-50 rounded-lg">I'm processing your automation request. Please wait...</div>];
     }
   };
 
@@ -257,11 +283,13 @@ const ChatCard = ({
         <div className="space-y-6 pb-4">
           {optimizedMessages.map(message => {
             let structuredData = message.structuredData;
+            
+            // ENHANCED: Try to parse structured data from bot messages
             if (message.isBot && !structuredData) {
               try {
                 structuredData = parseStructuredResponse(message.text);
               } catch (error: any) {
-                handleError(error, `Parsing message ${message.id}`);
+                console.log('Could not parse structured data from message:', error);
                 structuredData = null;
               }
             }
@@ -279,7 +307,7 @@ const ChatCard = ({
                     boxShadow: '0 0 25px rgba(92, 142, 246, 0.25)'
                   }}
                 >
-                  {/* Render structured content for bot messages */}
+                  {/* Render structured content for bot messages if available */}
                   {message.isBot && structuredData ? (
                     <div className="leading-relaxed">
                       {renderStructuredContent(structuredData)}

@@ -7,6 +7,9 @@ export interface ChatAIConnectionRequest {
   message: string;
   requestedPlatforms?: string[];
   context?: string;
+  messages?: any[];
+  automationId?: string;
+  automationContext?: any;
 }
 
 export interface ChatAIConnectionResponse {
@@ -14,6 +17,7 @@ export interface ChatAIConnectionResponse {
   connectionButtons?: ConnectionButton[];
   requiresAuth?: boolean;
   authMessage?: string;
+  structuredData?: any;
 }
 
 export class ChatAIConnectionService {
@@ -28,6 +32,13 @@ export class ChatAIConnectionService {
 
   async processConnectionRequest(request: ChatAIConnectionRequest): Promise<ChatAIConnectionResponse> {
     try {
+      console.log('🚀 ChatAIConnectionService: Processing request', {
+        hasMessage: !!request.message,
+        messageLength: request.message?.length || 0,
+        userId: request.userId,
+        automationId: request.automationId
+      });
+
       // Check if the message contains platform connection requests
       const platformKeywords = this.extractPlatformKeywords(request.message);
       
@@ -47,13 +58,61 @@ export class ChatAIConnectionService {
         };
       }
 
-      // If no platform connections requested, call the regular chat AI
+      // Call the chat AI function
       return await this.callChatAI(request);
       
     } catch (error) {
-      console.error('Error processing connection request:', error);
+      console.error('❌ ChatAIConnectionService: Error processing request:', error);
       return {
         response: "I apologize, but I encountered an error while processing your request. Please try again.",
+        requiresAuth: false
+      };
+    }
+  }
+
+  private async callChatAI(request: ChatAIConnectionRequest): Promise<ChatAIConnectionResponse> {
+    try {
+      console.log('📡 ChatAIConnectionService: Calling chat-ai edge function...');
+
+      const requestBody = {
+        message: request.message,
+        messages: request.messages || [],
+        automationId: request.automationId,
+        automationContext: request.automationContext,
+        context: request.context || 'general',
+        userId: request.userId
+      };
+
+      console.log('📋 Request body:', {
+        hasMessage: !!requestBody.message,
+        messageLength: requestBody.message?.length || 0,
+        messagesCount: requestBody.messages?.length || 0
+      });
+
+      const { data, error } = await supabase.functions.invoke('chat-ai', {
+        body: requestBody
+      });
+
+      if (error) {
+        console.error('❌ Supabase function error:', error);
+        throw error;
+      }
+
+      console.log('✅ Chat AI response received:', {
+        hasSummary: !!data?.summary,
+        stepsCount: data?.steps?.length || 0,
+        platformsCount: data?.platforms?.length || 0
+      });
+
+      return {
+        response: data?.summary || "I'm here to help you with your automations.",
+        requiresAuth: false,
+        structuredData: data
+      };
+    } catch (error) {
+      console.error('❌ ChatAIConnectionService: Error calling chat AI:', error);
+      return {
+        response: "I'm currently unable to process your request. Please try again in a moment.",
         requiresAuth: false
       };
     }
@@ -98,31 +157,6 @@ export class ChatAIConnectionService {
     return foundPlatforms;
   }
 
-  private async callChatAI(request: ChatAIConnectionRequest): Promise<ChatAIConnectionResponse> {
-    try {
-      const { data, error } = await supabase.functions.invoke('chat-ai', {
-        body: {
-          message: request.message,
-          context: request.context || 'general',
-          userId: request.userId
-        }
-      });
-
-      if (error) throw error;
-
-      return {
-        response: data.response || "I'm here to help you with your automations and platform connections.",
-        requiresAuth: false
-      };
-    } catch (error) {
-      console.error('Error calling chat AI:', error);
-      return {
-        response: "I'm currently unable to process your request. Please try again later.",
-        requiresAuth: false
-      };
-    }
-  }
-
   async handlePlatformConnection(userId: string, platform: string, action: 'connect' | 'disconnect'): Promise<{
     success: boolean;
     message: string;
@@ -153,7 +187,7 @@ export class ChatAIConnectionService {
         };
       }
     } catch (error) {
-      console.error(`Error ${action}ing ${platform}:`, error);
+      console.error(`❌ Error ${action}ing ${platform}:`, error);
       return {
         success: false,
         message: `Failed to ${action} ${platform}. Please try again.`

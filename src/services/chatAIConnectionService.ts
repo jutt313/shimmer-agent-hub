@@ -1,21 +1,19 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { platformConnectionService, ConnectionButton } from './platformConnectionService';
 
 export interface ChatAIConnectionRequest {
   userId: string;
   message: string;
   requestedPlatforms?: string[];
   context?: string;
-  messages?: any[];
-  automationId?: string;
-  automationContext?: any;
 }
 
 export interface ChatAIConnectionResponse {
   response: string;
+  connectionButtons?: ConnectionButton[];
   requiresAuth?: boolean;
   authMessage?: string;
-  structuredData?: any;
 }
 
 export class ChatAIConnectionService {
@@ -30,80 +28,96 @@ export class ChatAIConnectionService {
 
   async processConnectionRequest(request: ChatAIConnectionRequest): Promise<ChatAIConnectionResponse> {
     try {
-      console.log('🚀 ChatAIConnectionService: Processing request', {
-        hasMessage: !!request.message,
-        messageLength: request.message?.length || 0,
-        userId: request.userId,
-        automationId: request.automationId,
-        hasMessages: !!request.messages,
-        messagesCount: request.messages?.length || 0
-      });
-
-      // Ensure we have the required payload structure
-      const payload = {
-        message: request.message,
-        messages: request.messages || [],
-        automationId: request.automationId,
-        automationContext: request.automationContext,
-        context: request.context || 'general',
-        userId: request.userId
-      };
-
-      console.log('📋 Calling chat-ai with payload:', {
-        hasMessage: !!payload.message,
-        messageLength: payload.message?.length || 0,
-        messagesCount: payload.messages?.length || 0,
-        hasAutomationContext: !!payload.automationContext,
-        context: payload.context,
-        userId: payload.userId
-      });
-
-      const { data, error } = await supabase.functions.invoke('chat-ai', {
-        body: payload
-      });
-
-      if (error) {
-        console.error('❌ Supabase function error:', error);
-        throw error;
-      }
-
-      console.log('✅ Chat AI response received:', {
-        hasData: !!data,
-        dataType: typeof data,
-        hasSummary: !!data?.summary,
-        stepsCount: data?.steps?.length || 0,
-        platformsCount: data?.platforms?.length || 0
-      });
-
-      // Process the response
-      let responseText = "I'm here to help you build comprehensive automations.";
+      // Check if the message contains platform connection requests
+      const platformKeywords = this.extractPlatformKeywords(request.message);
       
-      if (data && typeof data === 'object') {
-        // Handle clarification-only responses
-        if (data.clarification_questions && Array.isArray(data.clarification_questions) && data.clarification_questions.length > 0) {
-          responseText = "I need some clarification:\n\n" + 
-            data.clarification_questions.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n');
-        }
-        // Handle full responses with summary
-        else if (data.summary && typeof data.summary === 'string') {
-          responseText = data.summary;
-        }
-        // Handle direct string responses
-        else if (typeof data === 'string') {
-          responseText = data;
-        }
+      if (platformKeywords.length > 0 || request.requestedPlatforms?.length) {
+        const platforms = request.requestedPlatforms || platformKeywords;
+        const connectionData = await platformConnectionService.requestConnectionButtons(
+          request.userId, 
+          platforms, 
+          request.context
+        );
+
+        return {
+          response: connectionData.message,
+          connectionButtons: connectionData.buttons,
+          requiresAuth: connectionData.buttons.some(b => !b.connected),
+          authMessage: "You'll need to connect to these platforms to use them in your automations."
+        };
       }
 
-      return {
-        response: responseText,
-        requiresAuth: false,
-        structuredData: data
-      };
-
+      // If no platform connections requested, call the regular chat AI
+      return await this.callChatAI(request);
+      
     } catch (error) {
-      console.error('❌ ChatAIConnectionService: Error processing request:', error);
+      console.error('Error processing connection request:', error);
       return {
         response: "I apologize, but I encountered an error while processing your request. Please try again.",
+        requiresAuth: false
+      };
+    }
+  }
+
+  private extractPlatformKeywords(message: string): string[] {
+    const platformMap: { [key: string]: string[] } = {
+      gmail: ['gmail', 'email', 'google mail'],
+      slack: ['slack', 'team chat'],
+      discord: ['discord'],
+      twitter: ['twitter', 'tweet', 'x.com'],
+      facebook: ['facebook', 'fb'],
+      instagram: ['instagram', 'insta'],
+      linkedin: ['linkedin'],
+      github: ['github', 'git'],
+      notion: ['notion'],
+      trello: ['trello', 'boards'],
+      asana: ['asana', 'project management'],
+      monday: ['monday', 'monday.com'],
+      hubspot: ['hubspot', 'crm'],
+      salesforce: ['salesforce'],
+      pipedrive: ['pipedrive'],
+      mailchimp: ['mailchimp'],
+      sendgrid: ['sendgrid'],
+      stripe: ['stripe', 'payments'],
+      paypal: ['paypal'],
+      shopify: ['shopify', 'ecommerce'],
+      woocommerce: ['woocommerce'],
+      zapier: ['zapier', 'automation'],
+      make: ['make', 'integromat']
+    };
+
+    const lowerMessage = message.toLowerCase();
+    const foundPlatforms: string[] = [];
+
+    Object.entries(platformMap).forEach(([platform, keywords]) => {
+      if (keywords.some(keyword => lowerMessage.includes(keyword))) {
+        foundPlatforms.push(platform);
+      }
+    });
+
+    return foundPlatforms;
+  }
+
+  private async callChatAI(request: ChatAIConnectionRequest): Promise<ChatAIConnectionResponse> {
+    try {
+      const { data, error } = await supabase.functions.invoke('chat-ai', {
+        body: {
+          message: request.message,
+          context: request.context || 'general',
+          userId: request.userId
+        }
+      });
+
+      if (error) throw error;
+
+      return {
+        response: data.response || "I'm here to help you with your automations and platform connections.",
+        requiresAuth: false
+      };
+    } catch (error) {
+      console.error('Error calling chat AI:', error);
+      return {
+        response: "I'm currently unable to process your request. Please try again later.",
         requiresAuth: false
       };
     }
@@ -124,6 +138,7 @@ export class ChatAIConnectionService {
           authUrl
         };
       } else {
+        // Disconnect
         const { error } = await supabase
           .from('platform_credentials')
           .delete()
@@ -138,7 +153,7 @@ export class ChatAIConnectionService {
         };
       }
     } catch (error) {
-      console.error(`❌ Error ${action}ing ${platform}:`, error);
+      console.error(`Error ${action}ing ${platform}:`, error);
       return {
         success: false,
         message: `Failed to ${action} ${platform}. Please try again.`

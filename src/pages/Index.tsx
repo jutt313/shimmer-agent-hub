@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useMemo } from "react";
 import { Send, Bot } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -6,11 +7,11 @@ import AIAgentForm from "@/components/AIAgentForm";
 import SettingsDropdown from "@/components/SettingsDropdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useErrorRecovery } from "@/hooks/useErrorRecovery";
 import { useAsyncOperation } from "@/hooks/useAsyncOperation";
-import { chatAIConnectionService } from "@/services/chatAIConnectionService";
 
 const Index = () => {
   const [message, setMessage] = useState("");
@@ -58,43 +59,51 @@ const Index = () => {
     setIsLoading(true);
 
     try {
-      console.log('🚀 Sending message via ChatAIConnectionService:', currentMessage);
-      
       const result = await executeChatRequest(async () => {
-        // Use the ChatAIConnectionService for consistent request handling
-        const response = await chatAIConnectionService.processConnectionRequest({
-          userId: user?.id || 'anonymous',
+        // Safe payload construction with null checks
+        const payload: any = { 
           message: currentMessage,
-          messages: messages.slice(-10).map(msg => ({
-            text: msg.text,
-            isBot: msg.isBot,
-            message_content: msg.text
-          })),
-          context: 'general_chat',
-          automationContext: currentAgentConfig ? {
-            agentConfig: currentAgentConfig.config || {},
-            llmProvider: currentAgentConfig.llmProvider || 'OpenAI',
-            model: currentAgentConfig.model || 'gpt-4o-mini'
-          } : undefined
+          messages: Array.isArray(messages) ? messages.slice(-10) : []
+        };
+
+        // Safe agent configuration with bulletproof null checks
+        if (currentAgentConfig && typeof currentAgentConfig === 'object') {
+          payload.agentConfig = currentAgentConfig.config || {};
+          payload.llmProvider = currentAgentConfig.llmProvider || 'OpenAI';
+          payload.model = currentAgentConfig.model || 'gpt-4o-mini';
+        }
+
+        console.log('Sending enhanced payload to chat-ai...');
+
+        const { data, error } = await supabase.functions.invoke('chat-ai', {
+          body: payload
         });
 
-        console.log('✅ Received response from ChatAIConnectionService:', response);
-        return response;
+        if (error) {
+          console.error('Supabase function error:', error);
+          throw error;
+        }
+
+        return data;
       }, {
         userAction: 'Sending chat message',
         additionalContext: `Message: "${currentMessage}"`
       });
 
-      // Handle the response from ChatAIConnectionService
+      // Ultra-safe response handling with multiple fallbacks
       let responseText = "I apologize, but I couldn't process your request properly. Please try again.";
-      let structuredData = null;
       
-      if (result && typeof result === 'object') {
-        if (result.response && typeof result.response === 'string') {
-          responseText = result.response;
-        }
-        if (result.structuredData) {
-          structuredData = result.structuredData;
+      if (result) {
+        if (typeof result === 'string' && result.trim()) {
+          responseText = result;
+        } else if (typeof result === 'object' && result !== null) {
+          if (typeof result.response === 'string' && result.response.trim()) {
+            responseText = result.response;
+          } else if (typeof result.message === 'string' && result.message.trim()) {
+            responseText = result.message;
+          } else if (typeof result.text === 'string' && result.text.trim()) {
+            responseText = result.text;
+          }
         }
       }
       
@@ -102,14 +111,12 @@ const Index = () => {
         id: Date.now() + 1,
         text: responseText,
         isBot: true,
-        timestamp: new Date(),
-        structuredData: structuredData
+        timestamp: new Date()
       };
       
       setMessages(prev => [...prev, botResponse]);
 
     } catch (error: any) {
-      console.error('❌ Error in chat request:', error);
       handleError(error, 'Chat message sending');
       
       const errorResponse = {
@@ -123,7 +130,7 @@ const Index = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [message, isLoading, messages, currentAgentConfig, executeChatRequest, handleError, user]);
+  }, [message, isLoading, messages, currentAgentConfig, executeChatRequest, handleError]);
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !isLoading) {
@@ -131,8 +138,10 @@ const Index = () => {
     }
   }, [handleSendMessage, isLoading]);
 
+  // Simplified and bulletproof agent config handler
   const handleAgentConfigSaved = useCallback((agentName: string, agentId?: string, llmProvider?: string, model?: string, config?: any, apiKey?: string) => {
     try {
+      // Enhanced null safety for agent configuration
       const safeAgentConfig = {
         name: agentName && typeof agentName === 'string' ? agentName : 'AI Agent',
         llmProvider: llmProvider && typeof llmProvider === 'string' ? llmProvider : 'OpenAI',
@@ -157,6 +166,7 @@ const Index = () => {
     }
   }, [toast, handleError]);
 
+  // Memoize the agent status display to prevent re-renders
   const agentStatusDisplay = useMemo(() => {
     if (!currentAgentConfig) return null;
     

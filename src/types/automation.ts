@@ -1,14 +1,14 @@
-
-
 export type AutomationBlueprint = {
   version: string;
   description?: string;
 
   trigger: {
-    type: 'manual' | 'scheduled' | 'webhook';
+    type: 'manual' | 'scheduled' | 'webhook' | 'platform'; // Added 'platform' for explicit platform triggers
     cron_expression?: string; // For 'scheduled'
     webhook_endpoint?: string; // For 'webhook'
     webhook_secret?: string; // For 'webhook'
+    platform?: string; // For 'platform' triggers
+    integration?: string; // Alias for platform
   };
 
   steps: Array<{
@@ -23,10 +23,15 @@ export type AutomationBlueprint = {
       platform_credential_id?: string;
     };
 
+    // MODIFIED: 'condition' now supports multiple 'cases' with labels and steps
     condition?: {
-      expression: string;
-      if_true: AutomationBlueprint['steps'];
-      if_false?: AutomationBlueprint['steps'];
+      expression?: string; // General expression for condition, if any
+      cases: Array<{
+        label: string; // The label for this specific branch (e.g., "Email is Gmail/Yahoo")
+        expression: string; // The specific condition expression for this case
+        steps: AutomationBlueprint['steps']; // Steps for this branch
+      }>;
+      default_steps?: AutomationBlueprint['steps']; // Optional steps if no cases match
     };
 
     loop?: {
@@ -47,7 +52,8 @@ export type AutomationBlueprint = {
 
     retry?: {
       max_attempts: number;
-      steps: AutomationBlueprint['steps'];
+      steps: AutomationBlueprint['steps']; // Steps to retry
+      on_retry_fail_steps?: AutomationBlueprint['steps']; // NEW: Steps to execute if all retries fail
     };
 
     fallback?: {
@@ -56,7 +62,7 @@ export type AutomationBlueprint = {
     };
 
     on_error?: 'continue' | 'stop' | 'retry';
-    ai_recommended?: boolean; // Add this for marking AI-recommended steps
+    ai_recommended?: boolean; // For marking AI-recommended steps
   }>;
 
   variables?: Record<string, any>;
@@ -67,7 +73,7 @@ export type AutomationDiagramData = {
     id: string;
     type: string;
     position: { x: number; y: number };
-    data: Record<string, any>;
+    data: Record<string, any>; // Contains label, explanation, icon, and specific step details
     sourcePosition?: string;
     targetPosition?: string;
   }>;
@@ -78,10 +84,9 @@ export type AutomationDiagramData = {
     animated?: boolean;
     type?: string;
     style?: Record<string, any>;
-    label?: string;
-    sourceHandle?: string;
+    label?: string; // Label for the edge (e.g., "True", "Email is Gmail")
+    sourceHandle?: string; // Connects to specific handle on source node
     labelStyle?: Record<string, any>;
     labelBgStyle?: Record<string, any>;
   }>;
 };
-

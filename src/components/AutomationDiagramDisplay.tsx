@@ -19,9 +19,7 @@ import { Button } from '@/components/ui/button';
 import { 
   RefreshCw, 
   AlertCircle,
-  CheckCircle,
   Loader2,
-  Zap,
   Code
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -33,7 +31,6 @@ import { AutomationBlueprint, AutomationDiagramData } from '@/types/automation';
 import { calculateEnhancedLayout } from '@/utils/diagramLayout';
 
 const nodeTypes = {
-  // All node types use the same CustomNodeMapper component
   triggerNode: CustomNodeMapper,
   platformTriggerNode: CustomNodeMapper,
   actionNode: CustomNodeMapper,
@@ -45,7 +42,6 @@ const nodeTypes = {
   fallbackNode: CustomNodeMapper,
   aiAgentNode: CustomNodeMapper,
   delayNode: CustomNodeMapper,
-  // Fallback for any unmapped types
   default: CustomNodeMapper
 };
 
@@ -83,7 +79,6 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     platformNodes: 0
   });
 
-  // Enhanced node data processing with AI agent recommendations
   const processNodeData = useCallback((nodeData: any) => {
     const processedData = {
       ...nodeData,
@@ -107,7 +102,6 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       } : undefined
     };
 
-    // Filter out dismissed agents
     if (nodeData.isRecommended && dismissedAgents.has(nodeData.agent?.agent_id || nodeData.label)) {
       return null;
     }
@@ -115,61 +109,54 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     return processedData;
   }, [onAgentAdd, onAgentDismiss, dismissedAgents]);
 
-  // Load diagram data when available
   useEffect(() => {
-    console.log('🔄 AutomationDiagramDisplay: Processing diagram data update');
+    console.log('🔄 AutomationDiagramDisplay: Processing clean diagram data');
     
     try {
       if (automationDiagramData?.nodes && automationDiagramData?.edges) {
-        console.log('✅ Using provided diagram data:', {
+        console.log('✅ Using clean diagram data:', {
           nodes: automationDiagramData.nodes.length,
           edges: automationDiagramData.edges.length
         });
 
-        // Process nodes with enhanced data
         const processedNodes = automationDiagramData.nodes
           .map(node => {
             const processedData = processNodeData(node.data);
-            if (!processedData) return null; // Filter out dismissed nodes
+            if (!processedData) return null;
             
             return {
               ...node,
               data: processedData,
-              type: node.type || 'actionNode' // Ensure all nodes have a type
+              type: node.type || 'actionNode'
             };
           })
           .filter(Boolean) as Node[];
 
-        // Apply enhanced layout with better positioning
-        const { nodes: layoutedNodes, edges: layoutedEdges } = calculateEnhancedLayout(
-          processedNodes, 
-          automationDiagramData.edges,
-          {
-            nodeWidth: 320,
-            nodeHeight: 120,
-            horizontalGap: 200,
-            verticalGap: 150,
-            startX: 100,
-            startY: 50
+        // Use original positioning for clean left-to-right flow
+        setNodes(processedNodes);
+        setEdges(automationDiagramData.edges.map(edge => ({
+          ...edge,
+          animated: true,
+          type: 'smoothstep',
+          style: {
+            stroke: '#8b5cf6',
+            strokeWidth: 3,
+            strokeDasharray: '8,4'
           }
-        );
-
-        setNodes(layoutedNodes);
-        setEdges(layoutedEdges);
+        })));
         
-        // Calculate diagram statistics
         const stats = {
-          totalNodes: layoutedNodes.length,
-          totalEdges: layoutedEdges.length,
-          conditionNodes: layoutedNodes.filter(n => n.type?.includes('condition')).length,
-          aiAgentNodes: layoutedNodes.filter(n => n.data?.isRecommended || n.type === 'aiAgentNode').length,
-          platformNodes: layoutedNodes.filter(n => n.data?.platform).length
+          totalNodes: processedNodes.length,
+          totalEdges: automationDiagramData.edges.length,
+          conditionNodes: processedNodes.filter(n => n.type?.includes('condition')).length,
+          aiAgentNodes: processedNodes.filter(n => n.data?.isRecommended || n.type === 'aiAgentNode').length,
+          platformNodes: processedNodes.filter(n => n.data?.platform).length
         };
         
         setDiagramStats(stats);
         setDiagramError(null);
         
-        console.log('📊 Enhanced diagram statistics:', stats);
+        console.log('📊 Clean diagram statistics:', stats);
         
       } else if (automationBlueprint?.steps?.length > 0) {
         console.log('⚠️ No diagram data available, but blueprint exists');
@@ -201,24 +188,15 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     [setEdges]
   );
 
-  // Custom edge styles with animated colorful dotted lines
-  const edgeOptions = {
-    style: {
-      strokeWidth: 3,
-      strokeDasharray: '8,4',
-      animation: 'dash 2s linear infinite',
-    },
-  };
-
   return (
     <div className="h-full w-full relative">
-      {/* Header with JSON Debug Button */}
+      {/* Header Controls */}
       <div className="absolute top-4 right-4 z-10 flex gap-2">
         <Button
           onClick={() => setShowJsonDebug(true)}
           size="sm"
           variant="outline"
-          className="bg-white/90 backdrop-blur-sm shadow-lg hover:bg-white border-purple-200 hover:border-purple-300"
+          className="bg-white/90 backdrop-blur-sm shadow-lg hover:bg-white border-purple-200 hover:border-purple-300 rounded-2xl"
         >
           <Code className="w-4 h-4 mr-2" />
           View JSON
@@ -228,7 +206,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             onClick={onRegenerateDiagram}
             size="sm"
             disabled={isGenerating}
-            className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white shadow-lg"
+            className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white shadow-lg rounded-2xl"
           >
             {isGenerating ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -240,8 +218,17 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         )}
       </div>
 
-      {/* Main Diagram */}
-      <div className="h-full w-full rounded-2xl overflow-hidden shadow-xl border border-gray-200">
+      {/* Statistics Badge */}
+      {diagramStats.totalNodes > 0 && (
+        <div className="absolute top-4 left-4 z-10">
+          <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm shadow-lg text-gray-700 px-3 py-1 rounded-2xl">
+            {diagramStats.totalNodes} nodes, {diagramStats.totalEdges} connections
+          </Badge>
+        </div>
+      )}
+
+      {/* Main Diagram Container */}
+      <div className="h-full w-full rounded-3xl overflow-hidden shadow-xl border border-gray-200">
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -266,51 +253,33 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             type: 'smoothstep',
             animated: true,
             style: {
+              stroke: '#8b5cf6',
               strokeWidth: 3,
-              strokeDasharray: '8,4',
-              stroke: 'url(#gradient)',
-            },
+              strokeDasharray: '8,4'
+            }
           }}
         >
-          {/* Animated gradient definition for colorful lines */}
-          <defs>
-            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#8b5cf6" />
-              <stop offset="25%" stopColor="#3b82f6" />
-              <stop offset="50%" stopColor="#10b981" />
-              <stop offset="75%" stopColor="#f59e0b" />
-              <stop offset="100%" stopColor="#ef4444" />
-              <animateTransform
-                attributeName="gradientTransform"
-                type="translate"
-                values="0 0;100 0;0 0"
-                dur="3s"
-                repeatCount="indefinite"
-              />
-            </linearGradient>
-          </defs>
-          
-          {/* Subtle background dots */}
+          {/* Minimal background */}
           <Background 
             variant={BackgroundVariant.Dots}
             gap={20} 
             size={2}
             color="#e5e7eb"
-            style={{ opacity: 0.3 }}
+            style={{ opacity: 0.1 }}
           />
           
-          {/* Enhanced controls */}
+          {/* Clean controls */}
           <Controls 
             position="bottom-right"
             showInteractive={false}
-            className="bg-white/90 backdrop-blur-sm shadow-lg rounded-lg border border-gray-200"
+            className="bg-white/90 backdrop-blur-sm shadow-lg rounded-2xl border border-gray-200"
             style={{ 
               right: '20px',
               bottom: '20px'
             }}
           />
           
-          {/* Beautiful minimap */}
+          {/* Responsive minimap */}
           <MiniMap 
             nodeStrokeColor="#8b5cf6"
             nodeColor="#f8fafc"
@@ -319,7 +288,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             position="bottom-left"
             pannable
             zoomable
-            className="bg-white/90 backdrop-blur-sm shadow-lg rounded-lg border border-gray-200"
+            className="bg-white/90 backdrop-blur-sm shadow-lg rounded-2xl border border-gray-200 hidden md:block"
             style={{
               left: '20px',
               bottom: '20px',
@@ -330,19 +299,10 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         </ReactFlow>
       </div>
 
-      {/* Statistics Badge */}
-      {diagramStats.totalNodes > 0 && (
-        <div className="absolute top-4 left-4 z-10">
-          <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm shadow-lg text-gray-700 px-3 py-1">
-            {diagramStats.totalNodes} nodes, {diagramStats.totalEdges} connections
-          </Badge>
-        </div>
-      )}
-
       {/* Error State */}
       {diagramError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/95 backdrop-blur-sm rounded-2xl">
-          <Card className="max-w-md mx-4 shadow-xl border-orange-200">
+        <div className="absolute inset-0 flex items-center justify-center bg-white/95 backdrop-blur-sm rounded-3xl">
+          <Card className="max-w-md mx-4 shadow-xl border-orange-200 rounded-3xl">
             <CardHeader className="text-center">
               <AlertCircle className="w-12 h-12 text-orange-500 mx-auto mb-2" />
               <CardTitle className="text-orange-800">Diagram Loading</CardTitle>
@@ -370,7 +330,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         />
       )}
 
-      {/* Custom CSS for animated edges */}
+      {/* Single color animated CSS */}
       <style>
         {`
         @keyframes dash {
@@ -380,19 +340,34 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         }
         
         .react-flow__edge-path {
+          stroke: #8b5cf6 !important;
+          stroke-width: 3px !important;
+          stroke-dasharray: 8,4 !important;
           animation: dash 2s linear infinite;
         }
         
         .react-flow__node {
-          border-radius: 16px !important;
+          border-radius: 24px !important;
         }
         
         .react-flow__controls {
-          border-radius: 12px !important;
+          border-radius: 16px !important;
         }
         
         .react-flow__minimap {
-          border-radius: 12px !important;
+          border-radius: 16px !important;
+        }
+
+        /* Responsive design for small screens */
+        @media (max-width: 768px) {
+          .react-flow__minimap {
+            display: none !important;
+          }
+          
+          .react-flow__controls {
+            right: 10px !important;
+            bottom: 10px !important;
+          }
         }
         `}
       </style>

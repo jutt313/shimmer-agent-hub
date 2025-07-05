@@ -180,7 +180,8 @@ serve(async (req) => {
       userFeedback: user_feedback ? 'provided' : 'none'
     })
 
-    const openAIApiKey = Deno.env.get('DAIGRAM GENRATORE')
+    // FIXED: Use the correct secret name
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY')
     if (!openAIApiKey) {
       console.error('❌ OpenAI API key not configured')
       return new Response(JSON.stringify({ 

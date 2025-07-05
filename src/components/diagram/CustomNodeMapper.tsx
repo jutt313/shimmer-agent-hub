@@ -1,792 +1,255 @@
-import React, { useState } from 'react';
+
+import React from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { 
-  Settings, 
-  GitBranch, 
-  Bot, 
-  Clock, 
+  Zap, 
+  GitFork, 
   Repeat, 
   RefreshCw, 
-  Shield, 
-  Zap, 
+  CornerDownRight, 
+  Bot, 
+  Clock, 
+  PlugZap,
+  FlagCheckered,
+  Settings,
   Play,
-  ChevronDown,
-  ChevronUp,
   Plus,
   X,
-  ExternalLink,
-  AlertTriangle,
-  Globe,
-  Mail,
-  Calendar,
-  Database,
-  MessageSquare,
-  FileText,
-  Users,
-  CreditCard,
-  Workflow
+  Info
 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-interface NodeData {
-  label: string;
-  icon?: string;
-  platform?: string;
-  action?: any;
-  condition?: any;
-  agent?: any;
-  delay?: any;
-  loop?: any;
-  retry?: any;
-  fallback?: any;
-  trigger?: any;
-  stepType?: string;
-  explanation?: string;
-  isRecommended?: boolean;
-  branches?: Array<{
-    label: string;
-    handle: string;
-    color: string;
-    stepsKey?: string;
-  }>;
-  onAdd?: () => void;
-  onDismiss?: () => void;
-  stepDetails?: {
-    integration?: string;
-    method?: string;
-    endpoint?: string;
-    parameters?: any;
-  };
-}
+const getNodeIcon = (iconName: string, platform?: string) => {
+  // Platform-specific icons
+  if (platform) {
+    switch (platform.toLowerCase()) {
+      case 'hubspot': return <PlugZap className="w-5 h-5" />;
+      case 'salesforce': return <PlugZap className="w-5 h-5" />;
+      case 'slack': return <PlugZap className="w-5 h-5" />;
+      case 'gmail': return <PlugZap className="w-5 h-5" />;
+      case 'zapier': return <PlugZap className="w-5 h-5" />;
+      default: return <PlugZap className="w-5 h-5" />;
+    }
+  }
 
-interface CustomNodeMapperProps {
-  id: string;
-  type: string;
-  data: NodeData;
-  selected?: boolean;
-}
+  // Generic icons based on step type
+  switch (iconName) {
+    case 'Zap': return <Zap className="w-5 h-5" />;
+    case 'GitFork': return <GitFork className="w-5 h-5" />;
+    case 'Repeat': return <Repeat className="w-5 h-5" />;
+    case 'RefreshCw': return <RefreshCw className="w-5 h-5" />;
+    case 'CornerDownRight': return <CornerDownRight className="w-5 h-5" />;
+    case 'Bot': return <Bot className="w-5 h-5" />;
+    case 'Clock': return <Clock className="w-5 h-5" />;
+    case 'PlugZap': return <PlugZap className="w-5 h-5" />;
+    case 'FlagCheckered': return <FlagCheckered className="w-5 h-5" />;
+    case 'Settings': return <Settings className="w-5 h-5" />;
+    case 'Play': return <Play className="w-5 h-5" />;
+    default: return <Zap className="w-5 h-5" />;
+  }
+};
 
-const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, selected }) => {
-  const [expanded, setExpanded] = useState(false);
+const getNodeStyle = (stepType: string, isRecommended: boolean = false) => {
+  const baseStyle = "relative rounded-2xl shadow-lg border-2 transition-all duration-300 hover:shadow-xl";
+  
+  if (isRecommended) {
+    return `${baseStyle} bg-gradient-to-br from-emerald-50 to-blue-50 border-emerald-300 hover:border-emerald-400`;
+  }
 
-  const handleExpansion = (e: React.MouseEvent) => {
+  switch (stepType) {
+    case 'trigger':
+      return `${baseStyle} bg-gradient-to-br from-purple-50 to-blue-50 border-purple-300 hover:border-purple-400`;
+    case 'condition':
+      return `${baseStyle} bg-gradient-to-br from-orange-50 to-yellow-50 border-orange-300 hover:border-orange-400`;
+    case 'ai_agent_call':
+      return `${baseStyle} bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-300 hover:border-emerald-400`;
+    case 'loop':
+      return `${baseStyle} bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-300 hover:border-indigo-400`;
+    case 'retry':
+      return `${baseStyle} bg-gradient-to-br from-amber-50 to-orange-50 border-amber-300 hover:border-amber-400`;
+    case 'delay':
+      return `${baseStyle} bg-gradient-to-br from-gray-50 to-slate-50 border-gray-300 hover:border-gray-400`;
+    case 'end':
+    case 'stop':
+      return `${baseStyle} bg-gradient-to-br from-red-50 to-pink-50 border-red-300 hover:border-red-400`;
+    default:
+      return `${baseStyle} bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-300 hover:border-blue-400`;
+  }
+};
+
+const CustomNodeMapper = ({ data }: { data: any }) => {
+  const {
+    label,
+    stepType,
+    explanation,
+    isRecommended = false,
+    platform,
+    icon = 'Zap',
+    branches = [],
+    onAdd,
+    onDismiss
+  } = data;
+
+  const handleInfoClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setExpanded(!expanded);
+    // Could implement detailed info modal here
+    console.log('Node info:', { label, stepType, explanation, data });
   };
 
-  // Enhanced platform icon mapping
-  const getPlatformIcon = (platform: string, method?: string) => {
-    const platformLower = platform?.toLowerCase() || '';
-    
-    // Platform-specific icons
-    if (platformLower.includes('gmail') || platformLower.includes('email')) return Mail;
-    if (platformLower.includes('calendar') || platformLower.includes('google calendar')) return Calendar;
-    if (platformLower.includes('slack') || platformLower.includes('discord')) return MessageSquare;
-    if (platformLower.includes('database') || platformLower.includes('sql')) return Database;
-    if (platformLower.includes('webhook') || platformLower.includes('api')) return Globe;
-    if (platformLower.includes('stripe') || platformLower.includes('payment')) return CreditCard;
-    if (platformLower.includes('notion') || platformLower.includes('document')) return FileText;
-    if (platformLower.includes('hubspot') || platformLower.includes('crm')) return Users;
-    if (platformLower.includes('zapier') || platformLower.includes('workflow')) return Workflow;
-    
-    // Method-specific fallbacks
-    if (method?.toLowerCase().includes('email')) return Mail;
-    if (method?.toLowerCase().includes('calendar')) return Calendar;
-    if (method?.toLowerCase().includes('message')) return MessageSquare;
-    
-    // Default platform icon
-    return Globe;
-  };
-
-  // Clean base node styling with enhanced mobile support
-  const baseNodeClasses = `
-    relative px-4 sm:px-6 py-4 sm:py-5 shadow-xl rounded-2xl sm:rounded-3xl border-2 transition-all duration-300 
-    cursor-pointer hover:shadow-2xl backdrop-blur-sm min-w-[280px] sm:min-w-[320px] max-w-[320px] sm:max-w-[400px]
-    bg-white
-    ${selected ? 'scale-105 shadow-2xl border-purple-400' : 'hover:scale-102 border-gray-200 hover:border-purple-300'}
-  `;
-
-  // TRIGGER NODE - Enhanced with dynamic trigger display
-  const TriggerNodeComponent = () => {
-    const platform = data.platform || data.trigger?.integration || data.stepDetails?.integration || '';
-    const triggerType = data.trigger?.type || 'manual';
-    const IconComponent = getPlatformIcon(platform, 'trigger');
-
-    return (
-      <div 
-        onClick={handleExpansion}
-        className={`${baseNodeClasses} border-red-300 hover:border-red-400 ${
-          selected ? 'border-red-400 shadow-red-200' : ''
-        }`}
-      >
-        <Handle
-          type="source"
-          position={Position.Right}
-          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-red-400 !rounded-full shadow-lg"
-        />
-        
-        <div className="flex items-start space-x-3 sm:space-x-4">
-          <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-red-50 flex items-center justify-center shadow-lg border-2 border-red-200">
-            <IconComponent className="w-6 h-6 sm:w-7 sm:h-7 text-red-600" />
-          </div>
-          
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm sm:text-lg font-bold text-red-800 leading-tight">
-                {data.label}
-              </div>
-              <div className="flex items-center space-x-1">
-                {expanded ? (
-                  <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
-                )}
-              </div>
-            </div>
-            
-            <div className="text-xs sm:text-sm font-semibold text-red-700 mb-1">
-              {triggerType.toUpperCase()} TRIGGER
-            </div>
-
-            {platform && (
-              <div className="flex items-center space-x-2 mb-2">
-                <div className="text-xs sm:text-sm font-medium px-2 sm:px-3 py-1 rounded-full border bg-red-50 border-red-200 text-red-700 inline-flex items-center space-x-2">
-                  <span>{platform.charAt(0).toUpperCase() + platform.slice(1)}</span>
-                  {expanded && <ExternalLink className="w-3 h-3" />}
-                </div>
-              </div>
-            )}
-            
-            {expanded && data.explanation && (
-              <div className="text-xs sm:text-sm text-red-700 leading-relaxed p-2 sm:p-3 bg-red-50 rounded-xl sm:rounded-2xl border border-red-200 mt-3">
-                <span className="font-semibold text-red-800">Trigger Details:</span>
-                <div className="mt-1">{data.explanation}</div>
-                
-                {data.trigger && (
-                  <div className="mt-2 text-xs text-red-600 space-y-1">
-                    <div><span className="font-medium">Type:</span> {data.trigger.type}</div>
-                    {data.trigger.cron_expression && (
-                      <div><span className="font-medium">Schedule:</span> {data.trigger.cron_expression}</div>
-                    )}
-                    {data.trigger.webhook_endpoint && (
-                      <div><span className="font-medium">Webhook:</span> {data.trigger.webhook_endpoint}</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // ACTION NODE - Enhanced with better platform icons
-  const ActionNodeComponent = () => {
-    const platform = data.platform || data.action?.integration || data.stepDetails?.integration || '';
-    const method = data.action?.method || data.stepDetails?.method || '';
-    const IconComponent = getPlatformIcon(platform, method);
-
-    return (
-      <div 
-        onClick={handleExpansion}
-        className={`${baseNodeClasses} border-blue-300 hover:border-blue-400 ${
-          selected ? 'border-blue-400 shadow-blue-200' : ''
-        }`}
-      >
-        <Handle
-          type="target"
-          position={Position.Left}
-          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-blue-400 !rounded-full shadow-lg"
-        />
-        <Handle
-          type="source"
-          position={Position.Right}
-          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-blue-400 !rounded-full shadow-lg"
-        />
-        
-        <div className="flex items-start space-x-3 sm:space-x-4">
-          <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-blue-50 flex items-center justify-center shadow-lg border-2 border-blue-200">
-            <IconComponent className="w-6 h-6 sm:w-7 sm:h-7 text-blue-600" />
-          </div>
-          
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm sm:text-lg font-bold text-blue-800 leading-tight">
-                ACTION
-              </div>
-              <div className="flex items-center space-x-1">
-                {expanded ? (
-                  <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-                )}
-              </div>
-            </div>
-            
-            <div className="text-xs sm:text-sm font-semibold text-blue-700 mb-1">
-              {data.label}
-            </div>
-
-            {platform && (
-              <div className="flex items-center space-x-2 mb-2">
-                <div className="text-xs sm:text-sm font-medium px-2 sm:px-3 py-1 rounded-full border bg-blue-50 border-blue-200 text-blue-700 inline-flex items-center space-x-2">
-                  <span>{platform.charAt(0).toUpperCase() + platform.slice(1)}</span>
-                  {expanded && <ExternalLink className="w-3 h-3" />}
-                </div>
-              </div>
-            )}
-            
-            {expanded && data.explanation && (
-              <div className="text-xs sm:text-sm text-blue-700 leading-relaxed p-2 sm:p-3 bg-blue-50 rounded-xl sm:rounded-2xl border border-blue-200 mt-3">
-                <span className="font-semibold text-blue-800">Action Details:</span>
-                <div className="mt-1">{data.explanation}</div>
-                
-                {data.action && (
-                  <div className="mt-2 text-xs text-blue-600 space-y-1">
-                    {method && <div><span className="font-medium">Method:</span> {method}</div>}
-                    {data.action.parameters && (
-                      <div>
-                        <span className="font-medium">Parameters:</span>
-                        <pre className="mt-1 p-2 bg-blue-50 rounded text-xs overflow-x-auto backdrop-blur-sm">
-                          {JSON.stringify(data.action.parameters, null, 2)}
-                        </pre>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // CONDITION NODE - Enhanced with dynamic branching
-  const ConditionNodeComponent = () => {
-    const branches = data.branches || [
-      { label: 'Yes', handle: 'true', color: '#8b5cf6' },
-      { label: 'No', handle: 'false', color: '#8b5cf6' }
-    ];
-
-    return (
-      <div 
-        className={`${baseNodeClasses} border-orange-300 hover:border-orange-400 ${
-          selected ? 'border-orange-400 shadow-orange-200' : ''
-        }`}
-        onClick={handleExpansion}
-      >
-        <Handle
-          type="target"
-          position={Position.Left}
-          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-orange-400 !rounded-full shadow-lg"
-        />
-        
-        <div className="flex items-start space-x-3 sm:space-x-4">
-          <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-orange-50 flex items-center justify-center shadow-lg border-2 border-orange-200">
-            <GitBranch className="w-6 h-6 sm:w-7 sm:h-7 text-orange-600" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm sm:text-lg font-bold text-orange-800 leading-tight">
-                CONDITION
-              </div>
-              {expanded ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" />}
-            </div>
-            
-            <div className="text-xs sm:text-sm font-semibold text-orange-700 mb-1">
-              {data.label}
-            </div>
-
-            {data.condition?.expression && (
-              <div className="text-xs sm:text-sm text-orange-600 font-medium mb-2 p-2 bg-orange-50 rounded-xl sm:rounded-2xl border border-orange-200">
-                {data.condition.expression}
-              </div>
-            )}
-            
-            {expanded && data.explanation && (
-              <div className="text-xs sm:text-sm text-orange-700 leading-relaxed p-2 sm:p-3 bg-orange-50 rounded-xl sm:rounded-2xl border border-orange-200 mt-3">
-                <span className="font-semibold text-orange-800">Condition Logic:</span>
-                <div className="mt-1">{data.explanation}</div>
-                
-                {data.condition && (
-                  <div className="mt-2 text-xs text-orange-600 space-y-1">
-                    <div><span className="font-medium">Expression:</span> {data.condition.expression}</div>
-                    <div><span className="font-medium">Branches:</span> {branches.length} paths</div>
-                    {data.condition.if_true && (
-                      <div><span className="font-medium">True Path:</span> {data.condition.if_true.length} steps</div>
-                    )}
-                    {data.condition.if_false && (
-                      <div><span className="font-medium">False Path:</span> {data.condition.if_false.length} steps</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-        
-        {/* Enhanced dynamic branches */}
-        {branches.map((branch, index) => {
-          const totalBranches = branches.length;
-          const topPosition = totalBranches === 1 ? 50 : 20 + (index * (60 / (totalBranches - 1 || 1)));
-          
-          return (
-            <React.Fragment key={branch.handle}>
-              <Handle
-                type="source"
-                position={Position.Right}
-                id={branch.handle}
-                className="w-3 h-3 sm:w-4 sm:h-4 !rounded-full !border-2 shadow-lg !bg-white"
-                style={{ 
-                  top: `${topPosition}%`,
-                  borderColor: '#8b5cf6'
+  return (
+    <TooltipProvider>
+      <div className={`${getNodeStyle(stepType, isRecommended)} min-w-[240px] max-w-[320px] p-4`}>
+        {/* AI Recommendation Actions */}
+        {isRecommended && (onAdd || onDismiss) && (
+          <div className="absolute -top-2 -right-2 flex gap-1">
+            {onAdd && (
+              <Button
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAdd();
                 }}
-              />
-              <div 
-                className="absolute text-xs sm:text-sm font-bold px-2 sm:px-3 py-1 rounded-full border-2 shadow-lg bg-white"
-                style={{ 
-                  top: `${topPosition - 12}%`,
-                  right: '-50px',
-                  borderColor: '#8b5cf6',
-                  color: '#8b5cf6'
-                }}
+                className="w-6 h-6 p-0 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg"
               >
-                {branch.label}
-              </div>
-            </React.Fragment>
-          );
-        })}
-      </div>
-    );
-  };
-
-  // AI AGENT NODE - Enhanced with better recommendations
-  const AIAgentNodeComponent = () => {
-    const isRecommended = data.isRecommended;
-
-    return (
-      <div 
-        className={`${baseNodeClasses} border-emerald-300 hover:border-emerald-400 ${
-          selected ? 'border-emerald-400 shadow-emerald-200' : ''
-        } ${isRecommended ? 'animate-pulse' : ''}`}
-        onClick={handleExpansion}
-      >
-        {isRecommended && (
-          <div className="absolute -top-2 sm:-top-3 -right-2 sm:-right-3 flex gap-1 sm:gap-2">
-            <div className="bg-emerald-500 text-white text-xs font-bold px-1 sm:px-2 py-1 rounded-full animate-bounce">
-              AI+
-            </div>
-            <Button
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                data.onAdd?.();
-              }}
-              className="h-6 w-6 sm:h-8 sm:w-8 p-0 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg"
-            >
-              <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={(e) => {
-                e.stopPropagation();
-                data.onDismiss?.();
-              }}
-              className="h-6 w-6 sm:h-8 sm:w-8 p-0 bg-white hover:bg-gray-50 text-gray-500 border-gray-300 rounded-full shadow-lg"
-            >
-              <X className="w-3 h-3 sm:w-4 sm:h-4" />
-            </Button>
+                <Plus className="w-3 h-3" />
+              </Button>
+            )}
+            {onDismiss && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDismiss();
+                }}
+                className="w-6 h-6 p-0 rounded-full bg-gray-500 hover:bg-gray-600 text-white shadow-lg"
+              >
+                <X className="w-3 h-3" />
+              </Button>
+            )}
           </div>
         )}
-        
-        <Handle
-          type="target"
-          position={Position.Left}
-          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-emerald-400 !rounded-full shadow-lg"
-        />
-        <Handle
-          type="source"
-          position={Position.Right}
-          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-emerald-400 !rounded-full shadow-lg"
-        />
-        
-        <div className="flex items-start space-x-3 sm:space-x-4">
-          <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-emerald-50 flex items-center justify-center shadow-lg border-2 border-emerald-200">
-            <Bot className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-600" />
+
+        {/* Main Node Content */}
+        <div className="flex items-start gap-3">
+          {/* Icon */}
+          <div className={`flex-shrink-0 p-2 rounded-xl ${
+            isRecommended 
+              ? 'bg-emerald-100 text-emerald-600' 
+              : stepType === 'trigger' 
+                ? 'bg-purple-100 text-purple-600'
+                : stepType === 'condition'
+                  ? 'bg-orange-100 text-orange-600'
+                  : stepType === 'ai_agent_call'
+                    ? 'bg-emerald-100 text-emerald-600'
+                    : 'bg-blue-100 text-blue-600'
+          }`}>
+            {getNodeIcon(icon, platform)}
           </div>
+
+          {/* Content */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm sm:text-lg font-bold text-emerald-800 leading-tight">
-                AI AGENT
-              </div>
-              {expanded ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />}
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="font-semibold text-sm text-gray-800 leading-tight line-clamp-2">
+                {label}
+              </h3>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleInfoClick}
+                    className="flex-shrink-0 w-6 h-6 p-0 hover:bg-gray-200 rounded-full"
+                  >
+                    <Info className="w-3 h-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">{explanation}</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
-            
-            <div className="text-xs sm:text-sm font-semibold text-emerald-700 mb-1">
-              {data.label}
-            </div>
-            
-            {expanded && data.agent?.agent_id && (
-              <div className="text-xs sm:text-sm text-emerald-600 font-medium mb-2 p-2 bg-emerald-50 rounded-xl sm:rounded-2xl border border-emerald-200">
-                Agent ID: {data.agent.agent_id}
-              </div>
+
+            {/* Platform Badge */}
+            {platform && (
+              <Badge variant="secondary" className="mt-2 text-xs">
+                {platform}
+              </Badge>
             )}
-            
-            {expanded && data.explanation && (
-              <div className="text-xs sm:text-sm text-emerald-700 leading-relaxed p-2 sm:p-3 bg-emerald-50 rounded-xl sm:rounded-2xl border border-emerald-200 mt-3">
-                <span className="font-semibold text-emerald-800">Agent Purpose:</span>
-                <div className="mt-1">{data.explanation}</div>
-                
-                {data.agent && (
-                  <div className="mt-2 text-xs text-emerald-600 space-y-1">
-                    {data.agent.input_prompt && (
-                      <div><span className="font-medium">Input:</span> {data.agent.input_prompt}</div>
-                    )}
-                    {data.agent.output_variable && (
-                      <div><span className="font-medium">Output:</span> {data.agent.output_variable}</div>
-                    )}
-                    {isRecommended && (
-                      <div className="text-emerald-700 font-semibold">This AI agent is recommended for optimal performance</div>
-                    )}
-                  </div>
-                )}
-              </div>
+
+            {/* AI Recommendation Badge */}
+            {isRecommended && (
+              <Badge className="mt-2 bg-emerald-100 text-emerald-700 text-xs">
+                AI Recommended
+              </Badge>
             )}
-          </div>
-        </div>
-      </div>
-    );
-  };
 
-  const RetryNodeComponent = () => {
-    const maxAttempts = data.retry?.max_attempts || 3;
-
-    return (
-      <div 
-        onClick={handleExpansion}
-        className={`${baseNodeClasses} border-amber-300 hover:border-amber-400 ${
-          selected ? 'border-amber-400 shadow-amber-200' : ''
-        }`}
-      >
-        <Handle
-          type="target"
-          position={Position.Left}
-          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-amber-400 !rounded-full shadow-lg"
-        />
-        <Handle
-          type="source"
-          position={Position.Right}
-          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-amber-400 !rounded-full shadow-lg"
-        />
-        
-        <div className="flex items-start space-x-3 sm:space-x-4">
-          <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-amber-50 flex items-center justify-center shadow-lg border-2 border-amber-200 relative">
-            <RefreshCw className="w-6 h-6 sm:w-7 sm:h-7 text-amber-600" />
-            <div className="absolute -top-1 -right-1 w-5 h-5 sm:w-6 sm:h-6 bg-amber-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
-              {maxAttempts}
-            </div>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm sm:text-lg font-bold text-amber-800 leading-tight">
-                RETRY
-              </div>
-              {expanded ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />}
-            </div>
-            
-            <div className="text-xs sm:text-sm font-semibold text-amber-700 mb-1">
-              {data.label}
-            </div>
-
-            <div className="text-xs sm:text-sm text-amber-600 font-medium mb-2 p-2 bg-amber-50 rounded-xl sm:rounded-2xl border border-amber-200">
-              Max Attempts: {maxAttempts}
-            </div>
-            
-            {expanded && data.explanation && (
-              <div className="text-xs sm:text-sm text-amber-700 leading-relaxed p-2 sm:p-3 bg-amber-50 rounded-xl sm:rounded-2xl border border-amber-200 mt-3">
-                <span className="font-semibold text-amber-800">Retry Configuration:</span>
-                <div className="mt-1">{data.explanation}</div>
-                
-                {data.retry && (
-                  <div className="mt-2 text-xs text-amber-600 space-y-1">
-                    <div><span className="font-medium">Max Attempts:</span> {data.retry.max_attempts}</div>
-                    {data.retry.steps && (
-                      <div><span className="font-medium">Retry Steps:</span> {data.retry.steps.length} actions</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const LoopNodeComponent = () => {
-    return (
-      <div 
-        onClick={handleExpansion}
-        className={`${baseNodeClasses} border-purple-300 hover:border-purple-400 ${
-          selected ? 'border-purple-400 shadow-purple-200' : ''
-        }`}
-      >
-        <Handle
-          type="target"
-          position={Position.Left}
-          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-purple-400 !rounded-full shadow-lg"
-        />
-        <Handle
-          type="source"
-          position={Position.Right}
-          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-purple-400 !rounded-full shadow-lg"
-        />
-        
-        <div className="flex items-start space-x-3 sm:space-x-4">
-          <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-purple-50 flex items-center justify-center shadow-lg border-2 border-purple-200">
-            <Repeat className="w-6 h-6 sm:w-7 sm:h-7 text-purple-600" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm sm:text-lg font-bold text-purple-800 leading-tight">
-                LOOP
-              </div>
-              {expanded ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />}
-            </div>
-            
-            <div className="text-xs sm:text-sm font-semibold text-purple-700 mb-1">
-              {data.label}
-            </div>
-
-            {data.loop?.array_source && (
-              <div className="text-xs sm:text-sm text-purple-600 font-medium mb-2 p-2 bg-purple-50 rounded-xl sm:rounded-2xl border border-purple-200">
-                Iterating: {data.loop.array_source}
-              </div>
-            )}
-            
-            {expanded && data.explanation && (
-              <div className="text-xs sm:text-sm text-purple-700 leading-relaxed p-2 sm:p-3 bg-purple-50 rounded-xl sm:rounded-2xl border border-purple-200 mt-3">
-                <span className="font-semibold text-purple-800">Loop Details:</span>
-                <div className="mt-1">{data.explanation}</div>
-                
-                {data.loop && (
-                  <div className="mt-2 text-xs text-purple-600 space-y-1">
-                    {data.loop.array_source && (
-                      <div><span className="font-medium">Source:</span> {data.loop.array_source}</div>
-                    )}
-                    {data.loop.steps && (
-                      <div><span className="font-medium">Loop Steps:</span> {data.loop.steps.length} actions</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const DelayNodeComponent = () => {
-    const delaySeconds = data.delay?.duration_seconds || 0;
-    const delayDisplay = delaySeconds >= 60 ? `${Math.floor(delaySeconds / 60)}m ${delaySeconds % 60}s` : `${delaySeconds}s`;
-
-    return (
-      <div 
-        onClick={handleExpansion}
-        className={`${baseNodeClasses} border-slate-300 hover:border-slate-400 ${
-          selected ? 'border-slate-400 shadow-slate-200' : ''
-        }`}
-      >
-        <Handle
-          type="target"
-          position={Position.Left}
-          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-slate-400 !rounded-full shadow-lg"
-        />
-        <Handle
-          type="source"
-          position={Position.Right}
-          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-slate-400 !rounded-full shadow-lg"
-        />
-        
-        <div className="flex items-start space-x-3 sm:space-x-4">
-          <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-slate-50 flex items-center justify-center shadow-lg border-2 border-slate-200">
-            <Clock className="w-6 h-6 sm:w-7 sm:h-7 text-slate-600" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm sm:text-lg font-bold text-slate-800 leading-tight">
-                DELAY
-              </div>
-              {expanded ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600" />}
-            </div>
-            
-            <div className="text-xs sm:text-sm font-semibold text-slate-700 mb-1">
-              {data.label}
-            </div>
-
-            <div className="text-xs sm:text-sm text-slate-600 font-medium mb-2 p-2 bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-200">
-              Duration: {delayDisplay}
-            </div>
-            
-            {expanded && data.explanation && (
-              <div className="text-xs sm:text-sm text-slate-700 leading-relaxed p-2 sm:p-3 bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-200 mt-3">
-                <span className="font-semibold text-slate-800">Delay Details:</span>
-                <div className="mt-1">{data.explanation}</div>
-                
-                {data.delay && (
-                  <div className="mt-2 text-xs text-slate-600 space-y-1">
-                    <div><span className="font-medium">Duration:</span> {data.delay.duration_seconds} seconds</div>
-                    <div><span className="font-medium">Purpose:</span> Wait before next action</div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const FallbackNodeComponent = () => {
-    return (
-      <div 
-        onClick={handleExpansion}
-        className={`${baseNodeClasses} border-indigo-300 hover:border-indigo-400 ${
-          selected ? 'border-indigo-400 shadow-indigo-200' : ''
-        }`}
-      >
-        <Handle
-          type="target"
-          position={Position.Left}
-          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-indigo-400 !rounded-full shadow-lg"
-        />
-        
-        <div className="flex items-start space-x-3 sm:space-x-4">
-          <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-indigo-50 flex items-center justify-center shadow-lg border-2 border-indigo-200">
-            <Shield className="w-6 h-6 sm:w-7 sm:h-7 text-indigo-600" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm sm:text-lg font-bold text-indigo-800 leading-tight">
-                {data.stepType === 'stop' ? 'END' : 'FALLBACK'}
-              </div>
-              {expanded ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />}
-            </div>
-            
-            <div className="text-xs sm:text-sm font-semibold text-indigo-700 mb-1">
-              {data.label}
-            </div>
-            
-            {expanded && data.explanation && (
-              <div className="text-xs sm:text-sm text-indigo-700 leading-relaxed p-2 sm:p-3 bg-indigo-50 rounded-xl sm:rounded-2xl border border-indigo-200 mt-3">
-                <span className="font-semibold text-indigo-800">
-                  {data.stepType === 'stop' ? 'End Point:' : 'Fallback Strategy:'}
-                </span>
-                <div className="mt-1">{data.explanation}</div>
-                
-                {data.fallback && (
-                  <div className="mt-2 text-xs text-indigo-600 space-y-1">
-                    {data.fallback.primary_steps && (
-                      <div><span className="font-medium">Primary Steps:</span> {data.fallback.primary_steps.length} actions</div>
-                    )}
-                    {data.fallback.fallback_steps && (
-                      <div><span className="font-medium">Fallback Steps:</span> {data.fallback.fallback_steps.length} actions</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Step Type Badge */}
+            <Badge variant="outline" className="mt-1 text-xs capitalize">
+              {stepType}
+            </Badge>
           </div>
         </div>
 
-        {/* Only show dual handles for fallback, not stop nodes */}
-        {data.stepType !== 'stop' && (
+        {/* Connection Handles */}
+        <Handle
+          type="target"
+          position={Position.Left}
+          className="w-3 h-3 bg-gray-400 border-2 border-white hover:bg-gray-600 transition-colors"
+          style={{ left: -6 }}
+        />
+
+        {/* Source Handles - Dynamic based on node type */}
+        {stepType === 'condition' && branches.length > 0 ? (
+          // Multiple handles for condition branches
+          branches.map((branch: any, index: number) => (
+            <Handle
+              key={branch.handle}
+              type="source"
+              position={Position.Right}
+              id={branch.handle}
+              className="w-3 h-3 bg-gray-400 border-2 border-white hover:bg-gray-600 transition-colors"
+              style={{ 
+                right: -6, 
+                top: `${30 + (index * 20)}%`,
+                backgroundColor: branch.color || '#8b5cf6'
+              }}
+            />
+          ))
+        ) : stepType === 'retry' ? (
+          // Success and failure handles for retry nodes
           <>
             <Handle
               type="source"
               position={Position.Right}
-              id="primary"
-              className="w-3 h-3 sm:w-4 sm:h-4 !rounded-full !border-2 !bg-white shadow-lg"
-              style={{ 
-                top: '35%',
-                borderColor: '#8b5cf6'
-              }}
+              id="success"
+              className="w-3 h-3 bg-green-500 border-2 border-white hover:bg-green-600 transition-colors"
+              style={{ right: -6, top: '40%' }}
             />
-            <div 
-              className="absolute text-xs sm:text-sm font-bold px-2 sm:px-3 py-1 rounded-full border-2 shadow-lg bg-white"
-              style={{ 
-                top: '25%',
-                right: '-50px',
-                borderColor: '#8b5cf6',
-                color: '#8b5cf6'
-              }}
-            >
-              Primary
-            </div>
-
             <Handle
               type="source"
               position={Position.Right}
-              id="fallback"
-              className="w-3 h-3 sm:w-4 sm:h-4 !rounded-full !border-2 !bg-white shadow-lg"
-              style={{ 
-                top: '65%',
-                borderColor: '#8b5cf6'
-              }}
+              id="failure"
+              className="w-3 h-3 bg-red-500 border-2 border-white hover:bg-red-600 transition-colors"
+              style={{ right: -6, top: '60%' }}
             />
-            <div 
-              className="absolute text-xs sm:text-sm font-bold px-2 sm:px-3 py-1 rounded-full border-2 shadow-lg bg-white"
-              style={{ 
-                top: '55%',
-                right: '-50px',
-                borderColor: '#8b5cf6',
-                color: '#8b5cf6'
-              }}
-            >
-              Fallback
-            </div>
           </>
-        )}
+        ) : stepType !== 'end' && stepType !== 'stop' ? (
+          // Standard single handle for most nodes
+          <Handle
+            type="source"
+            position={Position.Right}
+            className="w-3 h-3 bg-gray-400 border-2 border-white hover:bg-gray-600 transition-colors"
+            style={{ right: -6 }}
+          />
+        ) : null}
       </div>
-    );
-  };
-
-  // Main switch statement to determine which component to render
-  switch (type) {
-    case 'triggerNode':
-    case 'platformTriggerNode':
-      return <TriggerNodeComponent />;
-    
-    case 'actionNode':
-    case 'platformNode':
-      return <ActionNodeComponent />;
-    
-    case 'conditionNode':
-    case 'dynamicConditionNode':
-      return <ConditionNodeComponent />;
-    
-    case 'loopNode':
-      return <LoopNodeComponent />;
-    
-    case 'retryNode':
-      return <RetryNodeComponent />;
-    
-    case 'fallbackNode':
-      return <FallbackNodeComponent />;
-    
-    case 'aiAgentNode':
-      return <AIAgentNodeComponent />;
-    
-    case 'delayNode':
-      return <DelayNodeComponent />;
-    
-    default:
-      return <ActionNodeComponent />;
-  }
+    </TooltipProvider>
+  );
 };
 
 export default CustomNodeMapper;

@@ -60,7 +60,7 @@ const AutomationDetail = () => {
     fetchAutomationAndChats();
   }, [user, id, navigate]);
 
-  const generateAndSaveDiagram = async (automationId: string, blueprint: AutomationBlueprint, forceRegenerate = false) => {
+  const generateAndSaveDiagram = async (automationId: string, blueprint: AutomationBlueprint, forceRegenerate = false, userFeedback?: string) => {
     if (!blueprint || !blueprint.steps || blueprint.steps.length === 0) {
       console.warn('❌ No blueprint or steps to generate diagram for');
       toast({
@@ -74,84 +74,47 @@ const AutomationDetail = () => {
     setGeneratingDiagram(true);
     
     try {
-      // ENHANCED step counting with conditional logic support
-      const countAllSteps = (steps: any[]): number => {
-        let count = 0;
-        steps.forEach(step => {
-          count++;
-          
-          // Count conditional branches
-          if (step.condition) {
-            if (step.condition.if_true && Array.isArray(step.condition.if_true)) {
-              count += countAllSteps(step.condition.if_true);
-            }
-            if (step.condition.if_false && Array.isArray(step.condition.if_false)) {
-              count += countAllSteps(step.condition.if_false);
-            }
-          }
-          
-          // Count loop steps
-          if (step.loop && step.loop.steps && Array.isArray(step.loop.steps)) {
-            count += countAllSteps(step.loop.steps);
-          }
-          
-          // Count retry steps
-          if (step.retry && step.retry.steps && Array.isArray(step.retry.steps)) {
-            count += countAllSteps(step.retry.steps);
-          }
-          
-          // Count fallback steps
-          if (step.fallback) {
-            if (step.fallback.primary_steps && Array.isArray(step.fallback.primary_steps)) {
-              count += countAllSteps(step.fallback.primary_steps);
-            }
-            if (step.fallback.fallback_steps && Array.isArray(step.fallback.fallback_steps)) {
-              count += countAllSteps(step.fallback.fallback_steps);
-            }
-          }
-        });
-        return count;
-      };
-
-      const totalSteps = countAllSteps(blueprint.steps);
-      const conditionSteps = blueprint.steps.filter(step => step.type === 'condition').length;
-      const aiAgentSteps = blueprint.steps.filter(step => 
-        step.type === 'ai_agent_call' || 
-        (step as any).ai_recommended === true ||
-        (step.ai_agent_call && (step.ai_agent_call as any).is_recommended)
-      ).length;
-      const retrySteps = blueprint.steps.filter(step => step.type === 'retry').length;
-      
-      console.log('🎨 Generating ENHANCED AI diagram for automation:', automationId);
-      console.log('📊 ENHANCED Blueprint analysis:', {
+      console.log('🚀 Generating OpenAI-powered intelligent diagram for automation:', automationId);
+      console.log('📊 Blueprint analysis:', {
         mainSteps: blueprint.steps.length,
-        totalSteps: totalSteps,
-        conditionSteps: conditionSteps,
-        aiAgentSteps: aiAgentSteps,
-        retrySteps: retrySteps,
-        forceRegenerate: forceRegenerate
+        triggerType: blueprint.trigger?.type,
+        conditionSteps: blueprint.steps.filter(step => step.type === 'condition').length,
+        aiAgentSteps: blueprint.steps.filter(step => 
+          step.type === 'ai_agent_call' || 
+          (step as any).ai_recommended === true ||
+          (step.ai_agent_call && (step.ai_agent_call as any).is_recommended)
+        ).length,
+        forceRegenerate: forceRegenerate,
+        userFeedback: userFeedback ? 'provided' : 'none'
       });
       
-      // Call the enhanced diagram-generator Edge Function
+      // Prepare the request body with user feedback if provided
+      const requestBody: any = { automation_blueprint: blueprint };
+      if (userFeedback && userFeedback.trim()) {
+        requestBody.user_feedback = userFeedback.trim();
+        console.log('🎯 Including user feedback for diagram improvement:', userFeedback.substring(0, 100));
+      }
+      
+      // Call the OpenAI-powered diagram-generator Edge Function
       const { data, error } = await supabase.functions.invoke('diagram-generator', {
-        body: { automation_blueprint: blueprint },
+        body: requestBody,
       });
 
       if (error) {
-        console.error('❌ Error invoking ENHANCED diagram-generator:', error);
+        console.error('❌ Error invoking OpenAI diagram-generator:', error);
         toast({
           title: "Diagram Generation Failed",
-          description: `Error from enhanced diagram-generator: ${error.message || 'Unknown error'}`,
+          description: `Error from OpenAI diagram-generator: ${error.message || 'Unknown error'}`,
           variant: "destructive",
         });
         return;
       }
 
       if (!data) {
-        console.error('❌ No data received from enhanced diagram-generator');
+        console.error('❌ No data received from OpenAI diagram-generator');
         toast({
           title: "No Diagram Data",
-          description: "The enhanced diagram generator returned no data",
+          description: "The OpenAI diagram generator returned no data",
           variant: "destructive",
         });
         return;
@@ -159,9 +122,9 @@ const AutomationDetail = () => {
 
       // Check if there's an error in the response
       if (data.error) {
-        console.error('❌ Enhanced diagram generation error:', data);
+        console.error('❌ OpenAI diagram generation error:', data);
         toast({
-          title: "Enhanced Diagram Generation Error",
+          title: "OpenAI Diagram Generation Error",
           description: `${data.error} (Source: ${data.source || 'unknown'})`,
           variant: "destructive",
         });
@@ -169,10 +132,10 @@ const AutomationDetail = () => {
       }
 
       if (!data.nodes || !data.edges) {
-        console.error('❌ Invalid enhanced diagram data structure received:', data);
+        console.error('❌ Invalid OpenAI diagram data structure received:', data);
         toast({
-          title: "Invalid Enhanced Diagram Data",
-          description: "Received invalid diagram structure from enhanced AI",
+          title: "Invalid OpenAI Diagram Data",
+          description: "Received invalid diagram structure from OpenAI",
           variant: "destructive",
         });
         return;
@@ -182,34 +145,32 @@ const AutomationDetail = () => {
       const edgeCount = data.edges.length;
       const conditionNodeCount = data.nodes.filter((n: any) => n.type?.includes('condition')).length;
       const aiAgentNodeCount = data.nodes.filter((n: any) => n.data?.isRecommended).length;
+      const platformNodeCount = data.nodes.filter((n: any) => n.data?.platform).length;
 
-      console.log('✅ Generated ENHANCED comprehensive diagram:', {
+      console.log('✅ Generated OpenAI-powered comprehensive diagram:', {
         nodes: nodeCount,
         edges: edgeCount,
         conditionNodes: conditionNodeCount,
         aiAgentNodes: aiAgentNodeCount,
-        expectedSteps: totalSteps,
-        expectedConditions: conditionSteps
+        platformNodes: platformNodeCount,
+        source: data.metadata?.source || 'unknown',
+        generatedAt: data.metadata?.generatedAt
       });
 
-      // Enhanced validation
+      // Enhanced validation for OpenAI-generated content
       const validationResults = {
-        sufficientNodes: nodeCount >= Math.max(blueprint.steps.length * 0.8, 1),
-        hasConditions: conditionSteps === 0 || conditionNodeCount > 0,
-        hasAIAgents: aiAgentSteps === 0 || aiAgentNodeCount > 0,
-        hasConnections: edgeCount > 0
+        sufficientNodes: nodeCount >= Math.max(blueprint.steps.length * 0.5, 1),
+        hasConnections: edgeCount > 0,
+        hasIntelligentRouting: data.metadata?.routePathsTerminated > 0,
+        hasAIAnalysis: data.metadata?.source === 'openai-intelligent-generator'
       };
 
       if (!validationResults.sufficientNodes) {
-        console.warn(`⚠️ Enhanced AI generated fewer nodes (${nodeCount}) than expected (${blueprint.steps.length})`);
+        console.warn(`⚠️ OpenAI generated fewer nodes (${nodeCount}) than expected (${blueprint.steps.length})`);
       }
 
-      if (!validationResults.hasConditions && conditionSteps > 0) {
-        console.warn(`⚠️ Expected ${conditionSteps} condition nodes but found ${conditionNodeCount}`);
-      }
-
-      if (!validationResults.hasAIAgents && aiAgentSteps > 0) {
-        console.warn(`⚠️ Expected ${aiAgentSteps} AI agent nodes but found ${aiAgentNodeCount}`);
+      if (!validationResults.hasIntelligentRouting) {
+        console.warn(`⚠️ OpenAI diagram may be missing intelligent route mapping`);
       }
 
       // Save the generated diagram data back to the database
@@ -219,10 +180,10 @@ const AutomationDetail = () => {
         .eq('id', automationId);
 
       if (updateError) {
-        console.error('❌ Error saving enhanced diagram data to DB:', updateError);
+        console.error('❌ Error saving OpenAI diagram data to DB:', updateError);
         toast({
           title: "Save Failed", 
-          description: "Could not save generated enhanced diagram to database",
+          description: "Could not save generated OpenAI diagram to database",
           variant: "destructive",
         });
         return;
@@ -234,16 +195,21 @@ const AutomationDetail = () => {
         automation_diagram_data: data
       }));
 
-      console.log('✅ ENHANCED comprehensive diagram generated and saved successfully!');
+      console.log('✅ OpenAI-powered comprehensive diagram generated and saved successfully!');
+      
+      const successMessage = userFeedback 
+        ? `AI improved the diagram based on your feedback with ${nodeCount} nodes and ${aiAgentNodeCount} AI recommendations!`
+        : `AI created a comprehensive diagram with ${nodeCount} nodes, ${conditionNodeCount} conditions, and ${aiAgentNodeCount} AI recommendations!`;
+      
       toast({
-        title: "Enhanced Diagram Generated Successfully",
-        description: `AI created a comprehensive diagram with ${nodeCount} nodes, ${conditionNodeCount} conditions, and ${aiAgentNodeCount} AI agent recommendations!`,
+        title: "OpenAI Diagram Generated Successfully",
+        description: successMessage,
       });
 
     } catch (err) {
-      console.error('💥 Unexpected error in generateAndSaveDiagram (enhanced):', err);
+      console.error('💥 Unexpected error in OpenAI diagram generation:', err);
       toast({
-        title: "Enhanced Generation Error",
+        title: "OpenAI Generation Error",
         description: `Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`,
         variant: "destructive",
       });
@@ -579,9 +545,9 @@ const AutomationDetail = () => {
     setDismissedAgents(prev => new Set([...prev, agentName]));
   };
 
-  const handleRegenerateDiagram = () => {
+  const handleRegenerateDiagram = (userFeedback?: string) => {
     if (automation?.automation_blueprint) {
-      generateAndSaveDiagram(automation.id, automation.automation_blueprint, true);
+      generateAndSaveDiagram(automation.id, automation.automation_blueprint, true, userFeedback);
     }
   };
 

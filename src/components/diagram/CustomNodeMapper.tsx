@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { 
@@ -10,7 +9,7 @@ import {
   Bot, 
   Clock, 
   PlugZap,
-  FlagCheckered,
+  Flag,
   Settings,
   Play,
   Plus,
@@ -45,7 +44,7 @@ const getNodeIcon = (iconName: string, platform?: string) => {
     case 'Bot': return <Bot className="w-5 h-5" />;
     case 'Clock': return <Clock className="w-5 h-5" />;
     case 'PlugZap': return <PlugZap className="w-5 h-5" />;
-    case 'FlagCheckered': return <FlagCheckered className="w-5 h-5" />;
+    case 'Flag': return <Flag className="w-5 h-5" />;
     case 'Settings': return <Settings className="w-5 h-5" />;
     case 'Play': return <Play className="w-5 h-5" />;
     default: return <Zap className="w-5 h-5" />;

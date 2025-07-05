@@ -172,7 +172,7 @@ const COMPREHENSIVE_DIAGRAM_SYSTEM_PROMPT = `You are an EXPERT Automation Diagra
       "label": "AUTOMATION END" | "PATH END: [REASON]",
       "stepType": "end" | "stop",
       "explanation": "This automation path concludes here",
-      "icon": "FlagCheckered"
+      "icon": "Flag"
     }
   }
   \`\`\`

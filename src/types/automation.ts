@@ -68,25 +68,17 @@ export type AutomationBlueprint = {
   variables?: Record<string, any>;
 };
 
-export type AutomationDiagramData = {
-  nodes: Array<{
-    id: string;
-    type: string;
-    position: { x: number; y: number };
-    data: Record<string, any>; // Contains label, explanation, icon, and specific step details
-    sourcePosition?: string;
-    targetPosition?: string;
-  }>;
-  edges: Array<{
-    id: string;
-    source: string;
-    target: string;
-    animated?: boolean;
-    type?: string;
-    style?: Record<string, any>;
-    label?: string; // Label for the edge (e.g., "True", "Email is Gmail")
-    sourceHandle?: string; // Connects to specific handle on source node
-    labelStyle?: Record<string, any>;
-    labelBgStyle?: Record<string, any>;
-  }>;
-};
+export interface AutomationDiagramData {
+  nodes: any[];
+  edges: any[];
+  metadata?: {
+    totalSteps?: number;
+    conditionalBranches?: number;
+    aiAgentRecommendations?: number;
+    platforms?: string[];
+    routePathsTerminated?: number;
+    generatedAt?: string;
+    triggerType?: string;
+    source?: string;
+  };
+}

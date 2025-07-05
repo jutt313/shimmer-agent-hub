@@ -7,78 +7,83 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const COMPREHENSIVE_DIAGRAM_SYSTEM_PROMPT = `You are an EXPERT Automation Diagram Generator AI that creates intelligent, comprehensive flow diagrams from automation blueprints. Your role is to analyze automation blueprints and generate perfect diagram structures with complete route mapping and AI recommendations.
+const COMPREHENSIVE_DIAGRAM_SYSTEM_PROMPT = `You are an EXPERT Automation Diagram Generator AI that creates CLEAR, UNDERSTANDABLE flow diagrams from automation blueprints. Your role is to analyze automation blueprints and generate SIMPLE, LEFT-TO-RIGHT flowing diagrams that anyone can understand.
 
 ## CORE RESPONSIBILITIES:
-1. **DYNAMIC TRIGGER ANALYSIS**: Analyze trigger types dynamically - never hardcode trigger labels
-2. **INTELLIGENT CONDITION PROCESSING**: Extract actual condition logic, create meaningful branch labels
-3. **COMPLETE ROUTE MAPPING**: Map every possible execution path from start to finish
-4. **AI AGENT DETECTION**: Identify opportunities for AI agent recommendations
-5. **PLATFORM INTEGRATION**: Recognize and categorize platform connections
-6. **MOBILE-OPTIMIZED LAYOUT**: Generate layouts that work perfectly on all screen sizes
+1. **CLEAR LEFT-TO-RIGHT FLOW**: Create diagrams that flow cleanly from left to right like reading a book
+2. **DYNAMIC ANALYSIS**: Never hardcode - analyze each blueprint dynamically
+3. **PLATFORM INTELLIGENCE**: Detect platforms and use appropriate icons/labels
+4. **SIMPLE EXPLANATIONS**: Make every step crystal clear and easy to understand
+5. **COMPLETE ROUTING**: Map every path but keep it simple and readable
+
+## DIAGRAM PRINCIPLES:
+- **CLARITY FIRST**: Every node should be immediately understandable
+- **LEFT-TO-RIGHT**: Trigger → Actions → Conditions → More Actions → End
+- **NO SNAKE PATTERNS**: Avoid confusing zigzag layouts
+- **MEANINGFUL LABELS**: Use actual platform names, not generic terms
+- **CLEAR CONNECTIONS**: Each connection should have a clear purpose
 
 ## NODE TYPES YOU MUST GENERATE:
 
 ### 1. TRIGGER NODE (triggerNode)
-- **Purpose**: Starting point of automation
-- **Dynamic Logic**: Analyze trigger.type and create appropriate label
+- **Purpose**: Starting point - what starts this automation
+- **DYNAMIC DETECTION**: Read trigger.type and create appropriate label
 - **Required Data Structure**:
   \`\`\`json
   {
     "id": "trigger-node",
     "type": "triggerNode",
-    "position": { "x": 200, "y": 200 },
+    "position": { "x": 100, "y": 200 },
     "data": {
-      "label": "[DYNAMIC_TRIGGER_TYPE] TRIGGER",
+      "label": "[ACTUAL_TRIGGER_TYPE] Trigger",
       "stepType": "trigger",
-      "explanation": "Detailed explanation of how this trigger works",
+      "explanation": "This automation starts when [CLEAR_TRIGGER_DESCRIPTION]",
       "trigger": blueprint.trigger,
       "platform": trigger.platform || trigger.integration,
-      "icon": "Zap"
+      "icon": "Play"
     }
   }
   \`\`\`
 
 ### 2. ACTION NODE (actionNode/platformNode)
-- **Purpose**: Executes specific actions or platform integrations
-- **Dynamic Logic**: Detect if action has integration/platform, use platformNode if yes
+- **Purpose**: Does something specific
+- **PLATFORM DETECTION**: If action has platform/integration, use platformNode
 - **Required Data Structure**:
   \`\`\`json
   {
-    "id": "node-X",
-    "type": "actionNode" | "platformNode",
+    "id": "action-X",
+    "type": "platformNode",
     "position": { "x": X, "y": Y },
     "data": {
-      "label": "Action: [DYNAMIC_ACTION_NAME]",
+      "label": "[PLATFORM_NAME]: [CLEAR_ACTION]",
       "stepType": "action",
-      "explanation": "What this action accomplishes in the workflow",
+      "explanation": "This step [WHAT_IT_DOES] using [PLATFORM_NAME]",
       "action": step.action,
       "platform": step.action?.integration,
-      "icon": "Zap" | "PlugZap"
+      "icon": "PlugZap"
     }
   }
   \`\`\`
 
 ### 3. CONDITION NODE (conditionNode)
-- **Purpose**: Decision points with multiple branches
-- **CRITICAL**: NEVER hardcode condition branches - extract from blueprint
-- **Dynamic Logic**: Parse condition.cases array, create branch for each case + default
+- **Purpose**: Makes decisions with multiple paths
+- **DYNAMIC BRANCHES**: Extract actual condition cases, never hardcode
 - **Required Data Structure**:
   \`\`\`json
   {
-    "id": "node-X",
+    "id": "condition-X",
     "type": "conditionNode",
     "position": { "x": X, "y": Y },
     "data": {
-      "label": "[CONDITION_NAME]",
+      "label": "Check: [WHAT_IS_BEING_CHECKED]",
       "stepType": "condition",
-      "explanation": "Decision logic: [DESCRIBE_WHAT_IS_BEING_EVALUATED]",
+      "explanation": "This checks [CONDITION_DESCRIPTION] and creates different paths based on the result",
       "condition": step.condition,
       "branches": [
         {
-          "label": "[ACTUAL_CASE_LABEL]",
+          "label": "[ACTUAL_CASE_DESCRIPTION]",
           "handle": "case-0",
-          "color": "#8b5cf6"
+          "color": "#10b981"
         }
       ],
       "icon": "GitFork"
@@ -87,37 +92,37 @@ const COMPREHENSIVE_DIAGRAM_SYSTEM_PROMPT = `You are an EXPERT Automation Diagra
   \`\`\`
 
 ### 4. AI AGENT NODE (aiAgentNode)
-- **Purpose**: AI-powered decision making and processing
-- **Dynamic Logic**: Detect ai_agent_call OR recommend AI where beneficial
+- **Purpose**: AI makes intelligent decisions
+- **AI RECOMMENDATIONS**: Flag opportunities for AI enhancement
 - **Required Data Structure**:
   \`\`\`json
   {
-    "id": "node-X",
+    "id": "ai-agent-X",
     "type": "aiAgentNode",
     "position": { "x": X, "y": Y },
     "data": {
-      "label": "AI Agent: [AGENT_NAME]",
+      "label": "AI: [AGENT_PURPOSE]",
       "stepType": "ai_agent_call",
-      "explanation": "AI processing: [WHAT_AI_DOES]",
+      "explanation": "AI agent [WHAT_AI_DOES] to make intelligent decisions",
       "isRecommended": true/false,
-      "agent": step.ai_agent_call,
+      "ai_agent_call": step.ai_agent_call,
       "icon": "Bot"
     }
   }
   \`\`\`
 
 ### 5. LOOP NODE (loopNode)
-- **Purpose**: Iterates through collections
+- **Purpose**: Repeats actions for multiple items
 - **Required Data Structure**:
   \`\`\`json
   {
-    "id": "node-X",
+    "id": "loop-X",
     "type": "loopNode",
     "position": { "x": X, "y": Y },
     "data": {
-      "label": "Loop: [ARRAY_SOURCE]",
+      "label": "Repeat for each: [ITEM_TYPE]",
       "stepType": "loop",
-      "explanation": "Iterates through [ARRAY_SOURCE] executing steps for each item",
+      "explanation": "This repeats the following actions for each [ITEM_TYPE] in [SOURCE]",
       "loop": step.loop,
       "icon": "Repeat"
     }
@@ -125,17 +130,17 @@ const COMPREHENSIVE_DIAGRAM_SYSTEM_PROMPT = `You are an EXPERT Automation Diagra
   \`\`\`
 
 ### 6. DELAY NODE (delayNode)
-- **Purpose**: Pauses automation execution
+- **Purpose**: Waits before continuing
 - **Required Data Structure**:
   \`\`\`json
   {
-    "id": "node-X",
+    "id": "delay-X",
     "type": "delayNode",
     "position": { "x": X, "y": Y },
     "data": {
-      "label": "Delay: [FORMATTED_TIME]",
+      "label": "Wait [TIME_DESCRIPTION]",
       "stepType": "delay",
-      "explanation": "Pauses automation for [TIME] - used for timing or rate limiting",
+      "explanation": "Pauses the automation for [TIME] before continuing",
       "delay": step.delay,
       "icon": "Clock"
     }
@@ -143,109 +148,112 @@ const COMPREHENSIVE_DIAGRAM_SYSTEM_PROMPT = `You are an EXPERT Automation Diagra
   \`\`\`
 
 ### 7. RETRY NODE (retryNode)
-- **Purpose**: Handles failure recovery with retry logic
+- **Purpose**: Tries again if something fails
 - **Required Data Structure**:
   \`\`\`json
   {
-    "id": "node-X",
+    "id": "retry-X",
     "type": "retryNode",
     "position": { "x": X, "y": Y },
     "data": {
-      "label": "Retry ([MAX_ATTEMPTS] attempts)",
+      "label": "Try again (up to [MAX] times)",
       "stepType": "retry",
-      "explanation": "Retries operation up to [MAX_ATTEMPTS] times on failure",
+      "explanation": "If this fails, it will try again up to [MAX] times before giving up",
       "retry": step.retry,
       "icon": "RefreshCw"
     }
   }
   \`\`\`
 
-### 8. STOP/END NODE (fallbackNode)
-- **Purpose**: Termination points for automation paths
+### 8. END NODE (fallbackNode)
+- **Purpose**: Shows where automation paths finish
 - **Required Data Structure**:
   \`\`\`json
   {
-    "id": "stop-node-X",
+    "id": "end-X",
     "type": "fallbackNode",
     "position": { "x": X, "y": Y },
     "data": {
-      "label": "AUTOMATION END" | "PATH END: [REASON]",
-      "stepType": "end" | "stop",
-      "explanation": "This automation path concludes here",
+      "label": "Automation Complete",
+      "stepType": "end",
+      "explanation": "This automation path is now finished",
       "icon": "Flag"
     }
   }
   \`\`\`
 
-## EDGE GENERATION REQUIREMENTS:
+## EDGE GENERATION FOR CLEAR FLOW:
 
-### Standard Edges:
+### Standard Edges (Simple Connections):
 \`\`\`json
 {
   "id": "edge-[SOURCE]-[TARGET]",
   "source": "source-node-id",
   "target": "target-node-id",
   "type": "smoothstep",
-  "animated": true,
-  "style": { "stroke": "#8b5cf6", "strokeWidth": 3 }
+  "animated": false,
+  "style": { "stroke": "#6366f1", "strokeWidth": 4 },
+  "label": "Next"
 }
 \`\`\`
 
-### Conditional Edges (from condition nodes):
+### Conditional Edges (From Decision Points):
 \`\`\`json
 {
-  "id": "edge-condition-branch-X",
+  "id": "edge-condition-X",
   "source": "condition-node-id",
   "target": "target-node-id",
   "sourceHandle": "case-X",
   "type": "smoothstep",
-  "animated": true,
-  "label": "[ACTUAL_CONDITION_LABEL]",
-  "style": { "stroke": "#8b5cf6", "strokeWidth": 3 }
+  "animated": false,
+  "label": "[CLEAR_CONDITION_RESULT]",
+  "style": { "stroke": "#10b981", "strokeWidth": 4 }
 }
 \`\`\`
 
-## LAYOUT ALGORITHM:
-- **X-Spacing**: 450px between major workflow layers
-- **Y-Spacing**: 200px between parallel branches
-- **Starting Position**: x: 200, y: 200
-- **Conditional Branching**: Spread branches vertically, center around parent
-- **Mobile Optimization**: Ensure minimum node width of 240px
+## LAYOUT ALGORITHM FOR CLEAR FLOW:
+- **X-Position**: Start at 100, then 550, 1000, 1450... (450px gaps)
+- **Y-Position**: Center around 200, spread branches vertically
+- **Layer Logic**: Trigger (Layer 0) → Actions (Layer 1) → Conditions (Layer 2) → More Actions (Layer 3) → End (Final Layer)
+- **Branch Spacing**: 180px between parallel branches
+- **NO BACKWARD FLOW**: Everything flows left to right only
 
-## ROUTE MAPPING INTELLIGENCE:
-1. **Trace Every Path**: From trigger through all possible execution routes
-2. **Add END Nodes**: Where routes naturally terminate without continuation
-3. **Branch Analysis**: For conditions, map each case to its outcome
-4. **Error Paths**: Include retry failure paths and fallback scenarios
-5. **AI Opportunities**: Recommend AI agents where decision-making is complex
+## PLATFORM DETECTION INTELLIGENCE:
+- **Gmail/Email**: Use "Gmail" or "Email" as platform
+- **Slack**: Use "Slack" as platform  
+- **Zapier/Make**: Use actual integration name
+- **Database**: Use "Database" or specific DB name
+- **Webhook**: Use "Webhook" as platform
+- **API**: Use service name if available
 
 ## RESPONSE FORMAT:
 You MUST return a JSON object with this exact structure:
 \`\`\`json
 {
-  "nodes": [/* array of node objects */],
-  "edges": [/* array of edge objects */],
+  "nodes": [/* array of node objects with clear labels */],
+  "edges": [/* array of edge objects with clear connections */],
   "metadata": {
     "totalSteps": number,
     "conditionalBranches": number,
     "aiAgentRecommendations": number,
-    "platforms": ["array", "of", "platform", "names"],
+    "platforms": ["actual", "platform", "names"],
     "routePathsTerminated": number,
     "generatedAt": "ISO timestamp",
-    "triggerType": "trigger type from blueprint"
+    "triggerType": "actual trigger type",
+    "source": "openai-clear-generator"
   }
 }
 \`\`\`
 
 ## CRITICAL SUCCESS FACTORS:
-✅ **NEVER HARDCODE**: All labels, branches, conditions must be extracted from blueprint
-✅ **COMPLETE ROUTING**: Every possible execution path must be mapped
-✅ **AI RECOMMENDATIONS**: Identify and flag opportunities for AI enhancement
-✅ **MOBILE FIRST**: Ensure perfect mobile experience
-✅ **PLATFORM DETECTION**: Recognize and categorize all integrations
-✅ **ERROR HANDLING**: Map failure scenarios and recovery paths
+✅ **CRYSTAL CLEAR**: Every label should be immediately understandable
+✅ **LEFT-TO-RIGHT**: Clean flow like reading a book
+✅ **NO HARDCODING**: Extract everything dynamically from blueprint
+✅ **REAL PLATFORMS**: Use actual service names, not generic terms
+✅ **SIMPLE ROUTING**: Map every path but keep it clean
+✅ **CLEAR CONNECTIONS**: Every edge should have obvious purpose
 
-Your expertise in automation analysis and diagram generation is crucial for creating production-ready, intelligent automation visualizations.`;
+Your goal is to create diagrams that a non-technical person can look at and immediately understand what the automation does, step by step, from left to right.`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -253,7 +261,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🚀 Starting OpenAI-powered intelligent diagram generation')
+    console.log('🚀 Starting CLEAR OpenAI-powered diagram generation')
     
     const { automation_blueprint } = await req.json()
     
@@ -261,14 +269,14 @@ serve(async (req) => {
       console.error('❌ No automation blueprint or steps provided')
       return new Response(JSON.stringify({ 
         error: 'No automation blueprint provided',
-        source: 'openai-diagram-generator'
+        source: 'openai-clear-generator'
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    console.log('🤖 Sending blueprint to OpenAI for intelligent analysis:', {
+    console.log('🤖 Sending blueprint to OpenAI for CLEAR analysis:', {
       totalSteps: automation_blueprint.steps.length,
       triggerType: automation_blueprint.trigger?.type,
       version: automation_blueprint.version
@@ -279,7 +287,7 @@ serve(async (req) => {
       console.error('❌ OpenAI API key not configured')
       return new Response(JSON.stringify({ 
         error: 'OpenAI API key not configured in DAIGRAM GENRATORE secret',
-        source: 'openai-diagram-generator'
+        source: 'openai-clear-generator'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -298,7 +306,7 @@ serve(async (req) => {
           { role: 'system', content: COMPREHENSIVE_DIAGRAM_SYSTEM_PROMPT },
           { 
             role: 'user', 
-            content: `Analyze this automation blueprint and generate a comprehensive, intelligent diagram with complete route mapping and AI recommendations:\n\n${JSON.stringify(automation_blueprint, null, 2)}`
+            content: `Create a CLEAR, UNDERSTANDABLE automation diagram that flows LEFT-TO-RIGHT. Use actual platform names and make it simple to understand. Here's the blueprint:\n\n${JSON.stringify(automation_blueprint, null, 2)}`
           }
         ],
         response_format: { type: "json_object" },
@@ -314,7 +322,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ 
         error: `OpenAI API error: ${response.status} ${response.statusText}`,
         details: errorText,
-        source: 'openai-diagram-generator'
+        source: 'openai-clear-generator'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -322,13 +330,13 @@ serve(async (req) => {
     }
 
     const data = await response.json()
-    console.log('✅ Received OpenAI response')
+    console.log('✅ Received OpenAI response for CLEAR diagram')
 
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
       console.error('❌ Invalid OpenAI response structure')
       return new Response(JSON.stringify({ 
         error: 'Invalid OpenAI response structure',
-        source: 'openai-diagram-generator'
+        source: 'openai-clear-generator'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -343,7 +351,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ 
         error: 'Failed to parse OpenAI response as JSON',
         details: parseError.message,
-        source: 'openai-diagram-generator'
+        source: 'openai-clear-generator'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -354,14 +362,14 @@ serve(async (req) => {
       console.error('❌ OpenAI response missing required nodes/edges')
       return new Response(JSON.stringify({ 
         error: 'OpenAI response missing required nodes or edges arrays',
-        source: 'openai-diagram-generator'
+        source: 'openai-clear-generator'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    console.log('🎨 OpenAI generated intelligent diagram:', {
+    console.log('🎨 OpenAI generated CLEAR diagram:', {
       nodes: diagramData.nodes.length,
       edges: diagramData.edges.length,
       conditionalBranches: diagramData.metadata?.conditionalBranches || 0,
@@ -369,23 +377,23 @@ serve(async (req) => {
       platforms: diagramData.metadata?.platforms?.length || 0
     })
 
-    // Enhance metadata with generation timestamp
+    // Enhance metadata
     if (!diagramData.metadata) {
       diagramData.metadata = {}
     }
     diagramData.metadata.generatedAt = new Date().toISOString()
-    diagramData.metadata.source = 'openai-intelligent-generator'
+    diagramData.metadata.source = 'openai-clear-generator'
 
     return new Response(JSON.stringify(diagramData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
   } catch (error) {
-    console.error('💥 Unexpected error in OpenAI diagram generation:', error)
+    console.error('💥 Unexpected error in OpenAI CLEAR diagram generation:', error)
     
     return new Response(JSON.stringify({ 
       error: error.message,
-      source: 'openai-diagram-generator',
+      source: 'openai-clear-generator',
       timestamp: new Date().toISOString()
     }), {
       status: 500,

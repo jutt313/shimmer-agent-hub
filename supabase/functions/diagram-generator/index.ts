@@ -50,7 +50,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🎨 Starting CLEAN diagram generation with proper sequential flow')
+    console.log('🎯 Starting ENHANCED diagram generation with dynamic triggers and intelligent routing')
     
     const { automation_blueprint } = await req.json()
     
@@ -65,7 +65,7 @@ serve(async (req) => {
       })
     }
 
-    console.log('📊 Blueprint analysis:', {
+    console.log('📊 Enhanced blueprint analysis:', {
       totalSteps: automation_blueprint.steps.length,
       triggerType: automation_blueprint.trigger?.type,
       version: automation_blueprint.version
@@ -79,10 +79,88 @@ serve(async (req) => {
     const baseY = 200
     let nodeCounter = 0
 
+    // Helper function to get dynamic trigger type and explanation
+    const getTriggerInfo = (trigger: any) => {
+      if (!trigger) return { type: 'MANUAL', explanation: 'Automation starts manually when triggered by user' }
+      
+      const triggerType = trigger.type?.toUpperCase() || 'MANUAL'
+      let explanation = ''
+      
+      switch (trigger.type) {
+        case 'webhook':
+          explanation = `Automation triggered by incoming webhook from external service. Endpoint: ${trigger.webhook_endpoint || 'Generated webhook URL'}`
+          break
+        case 'scheduled':
+          explanation = `Automation runs on schedule: ${trigger.cron_expression || 'Custom schedule'}. Runs automatically at specified times.`
+          break
+        case 'manual':
+          explanation = 'Automation starts when manually triggered by user action or API call.'
+          break
+        case 'platform':
+          explanation = `Automation triggered by ${trigger.platform || 'platform'} events. Monitors for specific platform activities.`
+          break
+        default:
+          explanation = `Automation triggered by ${trigger.type} events. Starts when specified conditions are met.`
+      }
+      
+      return { type: `${triggerType} TRIGGER`, explanation }
+    }
+
+    // Helper function to extract intelligent condition labels
+    const getConditionBranches = (condition: any) => {
+      if (!condition || !condition.expression) {
+        return [
+          { label: 'True', handle: 'true', color: '#8b5cf6' },
+          { label: 'False', handle: 'false', color: '#8b5cf6' }
+        ]
+      }
+      
+      const expression = condition.expression.toLowerCase()
+      
+      // Extract meaningful labels from common condition patterns
+      if (expression.includes('gender') || expression.includes('sex')) {
+        return [
+          { label: 'Male', handle: 'male', color: '#8b5cf6' },
+          { label: 'Female', handle: 'female', color: '#8b5cf6' }
+        ]
+      } else if (expression.includes('age')) {
+        return [
+          { label: 'Young', handle: 'young', color: '#8b5cf6' },
+          { label: 'Adult', handle: 'adult', color: '#8b5cf6' }
+        ]
+      } else if (expression.includes('priority') || expression.includes('urgent')) {
+        return [
+          { label: 'High Priority', handle: 'high', color: '#8b5cf6' },
+          { label: 'Normal Priority', handle: 'normal', color: '#8b5cf6' }
+        ]
+      } else if (expression.includes('status') || expression.includes('active')) {
+        return [
+          { label: 'Active', handle: 'active', color: '#8b5cf6' },
+          { label: 'Inactive', handle: 'inactive', color: '#8b5cf6' }
+        ]
+      } else if (expression.includes('type') || expression.includes('category')) {
+        return [
+          { label: 'Category A', handle: 'catA', color: '#8b5cf6' },
+          { label: 'Category B', handle: 'catB', color: '#8b5cf6' }
+        ]
+      } else if (expression.includes('amount') || expression.includes('price') || expression.includes('cost')) {
+        return [
+          { label: 'High Value', handle: 'high_value', color: '#8b5cf6' },
+          { label: 'Low Value', handle: 'low_value', color: '#8b5cf6' }
+        ]
+      } else {
+        // Fallback to True/False for complex expressions
+        return [
+          { label: 'Yes', handle: 'true', color: '#8b5cf6' },
+          { label: 'No', handle: 'false', color: '#8b5cf6' }
+        ]
+      }
+    }
+
     // Helper function to get node type mapping
     const getNodeType = (step: any): string => {
       if (step.type === 'condition') return 'conditionNode'
-      if (step.type === 'ai_agent_call' || step.is_recommended) return 'aiAgentNode'
+      if (step.type === 'ai_agent_call' || step.is_recommended || step.ai_recommended) return 'aiAgentNode'
       if (step.type === 'retry') return 'retryNode'
       if (step.type === 'fallback') return 'fallbackNode'
       if (step.type === 'delay') return 'delayNode'
@@ -91,13 +169,40 @@ serve(async (req) => {
       return 'actionNode'
     }
 
-    // Helper function to get clean node data without emojis
+    // Helper function to generate enhanced explanations
+    const generateEnhancedExplanation = (step: any): string => {
+      if (step.type === 'condition') {
+        return `This decision point evaluates "${step.condition?.expression || 'conditional logic'}" and routes the automation to different paths based on the result. Each path can have different actions and outcomes.`
+      }
+      if (step.type === 'ai_agent_call' || step.is_recommended || step.ai_recommended) {
+        return `AI Agent intelligently processes "${step.ai_agent_call?.input_prompt || step.name || 'automation data'}" and provides smart analysis and decision-making. This enhances automation accuracy and handles complex scenarios.`
+      }
+      if (step.type === 'retry') {
+        return `Retry mechanism ensures reliability by attempting the operation up to ${step.retry?.max_attempts || 3} times if failures occur. This improves automation success rates.`
+      }
+      if (step.action?.integration) {
+        const integration = step.action.integration
+        const method = step.action.method || 'action'
+        return `Connects to ${integration} platform to perform "${method}" operation. This integrates your automation with external services and platforms.`
+      }
+      if (step.type === 'delay') {
+        const seconds = step.delay?.duration_seconds || 0
+        const time = seconds >= 60 ? `${Math.floor(seconds / 60)} minutes` : `${seconds} seconds`
+        return `Pauses automation for ${time} to allow time for external processes or to avoid rate limits. This ensures proper timing and coordination.`
+      }
+      if (step.type === 'loop') {
+        return `Repeats a set of actions for each item in "${step.loop?.array_source || 'data collection'}". This enables bulk processing and batch operations.`
+      }
+      return `Executes ${step.type} operation: ${step.name}. This step is part of your automation workflow and performs specific business logic.`
+    }
+
+    // Helper function to get clean node data
     const getNodeData = (step: any) => {
       const baseData = {
         label: step.name || 'Automation Step',
         stepType: step.type,
-        explanation: step.description || generateExplanation(step),
-        isRecommended: Boolean(step.is_recommended)
+        explanation: step.description || generateEnhancedExplanation(step),
+        isRecommended: Boolean(step.is_recommended || step.ai_recommended)
       }
 
       // Add platform-specific data
@@ -107,31 +212,27 @@ serve(async (req) => {
         baseData.stepDetails = step.action
       }
 
-      // Add condition-specific data with clean branches
+      // Add condition-specific data with intelligent branches
       if (step.type === 'condition' && step.condition) {
         baseData.condition = step.condition
-        baseData.branches = [
-          { label: 'True', handle: 'true', color: '#8b5cf6' },
-          { label: 'False', handle: 'false', color: '#8b5cf6' }
-        ]
+        baseData.branches = getConditionBranches(step.condition)
       }
 
-      // Add AI agent data
+      // Add AI agent data with recommendation flag
       if (step.type === 'ai_agent_call' && step.ai_agent_call) {
         baseData.agent = step.ai_agent_call
+        baseData.isRecommended = true
       }
 
-      // Add retry data
+      // Add other step-specific data
       if (step.type === 'retry' && step.retry) {
         baseData.retry = step.retry
       }
 
-      // Add delay data
       if (step.type === 'delay' && step.delay) {
         baseData.delay = step.delay
       }
 
-      // Add loop data
       if (step.type === 'loop' && step.loop) {
         baseData.loop = step.loop
       }
@@ -139,31 +240,37 @@ serve(async (req) => {
       return baseData
     }
 
-    // Helper function to generate clean explanation
-    const generateExplanation = (step: any): string => {
-      if (step.type === 'condition') {
-        return `Evaluates ${step.condition?.expression || 'conditional logic'} and routes to different paths based on the result.`
+    // Create STOP node helper
+    const createStopNode = (x: number, y: number): DiagramNode => {
+      nodeCounter++
+      return {
+        id: `stop-node-${nodeCounter}`,
+        type: 'fallbackNode',
+        position: { x, y },
+        data: {
+          label: 'END',
+          stepType: 'stop',
+          explanation: 'Automation ends here. No further steps are executed in this path.',
+          isRecommended: false
+        },
+        sourcePosition: 'right',
+        targetPosition: 'left'
       }
-      if (step.type === 'ai_agent_call') {
-        return `AI Agent processes ${step.ai_agent_call?.input_prompt || 'intelligent analysis'} and provides intelligent insights.`
-      }
-      if (step.action?.integration) {
-        return `Performs ${step.action.method || 'action'} in ${step.action.integration}`
-      }
-      return `Executes ${step.type} step: ${step.name}`
     }
 
-    // Create trigger node if exists
+    // Create dynamic trigger node
     if (automation_blueprint.trigger) {
+      const triggerInfo = getTriggerInfo(automation_blueprint.trigger)
       const triggerNode: DiagramNode = {
         id: 'trigger-node',
         type: 'triggerNode',
         position: { x: baseX, y: baseY },
         data: {
-          label: `${automation_blueprint.trigger.type?.toUpperCase() || 'MANUAL'} TRIGGER`,
+          label: triggerInfo.type,
           stepType: 'trigger',
-          explanation: `Automation starts when ${automation_blueprint.trigger.type || 'manually triggered'}`,
-          trigger: automation_blueprint.trigger
+          explanation: triggerInfo.explanation,
+          trigger: automation_blueprint.trigger,
+          platform: automation_blueprint.trigger.platform || automation_blueprint.trigger.integration
         },
         sourcePosition: 'right',
         targetPosition: 'left'
@@ -172,9 +279,10 @@ serve(async (req) => {
       nodes.push(triggerNode)
     }
 
-    // Process main steps sequentially for proper left-to-right flow
-    const processStepsSequentially = (steps: any[], startX: number, startY: number, parentId?: string): string[] => {
+    // Enhanced step processing with complete route explanation
+    const processStepsWithRouting = (steps: any[], startX: number, startY: number, parentId?: string, routePath: string = ''): { nodeIds: string[], endNodes: string[] } => {
       const processedNodeIds: string[] = []
+      const endNodeIds: string[] = []
       let currentX = startX
       
       for (let i = 0; i < steps.length; i++) {
@@ -182,7 +290,7 @@ serve(async (req) => {
         nodeCounter++
         const nodeId = `node-${nodeCounter}`
         
-        // Create node with proper left-to-right positioning
+        // Create node with enhanced positioning
         const node: DiagramNode = {
           id: nodeId,
           type: getNodeType(step),
@@ -195,9 +303,8 @@ serve(async (req) => {
         nodes.push(node)
         processedNodeIds.push(nodeId)
 
-        // Create sequential connection to previous node
+        // Create sequential connection
         if (i === 0 && parentId) {
-          // Connect to parent (trigger or previous section)
           edges.push({
             id: `edge-${parentId}-${nodeId}`,
             source: parentId,
@@ -207,7 +314,6 @@ serve(async (req) => {
             style: { stroke: '#8b5cf6', strokeWidth: 3 }
           })
         } else if (i > 0) {
-          // Connect to previous node in sequence
           const previousNodeId = processedNodeIds[i - 1]
           edges.push({
             id: `edge-${previousNodeId}-${nodeId}`,
@@ -219,75 +325,120 @@ serve(async (req) => {
           })
         }
 
-        // Handle condition branching
+        // Handle intelligent condition branching with STOP nodes
         if (step.type === 'condition' && step.condition) {
-          let branchY = startY - 150 // True branch above
+          const branches = getConditionBranches(step.condition)
           
-          // Process true branch
-          if (step.condition.if_true && Array.isArray(step.condition.if_true)) {
-            const trueBranchIds = processStepsSequentially(
+          // Process true/first branch
+          if (step.condition.if_true && Array.isArray(step.condition.if_true) && step.condition.if_true.length > 0) {
+            const trueBranchY = startY - 150
+            const trueBranchResult = processStepsWithRouting(
               step.condition.if_true,
               currentX + xSpacing,
-              branchY,
-              nodeId
+              trueBranchY,
+              nodeId,
+              `${routePath} -> ${branches[0].label}`
             )
             
-            if (trueBranchIds.length > 0) {
+            if (trueBranchResult.nodeIds.length > 0) {
               edges.push({
-                id: `edge-${nodeId}-true-${trueBranchIds[0]}`,
+                id: `edge-${nodeId}-true-${trueBranchResult.nodeIds[0]}`,
                 source: nodeId,
-                target: trueBranchIds[0],
-                sourceHandle: 'true',
+                target: trueBranchResult.nodeIds[0],
+                sourceHandle: branches[0].handle,
                 type: 'smoothstep',
                 animated: true,
-                label: 'True',
+                label: branches[0].label,
                 style: { stroke: '#8b5cf6', strokeWidth: 3 }
               })
             }
+            endNodeIds.push(...trueBranchResult.endNodes)
+          } else {
+            // Add STOP node for empty true branch
+            const stopNode = createStopNode(currentX + xSpacing, startY - 150)
+            nodes.push(stopNode)
+            edges.push({
+              id: `edge-${nodeId}-true-stop`,
+              source: nodeId,
+              target: stopNode.id,
+              sourceHandle: branches[0].handle,
+              type: 'smoothstep',
+              animated: true,
+              label: branches[0].label,
+              style: { stroke: '#8b5cf6', strokeWidth: 3 }
+            })
+            endNodeIds.push(stopNode.id)
           }
 
-          // Process false branch
-          branchY = startY + 150 // False branch below
-          if (step.condition.if_false && Array.isArray(step.condition.if_false)) {
-            const falseBranchIds = processStepsSequentially(
+          // Process false/second branch
+          if (step.condition.if_false && Array.isArray(step.condition.if_false) && step.condition.if_false.length > 0) {
+            const falseBranchY = startY + 150
+            const falseBranchResult = processStepsWithRouting(
               step.condition.if_false,
               currentX + xSpacing,
-              branchY,
-              nodeId
+              falseBranchY,
+              nodeId,
+              `${routePath} -> ${branches[1].label}`
             )
             
-            if (falseBranchIds.length > 0) {
+            if (falseBranchResult.nodeIds.length > 0) {
               edges.push({
-                id: `edge-${nodeId}-false-${falseBranchIds[0]}`,
+                id: `edge-${nodeId}-false-${falseBranchResult.nodeIds[0]}`,
                 source: nodeId,
-                target: falseBranchIds[0],
-                sourceHandle: 'false',
+                target: falseBranchResult.nodeIds[0],
+                sourceHandle: branches[1].handle,
                 type: 'smoothstep',
                 animated: true,
-                label: 'False',
+                label: branches[1].label,
                 style: { stroke: '#8b5cf6', strokeWidth: 3 }
               })
             }
+            endNodeIds.push(...falseBranchResult.endNodes)
+          } else {
+            // Add STOP node for empty false branch
+            const stopNode = createStopNode(currentX + xSpacing, startY + 150)
+            nodes.push(stopNode)
+            edges.push({
+              id: `edge-${nodeId}-false-stop`,
+              source: nodeId,
+              target: stopNode.id,
+              sourceHandle: branches[1].handle,
+              type: 'smoothstep',
+              animated: true,
+              label: branches[1].label,
+              style: { stroke: '#8b5cf6', strokeWidth: 3 }
+            })
+            endNodeIds.push(stopNode.id)
           }
+          
+          // This condition node doesn't continue linearly
+          break
         }
 
         currentX += xSpacing
+        
+        // If this is the last step, mark it as an end node
+        if (i === steps.length - 1) {
+          endNodeIds.push(nodeId)
+        }
       }
 
-      return processedNodeIds
+      return { nodeIds: processedNodeIds, endNodes: endNodeIds }
     }
 
-    // Process all steps starting from trigger
+    // Process all steps with enhanced routing
     const triggerParentId = automation_blueprint.trigger ? 'trigger-node' : undefined
     const startX = automation_blueprint.trigger ? baseX + xSpacing : baseX
     
-    processStepsSequentially(automation_blueprint.steps, startX, baseY, triggerParentId)
+    const mainResult = processStepsWithRouting(automation_blueprint.steps, startX, baseY, triggerParentId, 'Main Flow')
 
-    console.log('✅ Clean diagram generation completed!', {
+    console.log('✅ Enhanced diagram generation completed successfully!', {
       totalNodes: nodes.length,
       totalEdges: edges.length,
       conditionNodes: nodes.filter(n => n.type === 'conditionNode').length,
-      aiAgentNodes: nodes.filter(n => n.data.isRecommended).length
+      aiAgentNodes: nodes.filter(n => n.data.isRecommended).length,
+      stopNodes: nodes.filter(n => n.data.stepType === 'stop').length,
+      endNodes: mainResult.endNodes.length
     })
 
     const result = {
@@ -298,7 +449,10 @@ serve(async (req) => {
         conditionalBranches: nodes.filter(n => n.type === 'conditionNode').length,
         aiAgentRecommendations: nodes.filter(n => n.data.isRecommended).length,
         platforms: [...new Set(nodes.map(n => n.data.platform).filter(Boolean))],
-        generatedAt: new Date().toISOString()
+        routePaths: mainResult.endNodes.length,
+        stopNodes: nodes.filter(n => n.data.stepType === 'stop').length,
+        generatedAt: new Date().toISOString(),
+        triggerType: automation_blueprint.trigger?.type || 'manual'
       }
     }
 
@@ -307,7 +461,7 @@ serve(async (req) => {
     })
 
   } catch (error) {
-    console.error('💥 Error in clean diagram generation:', error)
+    console.error('💥 Error in enhanced diagram generation:', error)
     
     return new Response(JSON.stringify({ 
       error: error.message,

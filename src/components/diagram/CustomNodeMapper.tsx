@@ -15,10 +15,18 @@ import {
   Plus,
   X,
   ExternalLink,
-  AlertTriangle
+  AlertTriangle,
+  Globe,
+  Mail,
+  Calendar,
+  Database,
+  MessageSquare,
+  FileText,
+  Users,
+  CreditCard,
+  Workflow
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getPlatformIconConfig } from '@/utils/platformIcons';
 
 interface NodeData {
   label: string;
@@ -66,19 +74,43 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
     setExpanded(!expanded);
   };
 
-  // Clean base node styling with rounded corners
+  // Enhanced platform icon mapping
+  const getPlatformIcon = (platform: string, method?: string) => {
+    const platformLower = platform?.toLowerCase() || '';
+    
+    // Platform-specific icons
+    if (platformLower.includes('gmail') || platformLower.includes('email')) return Mail;
+    if (platformLower.includes('calendar') || platformLower.includes('google calendar')) return Calendar;
+    if (platformLower.includes('slack') || platformLower.includes('discord')) return MessageSquare;
+    if (platformLower.includes('database') || platformLower.includes('sql')) return Database;
+    if (platformLower.includes('webhook') || platformLower.includes('api')) return Globe;
+    if (platformLower.includes('stripe') || platformLower.includes('payment')) return CreditCard;
+    if (platformLower.includes('notion') || platformLower.includes('document')) return FileText;
+    if (platformLower.includes('hubspot') || platformLower.includes('crm')) return Users;
+    if (platformLower.includes('zapier') || platformLower.includes('workflow')) return Workflow;
+    
+    // Method-specific fallbacks
+    if (method?.toLowerCase().includes('email')) return Mail;
+    if (method?.toLowerCase().includes('calendar')) return Calendar;
+    if (method?.toLowerCase().includes('message')) return MessageSquare;
+    
+    // Default platform icon
+    return Globe;
+  };
+
+  // Clean base node styling with enhanced mobile support
   const baseNodeClasses = `
-    relative px-6 py-5 shadow-xl rounded-3xl border-2 transition-all duration-300 
-    cursor-pointer hover:shadow-2xl backdrop-blur-sm min-w-[320px] max-w-[400px]
+    relative px-4 sm:px-6 py-4 sm:py-5 shadow-xl rounded-2xl sm:rounded-3xl border-2 transition-all duration-300 
+    cursor-pointer hover:shadow-2xl backdrop-blur-sm min-w-[280px] sm:min-w-[320px] max-w-[320px] sm:max-w-[400px]
     bg-white
     ${selected ? 'scale-105 shadow-2xl border-purple-400' : 'hover:scale-102 border-gray-200 hover:border-purple-300'}
   `;
 
-  // TRIGGER NODE - Clean design without emojis
+  // TRIGGER NODE - Enhanced with dynamic trigger display
   const TriggerNodeComponent = () => {
     const platform = data.platform || data.trigger?.integration || data.stepDetails?.integration || '';
-    const iconConfig = getPlatformIconConfig(platform, 'trigger');
-    const IconComponent = iconConfig.icon || Play;
+    const triggerType = data.trigger?.type || 'manual';
+    const IconComponent = getPlatformIcon(platform, 'trigger');
 
     return (
       <div 
@@ -90,35 +122,35 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
         <Handle
           type="source"
           position={Position.Right}
-          className="w-4 h-4 !bg-white !border-2 !border-red-400 !rounded-full shadow-lg"
+          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-red-400 !rounded-full shadow-lg"
         />
         
-        <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center shadow-lg border-2 border-red-200">
-            <IconComponent className="w-7 h-7 text-red-600" />
+        <div className="flex items-start space-x-3 sm:space-x-4">
+          <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-red-50 flex items-center justify-center shadow-lg border-2 border-red-200">
+            <IconComponent className="w-6 h-6 sm:w-7 sm:h-7 text-red-600" />
           </div>
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-lg font-bold text-red-800 leading-tight">
-                TRIGGER
+              <div className="text-sm sm:text-lg font-bold text-red-800 leading-tight">
+                {data.label}
               </div>
               <div className="flex items-center space-x-1">
                 {expanded ? (
-                  <ChevronUp className="w-5 h-5 text-red-600" />
+                  <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
                 ) : (
-                  <ChevronDown className="w-5 h-5 text-red-600" />
+                  <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
                 )}
               </div>
             </div>
             
-            <div className="text-sm font-semibold text-red-700 mb-1">
-              {data.label}
+            <div className="text-xs sm:text-sm font-semibold text-red-700 mb-1">
+              {triggerType.toUpperCase()} TRIGGER
             </div>
 
             {platform && (
               <div className="flex items-center space-x-2 mb-2">
-                <div className="text-sm font-medium px-3 py-1 rounded-full border bg-red-50 border-red-200 text-red-700 inline-flex items-center space-x-2">
+                <div className="text-xs sm:text-sm font-medium px-2 sm:px-3 py-1 rounded-full border bg-red-50 border-red-200 text-red-700 inline-flex items-center space-x-2">
                   <span>{platform.charAt(0).toUpperCase() + platform.slice(1)}</span>
                   {expanded && <ExternalLink className="w-3 h-3" />}
                 </div>
@@ -126,7 +158,7 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
             )}
             
             {expanded && data.explanation && (
-              <div className="text-sm text-red-700 leading-relaxed p-3 bg-red-50 rounded-2xl border border-red-200 mt-3">
+              <div className="text-xs sm:text-sm text-red-700 leading-relaxed p-2 sm:p-3 bg-red-50 rounded-xl sm:rounded-2xl border border-red-200 mt-3">
                 <span className="font-semibold text-red-800">Trigger Details:</span>
                 <div className="mt-1">{data.explanation}</div>
                 
@@ -149,12 +181,11 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
     );
   };
 
-  // ACTION NODE - Clean design without emojis
+  // ACTION NODE - Enhanced with better platform icons
   const ActionNodeComponent = () => {
     const platform = data.platform || data.action?.integration || data.stepDetails?.integration || '';
     const method = data.action?.method || data.stepDetails?.method || '';
-    const iconConfig = getPlatformIconConfig(platform, method);
-    const IconComponent = iconConfig.icon || Settings;
+    const IconComponent = getPlatformIcon(platform, method);
 
     return (
       <div 
@@ -166,40 +197,40 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
         <Handle
           type="target"
           position={Position.Left}
-          className="w-4 h-4 !bg-white !border-2 !border-blue-400 !rounded-full shadow-lg"
+          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-blue-400 !rounded-full shadow-lg"
         />
         <Handle
           type="source"
           position={Position.Right}
-          className="w-4 h-4 !bg-white !border-2 !border-blue-400 !rounded-full shadow-lg"
+          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-blue-400 !rounded-full shadow-lg"
         />
         
-        <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center shadow-lg border-2 border-blue-200">
-            <IconComponent className="w-7 h-7 text-blue-600" />
+        <div className="flex items-start space-x-3 sm:space-x-4">
+          <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-blue-50 flex items-center justify-center shadow-lg border-2 border-blue-200">
+            <IconComponent className="w-6 h-6 sm:w-7 sm:h-7 text-blue-600" />
           </div>
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-lg font-bold text-blue-800 leading-tight">
+              <div className="text-sm sm:text-lg font-bold text-blue-800 leading-tight">
                 ACTION
               </div>
               <div className="flex items-center space-x-1">
                 {expanded ? (
-                  <ChevronUp className="w-5 h-5 text-blue-600" />
+                  <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
                 ) : (
-                  <ChevronDown className="w-5 h-5 text-blue-600" />
+                  <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
                 )}
               </div>
             </div>
             
-            <div className="text-sm font-semibold text-blue-700 mb-1">
+            <div className="text-xs sm:text-sm font-semibold text-blue-700 mb-1">
               {data.label}
             </div>
 
             {platform && (
               <div className="flex items-center space-x-2 mb-2">
-                <div className="text-sm font-medium px-3 py-1 rounded-full border bg-blue-50 border-blue-200 text-blue-700 inline-flex items-center space-x-2">
+                <div className="text-xs sm:text-sm font-medium px-2 sm:px-3 py-1 rounded-full border bg-blue-50 border-blue-200 text-blue-700 inline-flex items-center space-x-2">
                   <span>{platform.charAt(0).toUpperCase() + platform.slice(1)}</span>
                   {expanded && <ExternalLink className="w-3 h-3" />}
                 </div>
@@ -207,7 +238,7 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
             )}
             
             {expanded && data.explanation && (
-              <div className="text-sm text-blue-700 leading-relaxed p-3 bg-blue-50 rounded-2xl border border-blue-200 mt-3">
+              <div className="text-xs sm:text-sm text-blue-700 leading-relaxed p-2 sm:p-3 bg-blue-50 rounded-xl sm:rounded-2xl border border-blue-200 mt-3">
                 <span className="font-semibold text-blue-800">Action Details:</span>
                 <div className="mt-1">{data.explanation}</div>
                 
@@ -232,11 +263,11 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
     );
   };
 
-  // CONDITION NODE - Clean design with single color branches
+  // CONDITION NODE - Enhanced with dynamic branching
   const ConditionNodeComponent = () => {
     const branches = data.branches || [
-      { label: 'True', handle: 'true', color: '#8b5cf6' },
-      { label: 'False', handle: 'false', color: '#8b5cf6' }
+      { label: 'Yes', handle: 'true', color: '#8b5cf6' },
+      { label: 'No', handle: 'false', color: '#8b5cf6' }
     ];
 
     return (
@@ -249,33 +280,33 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
         <Handle
           type="target"
           position={Position.Left}
-          className="w-4 h-4 !bg-white !border-2 !border-orange-400 !rounded-full shadow-lg"
+          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-orange-400 !rounded-full shadow-lg"
         />
         
-        <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-orange-50 flex items-center justify-center shadow-lg border-2 border-orange-200">
-            <GitBranch className="w-7 h-7 text-orange-600" />
+        <div className="flex items-start space-x-3 sm:space-x-4">
+          <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-orange-50 flex items-center justify-center shadow-lg border-2 border-orange-200">
+            <GitBranch className="w-6 h-6 sm:w-7 sm:h-7 text-orange-600" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-lg font-bold text-orange-800 leading-tight">
+              <div className="text-sm sm:text-lg font-bold text-orange-800 leading-tight">
                 CONDITION
               </div>
-              {expanded ? <ChevronUp className="w-5 h-5 text-orange-600" /> : <ChevronDown className="w-5 h-5 text-orange-600" />}
+              {expanded ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" />}
             </div>
             
-            <div className="text-sm font-semibold text-orange-700 mb-1">
+            <div className="text-xs sm:text-sm font-semibold text-orange-700 mb-1">
               {data.label}
             </div>
 
             {data.condition?.expression && (
-              <div className="text-sm text-orange-600 font-medium mb-2 p-2 bg-orange-50 rounded-2xl border border-orange-200">
+              <div className="text-xs sm:text-sm text-orange-600 font-medium mb-2 p-2 bg-orange-50 rounded-xl sm:rounded-2xl border border-orange-200">
                 {data.condition.expression}
               </div>
             )}
             
             {expanded && data.explanation && (
-              <div className="text-sm text-orange-700 leading-relaxed p-3 bg-orange-50 rounded-2xl border border-orange-200 mt-3">
+              <div className="text-xs sm:text-sm text-orange-700 leading-relaxed p-2 sm:p-3 bg-orange-50 rounded-xl sm:rounded-2xl border border-orange-200 mt-3">
                 <span className="font-semibold text-orange-800">Condition Logic:</span>
                 <div className="mt-1">{data.explanation}</div>
                 
@@ -296,7 +327,7 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
           </div>
         </div>
         
-        {/* Single color branches with rounded styling */}
+        {/* Enhanced dynamic branches */}
         {branches.map((branch, index) => {
           const totalBranches = branches.length;
           const topPosition = totalBranches === 1 ? 50 : 20 + (index * (60 / (totalBranches - 1 || 1)));
@@ -307,17 +338,17 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
                 type="source"
                 position={Position.Right}
                 id={branch.handle}
-                className="w-4 h-4 !rounded-full !border-2 shadow-lg !bg-white"
+                className="w-3 h-3 sm:w-4 sm:h-4 !rounded-full !border-2 shadow-lg !bg-white"
                 style={{ 
                   top: `${topPosition}%`,
                   borderColor: '#8b5cf6'
                 }}
               />
               <div 
-                className="absolute text-sm font-bold px-3 py-1 rounded-full border-2 shadow-lg bg-white"
+                className="absolute text-xs sm:text-sm font-bold px-2 sm:px-3 py-1 rounded-full border-2 shadow-lg bg-white"
                 style={{ 
                   top: `${topPosition - 12}%`,
-                  right: '-60px',
+                  right: '-50px',
                   borderColor: '#8b5cf6',
                   color: '#8b5cf6'
                 }}
@@ -331,7 +362,7 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
     );
   };
 
-  // AI AGENT NODE - Clean design without emojis
+  // AI AGENT NODE - Enhanced with better recommendations
   const AIAgentNodeComponent = () => {
     const isRecommended = data.isRecommended;
 
@@ -343,9 +374,9 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
         onClick={handleExpansion}
       >
         {isRecommended && (
-          <div className="absolute -top-3 -right-3 flex gap-2">
-            <div className="bg-emerald-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-bounce">
-              RECOMMENDED
+          <div className="absolute -top-2 sm:-top-3 -right-2 sm:-right-3 flex gap-1 sm:gap-2">
+            <div className="bg-emerald-500 text-white text-xs font-bold px-1 sm:px-2 py-1 rounded-full animate-bounce">
+              AI+
             </div>
             <Button
               size="sm"
@@ -353,9 +384,9 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
                 e.stopPropagation();
                 data.onAdd?.();
               }}
-              className="h-8 w-8 p-0 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg"
+              className="h-6 w-6 sm:h-8 sm:w-8 p-0 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
             </Button>
             <Button
               size="sm"
@@ -364,9 +395,9 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
                 e.stopPropagation();
                 data.onDismiss?.();
               }}
-              className="h-8 w-8 p-0 bg-white hover:bg-gray-50 text-gray-500 border-gray-300 rounded-full shadow-lg"
+              className="h-6 w-6 sm:h-8 sm:w-8 p-0 bg-white hover:bg-gray-50 text-gray-500 border-gray-300 rounded-full shadow-lg"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3 h-3 sm:w-4 sm:h-4" />
             </Button>
           </div>
         )}
@@ -374,38 +405,38 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
         <Handle
           type="target"
           position={Position.Left}
-          className="w-4 h-4 !bg-white !border-2 !border-emerald-400 !rounded-full shadow-lg"
+          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-emerald-400 !rounded-full shadow-lg"
         />
         <Handle
           type="source"
           position={Position.Right}
-          className="w-4 h-4 !bg-white !border-2 !border-emerald-400 !rounded-full shadow-lg"
+          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-emerald-400 !rounded-full shadow-lg"
         />
         
-        <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center shadow-lg border-2 border-emerald-200">
-            <Bot className="w-7 h-7 text-emerald-600" />
+        <div className="flex items-start space-x-3 sm:space-x-4">
+          <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-emerald-50 flex items-center justify-center shadow-lg border-2 border-emerald-200">
+            <Bot className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-600" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-lg font-bold text-emerald-800 leading-tight">
+              <div className="text-sm sm:text-lg font-bold text-emerald-800 leading-tight">
                 AI AGENT
               </div>
-              {expanded ? <ChevronUp className="w-5 h-5 text-emerald-600" /> : <ChevronDown className="w-5 h-5 text-emerald-600" />}
+              {expanded ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />}
             </div>
             
-            <div className="text-sm font-semibold text-emerald-700 mb-1">
+            <div className="text-xs sm:text-sm font-semibold text-emerald-700 mb-1">
               {data.label}
             </div>
             
             {expanded && data.agent?.agent_id && (
-              <div className="text-sm text-emerald-600 font-medium mb-2 p-2 bg-emerald-50 rounded-2xl border border-emerald-200">
+              <div className="text-xs sm:text-sm text-emerald-600 font-medium mb-2 p-2 bg-emerald-50 rounded-xl sm:rounded-2xl border border-emerald-200">
                 Agent ID: {data.agent.agent_id}
               </div>
             )}
             
             {expanded && data.explanation && (
-              <div className="text-sm text-emerald-700 leading-relaxed p-3 bg-emerald-50 rounded-2xl border border-emerald-200 mt-3">
+              <div className="text-xs sm:text-sm text-emerald-700 leading-relaxed p-2 sm:p-3 bg-emerald-50 rounded-xl sm:rounded-2xl border border-emerald-200 mt-3">
                 <span className="font-semibold text-emerald-800">Agent Purpose:</span>
                 <div className="mt-1">{data.explanation}</div>
                 
@@ -430,7 +461,6 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
     );
   };
 
-  // Other node components with clean design
   const RetryNodeComponent = () => {
     const maxAttempts = data.retry?.max_attempts || 3;
 
@@ -444,39 +474,39 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
         <Handle
           type="target"
           position={Position.Left}
-          className="w-4 h-4 !bg-white !border-2 !border-amber-400 !rounded-full shadow-lg"
+          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-amber-400 !rounded-full shadow-lg"
         />
         <Handle
           type="source"
           position={Position.Right}
-          className="w-4 h-4 !bg-white !border-2 !border-amber-400 !rounded-full shadow-lg"
+          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-amber-400 !rounded-full shadow-lg"
         />
         
-        <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center shadow-lg border-2 border-amber-200 relative">
-            <RefreshCw className="w-7 h-7 text-amber-600" />
-            <div className="absolute -top-1 -right-1 w-6 h-6 bg-amber-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
+        <div className="flex items-start space-x-3 sm:space-x-4">
+          <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-amber-50 flex items-center justify-center shadow-lg border-2 border-amber-200 relative">
+            <RefreshCw className="w-6 h-6 sm:w-7 sm:h-7 text-amber-600" />
+            <div className="absolute -top-1 -right-1 w-5 h-5 sm:w-6 sm:h-6 bg-amber-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
               {maxAttempts}
             </div>
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-lg font-bold text-amber-800 leading-tight">
+              <div className="text-sm sm:text-lg font-bold text-amber-800 leading-tight">
                 RETRY
               </div>
-              {expanded ? <ChevronUp className="w-5 h-5 text-amber-600" /> : <ChevronDown className="w-5 h-5 text-amber-600" />}
+              {expanded ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />}
             </div>
             
-            <div className="text-sm font-semibold text-amber-700 mb-1">
+            <div className="text-xs sm:text-sm font-semibold text-amber-700 mb-1">
               {data.label}
             </div>
 
-            <div className="text-sm text-amber-600 font-medium mb-2 p-2 bg-amber-50 rounded-2xl border border-amber-200">
+            <div className="text-xs sm:text-sm text-amber-600 font-medium mb-2 p-2 bg-amber-50 rounded-xl sm:rounded-2xl border border-amber-200">
               Max Attempts: {maxAttempts}
             </div>
             
             {expanded && data.explanation && (
-              <div className="text-sm text-amber-700 leading-relaxed p-3 bg-amber-50 rounded-2xl border border-amber-200 mt-3">
+              <div className="text-xs sm:text-sm text-amber-700 leading-relaxed p-2 sm:p-3 bg-amber-50 rounded-xl sm:rounded-2xl border border-amber-200 mt-3">
                 <span className="font-semibold text-amber-800">Retry Configuration:</span>
                 <div className="mt-1">{data.explanation}</div>
                 
@@ -507,38 +537,38 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
         <Handle
           type="target"
           position={Position.Left}
-          className="w-4 h-4 !bg-white !border-2 !border-purple-400 !rounded-full shadow-lg"
+          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-purple-400 !rounded-full shadow-lg"
         />
         <Handle
           type="source"
           position={Position.Right}
-          className="w-4 h-4 !bg-white !border-2 !border-purple-400 !rounded-full shadow-lg"
+          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-purple-400 !rounded-full shadow-lg"
         />
         
-        <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-purple-50 flex items-center justify-center shadow-lg border-2 border-purple-200">
-            <Repeat className="w-7 h-7 text-purple-600" />
+        <div className="flex items-start space-x-3 sm:space-x-4">
+          <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-purple-50 flex items-center justify-center shadow-lg border-2 border-purple-200">
+            <Repeat className="w-6 h-6 sm:w-7 sm:h-7 text-purple-600" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-lg font-bold text-purple-800 leading-tight">
+              <div className="text-sm sm:text-lg font-bold text-purple-800 leading-tight">
                 LOOP
               </div>
-              {expanded ? <ChevronUp className="w-5 h-5 text-purple-600" /> : <ChevronDown className="w-5 h-5 text-purple-600" />}
+              {expanded ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />}
             </div>
             
-            <div className="text-sm font-semibold text-purple-700 mb-1">
+            <div className="text-xs sm:text-sm font-semibold text-purple-700 mb-1">
               {data.label}
             </div>
 
             {data.loop?.array_source && (
-              <div className="text-sm text-purple-600 font-medium mb-2 p-2 bg-purple-50 rounded-2xl border border-purple-200">
+              <div className="text-xs sm:text-sm text-purple-600 font-medium mb-2 p-2 bg-purple-50 rounded-xl sm:rounded-2xl border border-purple-200">
                 Iterating: {data.loop.array_source}
               </div>
             )}
             
             {expanded && data.explanation && (
-              <div className="text-sm text-purple-700 leading-relaxed p-3 bg-purple-50 rounded-2xl border border-purple-200 mt-3">
+              <div className="text-xs sm:text-sm text-purple-700 leading-relaxed p-2 sm:p-3 bg-purple-50 rounded-xl sm:rounded-2xl border border-purple-200 mt-3">
                 <span className="font-semibold text-purple-800">Loop Details:</span>
                 <div className="mt-1">{data.explanation}</div>
                 
@@ -574,36 +604,36 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
         <Handle
           type="target"
           position={Position.Left}
-          className="w-4 h-4 !bg-white !border-2 !border-slate-400 !rounded-full shadow-lg"
+          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-slate-400 !rounded-full shadow-lg"
         />
         <Handle
           type="source"
           position={Position.Right}
-          className="w-4 h-4 !bg-white !border-2 !border-slate-400 !rounded-full shadow-lg"
+          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-slate-400 !rounded-full shadow-lg"
         />
         
-        <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center shadow-lg border-2 border-slate-200">
-            <Clock className="w-7 h-7 text-slate-600" />
+        <div className="flex items-start space-x-3 sm:space-x-4">
+          <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-slate-50 flex items-center justify-center shadow-lg border-2 border-slate-200">
+            <Clock className="w-6 h-6 sm:w-7 sm:h-7 text-slate-600" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-lg font-bold text-slate-800 leading-tight">
+              <div className="text-sm sm:text-lg font-bold text-slate-800 leading-tight">
                 DELAY
               </div>
-              {expanded ? <ChevronUp className="w-5 h-5 text-slate-600" /> : <ChevronDown className="w-5 h-5 text-slate-600" />}
+              {expanded ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600" />}
             </div>
             
-            <div className="text-sm font-semibold text-slate-700 mb-1">
+            <div className="text-xs sm:text-sm font-semibold text-slate-700 mb-1">
               {data.label}
             </div>
 
-            <div className="text-sm text-slate-600 font-medium mb-2 p-2 bg-slate-50 rounded-2xl border border-slate-200">
+            <div className="text-xs sm:text-sm text-slate-600 font-medium mb-2 p-2 bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-200">
               Duration: {delayDisplay}
             </div>
             
             {expanded && data.explanation && (
-              <div className="text-sm text-slate-700 leading-relaxed p-3 bg-slate-50 rounded-2xl border border-slate-200 mt-3">
+              <div className="text-xs sm:text-sm text-slate-700 leading-relaxed p-2 sm:p-3 bg-slate-50 rounded-xl sm:rounded-2xl border border-slate-200 mt-3">
                 <span className="font-semibold text-slate-800">Delay Details:</span>
                 <div className="mt-1">{data.explanation}</div>
                 
@@ -632,28 +662,30 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
         <Handle
           type="target"
           position={Position.Left}
-          className="w-4 h-4 !bg-white !border-2 !border-indigo-400 !rounded-full shadow-lg"
+          className="w-3 h-3 sm:w-4 sm:h-4 !bg-white !border-2 !border-indigo-400 !rounded-full shadow-lg"
         />
         
-        <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center shadow-lg border-2 border-indigo-200">
-            <Shield className="w-7 h-7 text-indigo-600" />
+        <div className="flex items-start space-x-3 sm:space-x-4">
+          <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-indigo-50 flex items-center justify-center shadow-lg border-2 border-indigo-200">
+            <Shield className="w-6 h-6 sm:w-7 sm:h-7 text-indigo-600" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-lg font-bold text-indigo-800 leading-tight">
-                FALLBACK
+              <div className="text-sm sm:text-lg font-bold text-indigo-800 leading-tight">
+                {data.stepType === 'stop' ? 'END' : 'FALLBACK'}
               </div>
-              {expanded ? <ChevronUp className="w-5 h-5 text-indigo-600" /> : <ChevronDown className="w-5 h-5 text-indigo-600" />}
+              {expanded ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />}
             </div>
             
-            <div className="text-sm font-semibold text-indigo-700 mb-1">
+            <div className="text-xs sm:text-sm font-semibold text-indigo-700 mb-1">
               {data.label}
             </div>
             
             {expanded && data.explanation && (
-              <div className="text-sm text-indigo-700 leading-relaxed p-3 bg-indigo-50 rounded-2xl border border-indigo-200 mt-3">
-                <span className="font-semibold text-indigo-800">Fallback Strategy:</span>
+              <div className="text-xs sm:text-sm text-indigo-700 leading-relaxed p-2 sm:p-3 bg-indigo-50 rounded-xl sm:rounded-2xl border border-indigo-200 mt-3">
+                <span className="font-semibold text-indigo-800">
+                  {data.stepType === 'stop' ? 'End Point:' : 'Fallback Strategy:'}
+                </span>
                 <div className="mt-1">{data.explanation}</div>
                 
                 {data.fallback && (
@@ -671,50 +703,54 @@ const CustomNodeMapper: React.FC<CustomNodeMapperProps> = ({ id, type, data, sel
           </div>
         </div>
 
-        {/* Two outgoing paths: Primary and Fallback */}
-        <Handle
-          type="source"
-          position={Position.Right}
-          id="primary"
-          className="w-4 h-4 !rounded-full !border-2 !bg-white shadow-lg"
-          style={{ 
-            top: '35%',
-            borderColor: '#8b5cf6'
-          }}
-        />
-        <div 
-          className="absolute text-sm font-bold px-3 py-1 rounded-full border-2 shadow-lg bg-white"
-          style={{ 
-            top: '25%',
-            right: '-55px',
-            borderColor: '#8b5cf6',
-            color: '#8b5cf6'
-          }}
-        >
-          Primary
-        </div>
+        {/* Only show dual handles for fallback, not stop nodes */}
+        {data.stepType !== 'stop' && (
+          <>
+            <Handle
+              type="source"
+              position={Position.Right}
+              id="primary"
+              className="w-3 h-3 sm:w-4 sm:h-4 !rounded-full !border-2 !bg-white shadow-lg"
+              style={{ 
+                top: '35%',
+                borderColor: '#8b5cf6'
+              }}
+            />
+            <div 
+              className="absolute text-xs sm:text-sm font-bold px-2 sm:px-3 py-1 rounded-full border-2 shadow-lg bg-white"
+              style={{ 
+                top: '25%',
+                right: '-50px',
+                borderColor: '#8b5cf6',
+                color: '#8b5cf6'
+              }}
+            >
+              Primary
+            </div>
 
-        <Handle
-          type="source"
-          position={Position.Right}
-          id="fallback"
-          className="w-4 h-4 !rounded-full !border-2 !bg-white shadow-lg"
-          style={{ 
-            top: '65%',
-            borderColor: '#8b5cf6'
-          }}
-        />
-        <div 
-          className="absolute text-sm font-bold px-3 py-1 rounded-full border-2 shadow-lg bg-white"
-          style={{ 
-            top: '55%',
-            right: '-55px',
-            borderColor: '#8b5cf6',
-            color: '#8b5cf6'
-          }}
-        >
-          Fallback
-        </div>
+            <Handle
+              type="source"
+              position={Position.Right}
+              id="fallback"
+              className="w-3 h-3 sm:w-4 sm:h-4 !rounded-full !border-2 !bg-white shadow-lg"
+              style={{ 
+                top: '65%',
+                borderColor: '#8b5cf6'
+              }}
+            />
+            <div 
+              className="absolute text-xs sm:text-sm font-bold px-2 sm:px-3 py-1 rounded-full border-2 shadow-lg bg-white"
+              style={{ 
+                top: '55%',
+                right: '-50px',
+                borderColor: '#8b5cf6',
+                color: '#8b5cf6'
+              }}
+            >
+              Fallback
+            </div>
+          </>
+        )}
       </div>
     );
   };

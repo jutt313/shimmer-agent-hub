@@ -1,3 +1,4 @@
+
 export type AutomationBlueprint = {
   version: string;
   description?: string;
@@ -80,5 +81,6 @@ export interface AutomationDiagramData {
     generatedAt?: string;
     triggerType?: string;
     source?: string;
+    straightLines?: boolean;
   };
 }

@@ -157,16 +157,16 @@ export const calculateEnhancedLayout = (
         label = '⚠ FAILURE';
       } else if (edge.sourceHandle.startsWith('case-')) {
         const caseNumber = parseInt(edge.sourceHandle.replace('case-', ''));
-        label = edge.label || `Option ${caseNumber + 1}`;
+        label = edge.label?.toString() || `Option ${caseNumber + 1}`;
       } else {
-        label = edge.label || edge.sourceHandle;
+        label = edge.label?.toString() || edge.sourceHandle;
       }
     } else if (sourceStepType === 'condition') {
-      label = edge.label || '📍 Decision';
+      label = edge.label?.toString() || '📍 Decision';
     } else if (sourceStepType === 'trigger') {
       label = '🚀 Start';
     } else {
-      label = edge.label || '';
+      label = edge.label?.toString() || '';
     }
 
     return {

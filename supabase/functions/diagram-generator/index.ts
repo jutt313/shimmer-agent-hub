@@ -40,7 +40,6 @@ You MUST automatically detect these opportunities and set isRecommended: true:
 ## NODE TYPES YOU MUST GENERATE:
 
 ### 1. TRIGGER NODE (triggerNode)
-```json
 {
   "id": "trigger-node",
   "type": "triggerNode", 
@@ -49,41 +48,37 @@ You MUST automatically detect these opportunities and set isRecommended: true:
     "label": "[ACTUAL_TRIGGER_TYPE] Trigger",
     "stepType": "trigger",
     "explanation": "This automation starts when [CLEAR_TRIGGER_DESCRIPTION]",
-    "trigger": blueprint.trigger,
+    "trigger": "blueprint.trigger",
     "platform": "[DETECTED_PLATFORM_NAME]",
     "icon": "Play"
   }
 }
-```
 
 ### 2. ACTION NODE (platformNode/actionNode)
-```json
 {
   "id": "action-X",
   "type": "platformNode",
-  "position": { "x": X, "y": Y },
+  "position": { "x": "X", "y": "Y" },
   "data": {
     "label": "[PLATFORM_NAME]: [CLEAR_ACTION_DESCRIPTION]",
     "stepType": "action", 
     "explanation": "This step [DETAILED_EXPLANATION] using [PLATFORM_NAME]",
-    "action": step.action,
+    "action": "step.action",
     "platform": "[DETECTED_PLATFORM_NAME]",
     "icon": "PlugZap"
   }
 }
-```
 
 ### 3. CONDITION NODE (conditionNode) - CRITICAL FOR BRANCHING
-```json
 {
   "id": "condition-X",
   "type": "conditionNode",
-  "position": { "x": X, "y": Y },
+  "position": { "x": "X", "y": "Y" },
   "data": {
     "label": "Decision: [WHAT_IS_BEING_CHECKED]",
     "stepType": "condition",
     "explanation": "This analyzes [CONDITION_DESCRIPTION] and creates different paths based on the result",
-    "condition": step.condition,
+    "condition": "step.condition",
     "branches": [
       {
         "label": "[MEANINGFUL_CONDITION_DESCRIPTION]",
@@ -99,14 +94,12 @@ You MUST automatically detect these opportunities and set isRecommended: true:
     "icon": "GitFork"
   }
 }
-```
 
 ### 4. AI AGENT RECOMMENDATION NODE (aiAgentNode) - AUTO-DETECT OPPORTUNITIES
-```json
 {
   "id": "ai-agent-X",
   "type": "aiAgentNode", 
-  "position": { "x": X, "y": Y },
+  "position": { "x": "X", "y": "Y" },
   "data": {
     "label": "🤖 AI: [INTELLIGENT_TASK_DESCRIPTION]",
     "stepType": "ai_agent_call",
@@ -120,14 +113,12 @@ You MUST automatically detect these opportunities and set isRecommended: true:
     "icon": "Bot"
   }
 }
-```
 
 ### 5. END NODE (fallbackNode) - MANDATORY FOR ROUTE TERMINATION
-```json
 {
   "id": "end-X",
   "type": "fallbackNode",
-  "position": { "x": X, "y": Y },
+  "position": { "x": "X", "y": "Y" },
   "data": {
     "label": "✅ Automation Complete",
     "stepType": "end",
@@ -135,7 +126,6 @@ You MUST automatically detect these opportunities and set isRecommended: true:
     "icon": "Flag"
   }
 }
-```
 
 ## PLATFORM DETECTION INTELLIGENCE:
 You MUST detect these platforms and use exact names:
@@ -152,7 +142,6 @@ You MUST detect these platforms and use exact names:
 ## EDGE GENERATION FOR PERFECT FLOW:
 
 ### Standard Edges (Clean Connections):
-```json
 {
   "id": "edge-[SOURCE]-[TARGET]",
   "source": "source-node-id",
@@ -162,10 +151,8 @@ You MUST detect these platforms and use exact names:
   "style": { "stroke": "#6366f1", "strokeWidth": 4 },
   "label": "Next Step"
 }
-```
 
 ### Conditional Edges (From Decision Points):
-```json
 {
   "id": "edge-condition-X",
   "source": "condition-node-id",
@@ -176,7 +163,6 @@ You MUST detect these platforms and use exact names:
   "label": "[MEANINGFUL_CONDITION_RESULT]",
   "style": { "stroke": "#10b981", "strokeWidth": 4 }
 }
-```
 
 ## PERFECT LAYOUT ALGORITHM:
 - **Layer 0 (x=100)**: Trigger nodes only
@@ -189,22 +175,20 @@ You MUST detect these platforms and use exact names:
 
 ## MANDATORY RESPONSE FORMAT:
 You MUST return this exact JSON structure:
-```json
 {
-  "nodes": [/* array of node objects with clear labels and proper platform detection */],
-  "edges": [/* array of edge objects with meaningful labels and perfect connections */],
+  "nodes": [],
+  "edges": [],
   "metadata": {
-    "totalSteps": number,
-    "conditionalBranches": number,
-    "aiAgentRecommendations": number,
+    "totalSteps": "number",
+    "conditionalBranches": "number",
+    "aiAgentRecommendations": "number",
     "platforms": ["detected", "platform", "names"],
-    "routePathsTerminated": number,
+    "routePathsTerminated": "number",
     "generatedAt": "ISO timestamp",
     "triggerType": "actual trigger type",
     "source": "revolutionary-clear-generator"
   }
 }
-```
 
 ## SUCCESS CRITERIA:
 ✅ **CRYSTAL CLEAR LEFT-TO-RIGHT FLOW** - No snake patterns, clean reading flow

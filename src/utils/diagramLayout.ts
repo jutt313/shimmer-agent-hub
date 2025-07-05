@@ -13,7 +13,7 @@ export interface LayoutOptions {
 const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
   nodeWidth: 320,
   nodeHeight: 140,
-  horizontalGap: 500, // Increased for clearer left-to-right flow
+  horizontalGap: 500,
   verticalGap: 200,
   startX: 100,
   startY: 300
@@ -38,7 +38,9 @@ export const calculateEnhancedLayout = (
   nodes.forEach(node => {
     graph.set(node.id, []);
     inDegrees.set(node.id, 0);
-    nodeTypes.set(node.id, node.data?.stepType || node.type || 'action');
+    // Fix the TypeScript error by safely casting the stepType
+    const stepType = node.data?.stepType;
+    nodeTypes.set(node.id, typeof stepType === 'string' ? stepType : (node.type || 'action'));
   });
 
   edges.forEach(edge => {
@@ -54,8 +56,9 @@ export const calculateEnhancedLayout = (
   
   // Find root nodes (triggers or nodes with no incoming edges)
   nodes.forEach(node => {
-    const stepType = node.data?.stepType || node.type;
-    if (inDegrees.get(node.id) === 0 || stepType === 'trigger') {
+    const stepType = node.data?.stepType;
+    const safeStepType = typeof stepType === 'string' ? stepType : node.type;
+    if (inDegrees.get(node.id) === 0 || safeStepType === 'trigger') {
       queue.push(node.id);
       layers.set(node.id, 0);
     }
@@ -81,10 +84,11 @@ export const calculateEnhancedLayout = (
   // Handle orphaned nodes - put them in appropriate layers
   nodes.forEach(node => {
     if (!layers.has(node.id)) {
-      const stepType = node.data?.stepType || node.type;
-      if (stepType === 'trigger') {
+      const stepType = node.data?.stepType;
+      const safeStepType = typeof stepType === 'string' ? stepType : node.type;
+      if (safeStepType === 'trigger') {
         layers.set(node.id, 0);
-      } else if (stepType === 'end' || stepType === 'stop') {
+      } else if (safeStepType === 'end' || safeStepType === 'stop') {
         // Put end nodes in the last layer
         const maxLayer = Math.max(...Array.from(layers.values()));
         layers.set(node.id, maxLayer + 1);

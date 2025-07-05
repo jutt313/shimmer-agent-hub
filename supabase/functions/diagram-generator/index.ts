@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
@@ -11,24 +10,33 @@ interface DiagramNode {
   type: string;
   position: { x: number; y: number };
   data: {
-    label: string;
-    icon?: string;
-    platform?: string;
-    stepType?: string;
-    explanation?: string;
-    isRecommended?: boolean;
+    label: string; // Main label for the node
+    icon?: string; // Name of the icon to display (e.g., 'Zap', 'GitFork')
+    platform?: string; // Name of the integrated platform, if applicable
+    stepType?: string; // Original blueprint step type (e.g., 'action', 'condition')
+    explanation?: string; // Detailed description of the step
+    isRecommended?: boolean; // Flag if this is an AI recommendation
+    // 'branches' holds metadata for condition node's outgoing edges
     branches?: Array<{
       label: string;
-      handle: string;
+      handle: string; // Unique handle for connection
       color: string;
-      stepsKey?: string;
+      stepsKey?: string; 
     }>;
-    onAdd?: () => void;
-    onDismiss?: () => void;
-    [key: string]: any;
+    // Specific data for each step type, used for frontend to show more details
+    action?: any;
+    condition?: any;
+    loop?: any;
+    delay?: any;
+    ai_agent_call?: any;
+    retry?: any;
+    fallback?: any;
+    trigger?: any;
+    
+    [key: string]: any; // Allow other dynamic properties
   };
-  sourcePosition?: string;
-  targetPosition?: string;
+  sourcePosition?: string; // Position of outgoing connections
+  targetPosition?: string; // Position of incoming connections
 }
 
 interface DiagramEdge {
@@ -38,10 +46,10 @@ interface DiagramEdge {
   animated?: boolean;
   type?: string;
   style?: Record<string, any>;
-  label?: string;
-  sourceHandle?: string;
-  labelStyle?: Record<string, any>;
-  labelBgStyle?: Record<string, any>;
+  label?: string; // Label displayed on the edge
+  sourceHandle?: string; // Which source handle the edge connects to
+  labelStyle?: Record<string, any>; // Styling for the edge label
+  labelBgStyle?: Record<string, any>; // Styling for the edge label background
 }
 
 serve(async (req) => {
@@ -74,8 +82,9 @@ serve(async (req) => {
     const nodes: DiagramNode[] = []
     const edges: DiagramEdge[] = []
     
+    // Adjusted spacing for potentially wider multi-branch diagrams
     const baseX = 200
-    const xSpacing = 400
+    const xSpacing = 450 // Increased horizontal spacing between layers
     const baseY = 200
     let nodeCounter = 0
 
@@ -97,7 +106,7 @@ serve(async (req) => {
           explanation = 'Automation starts when manually triggered by user action or API call.'
           break
         case 'platform':
-          explanation = `Automation triggered by ${trigger.platform || 'platform'} events. Monitors for specific platform activities.`
+          explanation = `Automation triggered by ${trigger.platform || trigger.integration || 'platform'} events. Monitors for specific platform activities.`
           break
         default:
           explanation = `Automation triggered by ${trigger.type} events. Starts when specified conditions are met.`
@@ -106,55 +115,34 @@ serve(async (req) => {
       return { type: `${triggerType} TRIGGER`, explanation }
     }
 
-    // Helper function to extract intelligent condition labels
+    // MODIFIED: getConditionBranches to use the new 'cases' structure directly for labels
+    // This will generate the sourceHandles for the edges from the condition node
     const getConditionBranches = (condition: any) => {
-      if (!condition || !condition.expression) {
+      // Ensure condition.cases exists and is an array
+      if (!condition || !condition.cases || !Array.isArray(condition.cases)) {
+        // Fallback for old structure or malformed condition (should not happen with updated blueprint)
         return [
-          { label: 'True', handle: 'true', color: '#8b5cf6' },
-          { label: 'False', handle: 'false', color: '#8b5cf6' }
+          { label: 'True', handle: 'default-true', color: '#8b5cf6' },
+          { label: 'False', handle: 'default-false', color: '#8b5cf6' }
         ]
       }
       
-      const expression = condition.expression.toLowerCase()
-      
-      // Extract meaningful labels from common condition patterns
-      if (expression.includes('gender') || expression.includes('sex')) {
-        return [
-          { label: 'Male', handle: 'male', color: '#8b5cf6' },
-          { label: 'Female', handle: 'female', color: '#8b5cf6' }
-        ]
-      } else if (expression.includes('age')) {
-        return [
-          { label: 'Young', handle: 'young', color: '#8b5cf6' },
-          { label: 'Adult', handle: 'adult', color: '#8b5cf6' }
-        ]
-      } else if (expression.includes('priority') || expression.includes('urgent')) {
-        return [
-          { label: 'High Priority', handle: 'high', color: '#8b5cf6' },
-          { label: 'Normal Priority', handle: 'normal', color: '#8b5cf6' }
-        ]
-      } else if (expression.includes('status') || expression.includes('active')) {
-        return [
-          { label: 'Active', handle: 'active', color: '#8b5cf6' },
-          { label: 'Inactive', handle: 'inactive', color: '#8b5cf6' }
-        ]
-      } else if (expression.includes('type') || expression.includes('category')) {
-        return [
-          { label: 'Category A', handle: 'catA', color: '#8b5cf6' },
-          { label: 'Category B', handle: 'catB', color: '#8b5cf6' }
-        ]
-      } else if (expression.includes('amount') || expression.includes('price') || expression.includes('cost')) {
-        return [
-          { label: 'High Value', handle: 'high_value', color: '#8b5cf6' },
-          { label: 'Low Value', handle: 'low_value', color: '#8b5cf6' }
-        ]
+      const branches = condition.cases.map((caseItem: any, index: number) => ({
+        label: caseItem.label || `Case ${index + 1}`, // Use blueprint's label for clarity
+        handle: `case-${index}`, // Unique handle for each case
+        color: '#8b5cf6' // Default color for case branches
+      }))
+
+      // Add default_steps as a distinct branch if present
+      if (condition.default_steps && condition.default_steps.length > 0) {
+        branches.push({ label: 'No Match Found', handle: 'default-case', color: '#ef4444' }) // Red for default/no match
       } else {
-        // Fallback to True/False for complex expressions
-        return [
-          { label: 'Yes', handle: 'true', color: '#8b5cf6' },
-          { label: 'No', handle: 'false', color: '#8b5cf6' }
-        ]
+         // If no default_steps and no specific case matches, we still need a default exit point for diagram clarity
+         // This can be represented as an implicit "No Match" leading to an END node
+         // But for diagram clarity, it's better if explicit. Handled by subsequent END node creation.
       }
+
+      return branches
     }
 
     // Helper function to get node type mapping
@@ -165,136 +153,196 @@ serve(async (req) => {
       if (step.type === 'fallback') return 'fallbackNode'
       if (step.type === 'delay') return 'delayNode'
       if (step.type === 'loop') return 'loopNode'
-      if (step.action?.integration) return 'platformNode'
-      return 'actionNode'
+      if (step.action?.integration) return 'platformNode' // Keeping platformNode distinct as requested
+      return 'actionNode' // Default action node
     }
 
-    // Helper function to generate enhanced explanations
+    // MODIFIED: generateEnhancedExplanation for more specific details as requested by user
     const generateEnhancedExplanation = (step: any): string => {
       if (step.type === 'condition') {
-        return `This decision point evaluates "${step.condition?.expression || 'conditional logic'}" and routes the automation to different paths based on the result. Each path can have different actions and outcomes.`
+        let explanation = `Decision point: Evaluates multiple conditions and branches accordingly.`
+        if (step.condition?.cases) {
+          step.condition.cases.forEach((caseItem: any) => {
+            explanation += `\n- '${caseItem.label}': if "${caseItem.expression}" is true.`
+          })
+        }
+        if (step.condition?.default_steps) {
+          explanation += `\n- 'No Match Found': if no specific condition is met.`
+        }
+        return explanation
       }
       if (step.type === 'ai_agent_call' || step.is_recommended || step.ai_recommended) {
-        return `AI Agent intelligently processes "${step.ai_agent_call?.input_prompt || step.name || 'automation data'}" and provides smart analysis and decision-making. This enhances automation accuracy and handles complex scenarios.`
+        const agentName = step.ai_agent_call?.agent_id || 'AI Agent';
+        const inputPrompt = step.ai_agent_call?.input_prompt || 'automation data';
+        return `AI Agent "${agentName}" processes: "${inputPrompt}". Provides intelligent analysis and decision-making for enhanced automation. ${step.is_recommended ? "(AI Recommended)" : ""}`
       }
       if (step.type === 'retry') {
-        return `Retry mechanism ensures reliability by attempting the operation up to ${step.retry?.max_attempts || 3} times if failures occur. This improves automation success rates.`
+        const maxAttempts = step.retry?.max_attempts || 3;
+        const retryFailPathInfo = step.retry?.on_retry_fail_steps ? 'Includes a specific path for when retries are exhausted.' : 'No explicit path for retry failures, defaults to END.';
+        return `Reliability: Retries operation up to ${maxAttempts} times on failure. ${retryFailPathInfo}`
       }
       if (step.action?.integration) {
-        const integration = step.action.integration
-        const method = step.action.method || 'action'
-        return `Connects to ${integration} platform to perform "${method}" operation. This integrates your automation with external services and platforms.`
+        const integration = step.action.integration;
+        const method = step.action.method || 'perform action';
+        // Displaying parameters might be too verbose, but can be added if needed
+        // const params = JSON.stringify(step.action.parameters || {}); 
+        return `Connects to ${integration} to "${method}". Integrates your automation with external services.`
       }
       if (step.type === 'delay') {
-        const seconds = step.delay?.duration_seconds || 0
-        const time = seconds >= 60 ? `${Math.floor(seconds / 60)} minutes` : `${seconds} seconds`
-        return `Pauses automation for ${time} to allow time for external processes or to avoid rate limits. This ensures proper timing and coordination.`
+        const seconds = step.delay?.duration_seconds || 0;
+        const time = seconds >= 60 ? `${Math.floor(seconds / 60)} minutes` : `${seconds} seconds`;
+        return `Pause: Halts automation for ${time}. Used for timing or avoiding rate limits.`
       }
       if (step.type === 'loop') {
-        return `Repeats a set of actions for each item in "${step.loop?.array_source || 'data collection'}". This enables bulk processing and batch operations.`
+        return `Iteration: Repeats actions for each item from "${step.loop?.array_source || 'a data collection'}". Enables bulk processing.`
       }
-      return `Executes ${step.type} operation: ${step.name}. This step is part of your automation workflow and performs specific business logic.`
+      if (step.type === 'fallback') {
+        return `Error Handling: Executes primary steps. If primary fails or errors, switches to predefined fallback steps for graceful error handling.`
+      }
+      return `Executes: ${step.name || 'Unnamed Step'} (${step.type}).`
     }
 
-    // Helper function to get clean node data
+    // MODIFIED: getNodeData for more specific labels and icons based on user's request
     const getNodeData = (step: any) => {
-      const baseData = {
+      const baseData: Record<string, any> = {
         label: step.name || 'Automation Step',
         stepType: step.type,
         explanation: step.description || generateEnhancedExplanation(step),
         isRecommended: Boolean(step.is_recommended || step.ai_recommended)
       }
 
-      // Add platform-specific data
-      if (step.action?.integration) {
-        baseData.platform = step.action.integration
-        baseData.action = step.action
-        baseData.stepDetails = step.action
+      // Set specific label and store full data for detailed view
+      if (step.type === 'action' && step.action?.integration) {
+        baseData.label = `Action: ${step.action.integration}`; 
+        baseData.platform = step.action.integration;
+        baseData.action = step.action; 
+      } else if (step.type === 'action') {
+        baseData.label = `Action: ${step.name || 'Generic Task'}`;
+        baseData.action = step.action;
       }
 
-      // Add condition-specific data with intelligent branches
       if (step.type === 'condition' && step.condition) {
-        baseData.condition = step.condition
-        baseData.branches = getConditionBranches(step.condition)
-      }
-
-      // Add AI agent data with recommendation flag
-      if (step.type === 'ai_agent_call' && step.ai_agent_call) {
-        baseData.agent = step.ai_agent_call
-        baseData.isRecommended = true
-      }
-
-      // Add other step-specific data
-      if (step.type === 'retry' && step.retry) {
-        baseData.retry = step.retry
-      }
-
-      if (step.type === 'delay' && step.delay) {
-        baseData.delay = step.delay
+        baseData.label = step.name || 'Conditional Logic'; 
+        baseData.condition = step.condition;
+        baseData.branches = getConditionBranches(step.condition); 
       }
 
       if (step.type === 'loop' && step.loop) {
-        baseData.loop = step.loop
+        baseData.label = `Loop: ${step.loop.array_source || 'Collection'}`; 
+        baseData.loop = step.loop;
+      }
+
+      if (step.type === 'retry' && step.retry) {
+        baseData.label = `Retry (${step.retry.max_attempts || 3} attempts)`; 
+        baseData.retry = step.retry;
+      }
+
+      if (step.type === 'fallback' && step.fallback) {
+        baseData.label = 'Fallback Logic'; 
+        baseData.fallback = step.fallback;
+      }
+
+      if (step.type === 'ai_agent_call' && step.ai_agent_call) {
+        baseData.label = `AI Agent: ${step.ai_agent_call.agent_id || 'Recommended'}`; 
+        baseData.agent = step.ai_agent_call;
+        baseData.isRecommended = Boolean(step.ai_agent_call.is_recommended);
+      }
+      
+      if (step.type === 'delay' && step.delay) {
+        const seconds = step.delay.duration_seconds || 0;
+        const timeDisplay = seconds >= 60 ? `${Math.floor(seconds / 60)} min` : `${seconds} sec`;
+        baseData.label = `Delay: ${timeDisplay}`; 
+        baseData.delay = step.delay;
+      }
+
+      // Add specific icons based on step type or platform for frontend rendering
+      if (baseData.stepType === 'trigger') baseData.icon = 'Zap'; // Lightning bolt for triggers
+      else if (baseData.stepType === 'condition') baseData.icon = 'GitFork'; // Fork for conditions
+      else if (baseData.stepType === 'loop') baseData.icon = 'Repeat'; // Repeat for loops
+      else if (baseData.stepType === 'retry') baseData.icon = 'RefreshCw'; // Refresh for retry
+      else if (baseData.stepType === 'fallback') baseData.icon = 'CornerDownRight'; // Corner arrow for fallback
+      else if (baseData.stepType === 'ai_agent_call') baseData.icon = 'Bot'; // Robot for AI agent
+      else if (baseData.stepType === 'delay') baseData.icon = 'Clock'; // Clock for delay
+      else if (baseData.platform) {
+        // Here you would typically have a lookup for specific platform icons
+        // For now, a generic plug or specific platform icon based on a utility
+        baseData.icon = 'PlugZap'; // Generic plug icon for platforms
+        // Example: if (baseData.platform === 'HubSpot') baseData.icon = 'HubSpotIcon';
+      } else {
+        baseData.icon = 'Zap'; // Generic action icon
       }
 
       return baseData
     }
 
-    // Create STOP node helper
-    const createStopNode = (x: number, y: number): DiagramNode => {
+    // Create STOP/END node helper (MODIFIED for different END labels)
+    const createStopNode = (x: number, y: number, label: string = 'PATH END', icon: string = 'FlagCheckered'): DiagramNode => {
       nodeCounter++
       return {
         id: `stop-node-${nodeCounter}`,
-        type: 'fallbackNode',
+        type: 'fallbackNode', // Reusing fallbackNode for STOP visuals
         position: { x, y },
         data: {
-          label: 'END',
-          stepType: 'stop',
-          explanation: 'Automation ends here. No further steps are executed in this path.',
-          isRecommended: false
+          label: label,
+          stepType: 'stop', // Differentiate from 'fallback' type
+          explanation: `This automation path concludes here.`,
+          isRecommended: false,
+          icon: icon 
         },
         sourcePosition: 'right',
         targetPosition: 'left'
       }
     }
 
-    // Create dynamic trigger node
+    // Create dynamic trigger node (MODIFIED to use more generic trigger type and initial position)
+    const triggerParentId = automation_blueprint.trigger ? 'trigger-node' : undefined
+    const startXForSteps = automation_blueprint.trigger ? baseX + xSpacing : baseX;
+    
     if (automation_blueprint.trigger) {
-      const triggerInfo = getTriggerInfo(automation_blueprint.trigger)
+      const triggerInfo = getTriggerInfo(automation_blueprint.trigger);
       const triggerNode: DiagramNode = {
         id: 'trigger-node',
-        type: 'triggerNode',
+        type: 'triggerNode', // Retain this type for CustomNodeMapper
         position: { x: baseX, y: baseY },
         data: {
-          label: triggerInfo.type,
+          label: triggerInfo.type, // e.g., "WEBHOOK TRIGGER"
           stepType: 'trigger',
           explanation: triggerInfo.explanation,
           trigger: automation_blueprint.trigger,
-          platform: automation_blueprint.trigger.platform || automation_blueprint.trigger.integration
+          platform: automation_blueprint.trigger.platform || automation_blueprint.trigger.integration,
+          icon: 'Zap' // Initial icon for triggers
         },
         sourcePosition: 'right',
         targetPosition: 'left'
-      }
-      
-      nodes.push(triggerNode)
+      };
+      nodes.push(triggerNode);
     }
 
-    // Enhanced step processing with complete route explanation
-    const processStepsWithRouting = (steps: any[], startX: number, startY: number, parentId?: string, routePath: string = ''): { nodeIds: string[], endNodes: string[] } => {
+    // MODIFIED: processStepsWithRouting to handle multiple cases, retry paths, and fallback
+    // Also explicitly pass parentId and sourceHandle for clearer connections
+    const processStepsWithRouting = (
+      steps: any[],
+      startX: number,
+      startY: number,
+      parentId?: string,
+      sourceHandle?: string, // The handle on the parent node this path originates from
+      routePath: string = '' 
+    ): { nodeIds: string[], endNodes: string[], finalX: number, finalY: number } => {
       const processedNodeIds: string[] = []
       const endNodeIds: string[] = []
       let currentX = startX
-      
+      let currentY = startY // Tracks Y for sequential steps in a single path
+
       for (let i = 0; i < steps.length; i++) {
         const step = steps[i]
         nodeCounter++
         const nodeId = `node-${nodeCounter}`
         
-        // Create node with enhanced positioning
+        // Determine position for the current node
         const node: DiagramNode = {
           id: nodeId,
           type: getNodeType(step),
-          position: { x: currentX, y: startY },
+          position: { x: currentX, y: currentY },
           data: getNodeData(step),
           sourcePosition: 'right',
           targetPosition: 'left'
@@ -303,19 +351,21 @@ serve(async (req) => {
         nodes.push(node)
         processedNodeIds.push(nodeId)
 
-        // Create sequential connection
+        // Create connection from parent to current node if it's the first in a sequence
         if (i === 0 && parentId) {
           edges.push({
-            id: `edge-${parentId}-${nodeId}`,
+            id: `edge-${parentId}-${nodeId}-${sourceHandle || ''}`,
             source: parentId,
             target: nodeId,
             type: 'smoothstep',
             animated: true,
-            style: { stroke: '#8b5cf6', strokeWidth: 3 }
+            style: { stroke: '#8b5cf6', strokeWidth: 3 },
+            sourceHandle: sourceHandle || undefined // Use provided sourceHandle for specific branch connections
           })
         } else if (i > 0) {
+          // Connect to the previous node in the current linear path
           const previousNodeId = processedNodeIds[i - 1]
-          edges.push({
+           edges.push({
             id: `edge-${previousNodeId}-${nodeId}`,
             source: previousNodeId,
             target: nodeId,
@@ -325,112 +375,344 @@ serve(async (req) => {
           })
         }
 
-        // Handle intelligent condition branching with STOP nodes
-        if (step.type === 'condition' && step.condition) {
-          const branches = getConditionBranches(step.condition)
+        // Handle complex condition branching (MAJOR MODIFICATION)
+        if (step.type === 'condition' && step.condition && step.condition.cases) {
+          const branches = step.condition.cases;
+          const totalBranches = branches.length + (step.condition.default_steps && step.condition.default_steps.length > 0 ? 1 : 0);
+          const verticalBranchSpacing = 200; // Increased vertical spacing between branches
+          const initialBranchYOffset = -(totalBranches - 1) * (verticalBranchSpacing / 2);
           
-          // Process true/first branch
-          if (step.condition.if_true && Array.isArray(step.condition.if_true) && step.condition.if_true.length > 0) {
-            const trueBranchY = startY - 150
-            const trueBranchResult = processStepsWithRouting(
-              step.condition.if_true,
-              currentX + xSpacing,
-              trueBranchY,
-              nodeId,
-              `${routePath} -> ${branches[0].label}`
-            )
-            
-            if (trueBranchResult.nodeIds.length > 0) {
-              edges.push({
-                id: `edge-${nodeId}-true-${trueBranchResult.nodeIds[0]}`,
-                source: nodeId,
-                target: trueBranchResult.nodeIds[0],
-                sourceHandle: branches[0].handle,
-                type: 'smoothstep',
-                animated: true,
-                label: branches[0].label,
-                style: { stroke: '#8b5cf6', strokeWidth: 3 }
-              })
-            }
-            endNodeIds.push(...trueBranchResult.endNodes)
-          } else {
-            // Add STOP node for empty true branch
-            const stopNode = createStopNode(currentX + xSpacing, startY - 150)
-            nodes.push(stopNode)
-            edges.push({
-              id: `edge-${nodeId}-true-stop`,
-              source: nodeId,
-              target: stopNode.id,
-              sourceHandle: branches[0].handle,
-              type: 'smoothstep',
-              animated: true,
-              label: branches[0].label,
-              style: { stroke: '#8b5cf6', strokeWidth: 3 }
-            })
-            endNodeIds.push(stopNode.id)
-          }
+          let branchYCursor = currentY + initialBranchYOffset; // Starting Y for first branch
+          const endNodeForConditionBranches: string[] = []; // Collect end nodes of all branches from this condition
 
-          // Process false/second branch
-          if (step.condition.if_false && Array.isArray(step.condition.if_false) && step.condition.if_false.length > 0) {
-            const falseBranchY = startY + 150
-            const falseBranchResult = processStepsWithRouting(
-              step.condition.if_false,
+          branches.forEach((caseItem: any, index: number) => {
+            const branchResult = processStepsWithRouting(
+              caseItem.steps,
               currentX + xSpacing,
-              falseBranchY,
-              nodeId,
-              `${routePath} -> ${branches[1].label}`
-            )
+              branchYCursor,
+              nodeId, // Parent is the condition node
+              `case-${index}`, // Unique handle for each case
+              `${routePath} -> ${caseItem.label}`
+            );
             
-            if (falseBranchResult.nodeIds.length > 0) {
+            if (branchResult.nodeIds.length > 0) {
               edges.push({
-                id: `edge-${nodeId}-false-${falseBranchResult.nodeIds[0]}`,
+                id: `edge-${nodeId}-${caseItem.label.replace(/\s/g, '-')}-${branchResult.nodeIds[0]}`,
                 source: nodeId,
-                target: falseBranchResult.nodeIds[0],
-                sourceHandle: branches[1].handle,
+                target: branchResult.nodeIds[0],
+                sourceHandle: `case-${index}`,
                 type: 'smoothstep',
                 animated: true,
-                label: branches[1].label,
+                label: caseItem.label, // Use the blueprint's label for the edge
                 style: { stroke: '#8b5cf6', strokeWidth: 3 }
-              })
+              });
+              endNodeForConditionBranches.push(...branchResult.endNodes);
+            } else {
+              // Add PATH END node for empty branch (as requested)
+              const stopNode = createStopNode(currentX + xSpacing, branchYCursor, `PATH END: ${caseItem.label}`);
+              nodes.push(stopNode);
+              edges.push({
+                id: `edge-${nodeId}-${caseItem.label.replace(/\s/g, '-')}-stop`,
+                source: nodeId,
+                target: stopNode.id,
+                sourceHandle: `case-${index}`,
+                type: 'smoothstep',
+                animated: true,
+                label: caseItem.label,
+                style: { stroke: '#8b5cf6', strokeWidth: 3 }
+              });
+              endNodeForConditionBranches.push(stopNode.id);
             }
-            endNodeIds.push(...falseBranchResult.endNodes)
-          } else {
-            // Add STOP node for empty false branch
-            const stopNode = createStopNode(currentX + xSpacing, startY + 150)
-            nodes.push(stopNode)
+            branchYCursor += verticalBranchSpacing;
+          });
+
+          // Handle 'default_steps' if present (MODIFIED)
+          if (step.condition.default_steps && step.condition.default_steps.length > 0) {
+            const defaultResult = processStepsWithRouting(
+              step.condition.default_steps,
+              currentX + xSpacing,
+              branchYCursor,
+              nodeId,
+              'default-case', // Specific handle for default path
+              `${routePath} -> No Match Found`
+            );
+            if (defaultResult.nodeIds.length > 0) {
+              edges.push({
+                id: `edge-${nodeId}-default-${defaultResult.nodeIds[0]}`,
+                source: nodeId,
+                target: defaultResult.nodeIds[0],
+                sourceHandle: 'default-case',
+                type: 'smoothstep',
+                animated: true,
+                label: 'No Match Found', // Explicit label for this path
+                style: { stroke: '#ef4444', strokeWidth: 3 } // Red for no match
+              });
+              endNodeForConditionBranches.push(...defaultResult.endNodes);
+            } else {
+              // Add PATH END node for empty default branch
+              const stopNode = createStopNode(currentX + xSpacing, branchYCursor, 'PATH END: No Match');
+              nodes.push(stopNode);
+              edges.push({
+                id: `edge-${nodeId}-default-stop`,
+                source: nodeId,
+                target: stopNode.id,
+                sourceHandle: 'default-case',
+                type: 'smoothstep',
+                animated: true,
+                label: 'No Match Found',
+                style: { stroke: '#ef4444', strokeWidth: 3 }
+              });
+              endNodeForConditionBranches.push(stopNode.id);
+            }
+          } else if (branches.length === 0) {
+            // If condition has no cases and no default_steps, it's a dead end.
+            // This scenario should be rare with proper blueprint validation, but for safety:
+            const stopNode = createStopNode(currentX + xSpacing, currentY, 'PATH END: No Conditions Defined');
+            nodes.push(stopNode);
             edges.push({
-              id: `edge-${nodeId}-false-stop`,
-              source: nodeId,
-              target: stopNode.id,
-              sourceHandle: branches[1].handle,
-              type: 'smoothstep',
-              animated: true,
-              label: branches[1].label,
-              style: { stroke: '#8b5cf6', strokeWidth: 3 }
-            })
-            endNodeIds.push(stopNode.id)
+                id: `edge-${nodeId}-no-cases-stop`,
+                source: nodeId,
+                target: stopNode.id,
+                type: 'smoothstep',
+                animated: true,
+                label: 'No Paths Defined',
+                style: { stroke: '#6b7280', strokeWidth: 2, strokeDasharray: '4,4' }
+            });
+            endNodeForConditionBranches.push(stopNode.id);
           }
           
-          // This condition node doesn't continue linearly
-          break
+          endNodeIds.push(...endNodeForConditionBranches);
+          return { nodeIds: processedNodeIds, endNodes: endNodeIds, finalX: currentX, finalY: currentY }; // Condition node manages its own full flow
         }
 
-        currentX += xSpacing
+        // Handle retry node's success and failure paths (MODIFIED)
+        if (step.type === 'retry' && step.retry) {
+            const retrySuccessResult = processStepsWithRouting(
+                step.retry.steps,
+                currentX + xSpacing,
+                currentY - 75, // Position success path slightly above
+                nodeId,
+                'success', // Handle for success path
+                `${routePath} -> Retry Success`
+            );
+            if (retrySuccessResult.nodeIds.length > 0) {
+                edges.push({
+                    id: `edge-${nodeId}-retry-success-${retrySuccessResult.nodeIds[0]}`,
+                    source: nodeId,
+                    target: retrySuccessResult.nodeIds[0],
+                    sourceHandle: 'success',
+                    type: 'smoothstep',
+                    animated: true,
+                    label: 'Success', 
+                    style: { stroke: '#10b981', strokeWidth: 3 } // Green for success
+                });
+                endNodeIds.push(...retrySuccessResult.endNodes);
+            } else {
+                const stopNode = createStopNode(currentX + xSpacing, currentY - 75, 'RETRY SUCCESS END');
+                nodes.push(stopNode);
+                edges.push({
+                    id: `edge-${nodeId}-retry-success-stop`,
+                    source: nodeId,
+                    target: stopNode.id,
+                    sourceHandle: 'success',
+                    type: 'smoothstep',
+                    animated: true,
+                    label: 'Success',
+                    style: { stroke: '#10b981', strokeWidth: 3 }
+                });
+                endNodeIds.push(stopNode.id);
+            }
+
+            // Explicit retry failure path (NEW/MODIFIED)
+            if (step.retry.on_retry_fail_steps && step.retry.on_retry_fail_steps.length > 0) {
+                const retryFailY = currentY + 75; // Position failure path below
+                const retryFailResult = processStepsWithRouting(
+                    step.retry.on_retry_fail_steps,
+                    currentX + xSpacing,
+                    retryFailY,
+                    nodeId,
+                    'failure', // Handle for failure path
+                    `${routePath} -> Retry Failed`
+                );
+                if (retryFailResult.nodeIds.length > 0) {
+                    edges.push({
+                        id: `edge-${nodeId}-retry-fail-${retryFailResult.nodeIds[0]}`,
+                        source: nodeId,
+                        target: retryFailResult.nodeIds[0],
+                        sourceHandle: 'failure',
+                        type: 'smoothstep',
+                        animated: true,
+                        label: 'Failed (Retries Exhausted)', 
+                        style: { stroke: '#ef4444', strokeWidth: 3 } // Red for failure
+                    });
+                    endNodeIds.push(...retryFailResult.endNodes);
+                } else {
+                    const stopNode = createStopNode(currentX + xSpacing, retryFailY, 'RETRY FAILED END');
+                    nodes.push(stopNode);
+                    edges.push({
+                        id: `edge-${nodeId}-retry-fail-stop`,
+                        source: nodeId,
+                        target: stopNode.id,
+                        sourceHandle: 'failure',
+                        type: 'smoothstep',
+                        animated: true,
+                        label: 'Failed (Retries Exhausted)',
+                        style: { stroke: '#ef4444', strokeWidth: 3 }
+                    });
+                    endNodeIds.push(stopNode.id);
+                }
+            } else {
+                // Add an implicit PATH END node for retry failure if no explicit path in blueprint
+                const stopNode = createStopNode(currentX + xSpacing, currentY + 75, 'RETRY FAILED (No Path)');
+                nodes.push(stopNode);
+                edges.push({
+                    id: `edge-${nodeId}-retry-implicit-fail-stop`,
+                    source: nodeId,
+                    target: stopNode.id,
+                    sourceHandle: 'failure',
+                    type: 'smoothstep',
+                    animated: true,
+                    label: 'Implicit Failure',
+                    style: { stroke: '#ef4444', strokeWidth: 3, strokeDasharray: '4,4' } // Dashed red for implicit
+                });
+                endNodeIds.push(stopNode.id);
+            }
+            return { nodeIds: processedNodeIds, endNodes: endNodeIds, finalX: currentX, finalY: currentY }; // Retry node manages its own full flow
+        }
+
+        // Handle fallback node's primary and fallback paths (MODIFIED)
+        if (step.type === 'fallback' && step.fallback) {
+            // Primary path
+            const primaryResult = processStepsWithRouting(
+                step.fallback.primary_steps,
+                currentX + xSpacing,
+                currentY - 75, // Position primary path slightly above
+                nodeId,
+                'primary',
+                `${routePath} -> Primary Path`
+            );
+            if (primaryResult.nodeIds.length > 0) {
+                edges.push({
+                    id: `edge-${nodeId}-fallback-primary-${primaryResult.nodeIds[0]}`,
+                    source: nodeId,
+                    target: primaryResult.nodeIds[0],
+                    sourceHandle: 'primary',
+                    type: 'smoothstep',
+                    animated: true,
+                    label: 'Primary Success',
+                    style: { stroke: '#10b981', strokeWidth: 3 }
+                });
+                endNodeIds.push(...primaryResult.endNodes);
+            } else {
+                const stopNode = createStopNode(currentX + xSpacing, currentY - 75, 'PRIMARY PATH END');
+                nodes.push(stopNode);
+                edges.push({
+                    id: `edge-${nodeId}-fallback-primary-stop`,
+                    source: nodeId,
+                    target: stopNode.id,
+                    sourceHandle: 'primary',
+                    type: 'smoothstep',
+                    animated: true,
+                    label: 'Primary Success',
+                    style: { stroke: '#10b981', strokeWidth: 3 }
+                });
+                endNodeIds.push(stopNode.id);
+            }
+
+            // Fallback path
+            const fallbackResult = processStepsWithRouting(
+                step.fallback.fallback_steps,
+                currentX + xSpacing,
+                currentY + 75, // Position fallback path below
+                nodeId,
+                'fallback',
+                `${routePath} -> Fallback Path`
+            );
+            if (fallbackResult.nodeIds.length > 0) {
+                edges.push({
+                    id: `edge-${nodeId}-fallback-secondary-${fallbackResult.nodeIds[0]}`,
+                    source: nodeId,
+                    target: fallbackResult.nodeIds[0],
+                    sourceHandle: 'fallback',
+                    type: 'smoothstep',
+                    animated: true,
+                    label: 'Fallback Executed',
+                    style: { stroke: '#f59e0b', strokeWidth: 3 } // Amber for fallback
+                });
+                endNodeIds.push(...fallbackResult.endNodes);
+            } else {
+                const stopNode = createStopNode(currentX + xSpacing, currentY + 75, 'FALLBACK PATH END');
+                nodes.push(stopNode);
+                edges.push({
+                    id: `edge-${nodeId}-fallback-secondary-stop`,
+                    source: nodeId,
+                    target: stopNode.id,
+                    sourceHandle: 'fallback',
+                    type: 'smoothstep',
+                    animated: true,
+                    label: 'Fallback Executed',
+                    style: { stroke: '#f59e0b', strokeWidth: 3 }
+                });
+                endNodeIds.push(stopNode.id);
+            }
+            return { nodeIds: processedNodeIds, endNodes: endNodeIds, finalX: currentX, finalY: currentY }; // Fallback node manages its own full flow
+        }
         
-        // If this is the last step, mark it as an end node
+        currentX += xSpacing; // Move X for next sequential node in the same path
+        
+        // If this is the last step in a linear sequence, mark it as an end node
         if (i === steps.length - 1) {
           endNodeIds.push(nodeId)
         }
       }
 
-      return { nodeIds: processedNodeIds, endNodes: endNodeIds }
+      return { nodeIds: processedNodeIds, endNodes: endNodeIds, finalX: currentX, finalY: currentY }
     }
 
-    // Process all steps with enhanced routing
-    const triggerParentId = automation_blueprint.trigger ? 'trigger-node' : undefined
-    const startX = automation_blueprint.trigger ? baseX + xSpacing : baseX
-    
-    const mainResult = processStepsWithRouting(automation_blueprint.steps, startX, baseY, triggerParentId, 'Main Flow')
+    // Process all steps with enhanced routing, including the initial trigger and final end node
+    const mainResult = processStepsWithRouting(
+      automation_blueprint.steps, 
+      startXForSteps, 
+      baseY, 
+      triggerParentId, 
+      undefined, 
+      'Main Flow'
+    );
+
+    // Add a single, clear "AUTOMATION END" node at the very end
+    if (mainResult.endNodes.length > 0) {
+        const maxFinalX = Math.max(...mainResult.endNodes.map(id => nodes.find(n => n.id === id)?.position.x || 0));
+        const avgFinalY = mainResult.endNodes.reduce((sum, id) => sum + (nodes.find(n => n.id === id)?.position.y || 0), 0) / mainResult.endNodes.length;
+
+        const finalEndNodeId = `final-automation-end-node`;
+        const finalEndNode: DiagramNode = {
+            id: finalEndNodeId,
+            type: 'fallbackNode', // Visually re-using fallbackNode type, can be a dedicated 'endNode'
+            position: { x: maxFinalX + xSpacing, y: avgFinalY },
+            data: {
+                label: 'AUTOMATION END', // User wants "End node"
+                stepType: 'end', // Explicit stepType for rendering
+                explanation: 'The entire automation workflow has successfully concluded.',
+                isRecommended: false,
+                icon: 'FlagCheckered' // A checkered flag icon
+            },
+            sourcePosition: 'right',
+            targetPosition: 'left'
+        };
+        nodes.push(finalEndNode);
+
+        // Connect all disparate end nodes to this single final AUTOMATION END node
+        mainResult.endNodes.forEach(endNodeId => {
+            edges.push({
+                id: `edge-final-converge-${endNodeId}-${finalEndNodeId}`,
+                source: endNodeId,
+                target: finalEndNodeId,
+                type: 'smoothstep',
+                animated: true,
+                style: { stroke: '#4f46e5', strokeWidth: 3, strokeDasharray: '4,2' } // A distinct converging line style
+            });
+        });
+    }
 
     console.log('✅ Enhanced diagram generation completed successfully!', {
       totalNodes: nodes.length,
@@ -438,8 +720,9 @@ serve(async (req) => {
       conditionNodes: nodes.filter(n => n.type === 'conditionNode').length,
       aiAgentNodes: nodes.filter(n => n.data.isRecommended).length,
       stopNodes: nodes.filter(n => n.data.stepType === 'stop').length,
-      endNodes: mainResult.endNodes.length
-    })
+      generatedAt: new Date().toISOString(),
+      triggerType: automation_blueprint.trigger?.type || 'manual'
+    });
 
     const result = {
       nodes,
@@ -449,19 +732,19 @@ serve(async (req) => {
         conditionalBranches: nodes.filter(n => n.type === 'conditionNode').length,
         aiAgentRecommendations: nodes.filter(n => n.data.isRecommended).length,
         platforms: [...new Set(nodes.map(n => n.data.platform).filter(Boolean))],
-        routePaths: mainResult.endNodes.length,
-        stopNodes: nodes.filter(n => n.data.stepType === 'stop').length,
+        // Count all explicit end/stop nodes for 'routePaths' if desired, or just final 'AUTOMATION END'
+        routePathsTerminated: nodes.filter(n => n.data.stepType === 'stop' || n.data.stepType === 'end').length, 
         generatedAt: new Date().toISOString(),
         triggerType: automation_blueprint.trigger?.type || 'manual'
       }
-    }
+    };
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
+    });
 
   } catch (error) {
-    console.error('💥 Error in enhanced diagram generation:', error)
+    console.error('💥 Error in enhanced diagram generation:', error);
     
     return new Response(JSON.stringify({ 
       error: error.message,
@@ -470,6 +753,6 @@ serve(async (req) => {
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
+    });
   }
-})
+});

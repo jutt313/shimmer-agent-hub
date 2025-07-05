@@ -90,7 +90,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   });
 
   const processNodeData = useCallback((nodeData: any) => {
-    console.log('🔄 Processing node data:', { 
+    console.log('🎯 Processing PERFECT node:', { 
       label: nodeData.label, 
       stepType: nodeData.stepType, 
       platform: nodeData.platform,
@@ -139,15 +139,15 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   }, [onAgentAdd, onAgentDismiss, dismissedAgents, toast]);
 
   useEffect(() => {
-    console.log('🔄 Processing REVOLUTIONARY OpenAI-generated diagram data');
+    console.log('🎯 Processing PERFECT diagram with straight lines');
     
     try {
       if (automationDiagramData?.nodes && automationDiagramData?.edges) {
-        console.log('✅ Using REVOLUTIONARY OpenAI diagram data:', {
+        console.log('✅ Using PERFECT diagram data:', {
           nodes: automationDiagramData.nodes.length,
           edges: automationDiagramData.edges.length,
           source: automationDiagramData.metadata?.source || 'unknown',
-          aiRecommendations: automationDiagramData.metadata?.aiAgentRecommendations || 0
+          straightLines: automationDiagramData.metadata?.straightLines || false
         });
 
         const processedNodes = automationDiagramData.nodes
@@ -163,22 +163,23 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           })
           .filter(Boolean) as Node[];
 
-        console.log('📊 Processed nodes:', {
+        console.log('📊 Processed PERFECT nodes:', {
           original: automationDiagramData.nodes.length,
           processed: processedNodes.length,
           aiRecommendations: processedNodes.filter(n => n.data?.isRecommended).length
         });
 
-        // Apply CRYSTAL CLEAR left-to-right layout
+        // Apply PERFECT left-to-right layout with straight lines
         const { nodes: layoutedNodes, edges: layoutedEdges } = calculateEnhancedLayout(
           processedNodes,
           automationDiagramData.edges.map(edge => ({
             ...edge,
             animated: false,
-            type: edge.type || 'smoothstep',
+            type: 'straight', // STRAIGHT LINES!
             style: {
               stroke: edge.style?.stroke || '#6366f1',
-              strokeWidth: edge.style?.strokeWidth || 4,
+              strokeWidth: edge.style?.strokeWidth || 3,
+              strokeDasharray: undefined,
               ...edge.style
             }
           }))
@@ -199,18 +200,18 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         setDiagramStats(stats);
         setDiagramError(null);
         
-        console.log('📊 REVOLUTIONARY diagram statistics:', stats);
+        console.log('📊 PERFECT diagram statistics:', stats);
         
         if (stats.aiAgentNodes > 0) {
           toast({
             title: "🤖 AI Recommendations Found",
-            description: `${stats.aiAgentNodes} AI agent recommendations detected in your automation`,
+            description: `${stats.aiAgentNodes} AI agent recommendations detected`,
           });
         }
         
       } else if (automationBlueprint?.steps?.length > 0) {
-        console.log('⚠️ No diagram data available, but blueprint exists - generating REVOLUTIONARY diagram...');
-        setDiagramError('Creating crystal clear, intelligent diagram...');
+        console.log('⚠️ No diagram data available, generating PERFECT diagram...');
+        setDiagramError('Creating perfect left-to-right diagram with straight lines...');
         
       } else {
         console.log('❌ No diagram data or blueprint available');
@@ -227,7 +228,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         });
       }
     } catch (error) {
-      console.error('💥 Error processing REVOLUTIONARY diagram data:', error);
+      console.error('💥 Error processing PERFECT diagram:', error);
       setDiagramError(`Error processing diagram: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setNodes([]);
       setEdges([]);
@@ -243,13 +244,13 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     if (onRegenerateDiagram) {
       setIsRegenerating(true);
       try {
-        console.log('🔄 Regenerating REVOLUTIONARY diagram with user feedback:', regenerateInput);
+        console.log('🎯 Regenerating PERFECT diagram with feedback:', regenerateInput);
         await onRegenerateDiagram(regenerateInput.trim() || undefined);
         setShowRegenerateForm(false);
         setRegenerateInput('');
         toast({
-          title: "🎨 Creating Perfect Diagram",
-          description: "Making the diagram crystal clear with left-to-right flow and AI recommendations",
+          title: "🎯 Creating Perfect Diagram",
+          description: "Generating left-to-right flow with straight lines and AI recommendations",
         });
       } catch (error) {
         console.error('Error regenerating diagram:', error);
@@ -266,18 +267,18 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
 
   const handleQuickRegenerate = () => {
     if (onRegenerateDiagram) {
-      console.log('🔄 Quick regenerating REVOLUTIONARY diagram');
+      console.log('🎯 Quick regenerating PERFECT diagram');
       onRegenerateDiagram();
       toast({
-        title: "🚀 Creating Perfect Automation Diagram",
-        description: "Generating crystal clear left-to-right flow with AI recommendations and platform icons",
+        title: "🎯 Creating Perfect Diagram",
+        description: "Generating crystal clear left-to-right flow with straight lines",
       });
     }
   };
 
   return (
     <div className="h-full w-full relative bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Enhanced Header Controls - Perfect Mobile Support */}
+      {/* PERFECT Mobile-Responsive Header Controls */}
       <div className="absolute top-2 sm:top-4 right-2 sm:right-4 z-10 flex flex-col sm:flex-row gap-2">
         <Button
           onClick={() => setShowJsonDebug(true)}
@@ -298,7 +299,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
               className="bg-white/95 backdrop-blur-sm shadow-lg hover:bg-white border-orange-200 hover:border-orange-300 rounded-xl text-xs sm:text-sm px-2 sm:px-4"
             >
               <Settings className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Improve</span>
+              <span className="hidden sm:inline">Perfect</span>
               <span className="sm:hidden">Fix</span>
             </Button>
           </DialogTrigger>
@@ -316,7 +317,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
                 </Label>
                 <Textarea
                   id="feedback"
-                  placeholder="e.g., 'Add more AI recommendations', 'Fix snake patterns', 'Show platform icons', 'Make branches clearer'..."
+                  placeholder="e.g., 'Make lines straighter', 'Add more AI recommendations', 'Fix platform icons', 'Better condition branches'..."
                   value={regenerateInput}
                   onChange={(e) => setRegenerateInput(e.target.value)}
                   className="mt-2 min-h-[120px]"
@@ -366,7 +367,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         )}
       </div>
 
-      {/* Enhanced Statistics Badge - Perfect Mobile Support */}
+      {/* PERFECT Statistics Badge - Mobile-Responsive */}
       {diagramStats.totalNodes > 0 && (
         <div className="absolute top-2 sm:top-4 left-2 sm:left-4 z-10">
           <Badge variant="secondary" className="bg-white/95 backdrop-blur-sm shadow-lg text-gray-700 px-2 sm:px-3 py-1 rounded-xl text-xs sm:text-sm font-medium">
@@ -389,16 +390,11 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
                 • {diagramStats.conditionNodes} decisions
               </span>
             )}
-            {diagramStats.platformNodes > 0 && (
-              <span className="ml-1 sm:ml-2 text-blue-600 font-bold hidden xl:inline">
-                • {diagramStats.platformNodes} platforms
-              </span>
-            )}
           </Badge>
         </div>
       )}
 
-      {/* Main Diagram Container - PERFECT for all screen sizes */}
+      {/* PERFECT Diagram Container - Mobile Optimized */}
       <div className="h-full w-full rounded-none sm:rounded-xl overflow-hidden shadow-none sm:shadow-xl border-0 sm:border border-gray-200">
         <ReactFlow
           nodes={nodes}
@@ -411,20 +407,20 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           fitView
           fitViewOptions={{
             padding: 0.1,
-            minZoom: 0.2,
-            maxZoom: 1.2
+            minZoom: 0.3,
+            maxZoom: 1.5
           }}
-          defaultViewport={{ x: 0, y: 0, zoom: 0.6 }}
+          defaultViewport={{ x: 0, y: 0, zoom: 0.7 }}
           className="bg-gradient-to-br from-blue-50 via-white to-purple-50"
           panOnScroll
           panOnDrag={[1, 2]}
           proOptions={{ hideAttribution: true }}
           defaultEdgeOptions={{
-            type: 'smoothstep',
+            type: 'straight', // STRAIGHT LINES!
             animated: false,
             style: {
               stroke: '#6366f1',
-              strokeWidth: 4
+              strokeWidth: 3
             }
           }}
         >
@@ -459,14 +455,14 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         </ReactFlow>
       </div>
 
-      {/* Enhanced Error State */}
+      {/* PERFECT Error State */}
       {diagramError && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/95 backdrop-blur-sm p-4">
           <Card className="max-w-sm sm:max-w-md mx-auto shadow-xl border-orange-200 rounded-2xl">
             <CardHeader className="text-center">
               <AlertCircle className="w-12 h-12 sm:w-16 sm:h-16 text-orange-500 mx-auto mb-3" />
               <CardTitle className="text-orange-800 text-base sm:text-lg">
-                {isGenerating ? '🎨 Creating Perfect Diagram' : 'Loading Diagram'}
+                {isGenerating ? '🎯 Creating Perfect Diagram' : 'Loading Diagram'}
               </CardTitle>
             </CardHeader>
             <CardContent className="text-center">
@@ -475,7 +471,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
                 <div className="flex flex-col items-center gap-3">
                   <Loader2 className="w-6 h-6 animate-spin text-purple-600" />
                   <div className="text-sm text-purple-600 max-w-xs">
-                    AI is creating a crystal clear left-to-right diagram with intelligent recommendations and platform icons...
+                    AI is creating a perfect left-to-right diagram with straight lines, platform icons, and intelligent recommendations...
                   </div>
                 </div>
               )}
@@ -484,7 +480,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         </div>
       )}
 
-      {/* Enhanced JSON Debug Modal */}
+      {/* JSON Debug Modal */}
       {showJsonDebug && (
         <JsonDebugModal
           isOpen={showJsonDebug}

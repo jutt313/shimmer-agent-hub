@@ -25,18 +25,25 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { getPlatformIconConfig, getStepTypeIcon } from '@/utils/platformIcons';
 
 const getNodeIcon = (iconName: string, platform?: string, stepType?: string) => {
-  // Priority 1: Use platform icons
+  // Priority 1: Use platform icons with proper detection
   if (platform) {
-    console.log('🔍 Using platform icon for:', platform);
-    const { icon: PlatformIcon } = getPlatformIconConfig(platform);
-    return <PlatformIcon className="w-6 h-6" />;
+    console.log('🎯 Using platform icon for:', platform);
+    try {
+      const { icon: PlatformIcon } = getPlatformIconConfig(platform);
+      return <PlatformIcon className="w-6 h-6" />;
+    } catch (error) {
+      console.warn('⚠️ Platform icon not found for:', platform);
+    }
   }
 
   // Priority 2: Use step type icons
   if (stepType) {
-    console.log('🔍 Using step type icon for:', stepType);
-    const { icon: StepIcon } = getStepTypeIcon(stepType);
-    return <StepIcon className="w-6 h-6" />;
+    try {
+      const { icon: StepIcon } = getStepTypeIcon(stepType);
+      return <StepIcon className="w-6 h-6" />;
+    } catch (error) {
+      console.warn('⚠️ Step type icon not found for:', stepType);
+    }
   }
 
   // Priority 3: Fallback to generic icons
@@ -58,7 +65,7 @@ const getNodeIcon = (iconName: string, platform?: string, stepType?: string) => 
 };
 
 const getNodeStyle = (stepType: string, isRecommended: boolean = false) => {
-  const baseStyle = "relative rounded-2xl shadow-xl border-2 transition-all duration-300 hover:shadow-2xl cursor-pointer min-w-[320px] max-w-[400px]";
+  const baseStyle = "relative rounded-2xl shadow-xl border-2 transition-all duration-300 hover:shadow-2xl cursor-pointer min-w-[300px] max-w-[380px]";
   
   if (isRecommended) {
     return `${baseStyle} bg-gradient-to-br from-emerald-50 via-green-50 to-blue-50 border-emerald-400 hover:border-emerald-500 ring-2 ring-emerald-200`;
@@ -80,12 +87,20 @@ const getNodeStyle = (stepType: string, isRecommended: boolean = false) => {
 
 const getPlatformIconColor = (platform?: string, stepType?: string) => {
   if (platform) {
-    const { color } = getPlatformIconConfig(platform);
-    return color;
+    try {
+      const { color } = getPlatformIconConfig(platform);
+      return color;
+    } catch (error) {
+      console.warn('⚠️ Platform color not found for:', platform);
+    }
   }
   if (stepType) {
-    const { color } = getStepTypeIcon(stepType);
-    return color;
+    try {
+      const { color } = getStepTypeIcon(stepType);
+      return color;
+    } catch (error) {
+      console.warn('⚠️ Step type color not found for:', stepType);
+    }
   }
   return '#6B7280';
 };
@@ -112,12 +127,11 @@ const CustomNodeMapper = ({ data }: { data: any }) => {
     ai_agent_call
   } = data;
 
-  console.log('🎨 Rendering node:', { label, stepType, platform, isRecommended, branches: branches.length });
+  console.log('🎨 Rendering PERFECT node:', { label, stepType, platform, isRecommended, branches: branches.length });
 
   const handleNodeClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsExpanded(!isExpanded);
-    console.log('📱 Node clicked, expanded:', !isExpanded);
   };
 
   const getDetailedDescription = () => {
@@ -148,27 +162,10 @@ const CustomNodeMapper = ({ data }: { data: any }) => {
       });
     }
     
-    if (loop) {
-      details += `\n\n🔄 Loop Details:`;
-      details += `\nSource: ${loop.array_source}`;
-      details += `\nSteps: ${loop.steps?.length || 0}`;
-    }
-    
-    if (delay) {
-      details += `\n\n⏱️ Delay Details:`;
-      details += `\nDuration: ${delay.duration_seconds} seconds`;
-    }
-    
-    if (retry) {
-      details += `\n\n🔁 Retry Details:`;
-      details += `\nMax Attempts: ${retry.max_attempts}`;
-      details += `\nRetry Steps: ${retry.steps?.length || 0}`;
-    }
-    
     if (ai_agent_call) {
       details += `\n\n🤖 AI Agent Details:`;
       details += `\nAgent: ${ai_agent_call.agent_id}`;
-      details += `\nInput: ${ai_agent_call.input_prompt}`;
+      details += `\nTask: ${ai_agent_call.input_prompt}`;
       details += `\nOutput: ${ai_agent_call.output_variable}`;
     }
     
@@ -178,7 +175,7 @@ const CustomNodeMapper = ({ data }: { data: any }) => {
   return (
     <TooltipProvider>
       <div 
-        className={`${getNodeStyle(stepType, isRecommended)} p-4 sm:p-5 ${isExpanded ? 'min-h-[250px]' : ''}`}
+        className={`${getNodeStyle(stepType, isRecommended)} p-4 ${isExpanded ? 'min-h-[200px]' : ''}`}
         onClick={handleNodeClick}
       >
         {/* AI Recommendation Actions */}
@@ -191,7 +188,7 @@ const CustomNodeMapper = ({ data }: { data: any }) => {
                   e.stopPropagation();
                   onAdd();
                 }}
-                className="w-8 h-8 p-0 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg ring-2 ring-emerald-200"
+                className="w-8 h-8 p-0 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg"
               >
                 <Plus className="w-4 h-4" />
               </Button>
@@ -218,7 +215,7 @@ const CustomNodeMapper = ({ data }: { data: any }) => {
           <div 
             className="flex-shrink-0 p-3 rounded-xl shadow-md"
             style={{ 
-              backgroundColor: `${getPlatformIconColor(platform, stepType)}20`,
+              backgroundColor: `${getPlatformIconColor(platform, stepType)}15`,
               color: getPlatformIconColor(platform, stepType),
               border: `2px solid ${getPlatformIconColor(platform, stepType)}30`
             }}
@@ -229,7 +226,7 @@ const CustomNodeMapper = ({ data }: { data: any }) => {
           {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-3">
-              <h3 className="font-bold text-base sm:text-lg text-gray-800 leading-tight">
+              <h3 className="font-bold text-lg text-gray-800 leading-tight">
                 {label}
               </h3>
               
@@ -238,7 +235,7 @@ const CustomNodeMapper = ({ data }: { data: any }) => {
                   variant="ghost"
                   size="sm"
                   onClick={handleNodeClick}
-                  className="flex-shrink-0 w-8 h-8 p-0 hover:bg-gray-200 rounded-full"
+                  className="w-8 h-8 p-0 hover:bg-gray-200 rounded-full"
                 >
                   {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </Button>
@@ -248,11 +245,7 @@ const CustomNodeMapper = ({ data }: { data: any }) => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        console.log('ℹ️ Node info:', { label, stepType, explanation, data });
-                      }}
-                      className="flex-shrink-0 w-8 h-8 p-0 hover:bg-gray-200 rounded-full"
+                      className="w-8 h-8 p-0 hover:bg-gray-200 rounded-full"
                     >
                       <Info className="w-4 h-4" />
                     </Button>
@@ -287,14 +280,14 @@ const CustomNodeMapper = ({ data }: { data: any }) => {
             )}
 
             {/* Step Type Badge */}
-            <Badge variant="outline" className="mt-2 text-sm capitalize font-medium">
+            <Badge variant="outline" className="mt-2 text-sm capitalize font-medium ml-2">
               {stepType}
             </Badge>
 
             {/* Expanded Description */}
             {isExpanded && (
               <div className="mt-4 p-4 bg-white/80 backdrop-blur-sm rounded-xl shadow-inner border border-gray-200">
-                <p className="text-sm text-gray-700 whitespace-pre-line leading-relaxed font-medium">
+                <p className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">
                   {getDetailedDescription()}
                 </p>
               </div>
@@ -322,7 +315,7 @@ const CustomNodeMapper = ({ data }: { data: any }) => {
               className="w-4 h-4 border-2 border-white hover:bg-gray-600 transition-colors shadow-lg"
               style={{ 
                 right: -8, 
-                top: `${30 + (index * 20)}%`,
+                top: `${35 + (index * 15)}%`,
                 backgroundColor: branch.color || getPlatformIconColor(platform, stepType)
               }}
             />

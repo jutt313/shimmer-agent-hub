@@ -90,6 +90,13 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   });
 
   const processNodeData = useCallback((nodeData: any) => {
+    console.log('🔄 Processing node data:', { 
+      label: nodeData.label, 
+      stepType: nodeData.stepType, 
+      platform: nodeData.platform,
+      isRecommended: nodeData.isRecommended 
+    });
+
     const processedData = {
       ...nodeData,
       onAdd: nodeData.isRecommended ? () => {
@@ -102,16 +109,19 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             memory: 'Remember automation context and patterns',
             why_needed: nodeData.explanation || 'Essential for intelligent automation execution'
           };
+          console.log('➕ Adding AI agent:', agentData.name);
           onAgentAdd(agentData);
           toast({
-            title: "AI Agent Added",
+            title: "🤖 AI Agent Added",
             description: `${agentData.name} has been added to your automation`,
           });
         }
       } : undefined,
       onDismiss: nodeData.isRecommended ? () => {
         if (onAgentDismiss) {
-          onAgentDismiss(nodeData.ai_agent_call?.agent_id || nodeData.label);
+          const agentName = nodeData.ai_agent_call?.agent_id || nodeData.label;
+          console.log('❌ Dismissing AI agent:', agentName);
+          onAgentDismiss(agentName);
           toast({
             title: "AI Agent Dismissed",
             description: "Agent recommendation has been dismissed",
@@ -121,6 +131,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     };
 
     if (nodeData.isRecommended && dismissedAgents.has(nodeData.ai_agent_call?.agent_id || nodeData.label)) {
+      console.log('🚫 Node filtered out (dismissed):', nodeData.label);
       return null;
     }
 
@@ -128,14 +139,15 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   }, [onAgentAdd, onAgentDismiss, dismissedAgents, toast]);
 
   useEffect(() => {
-    console.log('🔄 Processing OpenAI-generated CLEAR diagram data');
+    console.log('🔄 Processing REVOLUTIONARY OpenAI-generated diagram data');
     
     try {
       if (automationDiagramData?.nodes && automationDiagramData?.edges) {
-        console.log('✅ Using OpenAI CLEAR diagram data:', {
+        console.log('✅ Using REVOLUTIONARY OpenAI diagram data:', {
           nodes: automationDiagramData.nodes.length,
           edges: automationDiagramData.edges.length,
-          source: automationDiagramData.metadata?.source || 'unknown'
+          source: automationDiagramData.metadata?.source || 'unknown',
+          aiRecommendations: automationDiagramData.metadata?.aiAgentRecommendations || 0
         });
 
         const processedNodes = automationDiagramData.nodes
@@ -151,7 +163,13 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           })
           .filter(Boolean) as Node[];
 
-        // Apply enhanced left-to-right layout
+        console.log('📊 Processed nodes:', {
+          original: automationDiagramData.nodes.length,
+          processed: processedNodes.length,
+          aiRecommendations: processedNodes.filter(n => n.data?.isRecommended).length
+        });
+
+        // Apply CRYSTAL CLEAR left-to-right layout
         const { nodes: layoutedNodes, edges: layoutedEdges } = calculateEnhancedLayout(
           processedNodes,
           automationDiagramData.edges.map(edge => ({
@@ -181,11 +199,18 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         setDiagramStats(stats);
         setDiagramError(null);
         
-        console.log('📊 CLEAR diagram statistics:', stats);
+        console.log('📊 REVOLUTIONARY diagram statistics:', stats);
+        
+        if (stats.aiAgentNodes > 0) {
+          toast({
+            title: "🤖 AI Recommendations Found",
+            description: `${stats.aiAgentNodes} AI agent recommendations detected in your automation`,
+          });
+        }
         
       } else if (automationBlueprint?.steps?.length > 0) {
-        console.log('⚠️ No diagram data available, but blueprint exists - generating CLEAR diagram...');
-        setDiagramError('Generating clear, easy-to-understand diagram...');
+        console.log('⚠️ No diagram data available, but blueprint exists - generating REVOLUTIONARY diagram...');
+        setDiagramError('Creating crystal clear, intelligent diagram...');
         
       } else {
         console.log('❌ No diagram data or blueprint available');
@@ -202,7 +227,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         });
       }
     } catch (error) {
-      console.error('💥 Error processing CLEAR diagram data:', error);
+      console.error('💥 Error processing REVOLUTIONARY diagram data:', error);
       setDiagramError(`Error processing diagram: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setNodes([]);
       setEdges([]);
@@ -218,13 +243,13 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     if (onRegenerateDiagram) {
       setIsRegenerating(true);
       try {
-        console.log('🔄 Regenerating CLEAR diagram with user feedback:', regenerateInput);
+        console.log('🔄 Regenerating REVOLUTIONARY diagram with user feedback:', regenerateInput);
         await onRegenerateDiagram(regenerateInput.trim() || undefined);
         setShowRegenerateForm(false);
         setRegenerateInput('');
         toast({
-          title: "Creating Better Diagram",
-          description: "Making the diagram clearer and easier to understand",
+          title: "🎨 Creating Perfect Diagram",
+          description: "Making the diagram crystal clear with left-to-right flow and AI recommendations",
         });
       } catch (error) {
         console.error('Error regenerating diagram:', error);
@@ -241,24 +266,24 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
 
   const handleQuickRegenerate = () => {
     if (onRegenerateDiagram) {
-      console.log('🔄 Quick regenerating CLEAR diagram');
+      console.log('🔄 Quick regenerating REVOLUTIONARY diagram');
       onRegenerateDiagram();
       toast({
-        title: "Making Diagram Clearer",
-        description: "Creating a better, easier-to-understand diagram",
+        title: "🚀 Creating Perfect Automation Diagram",
+        description: "Generating crystal clear left-to-right flow with AI recommendations and platform icons",
       });
     }
   };
 
   return (
-    <div className="h-full w-full relative bg-gray-50">
-      {/* Enhanced Header Controls - Mobile Responsive */}
+    <div className="h-full w-full relative bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      {/* Enhanced Header Controls - Perfect Mobile Support */}
       <div className="absolute top-2 sm:top-4 right-2 sm:right-4 z-10 flex flex-col sm:flex-row gap-2">
         <Button
           onClick={() => setShowJsonDebug(true)}
           size="sm"
           variant="outline"
-          className="bg-white/95 backdrop-blur-sm shadow-lg hover:bg-white border-purple-200 hover:border-purple-300 rounded-xl text-xs sm:text-sm"
+          className="bg-white/95 backdrop-blur-sm shadow-lg hover:bg-white border-purple-200 hover:border-purple-300 rounded-xl text-xs sm:text-sm px-2 sm:px-4"
         >
           <Code className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
           <span className="hidden sm:inline">Debug</span>
@@ -270,10 +295,10 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             <Button
               size="sm"
               variant="outline"
-              className="bg-white/95 backdrop-blur-sm shadow-lg hover:bg-white border-orange-200 hover:border-orange-300 rounded-xl text-xs sm:text-sm"
+              className="bg-white/95 backdrop-blur-sm shadow-lg hover:bg-white border-orange-200 hover:border-orange-300 rounded-xl text-xs sm:text-sm px-2 sm:px-4"
             >
               <Settings className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Make Clearer</span>
+              <span className="hidden sm:inline">Improve</span>
               <span className="sm:hidden">Fix</span>
             </Button>
           </DialogTrigger>
@@ -281,20 +306,20 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-purple-600" />
-                Make Diagram Clearer
+                Perfect Your Diagram
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div>
                 <Label htmlFor="feedback" className="text-sm font-medium">
-                  What should be clearer? (Optional)
+                  What needs improvement? (Optional)
                 </Label>
                 <Textarea
                   id="feedback"
-                  placeholder="e.g., 'Show platform icons', 'Make flow left to right', 'Add more details to steps', 'Fix confusing connections'..."
+                  placeholder="e.g., 'Add more AI recommendations', 'Fix snake patterns', 'Show platform icons', 'Make branches clearer'..."
                   value={regenerateInput}
                   onChange={(e) => setRegenerateInput(e.target.value)}
-                  className="mt-2 min-h-[100px]"
+                  className="mt-2 min-h-[120px]"
                 />
               </div>
               <div className="flex gap-2">
@@ -306,12 +331,12 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
                   {isRegenerating ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Making Clearer...
+                      Perfecting...
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4 mr-2" />
-                      Make Clearer
+                      Perfect Diagram
                     </>
                   )}
                 </Button>
@@ -328,7 +353,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             onClick={handleQuickRegenerate}
             size="sm"
             disabled={isGenerating}
-            className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white shadow-lg rounded-xl text-xs sm:text-sm"
+            className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white shadow-lg rounded-xl text-xs sm:text-sm px-2 sm:px-4"
           >
             {isGenerating ? (
               <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
@@ -341,14 +366,14 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         )}
       </div>
 
-      {/* Enhanced Statistics Badge - Mobile Responsive */}
+      {/* Enhanced Statistics Badge - Perfect Mobile Support */}
       {diagramStats.totalNodes > 0 && (
         <div className="absolute top-2 sm:top-4 left-2 sm:left-4 z-10">
-          <Badge variant="secondary" className="bg-white/95 backdrop-blur-sm shadow-lg text-gray-700 px-2 sm:px-3 py-1 rounded-xl text-xs sm:text-sm">
-            <span className="hidden lg:inline">
+          <Badge variant="secondary" className="bg-white/95 backdrop-blur-sm shadow-lg text-gray-700 px-2 sm:px-3 py-1 rounded-xl text-xs sm:text-sm font-medium">
+            <span className="hidden xl:inline">
               {diagramStats.totalNodes} steps • {diagramStats.totalEdges} connections
             </span>
-            <span className="hidden sm:inline lg:hidden">
+            <span className="hidden sm:inline xl:hidden">
               {diagramStats.totalNodes} steps • {diagramStats.totalEdges} links
             </span>
             <span className="sm:hidden">
@@ -356,19 +381,24 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             </span>
             {diagramStats.aiAgentNodes > 0 && (
               <span className="ml-1 sm:ml-2 text-emerald-600 font-bold">
-                • {diagramStats.aiAgentNodes} AI
+                • {diagramStats.aiAgentNodes} 🤖
               </span>
             )}
             {diagramStats.conditionNodes > 0 && (
-              <span className="ml-1 sm:ml-2 text-orange-600 font-bold hidden sm:inline">
+              <span className="ml-1 sm:ml-2 text-orange-600 font-bold hidden lg:inline">
                 • {diagramStats.conditionNodes} decisions
+              </span>
+            )}
+            {diagramStats.platformNodes > 0 && (
+              <span className="ml-1 sm:ml-2 text-blue-600 font-bold hidden xl:inline">
+                • {diagramStats.platformNodes} platforms
               </span>
             )}
           </Badge>
         </div>
       )}
 
-      {/* Main Diagram Container - Enhanced for Clarity */}
+      {/* Main Diagram Container - PERFECT for all screen sizes */}
       <div className="h-full w-full rounded-none sm:rounded-xl overflow-hidden shadow-none sm:shadow-xl border-0 sm:border border-gray-200">
         <ReactFlow
           nodes={nodes}
@@ -382,10 +412,10 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           fitViewOptions={{
             padding: 0.1,
             minZoom: 0.2,
-            maxZoom: 1.5
+            maxZoom: 1.2
           }}
-          defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
-          className="bg-gray-50"
+          defaultViewport={{ x: 0, y: 0, zoom: 0.6 }}
+          className="bg-gradient-to-br from-blue-50 via-white to-purple-50"
           panOnScroll
           panOnDrag={[1, 2]}
           proOptions={{ hideAttribution: true }}
@@ -403,13 +433,13 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             gap={32} 
             size={1.5}
             color="#e5e7eb"
-            style={{ opacity: 0.5 }}
+            style={{ opacity: 0.4 }}
           />
           
           <Controls 
             position="bottom-right"
             showInteractive={false}
-            className="bg-white/95 backdrop-blur-sm shadow-lg rounded-xl border border-gray-200"
+            className="bg-white/95 backdrop-blur-sm shadow-lg rounded-xl border border-gray-200 [&>button]:!bg-white/90 [&>button]:hover:!bg-gray-100"
           />
           
           <MiniMap 
@@ -420,10 +450,10 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             position="bottom-left"
             pannable
             zoomable
-            className="bg-white/95 backdrop-blur-sm shadow-lg rounded-xl border border-gray-200 hidden xl:block"
+            className="bg-white/95 backdrop-blur-sm shadow-lg rounded-xl border border-gray-200 hidden lg:block"
             style={{
-              width: '240px',
-              height: '160px'
+              width: '280px',
+              height: '180px'
             }}
           />
         </ReactFlow>
@@ -434,17 +464,19 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         <div className="absolute inset-0 flex items-center justify-center bg-white/95 backdrop-blur-sm p-4">
           <Card className="max-w-sm sm:max-w-md mx-auto shadow-xl border-orange-200 rounded-2xl">
             <CardHeader className="text-center">
-              <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 text-orange-500 mx-auto mb-2" />
-              <CardTitle className="text-orange-800 text-sm sm:text-base">
-                {isGenerating ? 'Creating Clear Diagram' : 'Loading Diagram'}
+              <AlertCircle className="w-12 h-12 sm:w-16 sm:h-16 text-orange-500 mx-auto mb-3" />
+              <CardTitle className="text-orange-800 text-base sm:text-lg">
+                {isGenerating ? '🎨 Creating Perfect Diagram' : 'Loading Diagram'}
               </CardTitle>
             </CardHeader>
             <CardContent className="text-center">
-              <p className="text-gray-600 mb-4 text-sm">{diagramError}</p>
+              <p className="text-gray-600 mb-4 text-sm sm:text-base">{diagramError}</p>
               {isGenerating && (
-                <div className="flex items-center justify-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
-                  <span className="text-sm text-purple-600">AI is creating an easy-to-understand diagram...</span>
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="w-6 h-6 animate-spin text-purple-600" />
+                  <div className="text-sm text-purple-600 max-w-xs">
+                    AI is creating a crystal clear left-to-right diagram with intelligent recommendations and platform icons...
+                  </div>
                 </div>
               )}
             </CardContent>

@@ -1,3 +1,4 @@
+
 import { Node, Edge } from '@xyflow/react';
 
 export interface LayoutOptions {
@@ -11,11 +12,11 @@ export interface LayoutOptions {
 
 const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
   nodeWidth: 320,
-  nodeHeight: 120,
-  horizontalGap: 450,
-  verticalGap: 180,
+  nodeHeight: 140,
+  horizontalGap: 500, // Increased for clearer left-to-right flow
+  verticalGap: 200,
   startX: 100,
-  startY: 100
+  startY: 300
 };
 
 export const calculateEnhancedLayout = (
@@ -25,42 +26,42 @@ export const calculateEnhancedLayout = (
 ): { nodes: Node[]; edges: Edge[] } => {
   const opts = { ...DEFAULT_LAYOUT_OPTIONS, ...options };
   
-  console.log('🎨 Calculating CLEAR left-to-right layout for', nodes.length, 'nodes');
+  console.log('🎨 Creating CRYSTAL CLEAR left-to-right layout for', nodes.length, 'nodes');
   
   if (!nodes || nodes.length === 0) return { nodes: [], edges };
 
-  // Build adjacency graph for proper left-to-right flow
+  // Build adjacency graph for perfect left-to-right flow
   const graph = new Map<string, string[]>();
   const inDegrees = new Map<string, number>();
-  const outDegrees = new Map<string, number>();
+  const nodeTypes = new Map<string, string>();
 
   nodes.forEach(node => {
     graph.set(node.id, []);
     inDegrees.set(node.id, 0);
-    outDegrees.set(node.id, 0);
+    nodeTypes.set(node.id, node.data?.stepType || node.type || 'action');
   });
 
   edges.forEach(edge => {
     if (graph.has(edge.source) && graph.has(edge.target)) {
       graph.get(edge.source)?.push(edge.target);
       inDegrees.set(edge.target, (inDegrees.get(edge.target) || 0) + 1);
-      outDegrees.set(edge.source, (outDegrees.get(edge.source) || 0) + 1);
     }
   });
 
-  // Topological sort for clean left-to-right positioning
-  const queue: string[] = [];
+  // Topological sort for perfect left-to-right positioning
   const layers = new Map<string, number>();
+  const queue: string[] = [];
   
   // Find root nodes (triggers or nodes with no incoming edges)
   nodes.forEach(node => {
-    if (inDegrees.get(node.id) === 0 || node.type === 'triggerNode') {
+    const stepType = node.data?.stepType || node.type;
+    if (inDegrees.get(node.id) === 0 || stepType === 'trigger') {
       queue.push(node.id);
       layers.set(node.id, 0);
     }
   });
 
-  // Process nodes layer by layer for clean flow
+  // Process nodes layer by layer for crystal clear flow
   let head = 0;
   while (head < queue.length) {
     const nodeId = queue[head++];
@@ -77,18 +78,23 @@ export const calculateEnhancedLayout = (
     });
   }
 
-  // Handle orphaned nodes
+  // Handle orphaned nodes - put them in appropriate layers
   nodes.forEach(node => {
     if (!layers.has(node.id)) {
-      if (node.type === 'triggerNode') {
+      const stepType = node.data?.stepType || node.type;
+      if (stepType === 'trigger') {
         layers.set(node.id, 0);
+      } else if (stepType === 'end' || stepType === 'stop') {
+        // Put end nodes in the last layer
+        const maxLayer = Math.max(...Array.from(layers.values()));
+        layers.set(node.id, maxLayer + 1);
       } else {
         layers.set(node.id, 1);
       }
     }
   });
 
-  // Group nodes by layer for clean vertical distribution
+  // Group nodes by layer for perfect vertical distribution
   const layerGroups = new Map<number, string[]>();
   layers.forEach((layer, nodeId) => {
     if (!layerGroups.has(layer)) {
@@ -97,19 +103,19 @@ export const calculateEnhancedLayout = (
     layerGroups.get(layer)?.push(nodeId);
   });
 
-  // Calculate positions with CLEAR spacing for readability
+  // Calculate positions with CRYSTAL CLEAR spacing
   const layoutedNodes = nodes.map(node => {
     const layer = layers.get(node.id) || 0;
     const layerNodes = layerGroups.get(layer) || [];
     const nodeIndex = layerNodes.indexOf(node.id);
     
-    // Horizontal position (clean left to right)
+    // Perfect horizontal position (clean left to right)
     const x = opts.startX + (layer * opts.horizontalGap);
     
-    // Vertical position with centered distribution
+    // Perfect vertical position with centered distribution
     const totalLayerHeight = Math.max(1, layerNodes.length) * opts.nodeHeight + 
                              Math.max(0, layerNodes.length - 1) * opts.verticalGap;
-    const layerStartY = opts.startY + 200 - (totalLayerHeight / 2);
+    const layerStartY = opts.startY - (totalLayerHeight / 2);
     const y = layerStartY + nodeIndex * (opts.nodeHeight + opts.verticalGap);
     
     return { 
@@ -127,7 +133,7 @@ export const calculateEnhancedLayout = (
     };
   });
 
-  // Enhanced edge styling with CLEAR connections
+  // Enhanced edge styling with PERFECT connections
   const layoutedEdges = edges.map((edge, index) => {
     const colors = [
       '#8b5cf6', // Purple
@@ -135,6 +141,9 @@ export const calculateEnhancedLayout = (
       '#10b981', // Green
       '#f59e0b', // Amber
       '#ef4444', // Red
+      '#06b6d4', // Cyan
+      '#8b5a2b', // Brown
+      '#dc2626', // Red
     ];
     
     const colorIndex = index % colors.length;
@@ -143,12 +152,12 @@ export const calculateEnhancedLayout = (
     const edgeStyle = {
       stroke: baseColor,
       strokeWidth: 4,
-      strokeDasharray: undefined, // Remove dashed lines for clarity
+      strokeDasharray: undefined,
       filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))',
       ...edge.style
     };
 
-    // Handle condition branch labels clearly
+    // Clear condition branch labels
     let label = edge.label;
     if (edge.sourceHandle) {
       if (edge.sourceHandle === 'true') {
@@ -160,15 +169,19 @@ export const calculateEnhancedLayout = (
       } else if (edge.sourceHandle === 'failure') {
         label = '⚠ FAILURE';
       } else if (edge.sourceHandle.startsWith('case-')) {
-        // Keep the actual label for case branches
-        label = edge.label || `Branch ${edge.sourceHandle.replace('case-', '')}`;
+        const caseNumber = edge.sourceHandle.replace('case-', '');
+        label = edge.label || `Condition ${parseInt(caseNumber) + 1}`;
+      } else {
+        label = edge.label || 'Next';
       }
+    } else {
+      label = edge.label || 'Next';
     }
 
     return {
       ...edge,
       type: 'smoothstep',
-      animated: false, // Remove animation for clarity
+      animated: false,
       style: edgeStyle,
       label,
       labelStyle: {
@@ -189,7 +202,7 @@ export const calculateEnhancedLayout = (
     };
   });
 
-  console.log('✅ CLEAR left-to-right layout completed:', {
+  console.log('✅ CRYSTAL CLEAR left-to-right layout completed:', {
     finalNodes: layoutedNodes.length,
     finalEdges: layoutedEdges.length,
     layers: Math.max(...Array.from(layers.values())) + 1,

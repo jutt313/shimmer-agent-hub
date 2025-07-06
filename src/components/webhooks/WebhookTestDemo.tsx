@@ -1,10 +1,11 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/components/ui/use-toast';
-import { TestTube, CheckCircle, XCircle, Clock, Activity } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { TestTube, CheckCircle, XCircle, Clock, Activity, Eye, EyeOff } from 'lucide-react';
 
 interface WebhookTestResult {
   success: boolean;
@@ -18,6 +19,7 @@ interface WebhookTestResult {
 const WebhookTestDemo = () => {
   const [testResult, setTestResult] = useState<WebhookTestResult | null>(null);
   const [testing, setTesting] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
   const { toast } = useToast();
 
   // Test webhook URL from database
@@ -29,7 +31,7 @@ const WebhookTestDemo = () => {
     setTestResult(null);
     
     try {
-      console.log('🧪 TESTING WEBHOOK SYSTEM - COMPLETE FLOW');
+      console.log('🧪 TESTING ENHANCED WEBHOOK SYSTEM - COMPLETE FLOW');
       console.log('📡 URL:', testWebhookUrl);
       
       const startTime = Date.now();
@@ -124,6 +126,11 @@ const WebhookTestDemo = () => {
     return 'bg-red-100 text-red-800 border-red-200';
   };
 
+  const maskSecret = (secret: string) => {
+    if (!secret) return '';
+    return secret.substring(0, 8) + '•'.repeat(secret.length - 8);
+  };
+
   return (
     <Card className="max-w-2xl mx-auto bg-white/95 backdrop-blur-sm border-0 shadow-xl rounded-3xl">
       <CardHeader>
@@ -131,10 +138,10 @@ const WebhookTestDemo = () => {
           <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl">
             <TestTube className="w-6 h-6 text-white" />
           </div>
-          Complete Webhook System Test
+          Enhanced Webhook System Test
         </CardTitle>
         <p className="text-gray-600">
-          Test the complete webhook flow: Frontend → test-webhook function → webhook-trigger function → Database
+          Test the complete webhook flow with improved error handling and diagnostics
         </p>
       </CardHeader>
       
@@ -145,6 +152,28 @@ const WebhookTestDemo = () => {
           <code className="text-sm bg-white p-2 rounded-lg border block break-all">
             {testWebhookUrl}
           </code>
+        </div>
+
+        {/* Secret Display with Toggle */}
+        <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="font-semibold text-amber-900">Webhook Secret:</h4>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowSecret(!showSecret)}
+              className="h-8 px-3 text-xs border-amber-300 hover:bg-amber-100"
+            >
+              {showSecret ? <EyeOff className="w-3 h-3 mr-1" /> : <Eye className="w-3 h-3 mr-1" />}
+              {showSecret ? 'Hide' : 'Show'}
+            </Button>
+          </div>
+          <code className="text-sm bg-white p-2 rounded-lg border block break-all text-amber-800">
+            {showSecret ? testSecret : maskSecret(testSecret)}
+          </code>
+          <p className="text-xs text-amber-700 mt-2">
+            This secret is used for webhook signature validation to ensure request authenticity.
+          </p>
         </div>
 
         {/* Test Button */}
@@ -158,12 +187,12 @@ const WebhookTestDemo = () => {
             {testing ? (
               <>
                 <Clock className="w-5 h-5 mr-2 animate-spin" />
-                Testing Complete Flow...
+                Testing Enhanced Flow...
               </>
             ) : (
               <>
                 <TestTube className="w-5 h-5 mr-2" />
-                Test Webhook System
+                Test Enhanced Webhook
               </>
             )}
           </Button>
@@ -176,7 +205,7 @@ const WebhookTestDemo = () => {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   {getStatusIcon(testResult)}
-                  <h4 className="font-semibold">Test Results</h4>
+                  <h4 className="font-semibold">Enhanced Test Results</h4>
                 </div>
                 <Badge className={getStatusColor(testResult)}>
                   {testResult.success ? 'SUCCESS' : 'FAILED'}
@@ -200,22 +229,22 @@ const WebhookTestDemo = () => {
 
               {testResult.userMessage && (
                 <div className="p-3 bg-gray-50 rounded-xl">
-                  <h5 className="font-medium text-gray-900 mb-1">Message:</h5>
+                  <h5 className="font-medium text-gray-900 mb-1">Result:</h5>
                   <p className="text-gray-700 text-sm">{testResult.userMessage}</p>
                 </div>
               )}
 
               {testResult.error && (
                 <div className="p-3 bg-red-50 rounded-xl mt-3">
-                  <h5 className="font-medium text-red-900 mb-1">Error:</h5>
+                  <h5 className="font-medium text-red-900 mb-1">Error Details:</h5>
                   <p className="text-red-700 text-sm">{testResult.error}</p>
                 </div>
               )}
 
               {testResult.details && (
-                <div className="p-3 bg-yellow-50 rounded-xl mt-3">
-                  <h5 className="font-medium text-yellow-900 mb-1">Details:</h5>
-                  <pre className="text-yellow-700 text-xs overflow-x-auto">
+                <div className="p-3 bg-blue-50 rounded-xl mt-3">
+                  <h5 className="font-medium text-blue-900 mb-1">Technical Details:</h5>
+                  <pre className="text-blue-700 text-xs overflow-x-auto">
                     {JSON.stringify(testResult.details, null, 2)}
                   </pre>
                 </div>
@@ -224,16 +253,17 @@ const WebhookTestDemo = () => {
           </div>
         )}
 
-        {/* Flow Explanation */}
+        {/* Enhanced Flow Explanation */}
         <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl border border-blue-200">
-          <h4 className="font-semibold text-gray-900 mb-2">🔄 Complete Test Flow:</h4>
+          <h4 className="font-semibold text-gray-900 mb-2">🔄 Enhanced Test Flow:</h4>
           <ol className="text-sm text-gray-700 space-y-1 list-decimal list-inside">
-            <li>Frontend calls <code>test-webhook</code> function</li>
-            <li>Test function sends POST request to webhook URL</li>
-            <li><code>webhook-trigger</code> function receives request</li>
-            <li>Webhook function looks up automation in database</li>
-            <li>Creates automation run and logs delivery</li>
-            <li>Returns success/failure response</li>
+            <li>Frontend calls <code>test-webhook</code> function with improved payload</li>
+            <li>Test function sends authenticated POST request to webhook URL</li>
+            <li><code>webhook-trigger</code> function receives request with enhanced logging</li>
+            <li>Enhanced database lookup with multiple strategies for reliability</li>
+            <li>Webhook function validates signature and processes automation</li>
+            <li>Creates automation run with detailed execution tracking</li>
+            <li>Returns comprehensive success/failure response with diagnostics</li>
           </ol>
         </div>
       </CardContent>

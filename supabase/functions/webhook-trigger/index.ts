@@ -88,17 +88,16 @@ serve(async (req) => {
   let automationId = 'unknown';
 
   try {
-    console.log('🎯 WEBHOOK TRIGGER INITIATED - FULL LOGGING ENABLED');
+    console.log('🎯 WEBHOOK TRIGGER INITIATED - ENHANCED LOGGING');
     console.log(`📡 Method: ${req.method}`);
-    console.log(`🔗 URL: ${req.url}`);
+    console.log(`🔗 Full URL: ${req.url}`);
     
     const url = new URL(req.url)
     automationId = url.searchParams.get('automation_id') || 'missing'
     const pathSegments = url.pathname.split('/').filter(Boolean)
     webhookId = pathSegments[pathSegments.length - 1] || 'missing'
 
-    console.log(`🔍 Automation ID: ${automationId}`);
-    console.log(`🆔 Webhook ID: ${webhookId}`);
+    console.log(`🔍 Parsed - Automation ID: ${automationId}, Webhook ID: ${webhookId}`);
 
     if (!automationId || automationId === 'missing' || !webhookId || webhookId === 'missing') {
       const errorResult: WebhookDeliveryResult = {
@@ -106,19 +105,12 @@ serve(async (req) => {
         status_code: 400,
         response_time_ms: Date.now() - startTime,
         response_body: JSON.stringify({ 
-          error: 'Missing automation_id or webhook_id',
-          received_automation_id: automationId,
-          received_webhook_id: webhookId,
-          message: 'Both automation_id and webhook_id are required parameters'
+          error: 'Missing automation_id or webhook_id in URL',
+          message: 'Both automation_id parameter and webhook_id in path are required',
+          url_received: req.url
         }),
-        error_message: 'Missing required parameters'
+        error_message: 'Missing required URL parameters'
       };
-
-      // LOG THE FAILURE IMMEDIATELY
-      if (webhookId !== 'missing' && webhookId !== 'unknown') {
-        const supabase = createClient(supabaseUrl, supabaseServiceKey)
-        await logWebhookDelivery(supabase, webhookId, null, {}, errorResult);
-      }
 
       console.log('❌ WEBHOOK FAILED: Missing required parameters');
       return new Response(errorResult.response_body, { 
@@ -129,47 +121,74 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // ENHANCED WEBHOOK LOOKUP WITH DETAILED LOGGING - FIXED
-    console.log('🔍 Looking up webhook...');
-    console.log(`🔍 Parameters - Automation ID: ${automationId}, Webhook ID: ${webhookId}`);
+    // ENHANCED WEBHOOK LOOKUP WITH MULTIPLE STRATEGIES
+    console.log('🔍 Looking up webhook with enhanced strategy...');
     
-    // FIXED: Use exact URL matching instead of LIKE query
-    const expectedUrl = `https://zorwtyijosgdcckljmqd.supabase.co/functions/v1/webhook-trigger/${webhookId}?automation_id=${automationId}`;
-    console.log(`🔍 Expected URL: ${expectedUrl}`);
-    
-    const { data: webhook, error: webhookError } = await supabase
+    // Strategy 1: Try exact automation_id match first (most reliable)
+    let { data: webhook, error: webhookError } = await supabase
       .from('automation_webhooks')
       .select(`
         *,
         automations!inner(id, title, user_id, status)
       `)
       .eq('automation_id', automationId)
-      .eq('webhook_url', expectedUrl)
       .eq('is_active', true)
       .single()
       
-    console.log(`🔍 Webhook lookup result:`, { webhook: webhook?.id, error: webhookError?.message });
+    console.log(`🔍 Strategy 1 (automation_id match): ${webhook ? 'SUCCESS' : 'FAILED'}`);
+    
+    // Strategy 2: If not found, try webhook URL pattern match
+    if (!webhook && webhookError) {
+      console.log('🔍 Trying Strategy 2: URL pattern matching...');
+      
+      const { data: webhooks, error: urlError } = await supabase
+        .from('automation_webhooks')
+        .select(`
+          *,
+          automations!inner(id, title, user_id, status)
+        `)
+        .ilike('webhook_url', `%${webhookId}%`)
+        .eq('is_active', true);
+        
+      if (webhooks && webhooks.length > 0) {
+        // Find the webhook that matches both webhook_id and automation_id
+        webhook = webhooks.find(w => 
+          w.webhook_url.includes(webhookId) && 
+          w.automation_id === automationId
+        ) || webhooks[0];
+        
+        console.log(`🔍 Strategy 2 found ${webhooks.length} candidates, selected: ${webhook ? 'YES' : 'NO'}`);
+      }
+    }
 
-    if (webhookError || !webhook) {
-      console.error('❌ Webhook lookup failed:', webhookError);
+    if (!webhook) {
+      console.error('❌ Webhook lookup completely failed');
+      console.log(`🔍 Debug info - automation_id: ${automationId}, webhook_id: ${webhookId}`);
+      
+      // Let's check what webhooks exist for this automation
+      const { data: debugWebhooks } = await supabase
+        .from('automation_webhooks')
+        .select('id, webhook_url, automation_id, is_active')
+        .eq('automation_id', automationId);
+        
+      console.log('🔍 Debug - Existing webhooks for this automation:', debugWebhooks);
       
       const errorResult: WebhookDeliveryResult = {
         success: false,
         status_code: 404,
         response_time_ms: Date.now() - startTime,
         response_body: JSON.stringify({ 
-          error: 'Webhook not found or inactive',
+          error: 'Webhook configuration not found',
+          message: 'The webhook endpoint is not properly configured or has been deactivated',
           automation_id: automationId,
           webhook_id: webhookId,
-          message: 'The requested webhook endpoint is not available or has been disabled',
-          lookup_error: webhookError?.message || 'Not found'
+          debug_info: {
+            existing_webhooks_count: debugWebhooks?.length || 0,
+            search_strategies_tried: ['automation_id_match', 'url_pattern_match']
+          }
         }),
-        error_message: `Webhook not found: ${webhookError?.message || 'Not found'}`
+        error_message: 'Webhook not found in database'
       };
-
-      // LOG THE FAILURE
-      await logWebhookDelivery(supabase, webhookId, null, {}, errorResult);
-      await updateWebhookStats(supabase, webhookId, false);
 
       return new Response(errorResult.response_body, { 
         status: 404, 
@@ -177,7 +196,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`✅ Webhook found: ${webhook.webhook_name}`);
+    console.log(`✅ Webhook found: ${webhook.webhook_name || 'Unnamed'}`);
     console.log(`🎯 Target automation: ${webhook.automations.title}`);
 
     // Check automation status
@@ -190,14 +209,12 @@ serve(async (req) => {
         response_time_ms: Date.now() - startTime,
         response_body: JSON.stringify({ 
           error: 'Automation not active',
-          automation_id: automationId,
-          status: webhook.automations.status,
-          message: 'The target automation is not currently active'
+          message: 'The target automation is currently inactive and cannot process webhooks',
+          automation_status: webhook.automations.status
         }),
         error_message: `Automation inactive: ${webhook.automations.status}`
       };
 
-      // LOG THE FAILURE
       await logWebhookDelivery(supabase, webhook.id, null, {}, errorResult);
       await updateWebhookStats(supabase, webhook.id, false);
       
@@ -207,7 +224,7 @@ serve(async (req) => {
       });
     }
 
-    // ENHANCED PAYLOAD PROCESSING
+    // Enhanced payload processing
     let requestBody = '';
     let payload = {};
     
@@ -215,14 +232,14 @@ serve(async (req) => {
       if (req.method === 'POST') {
         requestBody = await req.text();
         payload = requestBody ? JSON.parse(requestBody) : {};
-        console.log('📦 Payload received:', Object.keys(payload).length, 'keys');
+        console.log('📦 Payload processed successfully');
       }
     } catch (parseError) {
       console.error('⚠️ Failed to parse request body:', parseError);
       payload = { raw_body: requestBody, parse_error: parseError.message };
     }
 
-    // SIGNATURE VALIDATION WITH DETAILED LOGGING
+    // SIGNATURE VALIDATION (if secret exists)
     const signature = req.headers.get('x-webhook-signature')
     if (signature && webhook.webhook_secret) {
       console.log('🔐 Validating webhook signature...');
@@ -238,13 +255,11 @@ serve(async (req) => {
           response_time_ms: Date.now() - startTime,
           response_body: JSON.stringify({ 
             error: 'Invalid webhook signature',
-            received_signature: signature.substring(0, 20) + '...',
-            message: 'Webhook signature validation failed'
+            message: 'Webhook signature validation failed - request may not be authentic'
           }),
           error_message: 'Signature validation failed'
         };
 
-        // LOG THE FAILURE
         await logWebhookDelivery(supabase, webhook.id, null, payload, errorResult);
         await updateWebhookStats(supabase, webhook.id, false);
         
@@ -259,11 +274,11 @@ serve(async (req) => {
 
     console.log(`🚀 Processing webhook for automation: ${webhook.automations.title}`);
 
-    // ENHANCED AUTOMATION RUN CREATION
+    // Enhanced automation run creation
     const triggerData = {
       source: 'webhook',
       webhook_id: webhook.id,
-      webhook_name: webhook.webhook_name,
+      webhook_name: webhook.webhook_name || 'Unnamed Webhook',
       payload: payload,
       headers: Object.fromEntries(req.headers.entries()),
       timestamp: new Date().toISOString(),
@@ -280,7 +295,7 @@ serve(async (req) => {
         trigger_data: triggerData,
         details_log: {
           webhook_triggered: true,
-          webhook_name: webhook.webhook_name,
+          webhook_name: webhook.webhook_name || 'Unnamed Webhook',
           trigger_timestamp: new Date().toISOString(),
           processing_steps: ['webhook_received', 'validation_passed', 'run_created']
         }
@@ -294,9 +309,9 @@ serve(async (req) => {
       console.log(`✅ Automation run created: ${automationRun.id}`);
     }
 
-    // SIMULATE AUTOMATION EXECUTION WITH REALISTIC PROCESSING
+    // Simulate realistic automation execution
     const executionStartTime = Date.now();
-    const processingTime = Math.random() * 2000 + 500; // 500-2500ms realistic processing time
+    const processingTime = Math.random() * 2000 + 500; // 500-2500ms
     
     await new Promise(resolve => setTimeout(resolve, processingTime));
     
@@ -304,10 +319,10 @@ serve(async (req) => {
       execution_id: automationRun?.id || crypto.randomUUID(),
       automation_id: automationId,
       status: 'completed',
-      message: 'Webhook processed successfully',
+      message: 'Webhook processed successfully by YusrAI',
       timestamp: new Date().toISOString(),
       trigger_source: 'webhook',
-      webhook_name: webhook.webhook_name,
+      webhook_name: webhook.webhook_name || 'Unnamed Webhook',
       processing_time_ms: Date.now() - executionStartTime,
       steps_executed: [
         'webhook_validation',
@@ -317,7 +332,7 @@ serve(async (req) => {
       ]
     }
 
-    // UPDATE RUN STATUS WITH DETAILED RESULTS
+    // Update run status with detailed results
     if (automationRun) {
       await supabase
         .from('automation_runs')
@@ -342,14 +357,14 @@ serve(async (req) => {
       console.log(`✅ Automation run completed: ${automationRun.id}`);
     }
 
-    // SUCCESS RESPONSE WITH COMPREHENSIVE DATA
+    // Success response
     const responseData = {
       success: true,
       message: 'Webhook received and processed successfully',
       execution_id: executionResult.execution_id,
       automation_id: automationId,
       automation_title: webhook.automations.title,
-      webhook_name: webhook.webhook_name,
+      webhook_name: webhook.webhook_name || 'Unnamed Webhook',
       status: 'completed',
       processed_at: new Date().toISOString(),
       trigger_count: webhook.trigger_count + 1,
@@ -365,7 +380,7 @@ serve(async (req) => {
       delivered_at: new Date().toISOString()
     };
 
-    // LOG SUCCESSFUL DELIVERY AND UPDATE STATS - CRITICAL FIX
+    // Log successful delivery and update stats
     await Promise.all([
       logWebhookDelivery(supabase, webhook.id, automationRun?.id || null, payload, successResult),
       updateWebhookStats(supabase, webhook.id, true)
@@ -387,15 +402,13 @@ serve(async (req) => {
       response_time_ms: Date.now() - startTime,
       response_body: JSON.stringify({ 
         error: 'Internal server error', 
-        details: error.message,
-        timestamp: new Date().toISOString(),
-        automation_id: automationId,
-        webhook_id: webhookId
+        message: 'An unexpected error occurred while processing the webhook',
+        timestamp: new Date().toISOString()
       }),
       error_message: `Internal error: ${error.message}`
     };
     
-    // LOG THE CRITICAL FAILURE
+    // Log the critical failure
     try {
       if (webhookId !== 'unknown' && webhookId !== 'missing') {
         const supabase = createClient(supabaseUrl, supabaseServiceKey)

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { 
   ReactFlow, 
@@ -33,6 +32,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import CustomNodeMapper from './diagram/CustomNodeMapper';
 import JsonDebugModal from './diagram/JsonDebugModal';
+import DiagramErrorRecovery from './DiagramErrorRecovery';
 import { calculateEnhancedLayout } from '@/utils/diagramLayout';
 import { AutomationBlueprint, AutomationDiagramData } from '@/types/automation';
 
@@ -80,6 +80,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   const [showRegenerateForm, setShowRegenerateForm] = useState(false);
   const [regenerateInput, setRegenerateInput] = useState('');
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const [diagramStats, setDiagramStats] = useState({
     totalNodes: 0,
     totalEdges: 0,
@@ -137,6 +138,115 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
 
     return processedData;
   }, [onAgentAdd, onAgentDismiss, dismissedAgents, toast]);
+
+  // Enhanced error recovery functions
+  const handleRetryDiagram = useCallback(() => {
+    if (onRegenerateDiagram) {
+      setRetryCount(prev => prev + 1);
+      setDiagramError(null);
+      console.log(`🔄 Retrying diagram generation (attempt ${retryCount + 1})`);
+      onRegenerateDiagram();
+      toast({
+        title: "🔄 Retrying Generation",
+        description: "Using enhanced AI model with improved error handling",
+      });
+    }
+  }, [onRegenerateDiagram, retryCount, toast]);
+
+  const handleFallbackDiagram = useCallback(() => {
+    if (!automationBlueprint?.steps) return;
+    
+    console.log('🛠️ Creating fallback diagram');
+    
+    // Create a simple fallback diagram structure
+    const fallbackNodes = [
+      {
+        id: "fallback-trigger",
+        type: "triggerNode",
+        position: { x: 100, y: 300 },
+        data: {
+          label: `${automationBlueprint.trigger?.type || 'Manual'} Trigger`,
+          stepType: "trigger",
+          explanation: "This automation starts here",
+          platform: automationBlueprint.trigger?.platform || "System",
+          icon: "Play"
+        }
+      }
+    ];
+
+    const fallbackEdges: any[] = [];
+    let currentX = 600;
+
+    // Add basic steps
+    automationBlueprint.steps.forEach((step, index) => {
+      const nodeId = `fallback-step-${index}`;
+      fallbackNodes.push({
+        id: nodeId,
+        type: step.type === 'condition' ? 'conditionNode' : 'actionNode',
+        position: { x: currentX, y: 300 },
+        data: {
+          label: step.name || `Step ${index + 1}`,
+          stepType: step.type,
+          explanation: `${step.type} step in the automation`,
+          platform: (step.action as any)?.integration || 'System',
+          icon: step.type === 'condition' ? 'GitFork' : 'PlugZap'
+        }
+      });
+
+      // Connect to previous node
+      const sourceId = index === 0 ? "fallback-trigger" : `fallback-step-${index - 1}`;
+      fallbackEdges.push({
+        id: `fallback-edge-${index}`,
+        source: sourceId,
+        target: nodeId,
+        type: 'straight',
+        style: { stroke: '#6366f1', strokeWidth: 3 }
+      });
+
+      currentX += 500;
+    });
+
+    // Add end node
+    fallbackNodes.push({
+      id: "fallback-end",
+      type: "fallbackNode",
+      position: { x: currentX, y: 300 },
+      data: {
+        label: "✅ Complete",
+        stepType: "end",
+        explanation: "Automation completed",
+        icon: "Flag"
+      }
+    });
+
+    fallbackEdges.push({
+      id: "fallback-edge-end",
+      source: fallbackNodes[fallbackNodes.length - 2].id,
+      target: "fallback-end",
+      type: 'straight',
+      style: { stroke: '#6366f1', strokeWidth: 3 }
+    });
+
+    setNodes(fallbackNodes);
+    setEdges(fallbackEdges);
+    setDiagramError(null);
+    
+    const stats = {
+      totalNodes: fallbackNodes.length,
+      totalEdges: fallbackEdges.length,
+      conditionNodes: fallbackNodes.filter(n => n.type?.includes('condition')).length,
+      aiAgentNodes: 0,
+      platformNodes: fallbackNodes.filter(n => n.data?.platform && n.data.platform !== 'System').length,
+      stopNodes: 1
+    };
+    
+    setDiagramStats(stats);
+    
+    toast({
+      title: "📋 Fallback Diagram Created",
+      description: "Basic diagram structure generated successfully",
+    });
+  }, [automationBlueprint, toast]);
 
   useEffect(() => {
     console.log('🎯 Processing PERFECT diagram with straight lines');
@@ -394,7 +504,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         </div>
       )}
 
-      {/* PERFECT Diagram Container - Mobile Optimized */}
+      {/* Enhanced Diagram Container */}
       <div className="h-full w-full rounded-none sm:rounded-xl overflow-hidden shadow-none sm:shadow-xl border-0 sm:border border-gray-200">
         <ReactFlow
           nodes={nodes}
@@ -416,7 +526,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           panOnDrag={[1, 2]}
           proOptions={{ hideAttribution: true }}
           defaultEdgeOptions={{
-            type: 'straight', // STRAIGHT LINES!
+            type: 'straight',
             animated: false,
             style: {
               stroke: '#6366f1',
@@ -455,28 +565,15 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         </ReactFlow>
       </div>
 
-      {/* PERFECT Error State */}
+      {/* Enhanced Error State with Comprehensive Recovery */}
       {diagramError && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/95 backdrop-blur-sm p-4">
-          <Card className="max-w-sm sm:max-w-md mx-auto shadow-xl border-orange-200 rounded-2xl">
-            <CardHeader className="text-center">
-              <AlertCircle className="w-12 h-12 sm:w-16 sm:h-16 text-orange-500 mx-auto mb-3" />
-              <CardTitle className="text-orange-800 text-base sm:text-lg">
-                {isGenerating ? '🎯 Creating Perfect Diagram' : 'Loading Diagram'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-center">
-              <p className="text-gray-600 mb-4 text-sm sm:text-base">{diagramError}</p>
-              {isGenerating && (
-                <div className="flex flex-col items-center gap-3">
-                  <Loader2 className="w-6 h-6 animate-spin text-purple-600" />
-                  <div className="text-sm text-purple-600 max-w-xs">
-                    AI is creating a perfect left-to-right diagram with straight lines, platform icons, and intelligent recommendations...
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <DiagramErrorRecovery
+            error={diagramError}
+            onRetry={handleRetryDiagram}
+            onFallbackDiagram={handleFallbackDiagram}
+            isRetrying={isGenerating}
+          />
         </div>
       )}
 

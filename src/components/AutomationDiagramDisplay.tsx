@@ -215,6 +215,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         label: "✅ Complete",
         stepType: "end",
         explanation: "Automation completed",
+        platform: "System",
         icon: "Flag"
       }
     });

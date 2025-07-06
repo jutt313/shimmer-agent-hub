@@ -143,15 +143,9 @@ const WebhookManagementTab = () => {
     }
 
     try {
-      // Generate webhook URL using the proper domain
+      // FIXED: Generate webhook URL using consistent Supabase format
       const webhookId = crypto.randomUUID();
-      const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname.includes('lovable');
-      
-      const baseUrl = isDevelopment 
-        ? 'https://zorwtyijosgdcckljmqd.supabase.co/functions/v1/webhook-trigger'
-        : 'https://yusrai.com/api/webhooks';
-        
-      const webhookUrl = `${baseUrl}/${webhookId}?automation_id=${webhookForm.automation_id}`;
+      const webhookUrl = `https://zorwtyijosgdcckljmqd.supabase.co/functions/v1/webhook-trigger/${webhookId}?automation_id=${webhookForm.automation_id}`;
       const webhookSecret = crypto.randomUUID();
 
       const { data, error } = await supabase

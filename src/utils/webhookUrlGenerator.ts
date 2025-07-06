@@ -2,13 +2,10 @@
 // Fixed webhook URL generator using proper yusrai.com domain
 export const generateYusraiWebhookUrl = (automationId: string): string => {
   const webhookId = crypto.randomUUID();
-  const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname.includes('lovable');
   
-  // Use yusrai.com in production, supabase for development
-  const baseUrl = isDevelopment 
-    ? 'https://zorwtyijosgdcckljmqd.supabase.co/functions/v1/webhook-trigger'
-    : 'https://yusrai.com/api/webhooks';
-    
+  // FIXED: Always use Supabase URL for consistency
+  const baseUrl = 'https://zorwtyijosgdcckljmqd.supabase.co/functions/v1/webhook-trigger';
+     
   return `${baseUrl}/${webhookId}?automation_id=${automationId}`;
 };
 

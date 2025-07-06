@@ -23,7 +23,8 @@ export class WebhookManager {
 
   generateWebhookUrl(automationId: string): string {
     const webhookId = crypto.randomUUID();
-    return `${this.baseUrl}/webhook-trigger/${webhookId}?automation_id=${automationId}`;
+    // FIXED: Use consistent Supabase URL format 
+    return `https://zorwtyijosgdcckljmqd.supabase.co/functions/v1/webhook-trigger/${webhookId}?automation_id=${automationId}`;
   }
 
   registerWebhook(automationId: string, secret?: string): WebhookConfig {

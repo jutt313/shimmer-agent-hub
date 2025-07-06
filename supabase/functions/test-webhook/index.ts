@@ -29,19 +29,40 @@ serve(async (req) => {
     }
 
     console.log(`🎯 TESTING WEBHOOK: ${webhookUrl}`);
+    
+    // ENHANCED URL validation - ensure it's our webhook format
+    if (!webhookUrl.includes('zorwtyijosgdcckljmqd.supabase.co/functions/v1/webhook-trigger/')) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Invalid webhook URL format', 
+        userMessage: 'This URL is not a valid YusrAI webhook endpoint. Please use the webhook URL provided in your dashboard.',
+        responseTime: 0,
+        statusCode: 400
+      }), { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
 
-    // Create test payload with proper structure
+    // Create test payload with proper structure - ENHANCED
     const testPayload = {
-      event: 'test_webhook',
+      event: 'webhook_test',
       data: {
-        message: 'Test webhook from YusrAI System',
+        message: 'Test webhook from YusrAI Automation System',
         timestamp: new Date().toISOString(),
         test: true,
         source: 'yusrai_webhook_tester',
         test_id: crypto.randomUUID(),
-        environment: 'development'
+        environment: 'test_mode',
+        user_agent: 'YusrAI-Webhook-Tester/2.0',
+        version: '2.0'
       },
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      metadata: {
+        testing: true,
+        origin: 'test-webhook-function',
+        webhook_url: webhookUrl
+      }
     };
 
     const startTime = Date.now();
@@ -67,16 +88,19 @@ serve(async (req) => {
       }
     }
 
-    // Prepare headers with consistent naming
+    // Prepare headers with enhanced webhook information
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'User-Agent': 'YusrAI-Webhook-Tester/1.0',
+      'User-Agent': 'YusrAI-Webhook-Tester/2.0',
       'X-Webhook-Timestamp': testPayload.timestamp,
-      'X-Webhook-Event': 'test_webhook'
+      'X-Webhook-Event': 'webhook_test',
+      'X-Webhook-Test': 'true',
+      'X-Webhook-Version': '2.0'
     };
 
     if (signature) {
       headers['X-Webhook-Signature'] = signature;
+      console.log('🔐 Added webhook signature to test request');
     }
 
     console.log(`📡 SENDING TEST REQUEST to ${webhookUrl}`);

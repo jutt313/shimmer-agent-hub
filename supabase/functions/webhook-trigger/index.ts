@@ -129,8 +129,14 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // ENHANCED WEBHOOK LOOKUP WITH DETAILED LOGGING
+    // ENHANCED WEBHOOK LOOKUP WITH DETAILED LOGGING - FIXED
     console.log('🔍 Looking up webhook...');
+    console.log(`🔍 Parameters - Automation ID: ${automationId}, Webhook ID: ${webhookId}`);
+    
+    // FIXED: Use exact URL matching instead of LIKE query
+    const expectedUrl = `https://zorwtyijosgdcckljmqd.supabase.co/functions/v1/webhook-trigger/${webhookId}?automation_id=${automationId}`;
+    console.log(`🔍 Expected URL: ${expectedUrl}`);
+    
     const { data: webhook, error: webhookError } = await supabase
       .from('automation_webhooks')
       .select(`
@@ -138,9 +144,11 @@ serve(async (req) => {
         automations!inner(id, title, user_id, status)
       `)
       .eq('automation_id', automationId)
-      .like('webhook_url', `%${webhookId}%`)
+      .eq('webhook_url', expectedUrl)
       .eq('is_active', true)
       .single()
+      
+    console.log(`🔍 Webhook lookup result:`, { webhook: webhook?.id, error: webhookError?.message });
 
     if (webhookError || !webhook) {
       console.error('❌ Webhook lookup failed:', webhookError);

@@ -154,51 +154,57 @@ const PERFECT_DIAGRAM_SYSTEM_PROMPT = `You are an EXPERT Automation Diagram Gene
 Your goal is to create diagrams so clear that anyone can understand the automation flow instantly, with perfect left-to-right flow and straight connecting lines.`;
 
 serve(async (req) => {
+  console.log('🚀 Diagram generator function called');
+  
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    console.log('🎯 Starting PERFECT diagram generation with straight lines')
+    console.log('🎯 Starting diagram generation');
     
     const { automation_blueprint, user_feedback } = await req.json()
     
     if (!automation_blueprint || !automation_blueprint.steps) {
-      console.error('❌ No automation blueprint provided')
+      console.error('❌ No automation blueprint provided');
       return new Response(JSON.stringify({ 
         error: 'No automation blueprint provided',
-        source: 'perfect-diagram-generator'
+        source: 'diagram-generator'
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    console.log('🤖 Sending to OpenAI for PERFECT analysis:', {
+    console.log('📊 Blueprint received:', {
       totalSteps: automation_blueprint.steps.length,
       triggerType: automation_blueprint.trigger?.type,
       userFeedback: user_feedback ? 'provided' : 'none'
-    })
+    });
 
-    // FIXED: Use the correct secret name
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY')
+    // Get OpenAI API key from environment
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIApiKey) {
-      console.error('❌ OpenAI API key not configured')
+      console.error('❌ OpenAI API key not found in environment variables');
       return new Response(JSON.stringify({ 
-        error: 'OpenAI API key not configured',
-        source: 'perfect-diagram-generator'
+        error: 'OpenAI API key not configured. Please set OPENAI_API_KEY in Supabase secrets.',
+        source: 'diagram-generator'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
+    console.log('✅ OpenAI API key found, preparing request...');
+
     let userPrompt = `Create a PERFECT left-to-right automation diagram with STRAIGHT LINES that flows cleanly from left to right. Detect AI opportunities and use meaningful condition labels. Here's the blueprint:\n\n${JSON.stringify(automation_blueprint, null, 2)}`;
     
     if (user_feedback && user_feedback.trim()) {
       userPrompt += `\n\nUSER FEEDBACK: ${user_feedback.trim()}`;
-      console.log('🎯 Including user feedback for perfect diagram');
+      console.log('🎯 Including user feedback');
     }
+
+    console.log('🤖 Calling OpenAI API...');
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -216,43 +222,45 @@ serve(async (req) => {
         temperature: 0.1,
         max_tokens: 4000
       }),
-    })
+    });
+
+    console.log('📡 OpenAI response status:', response.status);
 
     if (!response.ok) {
-      console.error('❌ OpenAI API error:', response.status)
-      const errorText = await response.text()
+      const errorText = await response.text();
+      console.error('❌ OpenAI API error:', response.status, errorText);
       return new Response(JSON.stringify({ 
-        error: `OpenAI API error: ${response.status}`,
-        details: errorText,
-        source: 'perfect-diagram-generator'
+        error: `OpenAI API error: ${response.status} - ${errorText}`,
+        source: 'diagram-generator'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    const data = await response.json()
-    console.log('✅ Received OpenAI response for PERFECT diagram')
+    const data = await response.json();
+    console.log('✅ OpenAI response received');
 
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-      console.error('❌ Invalid OpenAI response structure')
+      console.error('❌ Invalid OpenAI response structure:', data);
       return new Response(JSON.stringify({ 
         error: 'Invalid OpenAI response structure',
-        source: 'perfect-diagram-generator'
+        source: 'diagram-generator'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    let diagramData
+    let diagramData;
     try {
-      diagramData = JSON.parse(data.choices[0].message.content)
+      diagramData = JSON.parse(data.choices[0].message.content);
     } catch (parseError) {
-      console.error('❌ Error parsing OpenAI JSON:', parseError)
+      console.error('❌ Error parsing OpenAI JSON:', parseError);
+      console.error('❌ Raw content:', data.choices[0].message.content);
       return new Response(JSON.stringify({ 
-        error: 'Failed to parse OpenAI response',
-        source: 'perfect-diagram-generator'
+        error: 'Failed to parse OpenAI response as JSON',
+        source: 'diagram-generator'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -260,45 +268,44 @@ serve(async (req) => {
     }
 
     if (!diagramData.nodes || !diagramData.edges) {
-      console.error('❌ Missing nodes/edges in response')
+      console.error('❌ Missing nodes/edges in diagram data:', diagramData);
       return new Response(JSON.stringify({ 
-        error: 'Missing required nodes or edges',
-        source: 'perfect-diagram-generator'
+        error: 'Missing required nodes or edges in diagram data',
+        source: 'diagram-generator'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    console.log('🎯 Generated PERFECT diagram:', {
+    console.log('🎯 Generated diagram:', {
       nodes: diagramData.nodes.length,
       edges: diagramData.edges.length,
-      aiRecommendations: diagramData.metadata?.aiAgentRecommendations || 0,
-      straightLines: true
-    })
+      aiRecommendations: diagramData.metadata?.aiAgentRecommendations || 0
+    });
 
     // Enhance metadata
     if (!diagramData.metadata) {
-      diagramData.metadata = {}
+      diagramData.metadata = {};
     }
-    diagramData.metadata.generatedAt = new Date().toISOString()
-    diagramData.metadata.source = 'perfect-diagram-generator'
-    diagramData.metadata.straightLines = true
+    diagramData.metadata.generatedAt = new Date().toISOString();
+    diagramData.metadata.source = 'diagram-generator';
+    diagramData.metadata.straightLines = true;
 
     return new Response(JSON.stringify(diagramData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
+    });
 
   } catch (error) {
-    console.error('💥 Error in PERFECT diagram generation:', error)
+    console.error('💥 Unexpected error in diagram generation:', error);
     
     return new Response(JSON.stringify({ 
-      error: error.message,
-      source: 'perfect-diagram-generator',
+      error: `Unexpected error: ${error.message}`,
+      source: 'diagram-generator',
       timestamp: new Date().toISOString()
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
+    });
   }
-})
+});

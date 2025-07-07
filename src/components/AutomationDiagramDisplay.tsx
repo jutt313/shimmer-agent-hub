@@ -250,15 +250,15 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   }, [automationBlueprint, toast]);
 
   useEffect(() => {
-    console.log('🎯 Processing PERFECT diagram with straight lines');
+    console.log('🎯 Processing PERFECT diagram with GREEN DOTTED lines');
     
     try {
       if (automationDiagramData?.nodes && automationDiagramData?.edges) {
-        console.log('✅ Using PERFECT diagram data:', {
+        console.log('✅ Using PERFECT diagram data with GREEN styling:', {
           nodes: automationDiagramData.nodes.length,
           edges: automationDiagramData.edges.length,
           source: automationDiagramData.metadata?.source || 'unknown',
-          straightLines: automationDiagramData.metadata?.straightLines || false
+          greenDottedLines: true
         });
 
         const processedNodes = automationDiagramData.nodes
@@ -274,13 +274,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           })
           .filter(Boolean) as Node[];
 
-        console.log('📊 Processed PERFECT nodes:', {
-          original: automationDiagramData.nodes.length,
-          processed: processedNodes.length,
-          aiRecommendations: processedNodes.filter(n => n.data?.isRecommended).length
-        });
-
-        // Apply PERFECT left-to-right layout with straight lines
+        // Apply PERFECT left-to-right layout with GREEN DOTTED lines
         const { nodes: layoutedNodes, edges: layoutedEdges } = calculateEnhancedLayout(
           processedNodes,
           automationDiagramData.edges.map(edge => ({
@@ -288,9 +282,9 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             animated: false,
             type: 'straight', // STRAIGHT LINES!
             style: {
-              stroke: edge.style?.stroke || '#6366f1',
-              strokeWidth: edge.style?.strokeWidth || 3,
-              strokeDasharray: undefined,
+              stroke: '#10b981', // GREEN COLOR
+              strokeWidth: 3,
+              strokeDasharray: '8 5', // DOTTED PATTERN
               ...edge.style
             }
           }))
@@ -321,8 +315,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         }
         
       } else if (automationBlueprint?.steps?.length > 0) {
-        console.log('⚠️ No diagram data available, generating PERFECT diagram...');
-        setDiagramError('Creating perfect left-to-right diagram with straight lines...');
+        console.log('⚠️ No diagram data available, generating PERFECT diagram with GREEN DOTTED lines...');
+        setDiagramError('Creating perfect left-to-right diagram with green dotted lines...');
         
       } else {
         console.log('❌ No diagram data or blueprint available');
@@ -530,8 +524,9 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             type: 'straight',
             animated: false,
             style: {
-              stroke: '#6366f1',
-              strokeWidth: 3
+              stroke: '#10b981', // GREEN COLOR
+              strokeWidth: 3,
+              strokeDasharray: '8 5' // DOTTED PATTERN
             }
           }}
         >

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,21 +30,19 @@ interface WebhookManagementTabProps {
   automationId: string;
 }
 
-interface DatabaseWebhook {
+interface Webhook {
   id: string;
-  webhook_name: string;
-  webhook_url: string;
-  webhook_secret: string;
+  name: string;
+  url: string;
+  secret: string;
   is_active: boolean;
   created_at: string;
   last_triggered_at?: string;
   trigger_count: number;
-  webhook_description?: string;
-  automation_id: string;
-  expected_events?: string[];
+  description?: string;
 }
 
-interface SimpleStats {
+interface WebhookAnalytics {
   total_triggers: number;
   successful_triggers: number;
   failed_triggers: number;
@@ -55,11 +52,11 @@ interface SimpleStats {
 
 const WebhookManagementTab: React.FC<WebhookManagementTabProps> = ({ automationId }) => {
   const { toast } = useToast();
-  const [webhooks, setWebhooks] = useState<DatabaseWebhook[]>([]);
+  const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [stats, setStats] = useState<SimpleStats | null>(null);
+  const [analytics, setAnalytics] = useState<WebhookAnalytics | null>(null);
   const [visibleSecrets, setVisibleSecrets] = useState<Set<string>>(new Set());
   
   // Form state
@@ -68,8 +65,7 @@ const WebhookManagementTab: React.FC<WebhookManagementTabProps> = ({ automationI
 
   useEffect(() => {
     fetchWebhooks();
-    // Skip analytics for now since the table doesn't exist
-    // fetchAnalytics();
+    fetchAnalytics();
   }, [automationId]);
 
   const fetchWebhooks = async () => {
@@ -94,6 +90,21 @@ const WebhookManagementTab: React.FC<WebhookManagementTabProps> = ({ automationI
     }
   };
 
+  const fetchAnalytics = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('webhook_analytics')
+        .select('*')
+        .eq('automation_id', automationId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      setAnalytics(data);
+    } catch (error) {
+      console.error('Error fetching webhook analytics:', error);
+    }
+  };
+
   const createWebhook = async () => {
     if (!newWebhookName.trim()) {
       toast({
@@ -113,10 +124,10 @@ const WebhookManagementTab: React.FC<WebhookManagementTabProps> = ({ automationI
         .from('automation_webhooks')
         .insert({
           automation_id: automationId,
-          webhook_name: newWebhookName.trim(),
-          webhook_description: newWebhookDescription.trim() || null,
-          webhook_url: webhookUrl,
-          webhook_secret: webhookSecret,
+          name: newWebhookName.trim(),
+          description: newWebhookDescription.trim() || null,
+          url: webhookUrl,
+          secret: webhookSecret,
           is_active: true,
           trigger_count: 0
         })
@@ -132,7 +143,7 @@ const WebhookManagementTab: React.FC<WebhookManagementTabProps> = ({ automationI
 
       toast({
         title: "Webhook Created",
-        description: `Webhook "${data.webhook_name}" has been created successfully`,
+        description: `Webhook "${data.name}" has been created successfully`,
       });
     } catch (error) {
       console.error('Error creating webhook:', error);
@@ -228,8 +239,8 @@ const WebhookManagementTab: React.FC<WebhookManagementTabProps> = ({ automationI
       
       {/* Rest of webhook content - kept for development but hidden in production */}
       <div className="opacity-30 pointer-events-none">
-        {/* Simple Analytics Overview */}
-        {stats && (
+        {/* Analytics Overview */}
+        {analytics && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <Card>
               <CardContent className="p-4">
@@ -239,7 +250,7 @@ const WebhookManagementTab: React.FC<WebhookManagementTabProps> = ({ automationI
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Total Triggers</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.total_triggers}</p>
+                    <p className="text-2xl font-bold text-gray-900">{analytics.total_triggers}</p>
                   </div>
                 </div>
               </CardContent>
@@ -254,8 +265,8 @@ const WebhookManagementTab: React.FC<WebhookManagementTabProps> = ({ automationI
                   <div>
                     <p className="text-sm text-gray-600">Success Rate</p>
                     <p className="text-2xl font-bold text-gray-900">
-                      {stats.total_triggers > 0 
-                        ? Math.round((stats.successful_triggers / stats.total_triggers) * 100)
+                      {analytics.total_triggers > 0 
+                        ? Math.round((analytics.successful_triggers / analytics.total_triggers) * 100)
                         : 0}%
                     </p>
                   </div>
@@ -271,7 +282,7 @@ const WebhookManagementTab: React.FC<WebhookManagementTabProps> = ({ automationI
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Avg Response</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.avg_response_time}ms</p>
+                    <p className="text-2xl font-bold text-gray-900">{analytics.avg_response_time}ms</p>
                   </div>
                 </div>
               </CardContent>
@@ -285,7 +296,7 @@ const WebhookManagementTab: React.FC<WebhookManagementTabProps> = ({ automationI
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Last 24h</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.last_24h_triggers}</p>
+                    <p className="text-2xl font-bold text-gray-900">{analytics.last_24h_triggers}</p>
                   </div>
                 </div>
               </CardContent>
@@ -385,13 +396,13 @@ const WebhookManagementTab: React.FC<WebhookManagementTabProps> = ({ automationI
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <h3 className="font-semibold text-lg">{webhook.webhook_name}</h3>
+                          <h3 className="font-semibold text-lg">{webhook.name}</h3>
                           <Badge variant={webhook.is_active ? "default" : "secondary"}>
                             {webhook.is_active ? "Active" : "Inactive"}
                           </Badge>
                         </div>
-                        {webhook.webhook_description && (
-                          <p className="text-gray-600 text-sm mb-2">{webhook.webhook_description}</p>
+                        {webhook.description && (
+                          <p className="text-gray-600 text-sm mb-2">{webhook.description}</p>
                         )}
                         <div className="text-sm text-gray-500">
                           Created: {new Date(webhook.created_at).toLocaleDateString()}
@@ -413,7 +424,7 @@ const WebhookManagementTab: React.FC<WebhookManagementTabProps> = ({ automationI
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => deleteWebhook(webhook.id, webhook.webhook_name)}
+                          onClick={() => deleteWebhook(webhook.id, webhook.name)}
                           className="text-red-600 hover:text-red-700"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -427,14 +438,14 @@ const WebhookManagementTab: React.FC<WebhookManagementTabProps> = ({ automationI
                         <Label className="text-sm font-medium text-gray-700">Webhook URL</Label>
                         <div className="flex items-center gap-2 mt-1">
                           <Input
-                            value={webhook.webhook_url}
+                            value={webhook.url}
                             readOnly
                             className="font-mono text-sm"
                           />
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => copyToClipboard(webhook.webhook_url, 'Webhook URL')}
+                            onClick={() => copyToClipboard(webhook.url, 'Webhook URL')}
                           >
                             <Copy className="w-4 h-4" />
                           </Button>
@@ -446,7 +457,7 @@ const WebhookManagementTab: React.FC<WebhookManagementTabProps> = ({ automationI
                         <Label className="text-sm font-medium text-gray-700">Webhook Secret</Label>
                         <div className="flex items-center gap-2 mt-1">
                           <Input
-                            value={visibleSecrets.has(webhook.id) ? webhook.webhook_secret : maskSecret(webhook.webhook_secret)}
+                            value={visibleSecrets.has(webhook.id) ? webhook.secret : maskSecret(webhook.secret)}
                             readOnly
                             className="font-mono text-sm"
                           />
@@ -460,7 +471,7 @@ const WebhookManagementTab: React.FC<WebhookManagementTabProps> = ({ automationI
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => copyToClipboard(webhook.webhook_secret, 'Webhook Secret')}
+                            onClick={() => copyToClipboard(webhook.secret, 'Webhook Secret')}
                           >
                             <Copy className="w-4 h-4" />
                           </Button>

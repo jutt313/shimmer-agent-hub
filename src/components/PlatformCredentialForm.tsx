@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { X, Eye, EyeOff, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,9 +19,16 @@ interface PlatformCredentialFormProps {
     }>;
   };
   onClose: () => void;
+  onCredentialSaved?: () => void;
+  onCredentialTested?: () => void;
 }
 
-const PlatformCredentialForm = ({ platform, onClose }: PlatformCredentialFormProps) => {
+const PlatformCredentialForm = ({ 
+  platform, 
+  onClose, 
+  onCredentialSaved,
+  onCredentialTested 
+}: PlatformCredentialFormProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [credentials, setCredentials] = useState<Record<string, string>>({});
@@ -62,64 +68,6 @@ const PlatformCredentialForm = ({ platform, onClose }: PlatformCredentialFormPro
     }
   };
 
-  // Early validation - if platform data is invalid, show error
-  if (!validatePlatformData(platform)) {
-    return (
-      <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-white/80 backdrop-blur-md rounded-3xl p-8 w-full max-w-md shadow-2xl border-0 relative">
-          <Button
-            onClick={onClose}
-            variant="ghost"
-            size="sm"
-            className="absolute top-4 right-4 rounded-full hover:bg-gray-100/50"
-          >
-            <X className="w-5 h-5" />
-          </Button>
-          
-          <div className="text-center">
-            <h2 className="text-xl font-bold text-red-600 mb-4">Invalid Platform Data</h2>
-            <p className="text-gray-600 mb-6">
-              The platform configuration is incomplete or corrupted. Please try generating the automation again.
-            </p>
-            <Button onClick={onClose} className="w-full rounded-xl">
-              Close
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Filter valid credentials
-  const validCredentials = platform.credentials.filter(validateCredentialData);
-  
-  if (validCredentials.length === 0) {
-    return (
-      <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-white/80 backdrop-blur-md rounded-3xl p-8 w-full max-w-md shadow-2xl border-0 relative">
-          <Button
-            onClick={onClose}
-            variant="ghost"
-            size="sm"
-            className="absolute top-4 right-4 rounded-full hover:bg-gray-100/50"
-          >
-            <X className="w-5 h-5" />
-          </Button>
-          
-          <div className="text-center">
-            <h2 className="text-xl font-bold text-yellow-600 mb-4">No Valid Credentials</h2>
-            <p className="text-gray-600 mb-6">
-              No valid credential fields found for {platform.name}. Please try generating the automation again.
-            </p>
-            <Button onClick={onClose} className="w-full rounded-xl">
-              Close
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const handleInputChange = (field: string, value: string) => {
     setCredentials(prev => ({ ...prev, [field]: value }));
   };
@@ -157,6 +105,7 @@ const PlatformCredentialForm = ({ platform, onClose }: PlatformCredentialFormPro
           title: "✅ Test Successful",
           description: data.user_message,
         });
+        onCredentialTested?.();
       } else {
         toast({
           title: "❌ Test Failed",
@@ -241,6 +190,7 @@ const PlatformCredentialForm = ({ platform, onClose }: PlatformCredentialFormPro
         description: `${platform.name} credentials have been saved securely.`,
       });
       
+      onCredentialSaved?.();
       onClose();
     } catch (error: any) {
       console.error('Save error:', error);
@@ -252,11 +202,6 @@ const PlatformCredentialForm = ({ platform, onClose }: PlatformCredentialFormPro
     } finally {
       setSaving(false);
     }
-  };
-
-  const isPasswordField = (field: string) => {
-    const passwordFields = ['password', 'secret', 'token', 'key'];
-    return passwordFields.some(pf => field.toLowerCase().includes(pf));
   };
 
   // Safe field processing
@@ -303,6 +248,39 @@ const PlatformCredentialForm = ({ platform, onClose }: PlatformCredentialFormPro
     }
   };
 
+  // Early validation - if platform data is invalid, show error
+  if (!platform || !platform.name || !Array.isArray(platform.credentials)) {
+    return (
+      <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-white/80 backdrop-blur-md rounded-3xl p-8 w-full max-w-md shadow-2xl border-0 relative">
+          <Button
+            onClick={onClose}
+            variant="ghost"
+            size="sm"
+            className="absolute top-4 right-4 rounded-full hover:bg-gray-100/50"
+          >
+            <X className="w-5 h-5" />
+          </Button>
+          
+          <div className="text-center">
+            <h2 className="text-xl font-bold text-red-600 mb-4">Invalid Platform Data</h2>
+            <p className="text-gray-600 mb-6">
+              The platform configuration is incomplete or corrupted. Please try generating the automation again.
+            </p>
+            <Button onClick={onClose} className="w-full rounded-xl">
+              Close
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const isPasswordField = (field: string) => {
+    const passwordFields = ['password', 'secret', 'token', 'key'];
+    return passwordFields.some(pf => field.toLowerCase().includes(pf));
+  };
+
   return (
     <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div 
@@ -329,7 +307,7 @@ const PlatformCredentialForm = ({ platform, onClose }: PlatformCredentialFormPro
         </p>
 
         <div className="space-y-6">
-          {validCredentials.map((cred, index) => (
+          {platform.credentials.map((cred, index) => (
             <div key={index}>
               <div className="flex items-center gap-2 mb-2">
                 <Label htmlFor={cred.field} className="text-gray-700 font-medium capitalize">

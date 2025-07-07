@@ -1,10 +1,10 @@
-
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Bot, Plus, X } from "lucide-react";
+import { Bot, Plus, X, Send, Play } from "lucide-react";
 import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useErrorRecovery } from "@/hooks/useErrorRecovery";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Message {
   id: number;
@@ -21,6 +21,9 @@ interface ChatCardProps {
   onAgentDismiss?: (agentName: string) => void;
   automationId?: string;
   isLoading?: boolean;
+  onSendMessage?: (message: string) => void;
+  onExecuteAutomation?: () => void;
+  platformCredentialStatus?: { [key: string]: 'saved' | 'tested' | 'unsaved' };
 }
 
 const ChatCard = ({
@@ -29,11 +32,15 @@ const ChatCard = ({
   dismissedAgents = new Set(),
   onAgentDismiss,
   automationId = "temp-automation-id",
-  isLoading = false
+  isLoading = false,
+  onSendMessage,
+  onExecuteAutomation,
+  platformCredentialStatus = {}
 }: ChatCardProps) => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { handleError } = useErrorRecovery();
+  const [inputMessage, setInputMessage] = useState("");
 
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
@@ -111,6 +118,40 @@ const ChatCard = ({
     }
   };
 
+  // Check if all platforms are configured and agents handled
+  const checkReadyForExecution = () => {
+    // Get platforms from latest bot message
+    const latestBotMessage = messages.filter(msg => msg.isBot).pop();
+    if (!latestBotMessage?.structuredData?.platforms) return false;
+
+    const platforms = latestBotMessage.structuredData.platforms;
+    const allPlatformsConfigured = platforms.every(platform => 
+      platformCredentialStatus[platform.name] === 'saved' || 
+      platformCredentialStatus[platform.name] === 'tested'
+    );
+
+    // Check if all agents are handled (added or dismissed)
+    const agents = latestBotMessage.structuredData.agents || [];
+    const allAgentsHandled = agents.every(agent => 
+      dismissedAgents.has(agent.name) // Agent was dismissed
+    );
+
+    return allPlatformsConfigured && allAgentsHandled && platforms.length > 0;
+  };
+
+  const handleSendMessage = () => {
+    if (!inputMessage.trim() || !onSendMessage) return;
+    onSendMessage(inputMessage);
+    setInputMessage("");
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
   const renderStructuredContent = (structuredData: StructuredResponse) => {
     const content = [];
 
@@ -141,7 +182,7 @@ const ChatCard = ({
         );
       }
 
-      // Simplified Platforms rendering with text-based credentials
+      // Enhanced Platforms rendering with smaller buttons (6 per row) and color coding
       if (Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
         try {
           const validPlatforms = structuredData.platforms.filter(platform => 
@@ -151,13 +192,43 @@ const ChatCard = ({
           if (validPlatforms.length > 0) {
             content.push(
               <div key="platforms" className="mb-4">
-                <p className="font-medium text-gray-800 mb-2">Required Platform Credentials:</p>
-                <div className="text-gray-700 ml-4 space-y-2">
+                <p className="font-medium text-gray-800 mb-3">Required Platform Credentials:</p>
+                <div className="grid grid-cols-6 gap-2 mb-4">
+                  {validPlatforms.map((platform, index) => {
+                    const platformName = platform.name || 'Unknown Platform';
+                    const status = platformCredentialStatus[platformName] || 'unsaved';
+                    
+                    const getButtonColor = () => {
+                      switch (status) {
+                        case 'saved':
+                        case 'tested':
+                          return 'bg-green-100 hover:bg-green-200 text-green-800 border-green-300';
+                        case 'unsaved':
+                        default:
+                          return 'bg-red-100 hover:bg-red-200 text-red-800 border-red-300';
+                      }
+                    };
+                    
+                    return (
+                      <Button
+                        key={`platform-${index}`}
+                        size="sm"
+                        variant="outline"
+                        className={`text-xs h-8 px-2 rounded-lg ${getButtonColor()} transition-colors`}
+                      >
+                        {platformName}
+                      </Button>
+                    );
+                  })}
+                </div>
+                
+                {/* Platform details */}
+                <div className="text-gray-700 space-y-2">
                   {validPlatforms.map((platform, index) => {
                     const platformName = platform.name || 'Unknown Platform';
                     
                     return (
-                      <div key={`platform-${index}`} className="bg-blue-50/30 p-3 rounded-lg border border-blue-200/50">
+                      <div key={`platform-detail-${index}`} className="bg-blue-50/30 p-3 rounded-lg border border-blue-200/50">
                         <p className="font-medium text-gray-800 mb-2">{platformName}</p>
                         {Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
                           <div className="text-sm text-gray-600 space-y-1">
@@ -262,6 +333,29 @@ const ChatCard = ({
         );
       }
 
+      // Execution Button - Show when ready
+      if (checkReadyForExecution() && onExecuteAutomation) {
+        content.push(
+          <div key="execution" className="mb-4">
+            <div className="p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-medium text-gray-800 mb-1">Ready to Launch</h4>
+                  <p className="text-sm text-gray-600">All platforms configured and AI agents handled</p>
+                </div>
+                <Button
+                  onClick={onExecuteAutomation}
+                  className="bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white px-6 py-2 rounded-xl shadow-lg"
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  Launch Automation
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
       return content;
     } catch (error: any) {
       console.error('Critical error in renderStructuredContent:', error);
@@ -279,7 +373,7 @@ const ChatCard = ({
     >
       <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/20 to-purple-100/20 pointer-events-none"></div>
       
-      <ScrollArea className="flex-1 relative z-10 p-6" ref={scrollAreaRef}>
+      <ScrollArea className="flex-1 relative z-10 p-6 max-h-[calc(100vh-200px)]" ref={scrollAreaRef}>
         <div className="space-y-6 pb-4">
           {optimizedMessages.map(message => {
             let structuredData = message.structuredData;
@@ -351,6 +445,41 @@ const ChatCard = ({
           <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
+
+      {/* Enhanced Input Area */}
+      {onSendMessage && (
+        <div className="relative z-10 p-4 border-t border-gray-200/50 bg-white/80 backdrop-blur-sm">
+          <div className="flex items-end gap-3 max-w-4xl mx-auto">
+            <div className="flex-shrink-0">
+              <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-600 rounded-full flex items-center justify-center">
+                <Bot className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            <div className="flex-1 relative">
+              <Textarea
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Ask me anything about your automation..."
+                className="resize-none min-h-[44px] max-h-[120px] rounded-xl border-0 bg-white/70 shadow-md focus:shadow-lg transition-shadow pr-12 focus:ring-2 focus:ring-purple-400 focus:ring-offset-2"
+                style={{ 
+                  boxShadow: '0 0 15px rgba(147, 51, 234, 0.1)',
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(240,248,255,0.9) 100%)'
+                }}
+                rows={1}
+              />
+              <Button
+                onClick={handleSendMessage}
+                disabled={!inputMessage.trim() || isLoading}
+                size="sm"
+                className="absolute right-2 bottom-2 bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white rounded-lg h-8 w-8 p-0"
+              >
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

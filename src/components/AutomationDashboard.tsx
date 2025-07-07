@@ -398,7 +398,7 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
   return (
     <Card className="w-full h-full bg-white/90 backdrop-blur-sm border-0 shadow-2xl rounded-3xl overflow-hidden">
       <CardHeader className="bg-white text-gray-800 pb-4 border-b border-gray-200">
-        <CardTitle className="text-xl font-bold flex items-center gap-3">
+        <CardTitle className="text-xl font-bold flex items-center gap-3 text-black">
           <BarChart3 className="w-6 h-6" />
           {automationTitle || 'Automation'} - Dashboard
         </CardTitle>
@@ -486,18 +486,18 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                 </Card>
               </div>
 
-              {/* Single Big Stacked Bar Chart */}
+              {/* Single Combined Performance Chart */}
               <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
                 <CardHeader>
-                  <CardTitle className="text-lg text-gray-800">Performance Analytics</CardTitle>
+                  <CardTitle className="text-lg text-gray-800">Performance Analytics - Combined View</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={[
-                        ...getChartData('daily').map(d => ({ ...d, period: `${d.period} (D)`, type: 'Daily' })),
-                        ...getChartData('weekly').map(d => ({ ...d, period: `${d.period} (W)`, type: 'Weekly' })),
-                        ...getChartData('monthly').map(d => ({ ...d, period: `${d.period} (M)`, type: 'Monthly' }))
+                        ...getChartData('daily').map(d => ({ ...d, period: `${d.period} (Daily)`, type: 'Daily' })),
+                        ...getChartData('weekly').map(d => ({ ...d, period: `${d.period} (Weekly)`, type: 'Weekly' })),
+                        ...getChartData('monthly').map(d => ({ ...d, period: `${d.period} (Monthly)`, type: 'Monthly' }))
                       ]}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="period" />
@@ -563,7 +563,7 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
             </div>
           </TabsContent>
 
-          {/* Services Tab - Enhanced */}
+          {/* Services Tab - Enhanced to show detected platforms */}
           <TabsContent value="services" className="flex-1 p-6 overflow-y-auto">
             <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
               <CardHeader>
@@ -573,8 +573,8 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {/* Show detected platforms from automation blueprint */}
                 <div className="space-y-4">
+                  {/* Show detected platforms from automation blueprint */}
                   {automationBlueprint?.steps?.map((step, index) => {
                     const platformName = (step.action as any)?.integration || 'Unknown Platform';
                     if (platformName === 'Unknown Platform') return null;
@@ -587,7 +587,7 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                           </div>
                           <div>
                             <h3 className="font-medium text-gray-900">{platformName}</h3>
-                            <p className="text-sm text-gray-600">Detected in automation steps</p>
+                            <p className="text-sm text-gray-600">Detected in automation blueprint</p>
                           </div>
                         </div>
                         <div className="text-right">
@@ -596,11 +596,11 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                           </Badge>
                           <div className="flex gap-4 text-sm">
                             <div>
-                              <p className="text-gray-600">Step Type</p>
-                              <p className="font-bold text-blue-600">{step.type}</p>
+                              <p className="text-gray-600">Calls Made</p>
+                              <p className="font-bold text-blue-600">0</p>
                             </div>
                             <div>
-                              <p className="text-gray-600">Status</p>
+                              <p className="text-gray-600">Credentials</p>
                               <p className="font-bold text-orange-600">Not Connected</p>
                             </div>
                           </div>
@@ -627,7 +627,7 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                         </Badge>
                         <div className="flex gap-4 text-sm">
                           <div>
-                            <p className="text-gray-600">Total Calls</p>
+                            <p className="text-gray-600">Calls Made</p>
                             <p className="font-bold text-blue-600">{platform.total_runs}</p>
                           </div>
                           <div>
@@ -656,7 +656,7 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
             </Card>
           </TabsContent>
 
-          {/* AI Agents Tab - Enhanced to show recommended agents */}
+          {/* AI Agents Tab - Enhanced to show configured and recommended agents */}
           <TabsContent value="agents" className="flex-1 p-6 overflow-y-auto">
             <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg">
               <CardHeader>
@@ -706,9 +706,9 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                   ))}
                   
                   {/* Show recommended agents from automation blueprint */}
-                  {automationBlueprint?.steps?.filter(step => step.type === 'ai_agent' || (step.action as any)?.type === 'ai_agent').map((step, index) => {
-                    const agentName = (step.action as any)?.agent_name || `AI Agent ${index + 1}`;
-                    const agentRole = (step.action as any)?.role || 'Automation Assistant';
+                  {automationBlueprint?.steps?.filter(step => step.type === 'ai_agent_call' || (step.action as any)?.type === 'ai_agent_call').map((step, index) => {
+                    const agentName = (step.ai_agent_call as any)?.agent_name || `AI Agent ${index + 1}`;
+                    const agentRole = (step.ai_agent_call as any)?.role || 'Automation Assistant';
                     const agentGoal = step.name || 'Execute intelligent automation tasks';
                     
                     return (
@@ -749,7 +749,7 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
                     );
                   })}
                   
-                  {aiAgents.length === 0 && (!automationBlueprint?.steps || !automationBlueprint.steps.some(step => step.type === 'ai_agent')) && (
+                  {aiAgents.length === 0 && (!automationBlueprint?.steps || !automationBlueprint.steps.some(step => step.type === 'ai_agent_call')) && (
                     <div className="text-center py-8">
                       <Bot className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                       <p className="text-gray-600">No AI agents configured or recommended</p>

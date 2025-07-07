@@ -1,3 +1,4 @@
+
 import { Node, Edge } from '@xyflow/react';
 
 export interface LayoutOptions {
@@ -25,7 +26,7 @@ export const calculateEnhancedLayout = (
 ): { nodes: Node[]; edges: Edge[] } => {
   const opts = { ...DEFAULT_LAYOUT_OPTIONS, ...options };
   
-  console.log('🎯 Creating PERFECT left-to-right diagram with GREEN DOTTED lines');
+  console.log('🎯 Creating PERFECT left-to-right diagram with straight lines');
   
   if (!nodes || nodes.length === 0) return { nodes: [], edges };
 
@@ -130,10 +131,15 @@ export const calculateEnhancedLayout = (
     };
   });
 
-  // STEP 5: Create PERFECT GREEN DOTTED line edges
+  // STEP 5: Create PERFECT straight line edges with meaningful labels
   const layoutedEdges = edges.map((edge, index) => {
-    // Use GREEN color scheme for all connections
-    const greenColor = '#10b981'; // emerald-500 green
+    const colors = [
+      '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', 
+      '#ef4444', '#06b6d4', '#8b5a2b', '#dc2626'
+    ];
+    
+    const colorIndex = index % colors.length;
+    const baseColor = colors[colorIndex];
     
     // Generate meaningful labels based on source node type and handle
     let label = '';
@@ -168,20 +174,20 @@ export const calculateEnhancedLayout = (
       type: 'straight', // STRAIGHT LINES - not curved!
       animated: false,
       style: {
-        stroke: greenColor, // GREEN COLOR for all connections
+        stroke: baseColor,
         strokeWidth: 3,
-        strokeDasharray: '8 5', // DOTTED LINE PATTERN
+        strokeDasharray: undefined,
         ...edge.style
       },
       label,
       labelStyle: {
         fontWeight: 'bold',
         fontSize: '12px',
-        color: greenColor,
+        color: baseColor,
         background: 'rgba(255, 255, 255, 0.95)',
         padding: '4px 8px',
         borderRadius: '12px',
-        border: `1px solid ${greenColor}`,
+        border: `1px solid ${baseColor}`,
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
       },
       labelBgStyle: {
@@ -190,11 +196,11 @@ export const calculateEnhancedLayout = (
     };
   });
 
-  console.log('✅ PERFECT left-to-right layout with GREEN DOTTED lines completed:', {
+  console.log('✅ PERFECT left-to-right layout completed:', {
     nodes: layoutedNodes.length,
     edges: layoutedEdges.length,
     layers: maxLayer + 1,
-    greenDottedLines: true
+    straightLines: true
   });
 
   return { nodes: layoutedNodes, edges: layoutedEdges };

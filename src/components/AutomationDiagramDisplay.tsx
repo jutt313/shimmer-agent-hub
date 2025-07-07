@@ -139,7 +139,6 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     return processedData;
   }, [onAgentAdd, onAgentDismiss, dismissedAgents, toast]);
 
-  // Enhanced error recovery functions
   const handleRetryDiagram = useCallback(() => {
     if (onRegenerateDiagram) {
       setRetryCount(prev => prev + 1);
@@ -200,7 +199,12 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         source: sourceId,
         target: nodeId,
         type: 'straight',
-        style: { stroke: '#6366f1', strokeWidth: 3 }
+        animated: true,
+        style: { 
+          stroke: '#8b5cf6', 
+          strokeWidth: 3,
+          strokeDasharray: '8,4'
+        }
       });
 
       currentX += 500;
@@ -225,7 +229,12 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       source: fallbackNodes[fallbackNodes.length - 2].id,
       target: "fallback-end",
       type: 'straight',
-      style: { stroke: '#6366f1', strokeWidth: 3 }
+      animated: true,
+      style: { 
+        stroke: '#8b5cf6', 
+        strokeWidth: 3,
+        strokeDasharray: '8,4'
+      }
     });
 
     setNodes(fallbackNodes);
@@ -250,7 +259,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   }, [automationBlueprint, toast]);
 
   useEffect(() => {
-    console.log('🎯 Processing PERFECT diagram with straight lines');
+    console.log('🎯 Processing PERFECT diagram with animated dotted lines and gradients');
     
     try {
       if (automationDiagramData?.nodes && automationDiagramData?.edges) {
@@ -258,7 +267,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           nodes: automationDiagramData.nodes.length,
           edges: automationDiagramData.edges.length,
           source: automationDiagramData.metadata?.source || 'unknown',
-          straightLines: automationDiagramData.metadata?.straightLines || false
+          animatedDottedLines: true
         });
 
         const processedNodes = automationDiagramData.nodes
@@ -280,17 +289,18 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           aiRecommendations: processedNodes.filter(n => n.data?.isRecommended).length
         });
 
-        // Apply PERFECT left-to-right layout with straight lines
+        // Apply PERFECT left-to-right layout with animated dotted lines
         const { nodes: layoutedNodes, edges: layoutedEdges } = calculateEnhancedLayout(
           processedNodes,
           automationDiagramData.edges.map(edge => ({
             ...edge,
-            animated: false,
-            type: 'straight', // STRAIGHT LINES!
+            animated: true, // ANIMATED!
+            type: 'straight',
             style: {
-              stroke: edge.style?.stroke || '#6366f1',
-              strokeWidth: edge.style?.strokeWidth || 3,
-              strokeDasharray: undefined,
+              stroke: '#8b5cf6',
+              strokeWidth: 3,
+              strokeDasharray: '8,4', // DOTTED ------
+              filter: 'drop-shadow(0 2px 4px rgba(139, 92, 246, 0.3))',
               ...edge.style
             }
           }))
@@ -311,7 +321,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         setDiagramStats(stats);
         setDiagramError(null);
         
-        console.log('📊 PERFECT diagram statistics:', stats);
+        console.log('📊 PERFECT animated dotted diagram statistics:', stats);
         
         if (stats.aiAgentNodes > 0) {
           toast({
@@ -321,8 +331,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         }
         
       } else if (automationBlueprint?.steps?.length > 0) {
-        console.log('⚠️ No diagram data available, generating PERFECT diagram...');
-        setDiagramError('Creating perfect left-to-right diagram with straight lines...');
+        console.log('⚠️ No diagram data available, generating PERFECT animated diagram...');
+        setDiagramError('Creating perfect animated dotted diagram with gradients...');
         
       } else {
         console.log('❌ No diagram data or blueprint available');
@@ -360,8 +370,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         setShowRegenerateForm(false);
         setRegenerateInput('');
         toast({
-          title: "🎯 Creating Perfect Diagram",
-          description: "Generating left-to-right flow with straight lines and AI recommendations",
+          title: "🎯 Creating Perfect Animated Diagram",
+          description: "Generating with dotted lines, gradients, and mobile optimization",
         });
       } catch (error) {
         console.error('Error regenerating diagram:', error);
@@ -378,28 +388,27 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
 
   const handleQuickRegenerate = () => {
     if (onRegenerateDiagram) {
-      console.log('🎯 Quick regenerating PERFECT diagram');
+      console.log('🎯 Quick regenerating PERFECT animated diagram');
       onRegenerateDiagram();
       toast({
-        title: "🎯 Creating Perfect Diagram",
-        description: "Generating crystal clear left-to-right flow with straight lines",
+        title: "🎯 Creating Perfect Animated Diagram",
+        description: "Generating with dotted lines and gradient colors",
       });
     }
   };
 
   return (
     <div className="h-full w-full relative bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* PERFECT Mobile-Responsive Header Controls */}
-      <div className="absolute top-2 sm:top-4 right-2 sm:right-4 z-10 flex flex-col sm:flex-row gap-2">
+      {/* MOBILE-OPTIMIZED Header Controls */}
+      <div className="absolute top-1 sm:top-2 md:top-4 right-1 sm:right-2 md:right-4 z-10 flex flex-col sm:flex-row gap-1 sm:gap-2">
         <Button
           onClick={() => setShowJsonDebug(true)}
           size="sm"
           variant="outline"
-          className="bg-white/95 backdrop-blur-sm shadow-lg hover:bg-white border-purple-200 hover:border-purple-300 rounded-xl text-xs sm:text-sm px-2 sm:px-4"
+          className="bg-white/95 backdrop-blur-sm shadow-lg hover:bg-white border-purple-200 hover:border-purple-300 rounded-xl text-xs px-2 py-1 sm:px-4 sm:py-2"
         >
-          <Code className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-          <span className="hidden sm:inline">Debug</span>
-          <span className="sm:hidden">JSON</span>
+          <Code className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+          <span className="hidden md:inline">Debug</span>
         </Button>
         
         <Dialog open={showRegenerateForm} onOpenChange={setShowRegenerateForm}>
@@ -407,52 +416,51 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             <Button
               size="sm"
               variant="outline"
-              className="bg-white/95 backdrop-blur-sm shadow-lg hover:bg-white border-orange-200 hover:border-orange-300 rounded-xl text-xs sm:text-sm px-2 sm:px-4"
+              className="bg-white/95 backdrop-blur-sm shadow-lg hover:bg-white border-orange-200 hover:border-orange-300 rounded-xl text-xs px-2 py-1 sm:px-4 sm:py-2"
             >
-              <Settings className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Perfect</span>
-              <span className="sm:hidden">Fix</span>
+              <Settings className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+              <span className="hidden md:inline">Perfect</span>
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="w-[95vw] max-w-md mx-auto">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-purple-600" />
+              <DialogTitle className="flex items-center gap-2 text-sm sm:text-base">
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
                 Perfect Your Diagram
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="feedback" className="text-sm font-medium">
-                  What needs improvement? (Optional)
+                <Label htmlFor="feedback" className="text-xs sm:text-sm font-medium">
+                  Enhancement Request (Optional)
                 </Label>
                 <Textarea
                   id="feedback"
-                  placeholder="e.g., 'Make lines straighter', 'Add more AI recommendations', 'Fix platform icons', 'Better condition branches'..."
+                  placeholder="e.g., 'More animated effects', 'Brighter gradients', 'Better mobile layout'..."
                   value={regenerateInput}
                   onChange={(e) => setRegenerateInput(e.target.value)}
-                  className="mt-2 min-h-[120px]"
+                  className="mt-2 min-h-[100px] text-xs sm:text-sm"
                 />
               </div>
               <div className="flex gap-2">
                 <Button 
                   onClick={handleRegenerateWithInput} 
-                  className="flex-1"
+                  className="flex-1 text-xs sm:text-sm"
                   disabled={isRegenerating}
                 >
                   {isRegenerating ? (
                     <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
                       Perfecting...
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      Perfect Diagram
+                      <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                      Perfect
                     </>
                   )}
                 </Button>
-                <Button variant="outline" onClick={() => setShowRegenerateForm(false)}>
+                <Button variant="outline" onClick={() => setShowRegenerateForm(false)} className="text-xs sm:text-sm">
                   Cancel
                 </Button>
               </div>
@@ -465,28 +473,27 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             onClick={handleQuickRegenerate}
             size="sm"
             disabled={isGenerating}
-            className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white shadow-lg rounded-xl text-xs sm:text-sm px-2 sm:px-4"
+            className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white shadow-lg rounded-xl text-xs px-2 py-1 sm:px-4 sm:py-2"
           >
             {isGenerating ? (
-              <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
+              <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 animate-spin" />
             ) : (
-              <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
             )}
             <span className="hidden sm:inline">{isGenerating ? 'Creating...' : 'Regenerate'}</span>
-            <span className="sm:hidden">{isGenerating ? 'Gen...' : 'Regen'}</span>
           </Button>
         )}
       </div>
 
-      {/* PERFECT Statistics Badge - Mobile-Responsive */}
+      {/* MOBILE-OPTIMIZED Statistics Badge */}
       {diagramStats.totalNodes > 0 && (
-        <div className="absolute top-2 sm:top-4 left-2 sm:left-4 z-10">
-          <Badge variant="secondary" className="bg-white/95 backdrop-blur-sm shadow-lg text-gray-700 px-2 sm:px-3 py-1 rounded-xl text-xs sm:text-sm font-medium">
-            <span className="hidden xl:inline">
+        <div className="absolute top-1 sm:top-2 md:top-4 left-1 sm:left-2 md:left-4 z-10">
+          <Badge variant="secondary" className="bg-white/95 backdrop-blur-sm shadow-lg text-gray-700 px-2 py-1 rounded-xl text-xs font-medium">
+            <span className="hidden lg:inline">
               {diagramStats.totalNodes} steps • {diagramStats.totalEdges} connections
             </span>
-            <span className="hidden sm:inline xl:hidden">
-              {diagramStats.totalNodes} steps • {diagramStats.totalEdges} links
+            <span className="hidden sm:inline lg:hidden">
+              {diagramStats.totalNodes} • {diagramStats.totalEdges}
             </span>
             <span className="sm:hidden">
               {diagramStats.totalNodes}/{diagramStats.totalEdges}
@@ -496,16 +503,11 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
                 • {diagramStats.aiAgentNodes} 🤖
               </span>
             )}
-            {diagramStats.conditionNodes > 0 && (
-              <span className="ml-1 sm:ml-2 text-orange-600 font-bold hidden lg:inline">
-                • {diagramStats.conditionNodes} decisions
-              </span>
-            )}
           </Badge>
         </div>
       )}
 
-      {/* Enhanced Diagram Container */}
+      {/* MOBILE-OPTIMIZED Diagram Container */}
       <div className="h-full w-full rounded-none sm:rounded-xl overflow-hidden shadow-none sm:shadow-xl border-0 sm:border border-gray-200">
         <ReactFlow
           nodes={nodes}
@@ -517,50 +519,51 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           connectionMode={ConnectionMode.Loose}
           fitView
           fitViewOptions={{
-            padding: 0.1,
-            minZoom: 0.3,
+            padding: 0.05, // Less padding on mobile
+            minZoom: 0.2,  // Allow more zoom out on mobile
             maxZoom: 1.5
           }}
-          defaultViewport={{ x: 0, y: 0, zoom: 0.7 }}
+          defaultViewport={{ x: 0, y: 0, zoom: 0.5 }} // Start more zoomed out on mobile
           className="bg-gradient-to-br from-blue-50 via-white to-purple-50"
           panOnScroll
           panOnDrag={[1, 2]}
           proOptions={{ hideAttribution: true }}
           defaultEdgeOptions={{
             type: 'straight',
-            animated: false,
+            animated: true, // ANIMATED!
             style: {
-              stroke: '#6366f1',
-              strokeWidth: 3
+              stroke: '#8b5cf6',
+              strokeWidth: 3,
+              strokeDasharray: '8,4' // DOTTED ------
             }
           }}
         >
           <Background 
             variant={BackgroundVariant.Dots}
-            gap={32} 
-            size={1.5}
+            gap={24} // Smaller gap on mobile
+            size={1}
             color="#e5e7eb"
-            style={{ opacity: 0.4 }}
+            style={{ opacity: 0.3 }}
           />
           
           <Controls 
             position="bottom-right"
             showInteractive={false}
-            className="bg-white/95 backdrop-blur-sm shadow-lg rounded-xl border border-gray-200 [&>button]:!bg-white/90 [&>button]:hover:!bg-gray-100"
+            className="bg-white/95 backdrop-blur-sm shadow-lg rounded-xl border border-gray-200 [&>button]:!bg-white/90 [&>button]:hover:!bg-gray-100 [&>button]:text-xs [&>button]:p-1 sm:[&>button]:p-2"
           />
           
           <MiniMap 
-            nodeStrokeColor="#6366f1"
+            nodeStrokeColor="#8b5cf6"
             nodeColor="#f8fafc"
             nodeBorderRadius={16}
-            maskColor="rgba(99, 102, 241, 0.1)"
+            maskColor="rgba(139, 92, 246, 0.1)"
             position="bottom-left"
             pannable
             zoomable
             className="bg-white/95 backdrop-blur-sm shadow-lg rounded-xl border border-gray-200 hidden lg:block"
             style={{
-              width: '280px',
-              height: '180px'
+              width: '220px', // Smaller on mobile
+              height: '140px'
             }}
           />
         </ReactFlow>
@@ -568,7 +571,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
 
       {/* Enhanced Error State with Comprehensive Recovery */}
       {diagramError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/95 backdrop-blur-sm p-4">
+        <div className="absolute inset-0 flex items-center justify-center bg-white/95 backdrop-blur-sm p-2 sm:p-4">
           <DiagramErrorRecovery
             error={diagramError}
             onRetry={handleRetryDiagram}
@@ -578,7 +581,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         </div>
       )}
 
-      {/* JSON Debug Modal */}
+      {/* JSON Debug Modal - Mobile Optimized */}
       {showJsonDebug && (
         <JsonDebugModal
           isOpen={showJsonDebug}

@@ -26,7 +26,7 @@ export const calculateEnhancedLayout = (
 ): { nodes: Node[]; edges: Edge[] } => {
   const opts = { ...DEFAULT_LAYOUT_OPTIONS, ...options };
   
-  console.log('🎯 Creating PERFECT left-to-right diagram with straight lines');
+  console.log('🎯 Creating PERFECT left-to-right diagram with animated dotted lines');
   
   if (!nodes || nodes.length === 0) return { nodes: [], edges };
 
@@ -127,19 +127,25 @@ export const calculateEnhancedLayout = (
         borderRadius: '16px',
         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
         border: '2px solid rgba(139, 92, 246, 0.2)',
+        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1), rgba(16, 185, 129, 0.1))',
       }
     };
   });
 
-  // STEP 5: Create PERFECT straight line edges with meaningful labels
+  // STEP 5: Create PERFECT animated dotted lines with gradient colors
   const layoutedEdges = edges.map((edge, index) => {
-    const colors = [
-      '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', 
-      '#ef4444', '#06b6d4', '#8b5a2b', '#dc2626'
+    const gradientColors = [
+      'linear-gradient(45deg, #8b5cf6, #3b82f6)',
+      'linear-gradient(45deg, #3b82f6, #10b981)',
+      'linear-gradient(45deg, #10b981, #8b5cf6)',
+      'linear-gradient(45deg, #f59e0b, #ef4444)',
+      'linear-gradient(45deg, #ef4444, #06b6d4)',
+      'linear-gradient(45deg, #06b6d4, #8b5a2b)',
+      'linear-gradient(45deg, #dc2626, #8b5cf6)'
     ];
     
-    const colorIndex = index % colors.length;
-    const baseColor = colors[colorIndex];
+    const colorIndex = index % gradientColors.length;
+    const gradientColor = gradientColors[colorIndex];
     
     // Generate meaningful labels based on source node type and handle
     let label = '';
@@ -171,24 +177,26 @@ export const calculateEnhancedLayout = (
 
     return {
       ...edge,
-      type: 'straight', // STRAIGHT LINES - not curved!
-      animated: false,
+      type: 'straight',
+      animated: true, // ANIMATED EFFECT!
       style: {
-        stroke: baseColor,
+        stroke: '#8b5cf6',
         strokeWidth: 3,
-        strokeDasharray: undefined,
+        strokeDasharray: '8,4', // DOTTED LINE EFFECT ------
+        background: gradientColor,
+        filter: 'drop-shadow(0 2px 4px rgba(139, 92, 246, 0.3))',
         ...edge.style
       },
       label,
       labelStyle: {
         fontWeight: 'bold',
         fontSize: '12px',
-        color: baseColor,
-        background: 'rgba(255, 255, 255, 0.95)',
+        color: '#8b5cf6',
+        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(139, 92, 246, 0.1))',
         padding: '4px 8px',
         borderRadius: '12px',
-        border: `1px solid ${baseColor}`,
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+        border: '1px solid #8b5cf6',
+        boxShadow: '0 2px 8px rgba(139, 92, 246, 0.2)',
       },
       labelBgStyle: {
         fill: 'transparent',
@@ -196,11 +204,12 @@ export const calculateEnhancedLayout = (
     };
   });
 
-  console.log('✅ PERFECT left-to-right layout completed:', {
+  console.log('✅ PERFECT animated dotted diagram with gradients completed:', {
     nodes: layoutedNodes.length,
     edges: layoutedEdges.length,
     layers: maxLayer + 1,
-    straightLines: true
+    animatedDottedLines: true,
+    gradientColors: true
   });
 
   return { nodes: layoutedNodes, edges: layoutedEdges };

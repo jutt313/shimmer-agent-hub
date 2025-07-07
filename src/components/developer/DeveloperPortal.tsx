@@ -86,7 +86,7 @@ const DeveloperPortal = () => {
         </TabsContent>
 
         <TabsContent value="webhooks" className="mt-6">
-          <WebhookManagementTab />
+          <WebhookManagementTab automationId="developer-portal" />
         </TabsContent>
       </Tabs>
     </div>

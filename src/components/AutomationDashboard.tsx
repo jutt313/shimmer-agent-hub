@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { BarChart3, Activity, MessageCircle, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -5,32 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { 
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-  ArcElement
-} from 'chart.js';
-import { Line, Pie } from 'react-chartjs-2';
 import { AutomationBlueprint } from '@/types/automation';
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-  ArcElement
-);
 
 interface AutomationDashboardProps {
   automationId: string;
@@ -92,8 +68,8 @@ const AutomationDashboard: React.FC<AutomationDashboardProps> = ({
 
       const totalMessages = messagesData.length;
 
-      // Calculate average response time
-      const responseTimes = data.map(run => run.response_time).filter(time => typeof time === 'number');
+      // Calculate average response time using duration_ms
+      const responseTimes = data.map(run => run.duration_ms).filter(time => typeof time === 'number');
       const averageResponseTime = responseTimes.length > 0
         ? responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length
         : 0;
@@ -123,7 +99,7 @@ const AutomationDashboard: React.FC<AutomationDashboardProps> = ({
         .from('automation_runs')
         .select('*')
         .eq('automation_id', automationId)
-        .order('created_at', { ascending: false })
+        .order('run_timestamp', { ascending: false })
         .limit(10);
 
       if (error) throw error;
@@ -159,80 +135,9 @@ const AutomationDashboard: React.FC<AutomationDashboardProps> = ({
     }
   };
 
-  const lineChartData = {
-    labels: runHistory.map(run => new Date(run.created_at).toLocaleTimeString()),
-    datasets: [
-      {
-        label: 'Response Time (ms)',
-        data: runHistory.map(run => run.response_time),
-        fill: true,
-        backgroundColor: 'rgba(99, 102, 241, 0.2)',
-        borderColor: '#6366f1',
-        tension: 0.3
-      }
-    ]
-  };
-
-  const pieChartData = {
-    labels: ['Successful', 'Failed'],
-    datasets: [
-      {
-        label: 'Automation Runs',
-        data: [stats.successfulRuns, stats.failedRuns],
-        backgroundColor: ['#10b981', '#ef4444'],
-        borderWidth: 0,
-        hoverOffset: 5
-      }
-    ]
-  };
-
-  const lineChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        display: false
-      },
-      title: {
-        display: false,
-        text: 'Run History'
-      }
-    },
-    scales: {
-      x: {
-        grid: {
-          display: false
-        }
-      },
-      y: {
-        grid: {
-          display: false
-        }
-      }
-    }
-  };
-
-  const pieChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'bottom',
-        labels: {
-          usePointStyle: true,
-          pointStyle: 'circle'
-        }
-      },
-      title: {
-        display: false,
-        text: 'Run Distribution'
-      }
-    }
-  };
-
   return (
     <div className="h-full flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      {/* FIXED: Clean white header instead of chunky purple */}
+      {/* Clean white header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -311,25 +216,39 @@ const AutomationDashboard: React.FC<AutomationDashboardProps> = ({
             </Card>
           </div>
 
-          {/* Charts */}
+          {/* Simple Charts Section */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
-                <CardTitle>Run History</CardTitle>
-                <p className="text-sm text-gray-500">Last 10 runs</p>
+                <CardTitle>Success Rate</CardTitle>
+                <p className="text-sm text-gray-500">Performance overview</p>
               </CardHeader>
-              <CardContent className="h-72">
-                <Line data={lineChartData} options={lineChartOptions} height={250} />
+              <CardContent>
+                <div className="flex items-center justify-center h-32">
+                  <div className="text-center">
+                    <div className="text-4xl font-bold text-green-600">
+                      {stats.totalRuns > 0 ? Math.round((stats.successfulRuns / stats.totalRuns) * 100) : 0}%
+                    </div>
+                    <p className="text-sm text-gray-500 mt-2">Success Rate</p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Run Distribution</CardTitle>
-                <p className="text-sm text-gray-500">Success vs. Failure</p>
+                <CardTitle>Average Duration</CardTitle>
+                <p className="text-sm text-gray-500">Response performance</p>
               </CardHeader>
-              <CardContent className="h-72">
-                <Pie data={pieChartData} options={pieChartOptions} height={250} />
+              <CardContent>
+                <div className="flex items-center justify-center h-32">
+                  <div className="text-center">
+                    <div className="text-4xl font-bold text-blue-600">
+                      {Math.round(stats.averageResponseTime)}
+                    </div>
+                    <p className="text-sm text-gray-500 mt-2">ms average</p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -347,8 +266,8 @@ const AutomationDashboard: React.FC<AutomationDashboardProps> = ({
                     <div key={run.id} className="py-3">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-medium">{new Date(run.created_at).toLocaleString()}</p>
-                          <p className="text-sm text-gray-500">Response Time: {run.response_time}ms</p>
+                          <p className="font-medium">{new Date(run.run_timestamp).toLocaleString()}</p>
+                          <p className="text-sm text-gray-500">Duration: {run.duration_ms || 0}ms</p>
                         </div>
                         {run.status === 'success' ? (
                           <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
@@ -360,10 +279,10 @@ const AutomationDashboard: React.FC<AutomationDashboardProps> = ({
                           </Badge>
                         )}
                       </div>
-                      {run.error && (
+                      {run.details_log && typeof run.details_log === 'object' && run.details_log.error && (
                         <div className="mt-2 p-3 bg-red-50 rounded-md text-sm text-red-700">
                           <AlertTriangle className="w-4 h-4 inline-block mr-1 align-text-top" />
-                          {run.error}
+                          {String(run.details_log.error)}
                         </div>
                       )}
                     </div>

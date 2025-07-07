@@ -1,5 +1,7 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
-import ReactFlow, {
+import {
+  ReactFlow,
   addEdge,
   useNodesState,
   useEdgesState,
@@ -9,8 +11,8 @@ import ReactFlow, {
   MiniMap,
   MarkerType,
   ConnectionMode
-} from 'reactflow';
-import 'reactflow/dist/style.css';
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import { Network, CheckCircle } from 'lucide-react';
 import { generateLayoutData } from '@/utils/diagramLayout';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +24,13 @@ import DiagramErrorRecovery from './DiagramErrorRecovery';
 interface AutomationDiagramDisplayProps {
   automationBlueprint?: AutomationBlueprint | null;
   automationId: string;
+  automationDiagramData?: { nodes: any[]; edges: any[] } | null;
+  messages?: any[];
+  onAgentAdd?: (agent: any) => void;
+  onAgentDismiss?: (agentName: string) => void;
+  dismissedAgents?: Set<string>;
+  isGenerating?: boolean;
+  onRegenerateDiagram?: (userFeedback?: string) => void;
 }
 
 const CustomNode = ({ data }: any) => {
@@ -42,19 +51,37 @@ const CustomNode = ({ data }: any) => {
 
 const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   automationBlueprint,
-  automationId
+  automationId,
+  automationDiagramData,
+  isGenerating = false,
+  onRegenerateDiagram
 }) => {
   const { toast } = useToast();
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [error, setError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
 
   useEffect(() => {
-    if (automationBlueprint) {
-      const { nodes: newNodes, edges: newEdges } = generateLayoutData(automationBlueprint);
-      setNodes(newNodes);
-      setEdges(newEdges);
+    if (automationDiagramData && automationDiagramData.nodes && automationDiagramData.edges) {
+      // Use the pre-generated diagram data
+      setNodes(automationDiagramData.nodes);
+      setEdges(automationDiagramData.edges);
+      setError(null);
+    } else if (automationBlueprint) {
+      // Generate diagram from blueprint
+      try {
+        const { nodes: newNodes, edges: newEdges } = generateLayoutData(automationBlueprint);
+        setNodes(newNodes);
+        setEdges(newEdges);
+        setError(null);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to generate diagram';
+        setError(errorMessage);
+        console.error('Error generating diagram:', err);
+      }
     }
-  }, [automationBlueprint, setNodes, setEdges]);
+  }, [automationBlueprint, automationDiagramData, setNodes, setEdges]);
 
   const nodeTypes = React.useMemo(() => ({
     custom: CustomNode,
@@ -64,6 +91,45 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     (params) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
+
+  const handleRetry = () => {
+    setRetrying(true);
+    setError(null);
+    if (onRegenerateDiagram) {
+      onRegenerateDiagram();
+    }
+    setTimeout(() => setRetrying(false), 2000);
+  };
+
+  const handleFallbackDiagram = () => {
+    if (automationBlueprint) {
+      try {
+        const { nodes: fallbackNodes, edges: fallbackEdges } = generateLayoutData(automationBlueprint);
+        setNodes(fallbackNodes);
+        setEdges(fallbackEdges);
+        setError(null);
+        toast({
+          title: "Fallback Diagram Generated",
+          description: "Using basic diagram layout",
+        });
+      } catch (err) {
+        console.error('Error generating fallback diagram:', err);
+      }
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="h-full bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex items-center justify-center">
+        <DiagramErrorRecovery
+          error={error}
+          onRetry={handleRetry}
+          onFallbackDiagram={handleFallbackDiagram}
+          isRetrying={retrying}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="h-full bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -130,7 +196,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           />
         </ReactFlow>
 
-        {!automationBlueprint && (
+        {!automationBlueprint && !automationDiagramData && (
           <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm">
             <div className="text-center">
               <Network className="w-16 h-16 text-slate-400 mx-auto mb-4" />
@@ -140,7 +206,15 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           </div>
         )}
 
-        <DiagramErrorRecovery />
+        {isGenerating && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm">
+            <div className="text-center">
+              <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+              <h3 className="text-lg font-semibold text-slate-700 mb-2">Generating Diagram</h3>
+              <p className="text-slate-500">Creating your automation flow diagram...</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

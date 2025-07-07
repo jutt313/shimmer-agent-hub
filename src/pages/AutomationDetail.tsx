@@ -689,11 +689,8 @@ const AutomationDetail = () => {
               <div className="h-[calc(100vh-160px)]">
                 <AutomationDiagramDisplay
                   automationBlueprint={automation?.automation_blueprint}
+                  automationId={automation.id}
                   automationDiagramData={automation?.automation_diagram_data}
-                  messages={messages}
-                  onAgentAdd={handleAgentAdd}
-                  onAgentDismiss={handleAgentDismiss}
-                  dismissedAgents={dismissedAgents}
                   isGenerating={generatingDiagram}
                   onRegenerateDiagram={handleRegenerateDiagram}
                 />

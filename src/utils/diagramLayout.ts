@@ -213,3 +213,111 @@ export const validateNodesAndEdges = (nodes: Node[], edges: Edge[]): { validNode
   
   return { validNodes: nodes, validEdges };
 };
+
+export const generateLayoutData = (blueprint: any) => {
+  if (!blueprint || !blueprint.steps) {
+    return { nodes: [], edges: [] };
+  }
+
+  const nodes: any[] = [];
+  const edges: any[] = [];
+  const stepWidth = 250;
+  const stepHeight = 120;
+  const verticalSpacing = 200;
+  const horizontalSpacing = 300;
+
+  // Create start node
+  nodes.push({
+    id: 'start',
+    type: 'custom',
+    position: { x: 50, y: 50 },
+    data: {
+      label: 'Start',
+      type: 'start',
+      description: 'Automation begins here'
+    }
+  });
+
+  // Calculate positions for each step
+  blueprint.steps.forEach((step: any, index: number) => {
+    const row = Math.floor(index / 3);
+    const col = index % 3;
+    
+    const x = 50 + (col + 1) * horizontalSpacing;
+    const y = 50 + (row + 1) * verticalSpacing;
+
+    nodes.push({
+      id: `step-${index}`,
+      type: 'custom',
+      position: { x, y },
+      data: {
+        label: step.platform || `Step ${index + 1}`,
+        type: 'step',
+        description: step.action || 'Automation step',
+        platform: step.platform,
+        action: step.action,
+        stepNumber: index + 1
+      }
+    });
+
+    // Create edge from previous node
+    const sourceId = index === 0 ? 'start' : `step-${index - 1}`;
+    edges.push({
+      id: `edge-${sourceId}-step-${index}`,
+      source: sourceId,
+      target: `step-${index}`,
+      type: 'smoothstep',
+      style: {
+        stroke: '#10b981',
+        strokeWidth: 3,
+        strokeDasharray: '8 4',
+        filter: 'drop-shadow(0 2px 4px rgba(16, 185, 129, 0.3))',
+      },
+      animated: true,
+      markerEnd: {
+        type: 'arrowclosed',
+        color: '#10b981',
+      }
+    });
+  });
+
+  // Create end node
+  const lastStepIndex = blueprint.steps.length - 1;
+  const endRow = Math.floor(lastStepIndex / 3);
+  const endCol = (lastStepIndex + 1) % 3;
+  
+  nodes.push({
+    id: 'end',
+    type: 'custom',
+    position: { 
+      x: 50 + (endCol + 1) * horizontalSpacing, 
+      y: 50 + (endRow + 2) * verticalSpacing 
+    },
+    data: {
+      label: 'End',
+      type: 'end',
+      description: 'Automation completes'
+    }
+  });
+
+  // Edge to end node
+  edges.push({
+    id: `edge-step-${lastStepIndex}-end`,
+    source: `step-${lastStepIndex}`,
+    target: 'end',
+    type: 'smoothstep',
+    style: {
+      stroke: '#10b981',
+      strokeWidth: 3,
+      strokeDasharray: '8 4',
+      filter: 'drop-shadow(0 2px 4px rgba(16, 185, 129, 0.3))',
+    },
+    animated: true,
+    markerEnd: {
+      type: 'arrowclosed',
+      color: '#10b981',
+    }
+  });
+
+  return { nodes, edges };
+};

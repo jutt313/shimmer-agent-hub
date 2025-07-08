@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Settings, User, LogOut, Code, PlayCircle, BookOpen, Bell } from "lucide-react";
+import { Settings, User, LogOut, Code, PlayCircle, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -53,16 +53,20 @@ const SettingsDropdown = () => {
             Documentation Library
           </DropdownMenuItem>
           
-          <DropdownMenuItem onClick={() => handleComingSoonClick("Developer API")}>
-            <Code className="w-4 h-4 mr-2" />
-            Developer API
-            <span className="ml-auto text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-full">Coming Soon</span>
+          <DropdownMenuItem onClick={() => handleComingSoonClick("Developer API")} className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Code className="w-4 h-4 mr-2" />
+              Developer API
+            </div>
+            <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium">Coming Soon</span>
           </DropdownMenuItem>
           
-          <DropdownMenuItem onClick={() => handleComingSoonClick("API Playground")}>
-            <PlayCircle className="w-4 h-4 mr-2" />
-            API Playground
-            <span className="ml-auto text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-full">Coming Soon</span>
+          <DropdownMenuItem onClick={() => handleComingSoonClick("API Playground")} className="flex items-center justify-between">
+            <div className="flex items-center">
+              <PlayCircle className="w-4 h-4 mr-2" />
+              API Playground
+            </div>
+            <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium">Coming Soon</span>
           </DropdownMenuItem>
           
           <DropdownMenuSeparator />

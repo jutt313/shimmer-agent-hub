@@ -1,10 +1,9 @@
 
 import { useState, useEffect } from 'react';
-import { Bell, Mail, Smartphone, Monitor, Settings } from 'lucide-react';
+import { Bell, Settings } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -48,21 +47,27 @@ const NotificationsTab = () => {
   }, [user]);
 
   const fetchNotificationPreferences = async () => {
+    if (!user) return;
+    
     try {
+      console.log('Fetching notification preferences for user:', user.id);
+      
       const { data, error } = await supabase
         .from('user_preferences')
         .select('notification_preferences')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .single();
 
       if (error && error.code !== 'PGRST116') {
-        throw error;
+        console.error('Error fetching notification preferences:', error);
+        return;
       }
 
       if (data?.notification_preferences) {
+        const dbPrefs = data.notification_preferences as Record<string, boolean>;
         setPreferences(prevPreferences => ({
           ...prevPreferences,
-          ...(data.notification_preferences as Partial<NotificationPreferences>)
+          ...dbPrefs
         }));
       }
     } catch (error) {
@@ -85,7 +90,10 @@ const NotificationsTab = () => {
           updated_at: new Date().toISOString()
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
 
       setPreferences(updatedPreferences);
       toast({
@@ -96,7 +104,7 @@ const NotificationsTab = () => {
       console.error('Error updating notification preferences:', error);
       toast({
         title: "Error",
-        description: "Failed to update notification preferences",
+        description: "Failed to update notification preferences. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -267,7 +275,7 @@ const NotificationsTab = () => {
       <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-0 shadow-lg rounded-2xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-xl bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-            <Monitor className="w-5 h-5 text-purple-600" />
+            <Bell className="w-5 h-5 text-purple-600" />
             System Updates
           </CardTitle>
           <CardDescription>
@@ -298,74 +306,6 @@ const NotificationsTab = () => {
                 onCheckedChange={() => handleToggle('maintenance_notices')}
                 disabled={loading}
               />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Delivery Methods */}
-      <Card className="bg-gradient-to-br from-yellow-50 to-orange-50 border-0 shadow-lg rounded-2xl">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-xl bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
-            <Mail className="w-5 h-5 text-yellow-600" />
-            Delivery Methods
-          </CardTitle>
-          <CardDescription>
-            Choose how you'd like to receive notifications
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="bg-white/70 p-4 rounded-xl">
-            <div className="flex items-center gap-3 mb-3">
-              <Mail className="w-5 h-5 text-blue-600" />
-              <Label className="font-medium text-gray-900">Email Notifications</Label>
-            </div>
-            <p className="text-sm text-gray-600 mb-3">
-              Receive notifications via email at {user?.email}
-            </p>
-            <div className="flex items-center gap-2">
-              <span className="text-xs bg-green-100 text-green-600 px-3 py-1 rounded-full">
-                ✓ Active
-              </span>
-              <span className="text-xs text-gray-500">
-                Primary notification method
-              </span>
-            </div>
-          </div>
-
-          <div className="bg-white/70 p-4 rounded-xl">
-            <div className="flex items-center gap-3 mb-3">
-              <Bell className="w-5 h-5 text-purple-600" />
-              <Label className="font-medium text-gray-900">In-App Notifications</Label>
-            </div>
-            <p className="text-sm text-gray-600 mb-3">
-              Real-time notifications within the YusrAI platform
-            </p>
-            <div className="flex items-center gap-2">
-              <span className="text-xs bg-green-100 text-green-600 px-3 py-1 rounded-full">
-                ✓ Active
-              </span>
-              <span className="text-xs text-gray-500">
-                Instant notifications
-              </span>
-            </div>
-          </div>
-
-          <div className="bg-white/70 p-4 rounded-xl">
-            <div className="flex items-center gap-3 mb-3">
-              <Smartphone className="w-5 h-5 text-gray-400" />
-              <Label className="font-medium text-gray-900">Push Notifications</Label>
-            </div>
-            <p className="text-sm text-gray-600 mb-3">
-              Mobile and desktop push notifications
-            </p>
-            <div className="flex items-center gap-2">
-              <span className="text-xs bg-orange-100 text-orange-600 px-3 py-1 rounded-full">
-                🚀 Coming Soon
-              </span>
-              <span className="text-xs text-gray-500">
-                Mobile app notifications
-              </span>
             </div>
           </div>
         </CardContent>

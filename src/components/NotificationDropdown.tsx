@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Bell, Check, X, Trash2 } from 'lucide-react';
+import { Bell, Check, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -233,8 +233,7 @@ const NotificationDropdown = () => {
               size="sm"
               className="w-full text-blue-600 hover:bg-blue-50"
               onClick={() => {
-                // Future: Navigate to full notifications page
-                console.log('View all notifications');
+                console.log('View all notifications - Coming soon');
               }}
             >
               View all notifications

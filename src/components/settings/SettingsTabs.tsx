@@ -1,12 +1,11 @@
 
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { User, Shield, Bot, Settings, Code } from "lucide-react";
+import { User, Shield, Bot, Settings } from "lucide-react";
 import ProfileTab from "./ProfileTab";
 import PlatformCredentialsTab from "./PlatformCredentialsTab";
 import AutomationsTab from "./AutomationsTab";
 import NotificationsTab from "./NotificationsTab";
-import DeveloperTab from "./DeveloperTab";
 
 const SettingsTabs = () => {
   const [activeTab, setActiveTab] = useState("profile");
@@ -19,7 +18,7 @@ const SettingsTabs = () => {
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5 bg-white/80 backdrop-blur-sm rounded-2xl p-2 shadow-sm border">
+        <TabsList className="grid w-full grid-cols-4 bg-white/80 backdrop-blur-sm rounded-2xl p-2 shadow-sm border">
           <TabsTrigger 
             value="profile" 
             className="flex items-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300"
@@ -48,13 +47,6 @@ const SettingsTabs = () => {
             <Settings className="w-4 h-4" />
             Notifications
           </TabsTrigger>
-          <TabsTrigger 
-            value="developer" 
-            className="flex items-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300"
-          >
-            <Code className="w-4 h-4" />
-            Developer
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile">
@@ -71,10 +63,6 @@ const SettingsTabs = () => {
 
         <TabsContent value="notifications">
           <NotificationsTab />
-        </TabsContent>
-
-        <TabsContent value="developer">
-          <DeveloperTab />
         </TabsContent>
       </Tabs>
     </div>

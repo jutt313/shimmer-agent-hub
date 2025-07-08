@@ -60,9 +60,9 @@ const NotificationsTab = () => {
       }
 
       if (data?.notification_preferences) {
-        setPreferences(prev => ({
-          ...prev,
-          ...data.notification_preferences
+        setPreferences(prevPreferences => ({
+          ...prevPreferences,
+          ...(data.notification_preferences as Partial<NotificationPreferences>)
         }));
       }
     } catch (error) {

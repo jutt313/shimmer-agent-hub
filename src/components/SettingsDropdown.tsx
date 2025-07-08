@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Settings, User, LogOut, Code, PlayCircle, BookOpen } from "lucide-react";
+import { Settings, User, LogOut, Code, PlayCircle, BookOpen, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,17 +11,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 import SettingsTabs from "./settings/SettingsTabs";
-import DeveloperPortal from "./developer/DeveloperPortal";
-import PlaygroundConsole from "./developer/PlaygroundConsole";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
 
 const SettingsDropdown = () => {
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const [showSettings, setShowSettings] = useState(false);
-  const [showDeveloperPortal, setShowDeveloperPortal] = useState(false);
-  const [showPlayground, setShowPlayground] = useState(false);
+  const [showComingSoon, setShowComingSoon] = useState(false);
+  const [comingSoonFeature, setComingSoonFeature] = useState("");
 
   const handleSignOut = async () => {
     await signOut();
@@ -31,11 +29,16 @@ const SettingsDropdown = () => {
     navigate('/documentation');
   };
 
+  const handleComingSoonClick = (feature: string) => {
+    setComingSoonFeature(feature);
+    setShowComingSoon(true);
+  };
+
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="rounded-full p-2">
+          <Button variant="ghost" size="sm" className="rounded-full p-2 hover:bg-gray-100">
             <Settings className="w-5 h-5" />
           </Button>
         </DropdownMenuTrigger>
@@ -50,14 +53,16 @@ const SettingsDropdown = () => {
             Documentation Library
           </DropdownMenuItem>
           
-          <DropdownMenuItem onClick={() => setShowDeveloperPortal(true)}>
+          <DropdownMenuItem onClick={() => handleComingSoonClick("Developer API")}>
             <Code className="w-4 h-4 mr-2" />
             Developer API
+            <span className="ml-auto text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-full">Coming Soon</span>
           </DropdownMenuItem>
           
-          <DropdownMenuItem onClick={() => setShowPlayground(true)}>
+          <DropdownMenuItem onClick={() => handleComingSoonClick("API Playground")}>
             <PlayCircle className="w-4 h-4 mr-2" />
             API Playground
+            <span className="ml-auto text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-full">Coming Soon</span>
           </DropdownMenuItem>
           
           <DropdownMenuSeparator />
@@ -76,17 +81,29 @@ const SettingsDropdown = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Developer Portal Modal */}
-      <Dialog open={showDeveloperPortal} onOpenChange={setShowDeveloperPortal}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DeveloperPortal />
-        </DialogContent>
-      </Dialog>
-
-      {/* API Playground Modal */}
-      <Dialog open={showPlayground} onOpenChange={setShowPlayground}>
-        <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
-          <PlaygroundConsole />
+      {/* Coming Soon Modal */}
+      <Dialog open={showComingSoon} onOpenChange={setShowComingSoon}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+              {comingSoonFeature}
+            </DialogTitle>
+            <DialogDescription className="text-gray-600 text-center space-y-3 pt-4">
+              <div className="text-4xl">🚀</div>
+              <p className="text-lg font-medium">We're working hard to bring you this feature!</p>
+              <p>Our {comingSoonFeature} is currently in development and will be available very soon to help you build amazing automations.</p>
+              <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 mt-4">
+                <p className="text-sm text-blue-800 font-medium">✨ Get ready for:</p>
+                <ul className="text-sm text-blue-700 mt-2 space-y-1">
+                  <li>• Powerful API access</li>
+                  <li>• Advanced automation tools</li>
+                  <li>• Seamless integrations</li>
+                  <li>• Professional workflows</li>
+                </ul>
+              </div>
+              <p className="text-sm text-gray-500 mt-4">Thank you for your patience as we perfect this experience for you! 💙</p>
+            </DialogDescription>
+          </DialogHeader>
         </DialogContent>
       </Dialog>
     </>

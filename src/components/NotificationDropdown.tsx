@@ -1,264 +1,244 @@
 
-import { useState } from 'react';
-import { Bell, HelpCircle, Calendar, Bot, AlertTriangle, Zap, BookOpen, Trash2, Check, MoreVertical } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Bell, Check, X, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { useNotifications, type Notification } from '@/hooks/useNotifications';
-import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  is_read: boolean;
+  created_at: string;
+  category: string;
+}
 
 const NotificationDropdown = () => {
-  const { notifications, unreadCount, loading, markAsRead, markAllAsRead, deleteNotification, deleteAllRead, deleteAllNotifications } = useNotifications();
-  const { handleError } = useErrorHandler();
-  const [isOpen, setIsOpen] = useState(false);
+  const { user } = useAuth();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(false);
 
-  const getNotificationIcon = (type: Notification['type']) => {
-    switch (type) {
-      case 'automation_status':
-        return <Bot className="w-4 h-4 text-blue-500" />;
-      case 'error':
-        return <AlertTriangle className="w-4 h-4 text-red-500" />;
-      case 'ai_agent':
-        return <Zap className="w-4 h-4 text-purple-500" />;
-      case 'platform_integration':
-        return <Calendar className="w-4 h-4 text-blue-500" />;
-      case 'knowledge_system':
-        return <BookOpen className="w-4 h-4 text-purple-500" />;
-      default:
-        return <Bell className="w-4 h-4 text-gray-500" />;
+  useEffect(() => {
+    if (user) {
+      fetchNotifications();
     }
-  };
+  }, [user]);
 
-  const handleNotificationClick = async (notification: Notification) => {
-    if (!notification.is_read) {
-      await markAsRead(notification.id);
-    }
+  const fetchNotifications = async () => {
+    if (!user) return;
     
-    const contextMessage = getNotificationHelpMessage(notification);
-    window.dispatchEvent(new CustomEvent('open-help-chat', {
-      detail: { 
-        message: contextMessage,
-        context: `Notification: ${notification.title} - ${notification.message}`
+    setLoading(true);
+    try {
+      console.log('Fetching notifications for user:', user.id);
+      
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error('Error fetching notifications:', error);
+        return;
       }
-    }));
-    setIsOpen(false);
+
+      console.log('Fetched notifications:', data);
+      setNotifications(data || []);
+      setUnreadCount(data?.filter(n => !n.is_read).length || 0);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const getNotificationHelpMessage = (notification: Notification) => {
-    switch (notification.type) {
-      case 'automation_status':
-        return `I have a question about this automation notification: "${notification.title}". Can you help me understand what this means and what I should do next?`;
+  const markAsRead = async (notificationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      setNotifications(prev => 
+        prev.map(n => 
+          n.id === notificationId ? { ...n, is_read: true } : n
+        )
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  const deleteNotification = async (notificationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', notificationId)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      setUnreadCount(prev => {
+        const notification = notifications.find(n => n.id === notificationId);
+        return notification && !notification.is_read ? Math.max(0, prev - 1) : prev;
+      });
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+    }
+  };
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
       case 'error':
-        return `I got this error notification: "${notification.title}". Can you help me understand what went wrong and how to fix it?`;
-      case 'ai_agent':
-        return `I have a question about this AI agent notification: "${notification.title}". What does this mean for my agent?`;
-      case 'platform_integration':
-        return `I need help with this platform integration notification: "${notification.title}". What should I do about this?`;
-      case 'knowledge_system':
-        return `I have a question about this knowledge system notification: "${notification.title}". Can you explain what this means?`;
+        return '❌';
+      case 'success':
+        return '✅';
+      case 'warning':
+        return '⚠️';
+      case 'info':
+        return 'ℹ️';
       default:
-        return `I need help understanding this notification: "${notification.title}". Can you explain what it means?`;
-    }
-  };
-
-  const handleHelpClick = (notification: Notification, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const contextMessage = getNotificationHelpMessage(notification);
-    window.dispatchEvent(new CustomEvent('open-help-chat', {
-      detail: { 
-        message: contextMessage,
-        context: `Notification Help: ${notification.title} - ${notification.message}`
-      }
-    }));
-    setIsOpen(false);
-  };
-
-  const handleDeleteClick = async (notificationId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await deleteNotification(notificationId);
-    } catch (error) {
-      console.error('Failed to delete notification:', error);
-    }
-  };
-
-  const handleDeleteAllRead = async () => {
-    try {
-      await deleteAllRead();
-    } catch (error) {
-      console.error('Failed to delete read notifications:', error);
-    }
-  };
-
-  const handleDeleteAll = async () => {
-    try {
-      await deleteAllNotifications();
-    } catch (error) {
-      console.error('Failed to delete all notifications:', error);
+        return '📢';
     }
   };
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
     
-    if (diffInHours < 1) return 'Just now';
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    return `${Math.floor(diffInHours / 24)}d ago`;
+    if (diffInSeconds < 60) return 'just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    return `${Math.floor(diffInSeconds / 86400)}d ago`;
   };
 
-  const readNotifications = notifications.filter(n => n.is_read);
-  const unreadNotifications = notifications.filter(n => !n.is_read);
-
   return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          className="relative rounded-xl border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-200"
-        >
+        <Button variant="ghost" size="sm" className="relative rounded-full p-2 hover:bg-gray-100">
           <Bell className="w-5 h-5" />
           {unreadCount > 0 && (
-            <Badge 
-              variant="destructive" 
-              className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-gradient-to-r from-blue-500 to-purple-600"
-            >
-              {unreadCount > 99 ? '99+' : unreadCount}
+            <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-red-500 text-white">
+              {unreadCount > 9 ? '9+' : unreadCount}
             </Badge>
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent 
-        className="w-80 max-h-96 overflow-y-auto bg-white/95 backdrop-blur-md border-0 shadow-2xl rounded-2xl"
-        align="end"
-      >
-        <DropdownMenuLabel className="flex items-center justify-between p-4">
-          <span className="text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Notifications
-          </span>
-          <div className="flex gap-2">
+      <DropdownMenuContent align="end" className="w-80 p-0 bg-white border shadow-lg">
+        <div className="p-4 border-b">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-gray-900">Notifications</h3>
             {unreadCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={markAllAsRead}
-                className="text-xs text-blue-600 hover:text-blue-700 h-7 px-2 rounded-lg hover:bg-blue-50"
-                title="Mark all as read"
-              >
-                <Check className="w-3 h-3 mr-1" />
-                Read all
-              </Button>
-            )}
-            {notifications.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
-                    title="Delete options"
-                  >
-                    <MoreVertical className="w-3 h-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48 bg-white/95 backdrop-blur-sm border border-gray-200 shadow-xl rounded-xl">
-                  {readNotifications.length > 0 && (
-                    <DropdownMenuItem 
-                      onClick={handleDeleteAllRead} 
-                      className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg mx-1"
-                    >
-                      <Trash2 className="w-3 h-3 mr-2" />
-                      Delete all read ({readNotifications.length})
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem 
-                    onClick={handleDeleteAll} 
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg mx-1"
-                  >
-                    <Trash2 className="w-3 h-3 mr-2" />
-                    Delete all notifications
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
+                {unreadCount} new
+              </Badge>
             )}
           </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator className="bg-gradient-to-r from-blue-200 via-purple-200 to-blue-200" />
+        </div>
         
-        {loading ? (
-          <div className="p-4 text-center text-gray-500">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto"></div>
-            <p className="mt-2 text-sm">Loading notifications...</p>
-          </div>
-        ) : notifications.length === 0 ? (
-          <div className="p-6 text-center text-gray-500">
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Bell className="w-6 h-6 text-white" />
+        <ScrollArea className="max-h-96">
+          {loading ? (
+            <div className="p-4 text-center text-gray-500">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto mb-2"></div>
+              Loading notifications...
             </div>
-            <p className="font-medium">No notifications yet</p>
-            <p className="text-xs mt-1 text-gray-400">You'll see automation updates and alerts here</p>
-          </div>
-        ) : (
-          <div className="max-h-80 overflow-y-auto">
-            {notifications.map((notification) => (
-              <DropdownMenuItem
-                key={notification.id}
-                className="p-0 cursor-pointer focus:bg-gray-50 mx-1 rounded-lg transition-all duration-150"
-                onClick={() => handleNotificationClick(notification)}
-              >
-                <div className={`w-full p-3 rounded-lg transition-all duration-150 ${!notification.is_read ? 'bg-gradient-to-r from-blue-50 to-purple-50' : 'hover:bg-gray-50'}`}>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-3 flex-1">
-                      <div className="mt-1">
-                        {getNotificationIcon(notification.type)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
+          ) : notifications.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              <Bell className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+              <p className="text-sm">No notifications yet</p>
+              <p className="text-xs text-gray-400 mt-1">
+                You'll see automation updates here
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {notifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`p-4 hover:bg-gray-50 transition-colors ${
+                    !notification.is_read ? 'bg-blue-50' : ''
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm">
+                          {getNotificationIcon(notification.type)}
+                        </span>
+                        <p className="font-medium text-sm text-gray-900 truncate">
                           {notification.title}
                         </p>
-                        <p className="text-xs text-gray-600 mt-1 break-words">
-                          {notification.message}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {formatTimeAgo(notification.created_at)}
-                        </p>
+                        {!notification.is_read && (
+                          <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                        )}
                       </div>
-                    </div>
-                    <div className="flex items-center space-x-1 ml-2">
-                      {!notification.is_read && (
-                        <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => handleHelpClick(notification, e)}
-                        className="h-6 w-6 p-0 hover:bg-blue-100 opacity-70 hover:opacity-100 transition-opacity rounded-full"
-                        title="Get help with this notification"
-                      >
-                        <HelpCircle className="w-3 h-3 text-blue-500" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => handleDeleteClick(notification.id, e)}
-                        className="h-6 w-6 p-0 hover:bg-red-100 opacity-70 hover:opacity-100 transition-opacity rounded-full"
-                        title="Delete this notification"
-                      >
-                        <Trash2 className="w-3 h-3 text-red-500" />
-                      </Button>
+                      <p className="text-xs text-gray-600 line-clamp-2 mb-2">
+                        {notification.message}
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-400">
+                          {formatTimeAgo(notification.created_at)}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {!notification.is_read && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => markAsRead(notification.id)}
+                              className="h-6 w-6 p-0 hover:bg-blue-100"
+                            >
+                              <Check className="w-3 h-3 text-blue-600" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteNotification(notification.id)}
+                            className="h-6 w-6 p-0 hover:bg-red-100"
+                          >
+                            <Trash2 className="w-3 h-3 text-red-600" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </DropdownMenuItem>
-            ))}
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+        
+        {notifications.length > 0 && (
+          <div className="p-3 border-t">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-blue-600 hover:bg-blue-50"
+              onClick={() => {
+                // Future: Navigate to full notifications page
+                console.log('View all notifications');
+              }}
+            >
+              View all notifications
+            </Button>
           </div>
         )}
       </DropdownMenuContent>

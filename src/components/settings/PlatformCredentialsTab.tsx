@@ -1,8 +1,7 @@
 
 import { useState, useEffect } from 'react';
-import { Key, Trash2, Edit, Plus, Eye, EyeOff } from 'lucide-react';
+import { Key, Shield, CheckCircle, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,7 +13,7 @@ interface PlatformCredential {
   credential_type: string;
   is_active: boolean;
   created_at: string;
-  credentials: string;
+  automation_title?: string;
 }
 
 const PlatformCredentialsTab = () => {
@@ -22,24 +21,54 @@ const PlatformCredentialsTab = () => {
   const { toast } = useToast();
   const [credentials, setCredentials] = useState<PlatformCredential[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCredentials, setShowCredentials] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    fetchCredentials();
+    fetchAutomationCredentials();
   }, [user]);
 
-  const fetchCredentials = async () => {
+  const fetchAutomationCredentials = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch credentials that are used in automations
+      const { data: credentialsData, error: credentialsError } = await supabase
         .from('platform_credentials')
-        .select('*')
+        .select(`
+          id,
+          platform_name,
+          credential_type,
+          is_active,
+          created_at
+        `)
         .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
+        .eq('is_active', true);
 
-      if (error) throw error;
-      setCredentials(data || []);
+      if (credentialsError) throw credentialsError;
+
+      // Fetch automations to see which ones use these platforms
+      const { data: automationsData, error: automationsError } = await supabase
+        .from('automations')
+        .select('id, title, platforms_config')
+        .eq('user_id', user?.id);
+
+      if (automationsError) throw automationsError;
+
+      // Map credentials to their automations
+      const credentialsWithAutomations = credentialsData?.map(credential => {
+        const connectedAutomation = automationsData?.find(automation => {
+          const platformsConfig = automation.platforms_config as any;
+          return platformsConfig?.some?.((platform: any) => 
+            platform.name === credential.platform_name
+          );
+        });
+
+        return {
+          ...credential,
+          automation_title: connectedAutomation?.title || 'Connected Automation'
+        };
+      }) || [];
+
+      setCredentials(credentialsWithAutomations);
     } catch (error) {
-      console.error('Error fetching credentials:', error);
+      console.error('Error fetching automation credentials:', error);
       toast({
         title: "Error",
         description: "Failed to load platform credentials",
@@ -50,173 +79,125 @@ const PlatformCredentialsTab = () => {
     }
   };
 
-  const handleDeleteCredential = async (credentialId: string) => {
-    try {
-      const { error } = await supabase
-        .from('platform_credentials')
-        .delete()
-        .eq('id', credentialId)
-        .eq('user_id', user?.id);
-
-      if (error) throw error;
-      
-      setCredentials(prev => prev.filter(c => c.id !== credentialId));
-      toast({
-        title: "Success",
-        description: "Platform credential deleted successfully",
-      });
-    } catch (error) {
-      console.error('Error deleting credential:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete credential",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const toggleCredentialVisibility = (credentialId: string) => {
-    setShowCredentials(prev => ({
-      ...prev,
-      [credentialId]: !prev[credentialId]
-    }));
-  };
-
-  const maskCredential = (credential: string) => {
-    if (credential.length <= 8) return '••••••••';
-    return credential.substring(0, 4) + '••••••••' + credential.substring(credential.length - 4);
-  };
-
   const getPlatformIcon = (platformName: string) => {
-    // You could add specific icons for different platforms here
     return <Key className="w-5 h-5" />;
   };
 
+  const getStatusIcon = (isActive: boolean) => {
+    return isActive ? (
+      <CheckCircle className="w-4 h-4 text-green-500" />
+    ) : (
+      <AlertCircle className="w-4 h-4 text-red-500" />
+    );
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-lg rounded-2xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Key className="w-5 h-5 text-green-600" />
-            Platform Credentials ({credentials.length})
+            <Shield className="w-5 h-5 text-blue-600" />
+            Connected Platform Credentials ({credentials.length})
           </CardTitle>
           <CardDescription>
-            Manage your saved platform credentials and API keys
+            Platform credentials currently connected to your automations
           </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-              <p className="mt-2 text-gray-600">Loading credentials...</p>
+              <p className="mt-2 text-gray-600">Loading connected platforms...</p>
             </div>
           ) : credentials.length === 0 ? (
             <div className="text-center py-8">
               <Key className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-600 mb-4">No platform credentials saved yet</p>
-              <Button
-                variant="outline"
-                className="rounded-xl"
-                onClick={() => {
-                  toast({
-                    title: "Add Credentials",
-                    description: "Credential management feature coming soon",
-                  });
-                }}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Platform Credential
-              </Button>
+              <p className="text-gray-600 mb-2">No platform credentials connected yet</p>
+              <p className="text-sm text-gray-500">
+                Platform credentials will appear here once you create automations that use them
+              </p>
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex justify-end">
-                <Button
-                  variant="outline"
-                  className="rounded-xl"
-                  onClick={() => {
-                    toast({
-                      title: "Add Credentials",
-                      description: "Credential management feature coming soon",
-                    });
-                  }}
+              {credentials.map((credential) => (
+                <div
+                  key={credential.id}
+                  className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200"
                 >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add New Credential
-                </Button>
-              </div>
-              
-              <div className="grid gap-4">
-                {credentials.map((credential) => (
-                  <div
-                    key={credential.id}
-                    className="flex items-center justify-between p-4 bg-white rounded-xl shadow-sm border"
-                  >
-                    <div className="flex items-center gap-4 flex-1">
-                      <div className="p-2 bg-gradient-to-r from-green-500 to-blue-500 rounded-xl text-white">
-                        {getPlatformIcon(credential.platform_name)}
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">{credential.platform_name}</h4>
-                        <p className="text-sm text-gray-600">{credential.credential_type}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono">
-                            {showCredentials[credential.id] 
-                              ? credential.credentials 
-                              : maskCredential(credential.credentials)
-                            }
-                          </code>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => toggleCredentialVisibility(credential.id)}
-                            className="h-6 w-6 p-0"
-                          >
-                            {showCredentials[credential.id] ? (
-                              <EyeOff className="w-3 h-3" />
-                            ) : (
-                              <Eye className="w-3 h-3" />
-                            )}
-                          </Button>
-                        </div>
-                        <div className="flex items-center gap-2 mt-2">
-                          <Badge variant={credential.is_active ? "default" : "secondary"}>
-                            {credential.is_active ? 'Active' : 'Inactive'}
-                          </Badge>
-                          <span className="text-xs text-gray-400">
-                            Added: {new Date(credential.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
+                  <div className="flex items-center gap-4 flex-1">
+                    <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl text-white">
+                      {getPlatformIcon(credential.platform_name)}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          toast({
-                            title: "Edit Credential",
-                            description: "Edit functionality coming soon",
-                          });
-                        }}
-                        className="rounded-xl"
-                      >
-                        <Edit className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteCredential(credential.id)}
-                        className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-medium text-gray-900">{credential.platform_name}</h4>
+                        {getStatusIcon(credential.is_active)}
+                      </div>
+                      <p className="text-sm text-gray-600">{credential.credential_type}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Used in: {credential.automation_title}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge variant={credential.is_active ? "default" : "secondary"} className="text-xs">
+                          {credential.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                        <span className="text-xs text-gray-400">
+                          Connected: {new Date(credential.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-right">
+                      <p className="text-xs text-gray-500">Status</p>
+                      <p className="text-sm font-medium text-green-600">Connected</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Coming Soon Card */}
+      <Card className="bg-gradient-to-r from-orange-50 to-yellow-50 border-orange-200 rounded-2xl">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-orange-100 rounded-xl">
+              <Key className="w-5 h-5 text-orange-600" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-medium text-orange-900 mb-1">Manual Credential Management</h4>
+              <p className="text-sm text-orange-700 mb-2">
+                Advanced platform credential management with manual add, edit, and test features
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="text-xs bg-orange-100 text-orange-600 px-3 py-1 rounded-full font-medium">
+                  🚀 Coming Soon
+                </span>
+                <span className="text-xs text-orange-600">
+                  Beta launch focused on automation-connected credentials
+                </span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Information Card */}
+      <Card className="bg-blue-50 border-blue-200 rounded-2xl">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3">
+            <Shield className="w-5 h-5 text-blue-600" />
+            <div>
+              <h4 className="font-medium text-blue-900">Secure Credential Storage</h4>
+              <p className="text-sm text-blue-700">
+                All platform credentials are encrypted and securely stored. They are automatically 
+                connected when you configure platforms in your automations.
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -117,6 +117,15 @@
   }
 }
 
+@keyframes scroll-vertical {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-50%);
+  }
+}
+
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -196,6 +205,10 @@
 
 .animate-float {
   animation: float 3s ease-in-out infinite;
+}
+
+.animate-scroll-vertical {
+  animation: scroll-vertical 30s linear infinite;
 }
 
 .animate-fade-in {

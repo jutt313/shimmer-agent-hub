@@ -6,7 +6,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RefreshCw, Sparkles, Plus, X, Loader2 } from 'lucide-react';
 import { AutomationBlueprint } from '@/types/automation';
-import ReactFlow, {
+import {
+  ReactFlow,
   Node,
   Edge,
   Background,
@@ -19,8 +20,8 @@ import ReactFlow, {
   EdgeChange,
   applyNodeChanges,
   applyEdgeChanges,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import { useToast } from '@/components/ui/use-toast';
 
 interface AutomationDiagramDisplayProps {

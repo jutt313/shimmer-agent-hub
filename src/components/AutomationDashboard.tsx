@@ -72,22 +72,10 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
         .from('automation_runs')
         .select('*')
         .eq('automation_id', automationId)
-        .order('started_at', { ascending: false });
+        .order('run_timestamp', { ascending: false });
 
       if (runsError) {
         console.error('Error fetching runs:', runsError);
-      }
-
-      // Fetch activity logs
-      const { data: logs, error: logsError } = await supabase
-        .from('automation_activity_logs')
-        .select('*')
-        .eq('automation_id', automationId)
-        .order('timestamp', { ascending: false })
-        .limit(20);
-
-      if (logsError) {
-        console.error('Error fetching activity logs:', logsError);
       }
 
       // Process runs data
@@ -95,20 +83,17 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
       const successfulRuns = processedRuns.filter(run => run.status === 'completed').length;
       const failedRuns = processedRuns.filter(run => run.status === 'failed').length;
       
+      // Calculate average execution time from duration_ms
       const executionTimes = processedRuns
-        .filter(run => run.completed_at && run.started_at)
-        .map(run => {
-          const start = new Date(run.started_at).getTime();
-          const end = new Date(run.completed_at).getTime();
-          return (end - start) / 1000; // Convert to seconds
-        });
+        .filter(run => run.duration_ms)
+        .map(run => run.duration_ms / 1000); // Convert to seconds
       
       const averageExecutionTime = executionTimes.length > 0 
         ? executionTimes.reduce((sum, time) => sum + time, 0) / executionTimes.length 
         : 0;
 
       const lastRun = processedRuns[0];
-      const lastRunTime = lastRun ? lastRun.started_at : null;
+      const lastRunTime = lastRun ? lastRun.run_timestamp : null;
 
       // Calculate uptime (mock data for now)
       const uptime = successfulRuns > 0 ? (successfulRuns / processedRuns.length) * 100 : 0;
@@ -122,13 +107,15 @@ const AutomationDashboard = ({ automationId, automationTitle, automationBlueprin
         uptime
       });
 
-      // Process activity logs
-      const processedLogs: ActivityLog[] = (logs || []).map(log => ({
-        id: log.id,
-        event_type: log.event_type || 'info',
-        message: log.message || 'Activity recorded',
-        timestamp: log.timestamp,
-        status: log.status || 'info'
+      // Create activity logs from runs data since automation_activity_logs doesn't exist
+      const processedLogs: ActivityLog[] = processedRuns.slice(0, 20).map(run => ({
+        id: run.id,
+        event_type: run.status === 'completed' ? 'execution' : 'error',
+        message: run.status === 'completed' 
+          ? `Automation executed successfully${run.duration_ms ? ` in ${(run.duration_ms / 1000).toFixed(1)}s` : ''}`
+          : `Automation execution failed`,
+        timestamp: run.run_timestamp,
+        status: run.status === 'completed' ? 'success' : 'error'
       }));
 
       setActivityLogs(processedLogs);

@@ -5,6 +5,9 @@ import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@
 import { useEffect, useRef, useState } from "react";
 import { useErrorRecovery } from "@/hooks/useErrorRecovery";
 import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Message {
   id: number;
@@ -41,6 +44,8 @@ const ChatCard = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { handleError } = useErrorRecovery();
   const [inputMessage, setInputMessage] = useState("");
+  const { toast } = useToast();
+  const { user } = useAuth();
 
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
@@ -137,6 +142,68 @@ const ChatCard = ({
     );
 
     return allPlatformsConfigured && allAgentsHandled && platforms.length > 0;
+  };
+
+  // FIXED: Proper automation execution handler
+  const handleExecuteAutomation = async () => {
+    if (!user?.id) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to execute automations",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const latestBotMessage = messages.filter(msg => msg.isBot).pop();
+    if (!latestBotMessage?.structuredData) {
+      toast({
+        title: "No Automation Found",
+        description: "Please create an automation first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      console.log('🚀 Executing automation via execute-automation function');
+      
+      const { data, error } = await supabase.functions.invoke('execute-automation', {
+        body: {
+          automation_id: automationId,
+          automation_data: latestBotMessage.structuredData,
+          trigger_data: {
+            executed_at: new Date().toISOString(),
+            trigger_type: 'manual',
+            triggered_by: user.id
+          }
+        }
+      });
+
+      if (error) {
+        console.error('❌ Automation execution error:', error);
+        toast({
+          title: "Execution Failed",
+          description: error.message || "Failed to execute automation",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('✅ Automation executed successfully:', data);
+      toast({
+        title: "🎉 Automation Executed!",
+        description: `Automation completed successfully. Run ID: ${data.run_id}`,
+      });
+
+    } catch (error: any) {
+      console.error('💥 Critical execution error:', error);
+      toast({
+        title: "Execution Error",
+        description: "An unexpected error occurred during execution",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSendMessage = () => {
@@ -334,7 +401,7 @@ const ChatCard = ({
       }
 
       // Execution Button - Show when ready
-      if (checkReadyForExecution() && onExecuteAutomation) {
+      if (checkReadyForExecution()) {
         content.push(
           <div key="execution" className="mb-4">
             <div className="p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200">
@@ -344,7 +411,7 @@ const ChatCard = ({
                   <p className="text-sm text-gray-600">All platforms configured and AI agents handled</p>
                 </div>
                 <Button
-                  onClick={onExecuteAutomation}
+                  onClick={handleExecuteAutomation}
                   className="bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white px-6 py-2 rounded-xl shadow-lg"
                 >
                   <Play className="w-4 h-4 mr-2" />

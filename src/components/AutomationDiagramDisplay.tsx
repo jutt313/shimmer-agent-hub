@@ -1,59 +1,31 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
-import { 
-  ReactFlow, 
-  Node, 
-  Edge, 
-  useNodesState, 
-  useEdgesState, 
-  Controls, 
-  Background, 
-  BackgroundVariant,
-  MiniMap,
-  ConnectionMode,
-  addEdge,
-  Connection
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
-import { Button } from '@/components/ui/button';
-import { 
-  RefreshCw, 
-  AlertCircle,
-  Loader2,
-  Code,
-  Settings,
-  Sparkles,
-  Maximize2
-} from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import CustomNodeMapper from './diagram/CustomNodeMapper';
-import JsonDebugModal from './diagram/JsonDebugModal';
-import DiagramErrorRecovery from './DiagramErrorRecovery';
-import { calculateEnhancedLayout } from '@/utils/diagramLayout';
-import { AutomationBlueprint, AutomationDiagramData } from '@/types/automation';
-
-const nodeTypes = {
-  triggerNode: CustomNodeMapper,
-  platformTriggerNode: CustomNodeMapper,
-  actionNode: CustomNodeMapper,
-  platformNode: CustomNodeMapper,
-  conditionNode: CustomNodeMapper,
-  dynamicConditionNode: CustomNodeMapper,
-  loopNode: CustomNodeMapper,
-  retryNode: CustomNodeMapper,
-  fallbackNode: CustomNodeMapper,
-  aiAgentNode: CustomNodeMapper,
-  delayNode: CustomNodeMapper,
-  default: CustomNodeMapper
-};
+import { RefreshCw, Sparkles, Plus, X, Loader2 } from 'lucide-react';
+import { AutomationBlueprint } from '@/types/automation';
+import ReactFlow, {
+  Node,
+  Edge,
+  Background,
+  Controls,
+  MiniMap,
+  useNodesState,
+  useEdgesState,
+  ConnectionMode,
+  NodeChange,
+  EdgeChange,
+  applyNodeChanges,
+  applyEdgeChanges,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
+import { useToast } from '@/components/ui/use-toast';
 
 interface AutomationDiagramDisplayProps {
   automationBlueprint?: AutomationBlueprint | null;
-  automationDiagramData?: AutomationDiagramData | null;
+  automationDiagramData?: { nodes: any[]; edges: any[] } | null;
   messages?: any[];
   onAgentAdd?: (agent: any) => void;
   onAgentDismiss?: (agentName: string) => void;
@@ -72,524 +44,274 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   isGenerating = false,
   onRegenerateDiagram
 }) => {
-  const { toast } = useToast();
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [diagramError, setDiagramError] = useState<string | null>(null);
-  const [showJsonDebug, setShowJsonDebug] = useState(false);
-  const [showRegenerateForm, setShowRegenerateForm] = useState(false);
-  const [regenerateInput, setRegenerateInput] = useState('');
-  const [isRegenerating, setIsRegenerating] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [diagramStats, setDiagramStats] = useState({
-    totalNodes: 0,
-    totalEdges: 0,
-    conditionNodes: 0,
-    aiAgentNodes: 0,
-    platformNodes: 0,
-    stopNodes: 0
-  });
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  const { toast } = useToast();
 
-  const processNodeData = useCallback((nodeData: any) => {
-    console.log('🎯 Processing PERFECT node:', { 
-      label: nodeData.label, 
-      stepType: nodeData.stepType, 
-      platform: nodeData.platform,
-      isRecommended: nodeData.isRecommended 
-    });
-
-    const processedData = {
-      ...nodeData,
-      onAdd: nodeData.isRecommended ? () => {
-        if (onAgentAdd) {
-          const agentData = {
-            name: nodeData.ai_agent_call?.agent_id || nodeData.label,
-            role: 'AI automation specialist',
-            goal: nodeData.explanation || 'Execute automation tasks intelligently',
-            rules: 'Follow automation best practices and user requirements',
-            memory: 'Remember automation context and patterns',
-            why_needed: nodeData.explanation || 'Essential for intelligent automation execution'
-          };
-          console.log('➕ Adding AI agent:', agentData.name);
-          onAgentAdd(agentData);
-          toast({
-            title: "🤖 AI Agent Added",
-            description: `${agentData.name} has been added to your automation`,
-          });
-        }
-      } : undefined,
-      onDismiss: nodeData.isRecommended ? () => {
-        if (onAgentDismiss) {
-          const agentName = nodeData.ai_agent_call?.agent_id || nodeData.label;
-          console.log('❌ Dismissing AI agent:', agentName);
-          onAgentDismiss(agentName);
-          toast({
-            title: "AI Agent Dismissed",
-            description: "Agent recommendation has been dismissed",
-          });
-        }
-      } : undefined
-    };
-
-    if (nodeData.isRecommended && dismissedAgents.has(nodeData.ai_agent_call?.agent_id || nodeData.label)) {
-      console.log('🚫 Node filtered out (dismissed):', nodeData.label);
-      return null;
+  // Load diagram data when it becomes available
+  useEffect(() => {
+    if (automationDiagramData?.nodes && automationDiagramData?.edges) {
+      console.log('📊 Loading diagram data:', {
+        nodes: automationDiagramData.nodes.length,
+        edges: automationDiagramData.edges.length
+      });
+      
+      setNodes(automationDiagramData.nodes);
+      setEdges(automationDiagramData.edges);
     }
+  }, [automationDiagramData, setNodes, setEdges]);
 
-    return processedData;
-  }, [onAgentAdd, onAgentDismiss, dismissedAgents, toast]);
+  const handleRegenerateClick = () => {
+    setShowFeedbackForm(true);
+  };
 
-  const handleRetryDiagram = useCallback(() => {
+  const handleSubmitFeedback = () => {
     if (onRegenerateDiagram) {
-      setRetryCount(prev => prev + 1);
-      setDiagramError(null);
-      console.log(`🔄 Retrying diagram generation (attempt ${retryCount + 1})`);
-      onRegenerateDiagram();
-      toast({
-        title: "🔄 Retrying Generation",
-        description: "Using enhanced AI model with improved error handling",
-      });
+      onRegenerateDiagram(feedback.trim() || undefined);
     }
-  }, [onRegenerateDiagram, retryCount, toast]);
-
-  const handleFallbackDiagram = useCallback(() => {
-    if (!automationBlueprint?.steps) return;
-    
-    console.log('🛠️ Creating fallback diagram');
-    
-    // Create a simple fallback diagram structure
-    const fallbackNodes = [
-      {
-        id: "fallback-trigger",
-        type: "triggerNode",
-        position: { x: 100, y: 300 },
-        data: {
-          label: `${automationBlueprint.trigger?.type || 'Manual'} Trigger`,
-          stepType: "trigger",
-          explanation: "This automation starts here",
-          platform: automationBlueprint.trigger?.platform || "System",
-          icon: "Play"
-        }
-      }
-    ];
-
-    const fallbackEdges: any[] = [];
-    let currentX = 600;
-
-    // Add basic steps
-    automationBlueprint.steps.forEach((step, index) => {
-      const nodeId = `fallback-step-${index}`;
-      fallbackNodes.push({
-        id: nodeId,
-        type: step.type === 'condition' ? 'conditionNode' : 'actionNode',
-        position: { x: currentX, y: 300 },
-        data: {
-          label: step.name || `Step ${index + 1}`,
-          stepType: step.type,
-          explanation: `${step.type} step in the automation`,
-          platform: (step.action as any)?.integration || 'System',
-          icon: step.type === 'condition' ? 'GitFork' : 'PlugZap'
-        }
-      });
-
-      // Connect to previous node
-      const sourceId = index === 0 ? "fallback-trigger" : `fallback-step-${index - 1}`;
-      fallbackEdges.push({
-        id: `fallback-edge-${index}`,
-        source: sourceId,
-        target: nodeId,
-        type: 'straight',
-        animated: true,
-        style: { 
-          stroke: '#8b5cf6', 
-          strokeWidth: 3,
-          strokeDasharray: '8,4'
-        }
-      });
-
-      currentX += 500;
-    });
-
-    // Add end node
-    fallbackNodes.push({
-      id: "fallback-end",
-      type: "fallbackNode",
-      position: { x: currentX, y: 300 },
-      data: {
-        label: "✅ Complete",
-        stepType: "end",
-        explanation: "Automation completed",
-        platform: "System",
-        icon: "Flag"
-      }
-    });
-
-    fallbackEdges.push({
-      id: "fallback-edge-end",
-      source: fallbackNodes[fallbackNodes.length - 2].id,
-      target: "fallback-end",
-      type: 'straight',
-      animated: true,
-      style: { 
-        stroke: '#8b5cf6', 
-        strokeWidth: 3,
-        strokeDasharray: '8,4'
-      }
-    });
-
-    setNodes(fallbackNodes);
-    setEdges(fallbackEdges);
-    setDiagramError(null);
-    
-    const stats = {
-      totalNodes: fallbackNodes.length,
-      totalEdges: fallbackEdges.length,
-      conditionNodes: fallbackNodes.filter(n => n.type?.includes('condition')).length,
-      aiAgentNodes: 0,
-      platformNodes: fallbackNodes.filter(n => n.data?.platform && n.data.platform !== 'System').length,
-      stopNodes: 1
-    };
-    
-    setDiagramStats(stats);
+    setFeedback('');
+    setShowFeedbackForm(false);
     
     toast({
-      title: "📋 Fallback Diagram Created",
-      description: "Basic diagram structure generated successfully",
+      title: "Regenerating Diagram",
+      description: "Creating an improved diagram based on your feedback...",
     });
-  }, [automationBlueprint, toast]);
+  };
 
-  useEffect(() => {
-    console.log('🎯 Processing PERFECT diagram with animated dotted lines and gradients');
+  const handleCancelFeedback = () => {
+    setFeedback('');
+    setShowFeedbackForm(false);
+  };
+
+  // Get AI agents from messages for recommendation display
+  const getRecommendedAgents = () => {
+    const agents: any[] = [];
+    messages.forEach(msg => {
+      if (msg.isBot && msg.structuredData?.agents) {
+        agents.push(...msg.structuredData.agents);
+      }
+    });
     
-    try {
-      if (automationDiagramData?.nodes && automationDiagramData?.edges) {
-        console.log('✅ Using PERFECT diagram data:', {
-          nodes: automationDiagramData.nodes.length,
-          edges: automationDiagramData.edges.length,
-          source: automationDiagramData.metadata?.source || 'unknown',
-          animatedDottedLines: true
-        });
-
-        const processedNodes = automationDiagramData.nodes
-          .map(node => {
-            const processedData = processNodeData(node.data);
-            if (!processedData) return null;
-            
-            return {
-              ...node,
-              data: processedData,
-              type: node.type || 'actionNode'
-            };
-          })
-          .filter(Boolean) as Node[];
-
-        console.log('📊 Processed PERFECT nodes:', {
-          original: automationDiagramData.nodes.length,
-          processed: processedNodes.length,
-          aiRecommendations: processedNodes.filter(n => n.data?.isRecommended).length
-        });
-
-        // Apply PERFECT left-to-right layout with animated dotted lines
-        const { nodes: layoutedNodes, edges: layoutedEdges } = calculateEnhancedLayout(
-          processedNodes,
-          automationDiagramData.edges.map(edge => ({
-            ...edge,
-            animated: true, // ANIMATED!
-            type: 'straight',
-            style: {
-              stroke: '#8b5cf6',
-              strokeWidth: 3,
-              strokeDasharray: '8,4', // DOTTED ------
-              filter: 'drop-shadow(0 2px 4px rgba(139, 92, 246, 0.3))',
-              ...edge.style
-            }
-          }))
-        );
-
-        setNodes(layoutedNodes);
-        setEdges(layoutedEdges);
-        
-        const stats = {
-          totalNodes: layoutedNodes.length,
-          totalEdges: layoutedEdges.length,
-          conditionNodes: layoutedNodes.filter(n => n.type?.includes('condition')).length,
-          aiAgentNodes: layoutedNodes.filter(n => n.data?.isRecommended || n.type === 'aiAgentNode').length,
-          platformNodes: layoutedNodes.filter(n => n.data?.platform).length,
-          stopNodes: layoutedNodes.filter(n => n.data?.stepType === 'stop' || n.data?.stepType === 'end').length
-        };
-        
-        setDiagramStats(stats);
-        setDiagramError(null);
-        
-        console.log('📊 PERFECT animated dotted diagram statistics:', stats);
-        
-        if (stats.aiAgentNodes > 0) {
-          toast({
-            title: "🤖 AI Recommendations Found",
-            description: `${stats.aiAgentNodes} AI agent recommendations detected`,
-          });
-        }
-        
-      } else if (automationBlueprint?.steps?.length > 0) {
-        console.log('⚠️ No diagram data available, generating PERFECT animated diagram...');
-        setDiagramError('Creating perfect animated dotted diagram with gradients...');
-        
-      } else {
-        console.log('❌ No diagram data or blueprint available');
-        setDiagramError('No automation data available to display');
-        setNodes([]);
-        setEdges([]);
-        setDiagramStats({
-          totalNodes: 0,
-          totalEdges: 0,
-          conditionNodes: 0,
-          aiAgentNodes: 0,
-          platformNodes: 0,
-          stopNodes: 0
-        });
-      }
-    } catch (error) {
-      console.error('💥 Error processing PERFECT diagram:', error);
-      setDiagramError(`Error processing diagram: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setNodes([]);
-      setEdges([]);
-    }
-  }, [automationDiagramData, automationBlueprint, processNodeData]);
-
-  const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
-  );
-
-  const handleRegenerateWithInput = async () => {
-    if (onRegenerateDiagram) {
-      setIsRegenerating(true);
-      try {
-        console.log('🎯 Regenerating PERFECT diagram with feedback:', regenerateInput);
-        await onRegenerateDiagram(regenerateInput.trim() || undefined);
-        setShowRegenerateForm(false);
-        setRegenerateInput('');
-        toast({
-          title: "🎯 Creating Perfect Animated Diagram",
-          description: "Generating with dotted lines, gradients, and mobile optimization",
-        });
-      } catch (error) {
-        console.error('Error regenerating diagram:', error);
-        toast({
-          title: "Regeneration Failed",
-          description: "Failed to regenerate diagram. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsRegenerating(false);
-      }
-    }
+    // Remove duplicates and dismissed agents
+    const uniqueAgents = agents.filter((agent, index, self) => 
+      index === self.findIndex(a => a.name === agent.name) &&
+      !dismissedAgents.has(agent.name)
+    );
+    
+    return uniqueAgents;
   };
 
-  const handleQuickRegenerate = () => {
-    if (onRegenerateDiagram) {
-      console.log('🎯 Quick regenerating PERFECT animated diagram');
-      onRegenerateDiagram();
-      toast({
-        title: "🎯 Creating Perfect Animated Diagram",
-        description: "Generating with dotted lines and gradient colors",
-      });
-    }
-  };
+  const recommendedAgents = getRecommendedAgents();
 
   return (
-    <div className="h-full w-full relative bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* MOBILE-OPTIMIZED Header Controls */}
-      <div className="absolute top-1 sm:top-2 md:top-4 right-1 sm:right-2 md:right-4 z-10 flex flex-col sm:flex-row gap-1 sm:gap-2">
-        <Button
-          onClick={() => setShowJsonDebug(true)}
-          size="sm"
-          variant="outline"
-          className="bg-white/95 backdrop-blur-sm shadow-lg hover:bg-white border-purple-200 hover:border-purple-300 rounded-xl text-xs px-2 py-1 sm:px-4 sm:py-2"
-        >
-          <Code className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-          <span className="hidden md:inline">Debug</span>
-        </Button>
-        
-        <Dialog open={showRegenerateForm} onOpenChange={setShowRegenerateForm}>
-          <DialogTrigger asChild>
-            <Button
-              size="sm"
-              variant="outline"
-              className="bg-white/95 backdrop-blur-sm shadow-lg hover:bg-white border-orange-200 hover:border-orange-300 rounded-xl text-xs px-2 py-1 sm:px-4 sm:py-2"
-            >
-              <Settings className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-              <span className="hidden md:inline">Perfect</span>
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="w-[95vw] max-w-md mx-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-sm sm:text-base">
-                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
-                Perfect Your Diagram
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="feedback" className="text-xs sm:text-sm font-medium">
-                  Enhancement Request (Optional)
-                </Label>
-                <Textarea
-                  id="feedback"
-                  placeholder="e.g., 'More animated effects', 'Brighter gradients', 'Better mobile layout'..."
-                  value={regenerateInput}
-                  onChange={(e) => setRegenerateInput(e.target.value)}
-                  className="mt-2 min-h-[100px] text-xs sm:text-sm"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button 
-                  onClick={handleRegenerateWithInput} 
-                  className="flex-1 text-xs sm:text-sm"
-                  disabled={isRegenerating}
+    <div className="h-full w-full bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-0 overflow-hidden"
+      style={{
+        boxShadow: '0 0 60px rgba(92, 142, 246, 0.15), 0 0 120px rgba(154, 94, 255, 0.08)'
+      }}
+    >
+      <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/20 to-purple-100/20 pointer-events-none"></div>
+      
+      <div className="relative z-10 h-full flex flex-col">
+        {/* Header */}
+        <div className="p-6 border-b border-gray-200/50">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Automation Diagram
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Visual representation of your automation workflow
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              {/* Feedback Form */}
+              {showFeedbackForm && (
+                <Card className="absolute top-16 right-6 w-80 z-50 bg-white/95 backdrop-blur-sm shadow-xl border border-blue-200/50"
+                  style={{
+                    boxShadow: '0 0 30px rgba(59, 130, 246, 0.2)'
+                  }}
                 >
-                  {isRegenerating ? (
-                    <>
-                      <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
-                      Perfecting...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                      Perfect
-                    </>
-                  )}
-                </Button>
-                <Button variant="outline" onClick={() => setShowRegenerateForm(false)} className="text-xs sm:text-sm">
-                  Cancel
-                </Button>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">Improve Diagram</CardTitle>
+                    <p className="text-sm text-gray-600">Tell us what you'd like to see improved</p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label htmlFor="feedback">What would you like to improve?</Label>
+                      <Textarea
+                        id="feedback"
+                        value={feedback}
+                        onChange={(e) => setFeedback(e.target.value)}
+                        placeholder="e.g., Add more detail to the API steps, show error handling paths, include timing information..."
+                        className="mt-1 min-h-[80px] resize-none"
+                        maxLength={500}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">{feedback.length}/500 characters</p>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleSubmitFeedback}
+                        size="sm"
+                        className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
+                        disabled={isGenerating}
+                      >
+                        {isGenerating ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Generating...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-4 h-4 mr-2" />
+                            Improve
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        onClick={handleCancelFeedback}
+                        size="sm"
+                        variant="outline"
+                        disabled={isGenerating}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              
+              {/* Regenerate Button */}
+              <Button
+                onClick={handleRegenerateClick}
+                size="sm"
+                variant="outline"
+                disabled={isGenerating || showFeedbackForm}
+                className="bg-white/80 hover:bg-white border-blue-200 text-blue-600 hover:text-blue-700"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Regenerate
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Diagram Content */}
+        <div className="flex-1 relative">
+          {nodes.length > 0 ? (
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              connectionMode={ConnectionMode.Loose}
+              fitView
+              fitViewOptions={{
+                padding: 0.2,
+                includeHiddenNodes: false,
+              }}
+              className="bg-gradient-to-br from-blue-50/30 to-purple-50/30"
+            >
+              <Background color="#e2e8f0" gap={20} />
+              <Controls className="bg-white/80 backdrop-blur-sm border border-blue-200/50 rounded-lg" />
+              <MiniMap 
+                className="bg-white/80 backdrop-blur-sm border border-blue-200/50 rounded-lg"
+                nodeColor="#3b82f6"
+                maskColor="rgba(59, 130, 246, 0.1)"
+              />
+            </ReactFlow>
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center p-8">
+                {isGenerating ? (
+                  <div className="space-y-4">
+                    <div className="w-16 h-16 mx-auto bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                      <Loader2 className="w-8 h-8 text-white animate-spin" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                        Generating AI-Powered Diagram
+                      </h3>
+                      <p className="text-gray-600">
+                        Creating an intelligent visualization of your automation workflow...
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="w-16 h-16 mx-auto bg-gradient-to-r from-gray-200 to-gray-300 rounded-full flex items-center justify-center">
+                      <RefreshCw className="w-8 h-8 text-gray-500" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                        No Diagram Available
+                      </h3>
+                      <p className="text-gray-600 mb-4">
+                        Create an automation first to see its visual workflow
+                      </p>
+                      {automationBlueprint && (
+                        <Button
+                          onClick={() => onRegenerateDiagram?.()}
+                          className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
+                        >
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Generate Diagram
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          </DialogContent>
-        </Dialog>
-        
-        {onRegenerateDiagram && (
-          <Button
-            onClick={handleQuickRegenerate}
-            size="sm"
-            disabled={isGenerating}
-            className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white shadow-lg rounded-xl text-xs px-2 py-1 sm:px-4 sm:py-2"
-          >
-            {isGenerating ? (
-              <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 animate-spin" />
-            ) : (
-              <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-            )}
-            <span className="hidden sm:inline">{isGenerating ? 'Creating...' : 'Regenerate'}</span>
-          </Button>
+          )}
+        </div>
+
+        {/* Recommended Agents Section */}
+        {recommendedAgents.length > 0 && (
+          <div className="p-6 border-t border-gray-200/50 bg-white/50 backdrop-blur-sm">
+            <h4 className="font-medium text-gray-800 mb-3">Recommended AI Agents for this Workflow:</h4>
+            <div className="flex flex-wrap gap-2">
+              {recommendedAgents.map((agent, index) => (
+                <div key={index} className="flex items-center gap-2 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200/50 rounded-lg p-2">
+                  <div className="flex-1">
+                    <p className="font-medium text-sm text-gray-800">{agent.name}</p>
+                    <p className="text-xs text-gray-600">{agent.role || 'AI Agent'}</p>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      onClick={() => onAgentAdd?.(agent)}
+                      className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-2 py-1 text-xs h-6"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onAgentDismiss?.(agent.name)}
+                      className="border-gray-300 text-gray-600 hover:bg-gray-100 px-1 py-1 text-xs h-6"
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
-
-      {/* MOBILE-OPTIMIZED Statistics Badge */}
-      {diagramStats.totalNodes > 0 && (
-        <div className="absolute top-1 sm:top-2 md:top-4 left-1 sm:left-2 md:left-4 z-10">
-          <Badge variant="secondary" className="bg-white/95 backdrop-blur-sm shadow-lg text-gray-700 px-2 py-1 rounded-xl text-xs font-medium">
-            <span className="hidden lg:inline">
-              {diagramStats.totalNodes} steps • {diagramStats.totalEdges} connections
-            </span>
-            <span className="hidden sm:inline lg:hidden">
-              {diagramStats.totalNodes} • {diagramStats.totalEdges}
-            </span>
-            <span className="sm:hidden">
-              {diagramStats.totalNodes}/{diagramStats.totalEdges}
-            </span>
-            {diagramStats.aiAgentNodes > 0 && (
-              <span className="ml-1 sm:ml-2 text-emerald-600 font-bold">
-                • {diagramStats.aiAgentNodes} 🤖
-              </span>
-            )}
-          </Badge>
-        </div>
-      )}
-
-      {/* MOBILE-OPTIMIZED Diagram Container */}
-      <div className="h-full w-full rounded-none sm:rounded-xl overflow-hidden shadow-none sm:shadow-xl border-0 sm:border border-gray-200">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          nodeTypes={nodeTypes}
-          connectionMode={ConnectionMode.Loose}
-          fitView
-          fitViewOptions={{
-            padding: 0.05, // Less padding on mobile
-            minZoom: 0.2,  // Allow more zoom out on mobile
-            maxZoom: 1.5
-          }}
-          defaultViewport={{ x: 0, y: 0, zoom: 0.5 }} // Start more zoomed out on mobile
-          className="bg-gradient-to-br from-blue-50 via-white to-purple-50"
-          panOnScroll
-          panOnDrag={[1, 2]}
-          proOptions={{ hideAttribution: true }}
-          defaultEdgeOptions={{
-            type: 'straight',
-            animated: true, // ANIMATED!
-            style: {
-              stroke: '#8b5cf6',
-              strokeWidth: 3,
-              strokeDasharray: '8,4' // DOTTED ------
-            }
-          }}
-        >
-          <Background 
-            variant={BackgroundVariant.Dots}
-            gap={24} // Smaller gap on mobile
-            size={1}
-            color="#e5e7eb"
-            style={{ opacity: 0.3 }}
-          />
-          
-          <Controls 
-            position="bottom-right"
-            showInteractive={false}
-            className="bg-white/95 backdrop-blur-sm shadow-lg rounded-xl border border-gray-200 [&>button]:!bg-white/90 [&>button]:hover:!bg-gray-100 [&>button]:text-xs [&>button]:p-1 sm:[&>button]:p-2"
-          />
-          
-          <MiniMap 
-            nodeStrokeColor="#8b5cf6"
-            nodeColor="#f8fafc"
-            nodeBorderRadius={16}
-            maskColor="rgba(139, 92, 246, 0.1)"
-            position="bottom-left"
-            pannable
-            zoomable
-            className="bg-white/95 backdrop-blur-sm shadow-lg rounded-xl border border-gray-200 hidden lg:block"
-            style={{
-              width: '220px', // Smaller on mobile
-              height: '140px'
-            }}
-          />
-        </ReactFlow>
-      </div>
-
-      {/* Enhanced Error State with Comprehensive Recovery */}
-      {diagramError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/95 backdrop-blur-sm p-2 sm:p-4">
-          <DiagramErrorRecovery
-            error={diagramError}
-            onRetry={handleRetryDiagram}
-            onFallbackDiagram={handleFallbackDiagram}
-            isRetrying={isGenerating}
-          />
-        </div>
-      )}
-
-      {/* JSON Debug Modal - Mobile Optimized */}
-      {showJsonDebug && (
-        <JsonDebugModal
-          isOpen={showJsonDebug}
-          onClose={() => setShowJsonDebug(false)}
-          diagramData={automationDiagramData}
-          blueprintData={automationBlueprint}
-        />
-      )}
     </div>
   );
 };

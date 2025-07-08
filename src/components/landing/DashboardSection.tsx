@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { BarChart3, TrendingUp, Activity, Users, Zap } from 'lucide-react';
 
@@ -21,7 +20,7 @@ const DashboardSection = () => {
         automations: Math.floor(Math.random() * 50) + 125,
         executions: Math.floor(Math.random() * 5000) + 15000,
         timeSaved: Math.floor(Math.random() * 200) + 450,
-        errorRate: (Math.random() * 0.5 + 0.1).toFixed(2)
+        errorRate: Math.random() * 0.5 + 0.1
       };
 
       let start = Date.now();
@@ -36,7 +35,7 @@ const DashboardSection = () => {
           automations: Math.floor(prev.automations + (targetMetrics.automations - prev.automations) * easeOut),
           executions: Math.floor(prev.executions + (targetMetrics.executions - prev.executions) * easeOut),
           timeSaved: Math.floor(prev.timeSaved + (targetMetrics.timeSaved - prev.timeSaved) * easeOut),
-          errorRate: (parseFloat(prev.errorRate) + (parseFloat(targetMetrics.errorRate) - parseFloat(prev.errorRate)) * easeOut).toFixed(2)
+          errorRate: prev.errorRate + (targetMetrics.errorRate - prev.errorRate) * easeOut
         }));
 
         if (progress < 1) {
@@ -150,7 +149,7 @@ const DashboardSection = () => {
                   <div>
                     <div className="text-sm text-gray-600">Error Rate</div>
                     <div className={`text-2xl font-bold text-gray-900 ${isAnimating ? 'animate-pulse' : ''}`}>
-                      {metrics.errorRate}%
+                      {metrics.errorRate.toFixed(2)}%
                     </div>
                   </div>
                 </div>

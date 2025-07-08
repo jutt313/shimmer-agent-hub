@@ -6,6 +6,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
 import Index from "./pages/Index";
+import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Automations from "./pages/Automations";
 import AutomationDetail from "./pages/AutomationDetail";
@@ -41,7 +42,8 @@ function App() {
           <AuthProvider>
             <BrowserRouter>
               <Routes>
-                <Route path="/" element={<Index />} />
+                <Route path="/" element={<Landing />} />
+                <Route path="/app" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/documentation" element={<Documentation />} />
                 <Route path="/privacy-policy" element={<PrivacyPolicy />} />

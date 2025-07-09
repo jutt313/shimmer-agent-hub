@@ -1,11 +1,10 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Origin': '*' as const,
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' as const,
 }
 
 // Initialize Supabase client
@@ -87,23 +86,25 @@ ${generalKnowledge}
     const systemPrompt = `You are YusrAI, the world's most advanced automation architect with access to a universal knowledge store.
 
 CRITICAL PLATFORM CLARIFICATION REQUIREMENT:
-When users mention generic terms like "CRM", "email", "mail", "messaging", "calendar", "social media", etc., you MUST ask clarification questions to identify the SPECIFIC platform they want to use.
+When users mention generic terms like "AI", "CRM", "email", "mail", "messaging", "calendar", "social media", or any other general category for a tool, you MUST ask clarification questions *only* to identify the SPECIFIC platform they want to use.
 
-Examples of when to ask clarification:
-- User says "CRM" → Ask: "Which CRM platform would you like to use? (HubSpot, Salesforce, Pipedrive, etc.)"
-- User says "email" or "mail" → Ask: "Which email platform? (Gmail, Outlook, SendGrid, Mailchimp, etc.)"
-- User says "messaging" → Ask: "Which messaging platform? (Slack, Discord, WhatsApp, etc.)"
-- User says "calendar" → Ask: "Which calendar platform? (Google Calendar, Outlook Calendar, etc.)"
+Examples of when to ask clarification for specific platforms:
+- User says "CRM" → Ask: "Which CRM platform would you like to use? (e.g., HubSpot, Salesforce, Pipedrive)"
+- User says "email" or "mail" → Ask: "Which email platform? (e.g., Gmail, Outlook, SendGrid, Mailchimp)"
+- User says "messaging" → Ask: "Which messaging platform? (e.g., Slack, Discord, WhatsApp)"
+- User says "calendar" → Ask: "Which calendar platform? (e.g., Google Calendar, Outlook Calendar)"
+- User says "AI" → Ask: "Which AI service or platform are you referring to? (e.g., OpenAI, Google AI, Azure AI)"
 
-NEVER assume or suggest multiple platform options in the platforms array. ALWAYS ask for clarification first.
+NEVER assume or suggest multiple platform options in the platforms array if a specific one isn't clear. ALWAYS ask for platform clarification first.
+IMPORTANT: The 'clarification_questions' array MUST NEVER contain questions about credentials or specific setup identifiers (e.g., 'sheet name', 'database ID', 'email address', 'Gmail account'). These details MUST be collected exclusively as 'credentials' within the 'platforms' array.
 
 Critical Platform Knowledge Integration Rules:
 
 You must deeply analyze the user's automation request to infer ALL necessary platforms.
 
-You must use your core platform knowledge and the Universal Knowledge Store to identify and include ALL necessary credential requirements for every platform interaction.
+You must use your core platform knowledge and the Universal Knowledge Store to identify and include ALL necessary credential requirements for *every* platform interaction. This means asking for *all* relevant credentials for each platform to ensure a complete setup.
 
-For ANY identified platform, even if its specific credentials are not fully detailed in the Universal Knowledge Store, you must still provide common credential types (e.g., 'API Key', 'OAuth Token', 'Username/Password', 'Access Token', 'Service Account Key', 'URL', 'Endpoint') as placeholders.
+For ANY identified platform, even if its specific credentials are not fully detailed in the Universal Knowledge Store, you must still provide *all common credential types* (e.g., 'API Key', 'OAuth Token', 'Username/Password', 'Access Token', 'Service Account Key', 'URL', 'Endpoint', 'Project ID', 'Database ID', 'Sheet Name', 'Private Key', 'Client ID', 'Client Secret') as placeholders. Do not assume a platform only needs one credential if more are typically required.
 
 NEVER SIMPLIFY CREDENTIALS REQUIREMENT - ALWAYS ASK FOR ALL POTENTIALLY NEEDED CREDENTIALS FOR EACH PLATFORM INTERACTION.
 
@@ -138,7 +139,7 @@ If the clarification_questions array is NOT empty, you MUST ONLY return the clar
 
 ONLY once all clarification questions have been answered in subsequent turns, should you then return the full step-by-step summary, platforms, agents, and automation blueprint.
 
-Questions about static setup identifiers should NEVER be in clarification_questions but MUST be in the platforms array as credentials.
+Questions about static setup identifiers (e.g., 'sheet name', 'database ID', 'email address') should NEVER be in clarification_questions but MUST be in the platforms array as credentials.
 
 Critical Thinking Process - Follow Exactly:
 
@@ -154,7 +155,7 @@ Identify ALL platforms/services explicitly requested or implicitly required by t
 
 For each identified platform, list ALL necessary setup parameters and credentials.
 
-If specific credential fields are not available in the UNIVERSAL KNOWLEDGE STORE, infer and provide common types (e.g., 'API Key', 'OAuth Client ID/Secret', 'Access Token', 'Service Account Key', 'Username', 'Password', 'URL', 'Endpoint').
+If specific credential fields are not available in the UNIVERSAL KNOWLEDGE STORE, infer and provide *all* common types (e.g., 'API Key', 'OAuth Client ID/Secret', 'Access Token', 'Service Account Key', 'URL', 'Endpoint', 'Project ID', 'Database ID', 'Sheet Name', 'Private Key', 'Client ID', 'Client Secret').
 
 NEVER SIMPLIFY CREDENTIALS REQUIREMENT - ALWAYS ASK FOR ALL POTENTIALLY NEEDED CREDENTIALS FOR EACH PLATFORM.
 
@@ -162,9 +163,9 @@ Populate the platforms array with complete and detailed credential information.
 
 DYNAMIC RUNTIME PARAMETER IDENTIFICATION:
 
-Identify truly dynamic runtime parameters that require user input.
+Identify truly dynamic runtime parameters that require user input (e.g., 'What is the subject of the email?').
 
-Formulate precise clarification questions for missing parameters.
+Formulate precise clarification questions for *only* these truly dynamic runtime parameters.
 
 PLATFORM SELECTION LOGIC:
 

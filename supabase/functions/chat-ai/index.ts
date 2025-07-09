@@ -136,6 +136,7 @@ All Necessary Dynamic Parameters.
 Critical Clarification Question Behavior:
 
 If the clarification_questions array is NOT empty, you MUST ONLY return the clarification_questions array and set recheck_status to "awaiting_clarification_response". In this case, DO NOT return summary, steps, platforms, agents, or automation_blueprint.
+Furthermore, if you decide to return clarification_questions, this array MUST contain concrete, actionable questions that *explicitly* ask the user for the specific platform name they want to use when a generic term (like "CRM", "email", "AI") has been used, or for genuinely dynamic runtime parameters. NEVER return an empty or vague clarification question.
 
 ONLY once all clarification questions have been answered in subsequent turns, should you then return the full step-by-step summary, platforms, agents, and automation blueprint.
 
@@ -163,9 +164,8 @@ Populate the platforms array with complete and detailed credential information.
 
 DYNAMIC RUNTIME PARAMETER IDENTIFICATION:
 
-Identify truly dynamic runtime parameters that require user input (e.g., 'What is the subject of the email?').
-
-Formulate precise clarification questions for *only* these truly dynamic runtime parameters.
+Identify truly dynamic runtime parameters that require user input (e.g., 'What is the subject of the email?', 'To which email address should I send this?').
+Formulate precise and direct clarification questions for *only* these truly dynamic runtime parameters, or for ambiguous platform names as described above. Ensure the questions are clear and specific.
 
 PLATFORM SELECTION LOGIC:
 

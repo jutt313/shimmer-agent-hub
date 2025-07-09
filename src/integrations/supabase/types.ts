@@ -1225,6 +1225,39 @@ export type Database = {
         }
         Relationships: []
       }
+      special_offers: {
+        Row: {
+          claimed_at: string | null
+          created_at: string | null
+          expires_at: string
+          id: string
+          is_claimed: boolean | null
+          offer_type: string
+          shown_at: string | null
+          user_id: string
+        }
+        Insert: {
+          claimed_at?: string | null
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          is_claimed?: boolean | null
+          offer_type?: string
+          shown_at?: string | null
+          user_id: string
+        }
+        Update: {
+          claimed_at?: string | null
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          is_claimed?: boolean | null
+          offer_type?: string
+          shown_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       universal_knowledge_store: {
         Row: {
           category: string
@@ -1279,6 +1312,45 @@ export type Database = {
           updated_at?: string
           usage_count?: number | null
           use_cases?: string[] | null
+        }
+        Relationships: []
+      }
+      usage_tracking: {
+        Row: {
+          active_ai_agents_count: number | null
+          active_automations_count: number | null
+          created_at: string | null
+          id: string
+          period_end: string
+          period_start: string
+          step_runs_used: number | null
+          total_runs_used: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          active_ai_agents_count?: number | null
+          active_automations_count?: number | null
+          created_at?: string | null
+          id?: string
+          period_end?: string
+          period_start?: string
+          step_runs_used?: number | null
+          total_runs_used?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          active_ai_agents_count?: number | null
+          active_automations_count?: number | null
+          created_at?: string | null
+          id?: string
+          period_end?: string
+          period_start?: string
+          step_runs_used?: number | null
+          total_runs_used?: number | null
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -1352,6 +1424,60 @@ export type Database = {
           created_at?: string | null
           id?: string
           notification_preferences?: Json | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_subscriptions: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          max_ai_agents: number
+          max_automations: number
+          max_step_runs: number
+          max_total_runs: number
+          monthly_price: number
+          plan_type: string
+          special_offer_expires_at: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          trial_ends_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_ai_agents: number
+          max_automations: number
+          max_step_runs: number
+          max_total_runs: number
+          monthly_price: number
+          plan_type: string
+          special_offer_expires_at?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          trial_ends_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_ai_agents?: number
+          max_automations?: number
+          max_step_runs?: number
+          max_total_runs?: number
+          monthly_price?: number
+          plan_type?: string
+          special_offer_expires_at?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          trial_ends_at?: string | null
           updated_at?: string | null
           user_id?: string
         }

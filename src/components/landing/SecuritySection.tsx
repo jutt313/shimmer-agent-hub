@@ -15,32 +15,23 @@ const SecuritySection = () => {
       icon: Lock,
       title: 'Advanced Access Control',
       description: 'Granular permissions and multi-factor authentication',
-      details: 'RBAC, SSO integration, API key management',
+      details: 'Role-based access, API key management, Secure sessions',
       color: 'from-blue-500 to-cyan-500'
     },
     {
       icon: Eye,
       title: 'Complete Audit Trail',
       description: 'Every action is logged and monitored in real-time',
-      details: 'Immutable logs, Real-time alerts, Compliance reporting',
+      details: 'Immutable logs, Real-time alerts, Activity tracking',
       color: 'from-purple-500 to-pink-500'
     },
     {
       icon: Server,
-      title: 'Infrastructure Security',
-      description: 'Secure cloud infrastructure with 99.99% uptime',
+      title: 'Secure Infrastructure',
+      description: 'Reliable cloud infrastructure with high availability',
       details: 'Auto-scaling, DDoS protection, Backup redundancy',
       color: 'from-orange-500 to-red-500'
     }
-  ];
-
-  const certifications = [
-    { name: 'SOC 2 Type II', icon: '🛡️' },
-    { name: 'ISO 27001', icon: '🔒' },
-    { name: 'GDPR Compliant', icon: '🇪🇺' },
-    { name: 'HIPAA Ready', icon: '🏥' },
-    { name: 'PCI DSS', icon: '💳' },
-    { name: '99.99% Uptime', icon: '⚡' }
   ];
 
   return (
@@ -68,7 +59,7 @@ const SecuritySection = () => {
           
           <p className="text-xl text-gray-300 max-w-3xl mx-auto">
             We've built security into every layer of our platform. Your automations and data 
-            are protected by the same standards used by Fortune 500 companies.
+            are protected by enterprise-grade security measures and best practices.
           </p>
         </div>
 
@@ -113,9 +104,9 @@ const SecuritySection = () => {
         <div className="grid md:grid-cols-3 gap-8 mb-16">
           <div className="text-center">
             <div className="text-4xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent mb-2">
-              99.99%
+              99.9%
             </div>
-            <div className="text-gray-300">Uptime Guarantee</div>
+            <div className="text-gray-300">Uptime Target</div>
           </div>
           <div className="text-center">
             <div className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent mb-2">
@@ -131,44 +122,72 @@ const SecuritySection = () => {
           </div>
         </div>
 
-        {/* Certifications */}
+        {/* Our Security Promise */}
         <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20">
-          <h3 className="text-2xl font-bold text-center mb-8">
-            Trusted by Enterprise • Certified by Industry Leaders
-          </h3>
-          
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-            {certifications.map((cert, index) => (
-              <div 
-                key={index}
-                className="text-center p-4 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all"
-              >
-                <div className="text-3xl mb-2">{cert.icon}</div>
-                <div className="text-sm text-gray-300 font-medium">{cert.name}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Security Promise */}
-        <div className="mt-16 text-center">
-          <div className="max-w-4xl mx-auto bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-2xl p-8 border border-green-500/30">
-            <div className="flex items-center justify-center gap-3 mb-4">
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-3 mb-6">
               <CheckCircle className="w-8 h-8 text-green-400" />
               <h3 className="text-2xl font-bold">Our Security Promise</h3>
             </div>
-            <p className="text-gray-300 text-lg mb-6">
-              We're so confident in our security that we offer a <span className="text-green-400 font-semibold">$1M security guarantee</span>. 
-              If your data is ever compromised due to our security failure, we'll cover the damages.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg transition-all">
-                View Security Documentation
-              </button>
-              <button className="border border-green-400 text-green-400 px-8 py-3 rounded-xl font-semibold hover:bg-green-400 hover:text-gray-900 transition-all">
-                Schedule Security Review
-              </button>
+            
+            <div className="grid md:grid-cols-2 gap-8 mb-8">
+              <div className="space-y-4">
+                <h4 className="text-lg font-semibold text-green-400">What We Guarantee</h4>
+                <ul className="space-y-2 text-gray-300 text-left">
+                  <li className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <span>End-to-end encryption for all data</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <span>Secure credential storage and management</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <span>Regular security audits and updates</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <span>Compliance with industry standards</span>
+                  </li>
+                </ul>
+              </div>
+              
+              <div className="space-y-4">
+                <h4 className="text-lg font-semibold text-blue-400">How We Protect You</h4>
+                <ul className="space-y-2 text-gray-300 text-left">
+                  <li className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                    <span>Isolated execution environments</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                    <span>Advanced threat detection systems</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                    <span>Automated backup and recovery</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                    <span>Real-time monitoring and alerts</span>
+                  </li>
+                </ul>
+              </div>
             </div>
+            
+            <p className="text-gray-300 text-lg mb-6">
+              Your security is our top priority. We implement the same security measures used by 
+              Fortune 500 companies to ensure your data and automations remain protected.
+            </p>
+            
+            <button 
+              onClick={() => window.location.href = '/auth'}
+              className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg transition-all inline-flex items-center gap-2"
+            >
+              <Shield className="w-5 h-5" />
+              Start Secure Trial
+            </button>
           </div>
         </div>
       </div>

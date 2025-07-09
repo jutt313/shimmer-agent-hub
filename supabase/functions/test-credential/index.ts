@@ -63,7 +63,7 @@ const storeCredentialInsights = async (platformName: string, testStatus: string,
   }
 };
 
-// Dynamic Platform API Configuration Builder (same as execute-automation)
+// Dynamic Platform API Configuration Builder
 const buildDynamicPlatformConfig = (
   platformName: string,
   platformsConfig: PlatformConfig[],
@@ -260,6 +260,7 @@ serve(async (req) => {
 
   try {
     const requestBody = await req.json();
+    console.log('🔧 Test credential request:', JSON.stringify(requestBody, null, 2));
     
     // Handle AI Agent testing
     if (requestBody.type === 'agent' && requestBody.agent_id) {
@@ -343,11 +344,113 @@ serve(async (req) => {
       }
     }
 
-    // Handle platform credential testing (existing logic)
+    // Handle platform credential testing - NEW DUAL MODE APPROACH
+    if (requestBody.type === 'platform') {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+      const { platform_name, credential_fields, user_id } = requestBody;
+
+      if (!platform_name || !credential_fields) {
+        throw new Error('Platform name and credential fields are required for platform testing');
+      }
+
+      console.log(`🧪 Testing raw credentials for platform: ${platform_name}`);
+
+      // Get all automations to find platforms_config for this platform
+      let platformsConfig: PlatformConfig[] = [];
+      
+      if (user_id) {
+        const { data: automations, error: automationsError } = await supabase
+          .from('automations')
+          .select('platforms_config')
+          .eq('user_id', user_id)
+          .not('platforms_config', 'is', null);
+
+        if (!automationsError && automations && automations.length > 0) {
+          // Merge all platforms_config from user's automations
+          for (const automation of automations) {
+            if (automation.platforms_config && Array.isArray(automation.platforms_config)) {
+              platformsConfig = [...platformsConfig, ...automation.platforms_config];
+            }
+          }
+          
+          // Remove duplicates based on platform name
+          platformsConfig = platformsConfig.filter((config, index, self) => 
+            index === self.findIndex(c => c.name.toLowerCase() === config.name.toLowerCase())
+          );
+        }
+      }
+
+      // Build dynamic platform configuration
+      const platformConfig = buildDynamicPlatformConfig(
+        platform_name, 
+        platformsConfig, 
+        credential_fields
+      );
+
+      // Get test endpoint
+      const testEndpoint = getDynamicTestEndpoint(platform_name, platformsConfig);
+
+      // Build test URL
+      const testUrl = `${platformConfig.baseURL.replace(/\/$/, '')}/${testEndpoint.endpoint.replace(/^\//, '')}`;
+
+      console.log(`🔗 Testing credential for ${platform_name} at: ${testUrl}`);
+      console.log(`📋 Test method: ${testEndpoint.method}`);
+      console.log(`🔑 Headers:`, Object.keys(platformConfig.headers));
+
+      // Make test request
+      const testResponse = await fetch(testUrl, {
+        method: testEndpoint.method,
+        headers: platformConfig.headers,
+        timeout: platformConfig.timeout,
+      });
+
+      const testMessage = testResponse.ok 
+        ? `✅ Credential test successful for ${platform_name}` 
+        : `❌ Credential test failed for ${platform_name}: ${testResponse.status}`;
+
+      let responseText = '';
+      try {
+        responseText = await testResponse.text();
+      } catch (error) {
+        console.error('Failed to read response text:', error);
+      }
+
+      const technicalDetails = {
+        status_code: testResponse.status,
+        response_preview: responseText.substring(0, 200),
+        test_url: testUrl,
+        test_method: testEndpoint.method,
+        platform_config_source: platformsConfig.find(c => 
+          c.name.toLowerCase() === platform_name.toLowerCase()
+        ) ? 'dynamic' : 'fallback',
+        timestamp: new Date().toISOString()
+      };
+
+      // Store credential insights for learning (async, don't await)
+      storeCredentialInsights(
+        platform_name, 
+        testResponse.ok ? 'success' : 'failed', 
+        technicalDetails, 
+        supabase
+      );
+
+      return new Response(JSON.stringify({
+        success: testResponse.ok,
+        user_message: testMessage,
+        technical_details: technicalDetails
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Legacy support for old credential testing format
     const { credentialId, userId } = requestBody;
 
     if (!credentialId || !userId) {
-      throw new Error('Credential ID and User ID are required');
+      throw new Error('Either use new format (type: platform, platform_name, credential_fields) or legacy format (credentialId, userId)');
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -466,11 +569,35 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Test failed:', error);
+    console.error('🚨 Test failed with error:', error);
+    
+    // Determine error type for better user messaging
+    let userMessage = `❌ Test failed: ${error.message}`;
+    let errorType = 'unknown';
+    
+    if (error.message.includes('fetch')) {
+      errorType = 'network';
+      userMessage = `❌ Network error: Unable to connect to the platform. Please check your internet connection and try again.`;
+    } else if (error.message.includes('timeout')) {
+      errorType = 'timeout';
+      userMessage = `❌ Request timeout: The platform took too long to respond. Please try again.`;
+    } else if (error.message.includes('credential')) {
+      errorType = 'credential';
+      userMessage = `❌ Credential error: ${error.message}`;
+    } else if (error.message.includes('not found') || error.message.includes('404')) {
+      errorType = 'not_found';
+      userMessage = `❌ Platform endpoint not found. This might be a configuration issue.`;
+    }
+
     return new Response(JSON.stringify({
       success: false,
-      user_message: `❌ Test failed: ${error.message}`,
-      technical_details: { error: error.message }
+      user_message: userMessage,
+      technical_details: { 
+        error: error.message,
+        error_type: errorType,
+        timestamp: new Date().toISOString(),
+        stack: error.stack
+      }
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

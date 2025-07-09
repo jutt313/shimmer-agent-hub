@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { X, Eye, EyeOff, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -76,11 +77,36 @@ const PlatformCredentialForm = ({
     setShowPassword(prev => ({ ...prev, [field]: !prev[field] }));
   };
 
+  // Validate that all required credentials are filled
+  const validateCredentials = (): boolean => {
+    if (!platform.credentials || platform.credentials.length === 0) {
+      return false;
+    }
+
+    for (const cred of platform.credentials) {
+      if (!credentials[cred.field] || credentials[cred.field].trim() === '') {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
   const handleTest = async () => {
-    if (!credentials || Object.keys(credentials).length === 0) {
+    // Validate credentials before testing
+    if (!validateCredentials()) {
       toast({
-        title: "Error",
-        description: "Please fill in all required fields before testing.",
+        title: "Missing Credentials",
+        description: "Please fill in all required credential fields before testing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!user?.id) {
+      toast({
+        title: "Authentication Required",
+        description: "You must be logged in to test credentials.",
         variant: "destructive",
       });
       return;
@@ -88,37 +114,66 @@ const PlatformCredentialForm = ({
 
     setTesting(true);
     try {
-      console.log('🧪 Testing platform credentials:', platform.name);
+      console.log('🧪 Testing platform credentials with new format:', platform.name);
       
+      // Use the new dual-mode testing approach
       const { data, error } = await supabase.functions.invoke('test-credential', {
         body: {
           type: 'platform',
           platform_name: platform.name,
-          credential_fields: credentials
+          credential_fields: credentials,
+          user_id: user.id // Include user context for platform config lookup
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Function invocation error:', error);
+        throw new Error(`Function error: ${error.message}`);
+      }
+
+      console.log('Test response:', data);
 
       if (data.success) {
         toast({
           title: "✅ Test Successful",
-          description: data.user_message,
+          description: data.user_message || `${platform.name} credentials are working correctly!`,
         });
         onCredentialTested?.();
       } else {
+        // Enhanced error messaging based on error type
+        const errorMessage = data.user_message || `Test failed for ${platform.name}`;
+        const errorType = data.technical_details?.error_type || 'unknown';
+        
         toast({
           title: "❌ Test Failed",
-          description: data.user_message,
+          description: errorMessage,
           variant: "destructive",
         });
-        console.error('Test technical details:', data.technical_details);
+        
+        // Log detailed error for debugging
+        console.error('Test failed details:', {
+          platform: platform.name,
+          error_type: errorType,
+          technical_details: data.technical_details
+        });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Test error:', error);
+      
+      // Enhanced error handling with specific messages
+      let errorMessage = "Failed to test credentials. Please check your connection and try again.";
+      
+      if (error.message.includes('Function error')) {
+        errorMessage = "Server error occurred during testing. Please try again.";
+      } else if (error.message.includes('network') || error.message.includes('fetch')) {
+        errorMessage = "Network error. Please check your internet connection.";
+      } else if (error.message.includes('timeout')) {
+        errorMessage = "Request timed out. The platform may be slow to respond.";
+      }
+      
       toast({
         title: "Test Failed",
-        description: "Failed to test credentials. Please check your connection and try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -127,10 +182,11 @@ const PlatformCredentialForm = ({
   };
 
   const handleSave = async () => {
-    if (!credentials || Object.keys(credentials).length === 0) {
+    // Validate credentials before saving
+    if (!validateCredentials()) {
       toast({
-        title: "Error",
-        description: "Please fill in all required fields before saving.",
+        title: "Missing Credentials",
+        description: "Please fill in all required credential fields before saving.",
         variant: "destructive",
       });
       return;
@@ -138,7 +194,7 @@ const PlatformCredentialForm = ({
 
     if (!user?.id) {
       toast({
-        title: "Error",
+        title: "Authentication Required",
         description: "You must be logged in to save credentials.",
         variant: "destructive",
       });
@@ -194,9 +250,17 @@ const PlatformCredentialForm = ({
       onClose();
     } catch (error: any) {
       console.error('Save error:', error);
+      
+      let errorMessage = `Failed to save ${platform.name} credentials.`;
+      if (error.message.includes('unique')) {
+        errorMessage = `Credentials for ${platform.name} already exist. They have been updated.`;
+      } else if (error.message.includes('permission') || error.message.includes('policy')) {
+        errorMessage = "Permission error. Please make sure you're logged in correctly.";
+      }
+      
       toast({
         title: "Save Failed",
-        description: `Failed to save ${platform.name} credentials: ${error.message}`,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -281,6 +345,9 @@ const PlatformCredentialForm = ({
     return passwordFields.some(pf => field.toLowerCase().includes(pf));
   };
 
+  // Check if all credentials are filled for button states
+  const allCredentialsFilled = validateCredentials();
+
   return (
     <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div 
@@ -307,72 +374,88 @@ const PlatformCredentialForm = ({
         </p>
 
         <div className="space-y-6">
-          {platform.credentials.map((cred, index) => (
-            <div key={index}>
-              <div className="flex items-center gap-2 mb-2">
-                <Label htmlFor={cred.field} className="text-gray-700 font-medium capitalize">
-                  {safeProcessField(cred.field)}
-                </Label>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <Info className="w-4 h-4 text-purple-600" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <div className="max-w-xs">
-                        <p className="font-medium mb-1">Why needed:</p>
-                        <p className="text-sm mb-3">{safeProcessWhyNeeded(cred.why_needed)}</p>
-                        <p className="font-medium mb-1">Get it here:</p>
-                        <a 
-                          href={safeProcessLink(cred.link)} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="text-blue-600 hover:underline text-sm break-all"
-                        >
-                          {safeProcessLink(cred.link)}
-                        </a>
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-              
-              <div className="relative">
-                <Input
-                  id={cred.field}
-                  type={isPasswordField(cred.field) && !showPassword[cred.field] ? "password" : "text"}
-                  value={credentials[cred.field] || ""}
-                  onChange={(e) => handleInputChange(cred.field, e.target.value)}
-                  placeholder={safeProcessPlaceholder(cred.placeholder)}
-                  className="rounded-xl border-0 bg-white/60 shadow-md focus:shadow-lg transition-shadow pr-10"
-                  style={{ boxShadow: '0 0 15px rgba(147, 51, 234, 0.1)' }}
-                />
+          {platform.credentials.map((cred, index) => {
+            if (!validateCredentialData(cred)) {
+              console.error('Invalid credential configuration:', cred);
+              return null;
+            }
+            
+            return (
+              <div key={index}>
+                <div className="flex items-center gap-2 mb-2">
+                  <Label htmlFor={cred.field} className="text-gray-700 font-medium capitalize">
+                    {safeProcessField(cred.field)}
+                  </Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="w-4 h-4 text-purple-600" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="max-w-xs">
+                          <p className="font-medium mb-1">Why needed:</p>
+                          <p className="text-sm mb-3">{safeProcessWhyNeeded(cred.why_needed)}</p>
+                          <p className="font-medium mb-1">Get it here:</p>
+                          <a 
+                            href={safeProcessLink(cred.link)} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-blue-600 hover:underline text-sm break-all"
+                          >
+                            {safeProcessLink(cred.link)}
+                          </a>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
                 
-                {isPasswordField(cred.field) && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
-                    onClick={() => togglePasswordVisibility(cred.field)}
-                  >
-                    {showPassword[cred.field] ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
-                  </Button>
-                )}
+                <div className="relative">
+                  <Input
+                    id={cred.field}
+                    type={isPasswordField(cred.field) && !showPassword[cred.field] ? "password" : "text"}
+                    value={credentials[cred.field] || ""}
+                    onChange={(e) => handleInputChange(cred.field, e.target.value)}
+                    placeholder={safeProcessPlaceholder(cred.placeholder)}
+                    className="rounded-xl border-0 bg-white/60 shadow-md focus:shadow-lg transition-shadow pr-10"
+                    style={{ boxShadow: '0 0 15px rgba(147, 51, 234, 0.1)' }}
+                  />
+                  
+                  {isPasswordField(cred.field) && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+                      onClick={() => togglePasswordVisibility(cred.field)}
+                    >
+                      {showPassword[cred.field] ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </Button>
+                  )}
+                </div>
               </div>
+            );
+          })}
+
+          {/* Validation Status */}
+          {!allCredentialsFilled && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+              <p className="text-sm text-yellow-800">
+                ⚠️ Please fill in all credential fields to enable testing and saving.
+              </p>
             </div>
-          ))}
+          )}
 
           {/* Action Buttons */}
           <div className="flex gap-4 pt-4">
             <Button
               onClick={handleTest}
-              disabled={testing || Object.keys(credentials).length === 0}
-              className="flex-1 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 border-0"
+              disabled={testing || !allCredentialsFilled}
+              className="flex-1 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 border-0 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ boxShadow: '0 0 20px rgba(147, 51, 234, 0.3)' }}
             >
               {testing ? "Testing..." : "Test Connection"}
@@ -380,8 +463,8 @@ const PlatformCredentialForm = ({
             
             <Button
               onClick={handleSave}
-              disabled={saving || Object.keys(credentials).length === 0}
-              className="flex-1 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 border-0"
+              disabled={saving || !allCredentialsFilled}
+              className="flex-1 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 border-0 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ boxShadow: '0 0 20px rgba(79, 70, 229, 0.3)' }}
             >
               {saving ? "Saving..." : "Save Credentials"}

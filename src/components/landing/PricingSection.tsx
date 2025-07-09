@@ -4,21 +4,20 @@ import { Check, Crown, Zap, Star, Gift } from 'lucide-react';
 
 const PricingSection = () => {
   const [showSpecial, setShowSpecial] = useState(false);
-  const [billingCycle, setBillingCycle] = useState('monthly');
 
   const plans = [
     {
       name: 'Starter',
       description: 'Perfect for individuals and small teams',
-      price: { monthly: 29.47, yearly: 23.58 },
-      originalPrice: { monthly: 49, yearly: 39 },
+      price: 29.97,
       icon: Zap,
       color: 'from-blue-500 to-cyan-500',
       features: [
         '5 Active Automations',
-        '1,000 Executions/month',
-        'Basic AI Chat Support',
-        '10+ Platform Integrations',
+        '2,500 Total Runs/month',
+        '1,000 Step Runs/month',
+        '5 AI Agents',
+        '50+ Platform Integrations',
         'Email Support',
         'Basic Analytics'
       ],
@@ -27,15 +26,15 @@ const PricingSection = () => {
     {
       name: 'Professional',
       description: 'Ideal for growing businesses',
-      price: { monthly: 49.95, yearly: 39.96 },
-      originalPrice: { monthly: 79, yearly: 63 },
+      price: 49.97,
       icon: Star,
       color: 'from-purple-500 to-pink-500',
       features: [
-        '25 Active Automations',
-        '10,000 Executions/month',
-        'Advanced AI Agents',
-        '50+ Platform Integrations',
+        '15 Active Automations',
+        '10,000 Total Runs/month',
+        '5,000 Step Runs/month',
+        '15 AI Agents',
+        '100+ Platform Integrations',
         'Priority Support',
         'Advanced Analytics',
         'Custom Triggers',
@@ -44,45 +43,63 @@ const PricingSection = () => {
       popular: true
     },
     {
-      name: 'Enterprise',
-      description: 'For large organizations',
-      price: { monthly: 129.97, yearly: 103.98 },
-      originalPrice: { monthly: 199, yearly: 159 },
+      name: 'Business',
+      description: 'For scaling companies',
+      price: 99.97,
       icon: Crown,
       color: 'from-emerald-500 to-teal-500',
       features: [
-        'Unlimited Automations',
-        'Unlimited Executions',
-        'Custom AI Agents',
-        'All Platform Integrations',
+        '50 Active Automations',
+        '50,000 Total Runs/month',
+        '25,000 Step Runs/month',
+        '50 AI Agents',
+        '200+ Platform Integrations',
         'Dedicated Support',
         'Advanced Security',
-        'API Access',
-        'White-label Options',
+        'Team Collaboration',
         'Custom Integrations'
+      ],
+      popular: false
+    },
+    {
+      name: 'Enterprise',
+      description: 'For large organizations',
+      price: 149.97,
+      icon: Crown,
+      color: 'from-gradient-start to-gradient-end',
+      features: [
+        '100 Active Automations',
+        '100,000 Total Runs/month',
+        '50,000 Step Runs/month',
+        '100 AI Agents',
+        '500+ Platform Integrations',
+        'White-glove Support',
+        'Custom Integrations',
+        'API Access',
+        'Enterprise Security'
       ],
       popular: false
     }
   ];
 
   const specialPlan = {
-    name: 'Lifetime Pro',
-    description: '🎉 Limited Time Special Offer',
-    price: 599.95,
-    originalPrice: 2399,
+    name: 'Special Beta',
+    description: 'Limited Time Offer - 24 Hours Only',
+    price: 59.97,
     icon: Gift,
     color: 'from-yellow-400 to-orange-500',
     features: [
-      'Everything in Enterprise',
-      'Lifetime Access - No Recurring Fees',
-      'Priority Feature Requests',
-      'Exclusive Beta Access',
-      '1-on-1 Setup Call',
-      'Lifetime Updates',
-      'VIP Support Channel',
-      'Custom Integration Credits'
+      '25 Active Automations',
+      '25,000 Total Runs/month',
+      '12,500 Step Runs/month',
+      '25 AI Agents',
+      '200+ Platform Integrations',
+      'Priority Support',
+      'Advanced Analytics',
+      'Custom Triggers',
+      'Team Collaboration'
     ],
-    badge: 'BEST VALUE'
+    badge: 'BETA SPECIAL'
   };
 
   return (
@@ -92,7 +109,7 @@ const PricingSection = () => {
         <div className="text-center mb-16">
           <div className="inline-flex items-center gap-2 bg-green-100 text-green-700 px-4 py-2 rounded-full mb-6">
             <Star className="w-4 h-4" />
-            <span className="text-sm font-medium">Simple Pricing</span>
+            <span className="text-sm font-medium">Beta Launch Pricing</span>
           </div>
           
           <h2 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
@@ -103,49 +120,20 @@ const PricingSection = () => {
           </h2>
           
           <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
-            Start free, scale as you grow. No hidden fees, no surprises. 
-            Just powerful automation that pays for itself.
+            Start with a 1-day free trial. No credit card required. 
+            Scale as you grow with powerful automation that pays for itself.
           </p>
-
-          {/* Billing Toggle */}
-          <div className="inline-flex items-center bg-white rounded-2xl p-2 shadow-lg border border-gray-200">
-            <button
-              onClick={() => setBillingCycle('monthly')}
-              className={`px-6 py-2 rounded-xl font-medium transition-all ${
-                billingCycle === 'monthly' 
-                  ? 'bg-blue-500 text-white shadow-md'
-                  : 'text-gray-600 hover:text-blue-600'
-              }`}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setBillingCycle('yearly')}
-              className={`px-6 py-2 rounded-xl font-medium transition-all relative ${
-                billingCycle === 'yearly' 
-                  ? 'bg-blue-500 text-white shadow-md'
-                  : 'text-gray-600 hover:text-blue-600'
-              }`}
-            >
-              Yearly
-              <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-                20% OFF
-              </span>
-            </button>
-          </div>
         </div>
 
-        {/* Regular Plans Grid */}
-        <div className="grid md:grid-cols-3 gap-8 mb-12">
+        {/* Plans Grid */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
           {plans.map((plan, index) => {
             const PlanIcon = plan.icon;
-            const currentPrice = plan.price[billingCycle];
-            const originalPrice = plan.originalPrice[billingCycle];
             
             return (
               <div 
                 key={index}
-                className={`relative bg-white rounded-3xl p-8 shadow-xl border-2 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2 ${
+                className={`relative bg-white rounded-3xl p-8 shadow-lg border-2 transition-all duration-300 hover:shadow-xl hover:-translate-y-2 ${
                   plan.popular ? 'border-purple-300 scale-105' : 'border-gray-200'
                 }`}
               >
@@ -170,17 +158,9 @@ const PricingSection = () => {
                 {/* Pricing */}
                 <div className="mb-6">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-bold text-gray-900">${currentPrice}</span>
-                    <span className="text-gray-500">/{billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
+                    <span className="text-4xl font-bold text-gray-900">${plan.price}</span>
+                    <span className="text-gray-500">/month</span>
                   </div>
-                  <div className="text-sm text-gray-500 line-through">
-                    was ${originalPrice}
-                  </div>
-                  {billingCycle === 'yearly' && (
-                    <div className="text-sm text-green-600 font-medium">
-                      Save ${(originalPrice * 12 - currentPrice * 12).toFixed(0)}/year
-                    </div>
-                  )}
                 </div>
 
                 {/* Features */}
@@ -188,7 +168,7 @@ const PricingSection = () => {
                   {plan.features.map((feature, featureIndex) => (
                     <li key={featureIndex} className="flex items-center gap-3">
                       <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
-                      <span className="text-gray-700">{feature}</span>
+                      <span className="text-gray-700 text-sm">{feature}</span>
                     </li>
                   ))}
                 </ul>
@@ -199,7 +179,7 @@ const PricingSection = () => {
                     ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}>
-                  Get Started
+                  Start Free Trial
                 </button>
               </div>
             );
@@ -213,12 +193,12 @@ const PricingSection = () => {
               onClick={() => setShowSpecial(true)}
               className="group bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:shadow-xl transition-all duration-300 relative overflow-hidden"
             >
-              <span className="relative z-10">🎁 Unlock Special Offer</span>
+              <span className="relative z-10">🎁 Unlock Beta Special</span>
               <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-red-500 transform translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
             </button>
           ) : (
             <div className="animate-fade-in">
-              {/* Special Lifetime Plan */}
+              {/* Special Beta Plan */}
               <div className="max-w-2xl mx-auto bg-gradient-to-r from-yellow-50 to-orange-50 rounded-3xl p-8 border-4 border-yellow-300 shadow-2xl relative overflow-hidden">
                 {/* Animated Background */}
                 <div className="absolute inset-0 bg-gradient-to-r from-yellow-200/20 to-orange-200/20 animate-pulse"></div>
@@ -226,7 +206,7 @@ const PricingSection = () => {
                 <div className="relative z-10">
                   {/* Special Badge */}
                   <div className="absolute -top-4 -right-4 bg-red-500 text-white px-4 py-2 rounded-full text-sm font-bold transform rotate-12">
-                    LIMITED TIME
+                    24 HOURS ONLY
                   </div>
 
                   <div className="flex items-center justify-center gap-4 mb-6">
@@ -248,11 +228,10 @@ const PricingSection = () => {
                     <div className="flex items-center justify-center gap-4">
                       <span className="text-5xl font-bold text-gray-900">${specialPlan.price}</span>
                       <div>
-                        <div className="text-2xl text-gray-500 line-through">${specialPlan.originalPrice}</div>
-                        <div className="text-green-600 font-bold">Save 75%!</div>
+                        <div className="text-sm text-gray-600">/month</div>
+                        <div className="text-green-600 font-bold">Save 40%!</div>
                       </div>
                     </div>
-                    <p className="text-gray-600 mt-2">One-time payment • Lifetime access</p>
                   </div>
 
                   {/* Special Features */}
@@ -260,7 +239,7 @@ const PricingSection = () => {
                     {specialPlan.features.map((feature, index) => (
                       <div key={index} className="flex items-center gap-3">
                         <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
-                        <span className="text-gray-700">{feature}</span>
+                        <span className="text-gray-700 text-sm">{feature}</span>
                       </div>
                     ))}
                   </div>
@@ -268,10 +247,10 @@ const PricingSection = () => {
                   {/* Special CTA */}
                   <div className="text-center">
                     <button className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-12 py-4 rounded-2xl font-bold text-xl hover:shadow-xl transition-all mb-4">
-                      Claim Lifetime Access Now! 🚀
+                      Claim Beta Special Now! 🚀
                     </button>
                     <p className="text-sm text-gray-600">
-                      ⏰ Only 47 spots remaining • Offer expires in 24 hours
+                      ⏰ Limited spots available • Expires in 24 hours
                     </p>
                   </div>
                 </div>
@@ -294,7 +273,7 @@ const PricingSection = () => {
           </div>
           <div className="space-y-3">
             <div className="text-4xl">📞</div>
-            <h4 className="font-semibold text-gray-900">24/7 Support</h4>
+            <h4 className="font-semibent text-gray-900">24/7 Support</h4>
             <p className="text-gray-600">Get help whenever you need it.</p>
           </div>
         </div>

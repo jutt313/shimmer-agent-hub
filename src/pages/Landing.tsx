@@ -16,8 +16,25 @@ import TestimonialsSection from '@/components/landing/TestimonialsSection';
 import TechnicalSpecsSection from '@/components/landing/TechnicalSpecsSection';
 import FinalCTASection from '@/components/landing/FinalCTASection';
 import LandingFooter from '@/components/landing/LandingFooter';
+import SpecialOfferModal from '@/components/SpecialOfferModal';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Landing = () => {
+  const { user } = useAuth();
+  const [showSpecialOffer, setShowSpecialOffer] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      // Show special offer modal after a short delay for authenticated users
+      const timer = setTimeout(() => {
+        setShowSpecialOffer(true);
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       {/* Hero Section */}
@@ -60,6 +77,12 @@ const Landing = () => {
       
       {/* Footer */}
       <LandingFooter />
+
+      {/* Special Offer Modal */}
+      <SpecialOfferModal 
+        isOpen={showSpecialOffer}
+        onOpenChange={setShowSpecialOffer}
+      />
     </div>
   );
 };

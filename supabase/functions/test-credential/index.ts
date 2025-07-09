@@ -514,15 +514,18 @@ serve(async (req) => {
     }
 
     // Handle platform credential testing - ENHANCED MODE
-    if (requestBody.type === 'platform') {
+    if (requestBody.type === 'platform' || (requestBody.platform_name && requestBody.credentials)) {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-      const { platform_name, credential_fields, user_id } = requestBody;
+      // Support both formats: new (credential_fields) and current frontend (credentials)
+      const platform_name = requestBody.platform_name;
+      const credential_fields = requestBody.credential_fields || requestBody.credentials;
+      const user_id = requestBody.user_id;
 
       if (!platform_name || !credential_fields) {
-        throw new Error('Platform name and credential fields are required for platform testing');
+        throw new Error('Platform name and credentials are required for platform testing');
       }
 
       console.log(`🧪 Testing raw credentials for platform: ${platform_name}`);

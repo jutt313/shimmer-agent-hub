@@ -42,6 +42,7 @@ const PlatformCredentialForm = ({
   const [testMessage, setTestMessage] = useState<string>('');
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [saveAttempts, setSaveAttempts] = useState(0);
+  const [hasBeenSaved, setHasBeenSaved] = useState(false);
 
   // Initialize credentials object
   useEffect(() => {
@@ -152,12 +153,13 @@ const PlatformCredentialForm = ({
 
       if (success) {
         console.log('✅ Credentials saved successfully');
+        setHasBeenSaved(true);
         toast({
           title: "Success",
           description: `${platform.name} credentials saved successfully!`,
         });
         onCredentialSaved();
-        onClose();
+        setTimeout(() => onClose(), 1500); // Delay close to show success state
       } else {
         throw new Error('Failed to save credentials - SecureCredentialManager returned false');
       }
@@ -275,15 +277,18 @@ const PlatformCredentialForm = ({
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto bg-gradient-to-br from-background to-background/95 border border-primary/20 shadow-2xl shadow-primary/10">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-xl font-semibold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
             Setup {platform.name} Credentials
             {testStatus === 'success' && (
-              <CheckCircle className="h-5 w-5 text-green-500" />
+              <CheckCircle className="h-5 w-5 text-green-500 animate-pulse" />
             )}
             {testStatus === 'error' && (
               <AlertCircle className="h-5 w-5 text-red-500" />
+            )}
+            {hasBeenSaved && (
+              <div className="text-sm text-green-600 font-normal">✓ Saved</div>
             )}
           </DialogTitle>
         </DialogHeader>
@@ -320,7 +325,7 @@ const PlatformCredentialForm = ({
                     placeholder={cred.placeholder}
                     value={credentials[normalizedField] || ''}
                     onChange={(e) => handleInputChange(cred.field, e.target.value)}
-                    className="pr-10"
+                    className="pr-10 rounded-xl border-2 border-muted-foreground/20 focus:border-primary/60 focus:ring-4 focus:ring-primary/20 transition-all duration-300 hover:border-primary/40 bg-background/50 backdrop-blur-sm"
                   />
                   
                   {shouldShowPasswordToggle(cred.field) && (
@@ -346,33 +351,44 @@ const PlatformCredentialForm = ({
           })}
 
           {testStatus !== 'idle' && (
-            <div className={`p-3 rounded-md text-sm ${
+            <div className={`p-4 rounded-xl text-sm transition-all duration-300 ${
               testStatus === 'success' 
-                ? 'bg-green-50 text-green-700 border border-green-200' 
+                ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border-2 border-green-200 shadow-lg shadow-green-200/50' 
                 : testStatus === 'error'
-                  ? 'bg-red-50 text-red-700 border border-red-200'
-                  : 'bg-blue-50 text-blue-700 border border-blue-200'
+                  ? 'bg-gradient-to-r from-red-50 to-rose-50 text-red-700 border-2 border-red-200 shadow-lg shadow-red-200/50'
+                  : 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border-2 border-blue-200 shadow-lg shadow-blue-200/50'
             }`}>
               <div className="flex items-center gap-2">
                 {testStatus === 'testing' && <Loader2 className="h-4 w-4 animate-spin" />}
-                {testStatus === 'success' && <CheckCircle className="h-4 w-4" />}
+                {testStatus === 'success' && <CheckCircle className="h-4 w-4 animate-bounce" />}
                 {testStatus === 'error' && <AlertCircle className="h-4 w-4" />}
-                <span>{testMessage}</span>
+                <span className="font-medium">{testMessage}</span>
               </div>
             </div>
           )}
 
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-4 pt-6">
             <Button
               onClick={handleTest}
               variant="outline"
               disabled={isTestingCredentials || isLoading}
-              className="flex-1"
+              className={`flex-1 rounded-xl h-12 font-medium transition-all duration-300 ${
+                testStatus === 'success' 
+                  ? 'border-green-500 bg-green-50 text-green-700 hover:bg-green-100 shadow-lg shadow-green-200/50' 
+                  : testStatus === 'error'
+                    ? 'border-red-500 bg-red-50 text-red-700 hover:bg-red-100'
+                    : 'border-primary/60 hover:border-primary hover:bg-primary/10 hover:shadow-lg hover:shadow-primary/20'
+              }`}
             >
               {isTestingCredentials ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Testing...
+                </>
+              ) : testStatus === 'success' ? (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Tested ✓
                 </>
               ) : (
                 'Test Credentials'
@@ -381,19 +397,38 @@ const PlatformCredentialForm = ({
             
             <Button
               onClick={handleSave}
-              disabled={isLoading || isTestingCredentials}
-              className="flex-1"
+              disabled={isLoading || isTestingCredentials || testStatus !== 'success'}
+              className={`flex-1 rounded-xl h-12 font-medium transition-all duration-300 ${
+                hasBeenSaved 
+                  ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-lg shadow-green-200/50' 
+                  : testStatus === 'success'
+                    ? 'bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-700 shadow-lg shadow-primary/30'
+                    : 'opacity-50 cursor-not-allowed'
+              }`}
             >
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Saving...
                 </>
-              ) : (
+              ) : hasBeenSaved ? (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Saved ✓
+                </>
+              ) : testStatus === 'success' ? (
                 'Save Credentials'
+              ) : (
+                'Test First to Save'
               )}
             </Button>
           </div>
+          
+          {testStatus !== 'success' && (
+            <p className="text-xs text-muted-foreground text-center pt-2">
+              💡 Test your credentials first to ensure they work before saving
+            </p>
+          )}
         </div>
       </DialogContent>
     </Dialog>

@@ -1,491 +1,459 @@
-import { useState } from "react";
-import { X, Eye, EyeOff, Info } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/components/ui/use-toast";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+
+import React, { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/components/ui/use-toast';
+import { Loader2, ExternalLink, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { SecureCredentialManager } from '@/utils/secureCredentials';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+
+interface Platform {
+  name: string;
+  credentials: Array<{
+    field: string;
+    placeholder: string;
+    link: string;
+    why_needed: string;
+  }>;
+}
 
 interface PlatformCredentialFormProps {
-  platform: {
-    name: string;
-    credentials: Array<{
-      field: string;
-      placeholder: string;
-      link: string;
-      why_needed: string;
-    }>;
-  };
+  platform: Platform;
   onClose: () => void;
-  onCredentialSaved?: () => void;
-  onCredentialTested?: () => void;
+  onCredentialSaved: () => void;
+  onCredentialTested: () => void;
 }
 
 const PlatformCredentialForm = ({ 
   platform, 
   onClose, 
-  onCredentialSaved,
+  onCredentialSaved, 
   onCredentialTested 
 }: PlatformCredentialFormProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [credentials, setCredentials] = useState<Record<string, string>>({});
-  const [showPassword, setShowPassword] = useState<Record<string, boolean>>({});
-  const [testing, setTesting] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isTestingCredentials, setIsTestingCredentials] = useState(false);
+  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [testMessage, setTestMessage] = useState<string>('');
+  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+  const [saveAttempts, setSaveAttempts] = useState(0);
 
-  // BULLETPROOF platform validation
-  const validatePlatformData = (platformData: any): boolean => {
-    try {
-      return (
-        platformData &&
-        typeof platformData === 'object' &&
-        typeof platformData.name === 'string' &&
-        platformData.name.trim().length > 0 &&
-        Array.isArray(platformData.credentials) &&
-        platformData.credentials.length > 0
-      );
-    } catch (error) {
-      console.error('Error validating platform data:', error);
-      return false;
-    }
-  };
+  // Initialize credentials object
+  useEffect(() => {
+    const initialCredentials: Record<string, string> = {};
+    platform.credentials.forEach(cred => {
+      const normalizedField = cred.field.toLowerCase().replace(/\s+/g, '_');
+      initialCredentials[normalizedField] = '';
+    });
+    setCredentials(initialCredentials);
+  }, [platform]);
 
-  // BULLETPROOF credential validation
-  const validateCredentialData = (cred: any): boolean => {
-    try {
-      return (
-        cred &&
-        typeof cred === 'object' &&
-        typeof cred.field === 'string' &&
-        cred.field.trim().length > 0
-      );
-    } catch (error) {
-      console.error('Error validating credential data:', error);
-      return false;
-    }
-  };
+  // Load existing credentials
+  useEffect(() => {
+    if (!user) return;
+
+    const loadExistingCredentials = async () => {
+      try {
+        console.log('🔍 Loading existing credentials for:', platform.name);
+        const existingCreds = await SecureCredentialManager.getCredentials(
+          user.id,
+          platform.name
+        );
+        
+        if (existingCreds) {
+          console.log('✅ Found existing credentials');
+          setCredentials(existingCreds);
+        }
+      } catch (error) {
+        console.error('❌ Error loading existing credentials:', error);
+      }
+    };
+
+    loadExistingCredentials();
+  }, [user, platform.name]);
 
   const handleInputChange = (field: string, value: string) => {
-    setCredentials(prev => ({ ...prev, [field]: value }));
+    const normalizedField = field.toLowerCase().replace(/\s+/g, '_');
+    setCredentials(prev => ({
+      ...prev,
+      [normalizedField]: value
+    }));
   };
 
   const togglePasswordVisibility = (field: string) => {
-    setShowPassword(prev => ({ ...prev, [field]: !prev[field] }));
+    const normalizedField = field.toLowerCase().replace(/\s+/g, '_');
+    setShowPasswords(prev => ({
+      ...prev,
+      [normalizedField]: !prev[normalizedField]
+    }));
   };
 
-  // Validate that all required credentials are filled
-  const validateCredentials = (): boolean => {
-    if (!platform.credentials || platform.credentials.length === 0) {
+  const validateCredentials = () => {
+    const requiredFields = platform.credentials.map(cred => 
+      cred.field.toLowerCase().replace(/\s+/g, '_')
+    );
+    
+    const missingFields = requiredFields.filter(field => !credentials[field]?.trim());
+    
+    if (missingFields.length > 0) {
+      toast({
+        title: "Missing Required Fields",
+        description: `Please fill in all required fields: ${missingFields.join(', ')}`,
+        variant: "destructive",
+      });
       return false;
     }
-
-    for (const cred of platform.credentials) {
-      if (!credentials[cred.field] || credentials[cred.field].trim() === '') {
-        return false;
-      }
-    }
-
+    
     return true;
   };
 
-  const handleTest = async () => {
-    // Validate credentials before testing
-    if (!validateCredentials()) {
-      toast({
-        title: "Missing Credentials",
-        description: "Please fill in all required credential fields before testing.",
-        variant: "destructive",
-      });
-      return;
+  const ensureUserProfile = async () => {
+    if (!user) {
+      throw new Error('User not authenticated');
     }
 
-    if (!user?.id) {
-      toast({
-        title: "Authentication Required",
-        description: "You must be logged in to test credentials.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setTesting(true);
     try {
-      console.log('🧪 Testing platform credentials:', platform.name);
-      console.log('📝 Credential fields being sent:', Object.keys(credentials));
-      
-      // Use the new dual-mode testing approach
-      const { data, error } = await supabase.functions.invoke('test-credential', {
-        body: {
-          type: 'platform',
-          platform_name: platform.name,
-          credential_fields: credentials,
-          user_id: user.id // Include user context for platform config lookup
+      // Check if user profile exists
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError && profileError.code === 'PGRST116') {
+        // Profile doesn't exist, create it
+        console.log('📝 Creating user profile for:', user.id);
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || user.user_metadata?.name || null
+          });
+
+        if (insertError) {
+          console.error('❌ Error creating user profile:', insertError);
+          throw new Error(`Failed to create user profile: ${insertError.message}`);
         }
-      });
-
-      if (error) {
-        console.error('Function invocation error:', error);
-        throw new Error(`Function error: ${error.message}`);
-      }
-
-      console.log('Test response:', data);
-
-      if (data.success) {
-        toast({
-          title: "✅ Test Successful",
-          description: data.user_message || `${platform.name} credentials are working correctly!`,
-        });
-        onCredentialTested?.();
+        
+        console.log('✅ User profile created successfully');
+      } else if (profileError) {
+        console.error('❌ Error checking user profile:', profileError);
+        throw new Error(`Profile check failed: ${profileError.message}`);
       } else {
-        // Enhanced error messaging based on error type
-        const errorMessage = data.user_message || `Test failed for ${platform.name}`;
-        const errorType = data.technical_details?.error_type || 'unknown';
-        
-        toast({
-          title: "❌ Test Failed",
-          description: errorMessage,
-          variant: "destructive",
-        });
-        
-        // Enhanced error logging for debugging
-        console.error('🔍 Test failed details:', {
-          platform: platform.name,
-          error_type: errorType,
-          status_code: data.technical_details?.status_code,
-          credential_fields_sent: data.technical_details?.credential_fields_sent,
-          normalized_fields: data.technical_details?.normalized_fields,
-          auth_headers_used: data.technical_details?.auth_headers_used,
-          response_preview: data.technical_details?.response_preview,
-          technical_details: data.technical_details
-        });
-
-        // Show additional debugging info for specific error types
-        if (errorType === 'authentication') {
-          console.log('🔐 Authentication Debug Info:');
-          console.log('- Original field names:', Object.keys(credentials));
-          console.log('- Normalized field names:', data.technical_details?.normalized_fields);
-          console.log('- Auth headers used:', data.technical_details?.auth_headers_used);
-        }
+        console.log('✅ User profile already exists');
       }
-    } catch (error: any) {
-      console.error('Test error:', error);
-      
-      // Enhanced error handling with specific messages
-      let errorMessage = "Failed to test credentials. Please check your connection and try again.";
-      
-      if (error.message.includes('Function error')) {
-        errorMessage = "Server error occurred during testing. Please try again.";
-      } else if (error.message.includes('network') || error.message.includes('fetch')) {
-        errorMessage = "Network error. Please check your internet connection.";
-      } else if (error.message.includes('timeout')) {
-        errorMessage = "Request timed out. The platform may be slow to respond.";
-      }
-      
-      toast({
-        title: "Test Failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setTesting(false);
+    } catch (error) {
+      console.error('❌ Error in ensureUserProfile:', error);
+      throw error;
     }
   };
 
   const handleSave = async () => {
-    // Validate credentials before saving
-    if (!validateCredentials()) {
-      toast({
-        title: "Missing Credentials",
-        description: "Please fill in all required credential fields before saving.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!user?.id) {
+    if (!user) {
       toast({
         title: "Authentication Required",
-        description: "You must be logged in to save credentials.",
+        description: "Please log in to save credentials",
         variant: "destructive",
       });
       return;
     }
 
-    setSaving(true);
+    if (!validateCredentials()) return;
+
+    setIsLoading(true);
+    setSaveAttempts(prev => prev + 1);
+
     try {
       console.log('💾 Saving platform credentials for:', platform.name);
+      console.log('🔐 User ID:', user.id);
+      console.log('📋 Credentials keys:', Object.keys(credentials));
+      
+      // Ensure user profile exists before saving credentials
+      await ensureUserProfile();
 
-      // Check if credentials already exist for this platform and user
-      const { data: existingCreds } = await supabase
-        .from('platform_credentials')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('platform_name', platform.name)
-        .single();
+      // Filter out empty credentials
+      const filteredCredentials = Object.fromEntries(
+        Object.entries(credentials).filter(([_, value]) => value.trim() !== '')
+      );
 
-      const credentialData = {
-        user_id: user.id,
-        platform_name: platform.name,
-        credential_type: 'api',
-        credentials: JSON.stringify(credentials),
-        is_active: true
-      };
+      if (Object.keys(filteredCredentials).length === 0) {
+        throw new Error('No valid credentials to save');
+      }
 
-      let result;
-      if (existingCreds) {
-        // Update existing credentials
-        result = await supabase
-          .from('platform_credentials')
-          .update(credentialData)
-          .eq('id', existingCreds.id)
-          .select()
-          .single();
+      console.log('💾 Attempting to save credentials...');
+      const success = await SecureCredentialManager.storeCredentials(
+        user.id,
+        platform.name,
+        filteredCredentials
+      );
+
+      if (success) {
+        console.log('✅ Credentials saved successfully');
+        toast({
+          title: "Success",
+          description: `${platform.name} credentials saved successfully!`,
+        });
+        onCredentialSaved();
+        onClose();
       } else {
-        // Insert new credentials
-        result = await supabase
-          .from('platform_credentials')
-          .insert(credentialData)
-          .select()
-          .single();
+        throw new Error('Failed to save credentials - SecureCredentialManager returned false');
       }
-
-      if (result.error) throw result.error;
-
-      toast({
-        title: "✅ Saved Successfully",
-        description: `${platform.name} credentials have been saved securely.`,
-      });
-      
-      onCredentialSaved?.();
-      onClose();
     } catch (error: any) {
-      console.error('Save error:', error);
+      console.error('❌ Save error:', error);
       
-      let errorMessage = `Failed to save ${platform.name} credentials.`;
-      if (error.message.includes('unique')) {
-        errorMessage = `Credentials for ${platform.name} already exist. They have been updated.`;
-      } else if (error.message.includes('permission') || error.message.includes('policy')) {
-        errorMessage = "Permission error. Please make sure you're logged in correctly.";
+      let errorMessage = 'Failed to save credentials';
+      
+      if (error.message?.includes('violates foreign key constraint')) {
+        errorMessage = 'User profile setup required. Please try again.';
+      } else if (error.message?.includes('duplicate key')) {
+        errorMessage = 'Credentials already exist. Updating existing credentials.';
+      } else if (error.message?.includes('permission denied')) {
+        errorMessage = 'Permission denied. Please check your authentication.';
+      } else if (error.message) {
+        errorMessage = error.message;
       }
-      
+
       toast({
         title: "Save Failed",
-        description: errorMessage,
+        description: `${errorMessage}${saveAttempts > 1 ? ` (Attempt ${saveAttempts})` : ''}`,
+        variant: "destructive",
+      });
+
+      // If it's a profile-related error and we haven't tried many times, retry
+      if (saveAttempts < 3 && (
+        error.message?.includes('foreign key') || 
+        error.message?.includes('profile')
+      )) {
+        console.log('🔄 Retrying save operation...');
+        setTimeout(() => handleSave(), 1000);
+        return;
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTest = async () => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to test credentials",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!validateCredentials()) return;
+
+    setIsTestingCredentials(true);
+    setTestStatus('testing');
+    setTestMessage('Testing credentials...');
+
+    try {
+      console.log('🧪 Testing credentials for:', platform.name);
+      
+      // Filter out empty credentials
+      const filteredCredentials = Object.fromEntries(
+        Object.entries(credentials).filter(([_, value]) => value.trim() !== '')
+      );
+
+      const response = await supabase.functions.invoke('test-credential', {
+        body: {
+          platform_name: platform.name,
+          credentials: filteredCredentials,
+          user_id: user.id
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Test request failed');
+      }
+
+      const result = response.data;
+      console.log('🧪 Test result:', result);
+
+      if (result.success) {
+        setTestStatus('success');
+        setTestMessage(result.message || 'Credentials verified successfully!');
+        toast({
+          title: "Test Successful",
+          description: result.message || 'Credentials are valid and working!',
+        });
+        onCredentialTested();
+      } else {
+        setTestStatus('error');
+        setTestMessage(result.error || 'Credential test failed');
+        toast({
+          title: "Test Failed",
+          description: result.error || 'Invalid credentials or connection failed',
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('❌ Test error:', error);
+      setTestStatus('error');
+      setTestMessage(error.message || 'Test failed');
+      toast({
+        title: "Test Error",
+        description: error.message || 'Failed to test credentials',
         variant: "destructive",
       });
     } finally {
-      setSaving(false);
+      setIsTestingCredentials(false);
     }
   };
 
-  // Safe field processing
-  const safeProcessField = (field: string): string => {
-    try {
-      if (!field || typeof field !== 'string') return 'credential';
-      return field.replace(/_/g, ' ').toLowerCase();
-    } catch (error) {
-      console.error('Error processing field:', error);
-      return 'credential';
+  const getInputType = (field: string) => {
+    const lowerField = field.toLowerCase();
+    if (lowerField.includes('password') || 
+        lowerField.includes('secret') || 
+        lowerField.includes('key') ||
+        lowerField.includes('token')) {
+      return 'password';
     }
-  };
-
-  // Safe placeholder processing
-  const safeProcessPlaceholder = (placeholder: any): string => {
-    try {
-      if (!placeholder || typeof placeholder !== 'string') return 'Enter value...';
-      return placeholder;
-    } catch (error) {
-      console.error('Error processing placeholder:', error);
-      return 'Enter value...';
+    if (lowerField.includes('email')) {
+      return 'email';
     }
-  };
-
-  // Safe link processing
-  const safeProcessLink = (link: any): string => {
-    try {
-      if (!link || typeof link !== 'string') return '#';
-      return link;
-    } catch (error) {
-      console.error('Error processing link:', error);
-      return '#';
+    if (lowerField.includes('url') || lowerField.includes('webhook')) {
+      return 'url';
     }
+    return 'text';
   };
 
-  // Safe why_needed processing
-  const safeProcessWhyNeeded = (whyNeeded: any): string => {
-    try {
-      if (!whyNeeded || typeof whyNeeded !== 'string') return 'Required for platform integration';
-      return whyNeeded;
-    } catch (error) {
-      console.error('Error processing why_needed:', error);
-      return 'Required for platform integration';
-    }
+  const shouldShowPasswordToggle = (field: string) => {
+    return getInputType(field) === 'password';
   };
-
-  // Early validation - if platform data is invalid, show error
-  if (!platform || !platform.name || !Array.isArray(platform.credentials)) {
-    return (
-      <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-white/80 backdrop-blur-md rounded-3xl p-8 w-full max-w-md shadow-2xl border-0 relative">
-          <Button
-            onClick={onClose}
-            variant="ghost"
-            size="sm"
-            className="absolute top-4 right-4 rounded-full hover:bg-gray-100/50"
-          >
-            <X className="w-5 h-5" />
-          </Button>
-          
-          <div className="text-center">
-            <h2 className="text-xl font-bold text-red-600 mb-4">Invalid Platform Data</h2>
-            <p className="text-gray-600 mb-6">
-              The platform configuration is incomplete or corrupted. Please try generating the automation again.
-            </p>
-            <Button onClick={onClose} className="w-full rounded-xl">
-              Close
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const isPasswordField = (field: string) => {
-    const passwordFields = ['password', 'secret', 'token', 'key'];
-    return passwordFields.some(pf => field.toLowerCase().includes(pf));
-  };
-
-  // Check if all credentials are filled for button states
-  const allCredentialsFilled = validateCredentials();
 
   return (
-    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div 
-        className="bg-white/80 backdrop-blur-md rounded-3xl p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl border-0 relative"
-        style={{
-          boxShadow: '0 0 60px rgba(147, 51, 234, 0.3), 0 0 120px rgba(79, 70, 229, 0.2)'
-        }}
-      >
-        {/* Close button */}
-        <Button
-          onClick={onClose}
-          variant="ghost"
-          size="sm"
-          className="absolute top-4 right-4 rounded-full hover:bg-gray-100/50"
-        >
-          <X className="w-5 h-5" />
-        </Button>
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            Setup {platform.name} Credentials
+            {testStatus === 'success' && (
+              <CheckCircle className="h-5 w-5 text-green-500" />
+            )}
+            {testStatus === 'error' && (
+              <AlertCircle className="h-5 w-5 text-red-500" />
+            )}
+          </DialogTitle>
+        </DialogHeader>
 
-        <h2 className="text-2xl font-bold text-gray-800 mb-2 bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-          Configure {platform.name}
-        </h2>
-        <p className="text-gray-600 mb-6">
-          Enter your {platform.name} credentials to connect this platform to your automation.
-        </p>
-
-        <div className="space-y-6">
+        <div className="space-y-4">
           {platform.credentials.map((cred, index) => {
-            if (!validateCredentialData(cred)) {
-              console.error('Invalid credential configuration:', cred);
-              return null;
-            }
+            const normalizedField = cred.field.toLowerCase().replace(/\s+/g, '_');
+            const inputType = getInputType(cred.field);
+            const showPassword = showPasswords[normalizedField];
             
             return (
-              <div key={index}>
-                <div className="flex items-center gap-2 mb-2">
-                  <Label htmlFor={cred.field} className="text-gray-700 font-medium capitalize">
-                    {safeProcessField(cred.field)}
+              <div key={index} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor={normalizedField} className="text-sm font-medium">
+                    {cred.field}
                   </Label>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Info className="w-4 h-4 text-purple-600" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <div className="max-w-xs">
-                          <p className="font-medium mb-1">Why needed:</p>
-                          <p className="text-sm mb-3">{safeProcessWhyNeeded(cred.why_needed)}</p>
-                          <p className="font-medium mb-1">Get it here:</p>
-                          <a 
-                            href={safeProcessLink(cred.link)} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-blue-600 hover:underline text-sm break-all"
-                          >
-                            {safeProcessLink(cred.link)}
-                          </a>
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  {cred.link && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => window.open(cred.link, '_blank')}
+                      className="text-blue-600 hover:text-blue-700 p-0 h-auto"
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      Get Key
+                    </Button>
+                  )}
                 </div>
                 
                 <div className="relative">
                   <Input
-                    id={cred.field}
-                    type={isPasswordField(cred.field) && !showPassword[cred.field] ? "password" : "text"}
-                    value={credentials[cred.field] || ""}
+                    id={normalizedField}
+                    type={inputType === 'password' && !showPassword ? 'password' : 'text'}
+                    placeholder={cred.placeholder}
+                    value={credentials[normalizedField] || ''}
                     onChange={(e) => handleInputChange(cred.field, e.target.value)}
-                    placeholder={safeProcessPlaceholder(cred.placeholder)}
-                    className="rounded-xl border-0 bg-white/60 shadow-md focus:shadow-lg transition-shadow pr-10"
-                    style={{ boxShadow: '0 0 15px rgba(147, 51, 234, 0.1)' }}
+                    className="pr-10"
                   />
                   
-                  {isPasswordField(cred.field) && (
+                  {shouldShowPasswordToggle(cred.field) && (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                       onClick={() => togglePasswordVisibility(cred.field)}
                     >
-                      {showPassword[cred.field] ? (
-                        <EyeOff className="w-4 h-4" />
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
                       ) : (
-                        <Eye className="w-4 h-4" />
+                        <Eye className="h-4 w-4 text-gray-400" />
                       )}
                     </Button>
                   )}
                 </div>
+                
+                <p className="text-xs text-gray-500">{cred.why_needed}</p>
               </div>
             );
           })}
 
-          {/* Validation Status */}
-          {!allCredentialsFilled && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
-              <p className="text-sm text-yellow-800">
-                ⚠️ Please fill in all credential fields to enable testing and saving.
-              </p>
+          {testStatus !== 'idle' && (
+            <div className={`p-3 rounded-md text-sm ${
+              testStatus === 'success' 
+                ? 'bg-green-50 text-green-700 border border-green-200' 
+                : testStatus === 'error'
+                  ? 'bg-red-50 text-red-700 border border-red-200'
+                  : 'bg-blue-50 text-blue-700 border border-blue-200'
+            }`}>
+              <div className="flex items-center gap-2">
+                {testStatus === 'testing' && <Loader2 className="h-4 w-4 animate-spin" />}
+                {testStatus === 'success' && <CheckCircle className="h-4 w-4" />}
+                {testStatus === 'error' && <AlertCircle className="h-4 w-4" />}
+                <span>{testMessage}</span>
+              </div>
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex gap-4 pt-4">
+          <div className="flex gap-3 pt-4">
             <Button
               onClick={handleTest}
-              disabled={testing || !allCredentialsFilled}
-              className="flex-1 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 border-0 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ boxShadow: '0 0 20px rgba(147, 51, 234, 0.3)' }}
+              variant="outline"
+              disabled={isTestingCredentials || isLoading}
+              className="flex-1"
             >
-              {testing ? "Testing..." : "Test Connection"}
+              {isTestingCredentials ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Testing...
+                </>
+              ) : (
+                'Test Credentials'
+              )}
             </Button>
             
             <Button
               onClick={handleSave}
-              disabled={saving || !allCredentialsFilled}
-              className="flex-1 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 border-0 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ boxShadow: '0 0 20px rgba(79, 70, 229, 0.3)' }}
+              disabled={isLoading || isTestingCredentials}
+              className="flex-1"
             >
-              {saving ? "Saving..." : "Save Credentials"}
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Credentials'
+              )}
             </Button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 

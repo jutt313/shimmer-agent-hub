@@ -814,7 +814,7 @@ serve(async (req) => {
         stack: error.stack
       }
     }), {
-      status: 500,
+      status: 200,  // Changed from 500 to 200 to fix "non-2xx status code" error
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

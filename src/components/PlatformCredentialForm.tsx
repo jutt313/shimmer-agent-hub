@@ -112,47 +112,7 @@ const PlatformCredentialForm = ({
     return true;
   };
 
-  const ensureUserProfile = async () => {
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-
-    try {
-      // Check if user profile exists
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError && profileError.code === 'PGRST116') {
-        // Profile doesn't exist, create it
-        console.log('📝 Creating user profile for:', user.id);
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            id: user.id,
-            email: user.email,
-            full_name: user.user_metadata?.full_name || user.user_metadata?.name || null
-          });
-
-        if (insertError) {
-          console.error('❌ Error creating user profile:', insertError);
-          throw new Error(`Failed to create user profile: ${insertError.message}`);
-        }
-        
-        console.log('✅ User profile created successfully');
-      } else if (profileError) {
-        console.error('❌ Error checking user profile:', profileError);
-        throw new Error(`Profile check failed: ${profileError.message}`);
-      } else {
-        console.log('✅ User profile already exists');
-      }
-    } catch (error) {
-      console.error('❌ Error in ensureUserProfile:', error);
-      throw error;
-    }
-  };
+  // Removed ensureUserProfile - no longer needed since foreign key constraint is removed
 
   const handleSave = async () => {
     if (!user) {
@@ -173,9 +133,6 @@ const PlatformCredentialForm = ({
       console.log('💾 Saving platform credentials for:', platform.name);
       console.log('🔐 User ID:', user.id);
       console.log('📋 Credentials keys:', Object.keys(credentials));
-      
-      // Ensure user profile exists before saving credentials
-      await ensureUserProfile();
 
       // Filter out empty credentials
       const filteredCredentials = Object.fromEntries(
@@ -209,11 +166,7 @@ const PlatformCredentialForm = ({
       
       let errorMessage = 'Failed to save credentials';
       
-      if (error.message?.includes('violates foreign key constraint')) {
-        errorMessage = 'User profile setup required. Please try again.';
-      } else if (error.message?.includes('duplicate key')) {
-        errorMessage = 'Credentials already exist. Updating existing credentials.';
-      } else if (error.message?.includes('permission denied')) {
+      if (error.message?.includes('permission denied')) {
         errorMessage = 'Permission denied. Please check your authentication.';
       } else if (error.message) {
         errorMessage = error.message;
@@ -221,19 +174,9 @@ const PlatformCredentialForm = ({
 
       toast({
         title: "Save Failed",
-        description: `${errorMessage}${saveAttempts > 1 ? ` (Attempt ${saveAttempts})` : ''}`,
+        description: errorMessage,
         variant: "destructive",
       });
-
-      // If it's a profile-related error and we haven't tried many times, retry
-      if (saveAttempts < 3 && (
-        error.message?.includes('foreign key') || 
-        error.message?.includes('profile')
-      )) {
-        console.log('🔄 Retrying save operation...');
-        setTimeout(() => handleSave(), 1000);
-        return;
-      }
     } finally {
       setIsLoading(false);
     }

@@ -1,11 +1,11 @@
 
 import React from 'react';
-import { Zap, Brain, Infinity, ArrowRight } from 'lucide-react';
+import { Zap, Brain, Infinity, ArrowRight, CheckCircle } from 'lucide-react';
 
 const SolutionSection = () => {
   return (
     <section className="py-20 px-6 relative overflow-hidden">
-      {/* Smooth Gradient Background */}
+      {/* Enhanced Background */}
       <div className="absolute inset-0 bg-gradient-to-b from-orange-50/30 via-blue-50/50 to-purple-50/40"></div>
       
       <div className="max-w-7xl mx-auto relative z-10">
@@ -37,15 +37,15 @@ const SolutionSection = () => {
             <p className="text-gray-600 mb-6">Build no-code workflows in minutes, not months. Our AI understands your needs instantly.</p>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <CheckCircle className="w-4 h-4 text-green-500" />
                 <span className="text-sm text-gray-600">5-minute setup</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <CheckCircle className="w-4 h-4 text-green-500" />
                 <span className="text-sm text-gray-600">Natural language prompts</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <CheckCircle className="w-4 h-4 text-green-500" />
                 <span className="text-sm text-gray-600">Instant deployment</span>
               </div>
             </div>
@@ -59,15 +59,15 @@ const SolutionSection = () => {
             <p className="text-gray-600 mb-6">Deploy smart agents that learn, adapt, and handle complex tasks 24/7 without supervision.</p>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <CheckCircle className="w-4 h-4 text-green-500" />
                 <span className="text-sm text-gray-600">Self-learning capabilities</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <CheckCircle className="w-4 h-4 text-green-500" />
                 <span className="text-sm text-gray-600">24/7 operation</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <CheckCircle className="w-4 h-4 text-green-500" />
                 <span className="text-sm text-gray-600">Complex decision making</span>
               </div>
             </div>
@@ -77,44 +77,47 @@ const SolutionSection = () => {
             <div className="w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center mb-6">
               <Infinity className="w-8 h-8 text-white" />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">Unlimited Integration</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">Universal Integration</h3>
             <p className="text-gray-600 mb-6">Connect any platform, automate any process. Our AI adapts to your existing tools seamlessly.</p>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-sm text-gray-600">Any platform support</span>
+                <CheckCircle className="w-4 h-4 text-green-500" />
+                <span className="text-sm text-gray-600">Connect any platform</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <CheckCircle className="w-4 h-4 text-green-500" />
                 <span className="text-sm text-gray-600">Real-time synchronization</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <CheckCircle className="w-4 h-4 text-green-500" />
                 <span className="text-sm text-gray-600">Secure connections</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* ROI Calculator Section */}
+        {/* Success Stories Section */}
         <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-3xl p-12 text-white text-center">
-          <h3 className="text-3xl md:text-4xl font-bold mb-6">Calculate Your ROI</h3>
+          <h3 className="text-3xl md:text-4xl font-bold mb-6">Real Results from Real Businesses</h3>
           <p className="text-xl mb-8 opacity-90">
-            See how much YusrAI could save your business in the first year
+            Join thousands of businesses already saving time and money with AI automation
           </p>
           
           <div className="grid md:grid-cols-3 gap-8 mb-8">
             <div className="bg-white/20 rounded-2xl p-6">
               <div className="text-4xl font-bold mb-2">85%</div>
-              <div className="text-green-100">Average Annual Saving</div>
+              <div className="text-green-100">Average Time Savings</div>
+              <div className="text-sm text-green-200 mt-1">15+ hours per week recovered</div>
             </div>
             <div className="bg-white/20 rounded-2xl p-6">
-              <div className="text-4xl font-bold mb-2">3</div>
-              <div className="text-green-100">Months Average Payback Period</div>
+              <div className="text-4xl font-bold mb-2">3x</div>
+              <div className="text-green-100">Faster Growth</div>
+              <div className="text-sm text-green-200 mt-1">vs manual operations</div>
             </div>
             <div className="bg-white/20 rounded-2xl p-6">
               <div className="text-4xl font-bold mb-2">450%</div>
               <div className="text-green-100">ROI in First Year</div>
+              <div className="text-sm text-green-200 mt-1">Typical customer returns</div>
             </div>
           </div>
           
@@ -122,7 +125,7 @@ const SolutionSection = () => {
             onClick={() => window.location.href = '/auth'}
             className="bg-white text-green-600 px-8 py-4 rounded-xl text-lg font-bold hover:shadow-2xl transition-all duration-300 transform hover:scale-105 inline-flex items-center gap-3"
           >
-            Calculate My Savings
+            Start Your Success Story
             <ArrowRight className="w-5 h-5" />
           </button>
         </div>

@@ -1,109 +1,50 @@
-
 import React, { useState } from 'react';
 import { Check, Crown, Zap, Star, Gift } from 'lucide-react';
-
 const PricingSection = () => {
   const [showSpecial, setShowSpecial] = useState(false);
-
-  const plans = [
-    {
-      name: 'Starter',
-      description: 'Perfect for individuals and small teams',
-      price: 29.97,
-      icon: Zap,
-      color: 'from-blue-500 to-cyan-500',
-      features: [
-        '5 Active Automations',
-        '2,500 Total Runs/month',
-        '1,000 Step Runs/month',
-        '5 AI Agents',
-        '50+ Platform Integrations',
-        'Email Support',
-        'Basic Analytics'
-      ],
-      popular: false
-    },
-    {
-      name: 'Professional',
-      description: 'Ideal for growing businesses',
-      price: 49.97,
-      icon: Star,
-      color: 'from-purple-500 to-pink-500',
-      features: [
-        '15 Active Automations',
-        '10,000 Total Runs/month',
-        '5,000 Step Runs/month',
-        '15 AI Agents',
-        '100+ Platform Integrations',
-        'Priority Support',
-        'Advanced Analytics',
-        'Custom Triggers',
-        'Team Collaboration'
-      ],
-      popular: true
-    },
-    {
-      name: 'Business',
-      description: 'For scaling companies',
-      price: 99.97,
-      icon: Crown,
-      color: 'from-emerald-500 to-teal-500',
-      features: [
-        '50 Active Automations',
-        '50,000 Total Runs/month',
-        '25,000 Step Runs/month',
-        '50 AI Agents',
-        '200+ Platform Integrations',
-        'Dedicated Support',
-        'Advanced Security',
-        'Team Collaboration',
-        'Custom Integrations'
-      ],
-      popular: false
-    },
-    {
-      name: 'Enterprise',
-      description: 'For large organizations',
-      price: 149.97,
-      icon: Crown,
-      color: 'from-gradient-start to-gradient-end',
-      features: [
-        '100 Active Automations',
-        '100,000 Total Runs/month',
-        '50,000 Step Runs/month',
-        '100 AI Agents',
-        '500+ Platform Integrations',
-        'White-glove Support',
-        'Custom Integrations',
-        'API Access',
-        'Enterprise Security'
-      ],
-      popular: false
-    }
-  ];
-
+  const plans = [{
+    name: 'Starter',
+    description: 'Perfect for individuals and small teams',
+    price: 29.97,
+    icon: Zap,
+    color: 'from-blue-500 to-cyan-500',
+    features: ['5 Active Automations', '2,500 Total Runs/month', '1,000 Step Runs/month', '5 AI Agents', '50+ Platform Integrations', 'Email Support', 'Basic Analytics'],
+    popular: false
+  }, {
+    name: 'Professional',
+    description: 'Ideal for growing businesses',
+    price: 49.97,
+    icon: Star,
+    color: 'from-purple-500 to-pink-500',
+    features: ['15 Active Automations', '10,000 Total Runs/month', '5,000 Step Runs/month', '15 AI Agents', '100+ Platform Integrations', 'Priority Support', 'Advanced Analytics', 'Custom Triggers', 'Team Collaboration'],
+    popular: true
+  }, {
+    name: 'Business',
+    description: 'For scaling companies',
+    price: 99.97,
+    icon: Crown,
+    color: 'from-emerald-500 to-teal-500',
+    features: ['50 Active Automations', '50,000 Total Runs/month', '25,000 Step Runs/month', '50 AI Agents', '200+ Platform Integrations', 'Dedicated Support', 'Advanced Security', 'Team Collaboration', 'Custom Integrations'],
+    popular: false
+  }, {
+    name: 'Enterprise',
+    description: 'For large organizations',
+    price: 149.97,
+    icon: Crown,
+    color: 'from-gradient-start to-gradient-end',
+    features: ['100 Active Automations', '100,000 Total Runs/month', '50,000 Step Runs/month', '100 AI Agents', '500+ Platform Integrations', 'White-glove Support', 'Custom Integrations', 'API Access', 'Enterprise Security'],
+    popular: false
+  }];
   const specialPlan = {
     name: 'Special Beta',
     description: 'Limited Time Offer - 24 Hours Only',
     price: 59.97,
     icon: Gift,
     color: 'from-yellow-400 to-orange-500',
-    features: [
-      '25 Active Automations',
-      '25,000 Total Runs/month',
-      '12,500 Step Runs/month',
-      '25 AI Agents',
-      '200+ Platform Integrations',
-      'Priority Support',
-      'Advanced Analytics',
-      'Custom Triggers',
-      'Team Collaboration'
-    ],
+    features: ['25 Active Automations', '25,000 Total Runs/month', '12,500 Step Runs/month', '25 AI Agents', '200+ Platform Integrations', 'Priority Support', 'Advanced Analytics', 'Custom Triggers', 'Team Collaboration'],
     badge: 'BETA SPECIAL'
   };
-
-  return (
-    <section id="pricing" className="py-20 px-6 bg-gradient-to-b from-gray-50 to-blue-50">
+  return <section id="pricing" className="py-20 px-6 bg-gradient-to-b from-gray-50 to-blue-50">
       <div className="max-w-7xl mx-auto">
         {/* Section Header */}
         <div className="text-center mb-16">
@@ -128,23 +69,14 @@ const PricingSection = () => {
         {/* Plans Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
           {plans.map((plan, index) => {
-            const PlanIcon = plan.icon;
-            
-            return (
-              <div 
-                key={index}
-                className={`relative bg-white rounded-3xl p-8 shadow-lg border-2 transition-all duration-300 hover:shadow-xl hover:-translate-y-2 ${
-                  plan.popular ? 'border-purple-300 scale-105' : 'border-gray-200'
-                }`}
-              >
+          const PlanIcon = plan.icon;
+          return <div key={index} className={`relative bg-white rounded-3xl p-8 shadow-lg border-2 transition-all duration-300 hover:shadow-xl hover:-translate-y-2 ${plan.popular ? 'border-purple-300 scale-105' : 'border-gray-200'}`}>
                 {/* Popular Badge */}
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                {plan.popular && <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                     <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-2 rounded-full text-sm font-semibold">
                       MOST POPULAR
                     </div>
-                  </div>
-                )}
+                  </div>}
 
                 {/* Plan Icon */}
                 <div className={`w-16 h-16 bg-gradient-to-r ${plan.color} rounded-2xl flex items-center justify-center mb-6`}>
@@ -165,39 +97,26 @@ const PricingSection = () => {
 
                 {/* Features */}
                 <ul className="space-y-3 mb-8">
-                  {plan.features.map((feature, featureIndex) => (
-                    <li key={featureIndex} className="flex items-center gap-3">
+                  {plan.features.map((feature, featureIndex) => <li key={featureIndex} className="flex items-center gap-3">
                       <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
                       <span className="text-gray-700 text-sm">{feature}</span>
-                    </li>
-                  ))}
+                    </li>)}
                 </ul>
 
                 {/* CTA Button */}
-                <button className={`w-full py-4 rounded-2xl font-semibold transition-all ${
-                  plan.popular 
-                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}>
+                <button className={`w-full py-4 rounded-2xl font-semibold transition-all ${plan.popular ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
                   Start Free Trial
                 </button>
-              </div>
-            );
-          })}
+              </div>;
+        })}
         </div>
 
         {/* Special Offer Reveal */}
         <div className="text-center mb-8">
-          {!showSpecial ? (
-            <button
-              onClick={() => setShowSpecial(true)}
-              className="group bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:shadow-xl transition-all duration-300 relative overflow-hidden"
-            >
+          {!showSpecial ? <button onClick={() => setShowSpecial(true)} className="group bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:shadow-xl transition-all duration-300 relative overflow-hidden">
               <span className="relative z-10">🎁 Unlock Beta Special</span>
               <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-red-500 transform translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
-            </button>
-          ) : (
-            <div className="animate-fade-in">
+            </button> : <div className="animate-fade-in">
               {/* Special Beta Plan */}
               <div className="max-w-2xl mx-auto bg-gradient-to-r from-yellow-50 to-orange-50 rounded-3xl p-8 border-4 border-yellow-300 shadow-2xl relative overflow-hidden">
                 {/* Animated Background */}
@@ -236,12 +155,10 @@ const PricingSection = () => {
 
                   {/* Special Features */}
                   <div className="grid md:grid-cols-2 gap-3 mb-8">
-                    {specialPlan.features.map((feature, index) => (
-                      <div key={index} className="flex items-center gap-3">
+                    {specialPlan.features.map((feature, index) => <div key={index} className="flex items-center gap-3">
                         <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
                         <span className="text-gray-700 text-sm">{feature}</span>
-                      </div>
-                    ))}
+                      </div>)}
                   </div>
 
                   {/* Special CTA */}
@@ -255,22 +172,13 @@ const PricingSection = () => {
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            </div>}
         </div>
 
         {/* Guarantees */}
         <div className="grid md:grid-cols-3 gap-8 text-center">
-          <div className="space-y-3">
-            <div className="text-4xl">💰</div>
-            <h4 className="font-semibold text-gray-900">30-Day Money Back</h4>
-            <p className="text-gray-600">Not satisfied? Get a full refund.</p>
-          </div>
-          <div className="space-y-3">
-            <div className="text-4xl">🔒</div>
-            <h4 className="font-semibold text-gray-900">Secure Payments</h4>
-            <p className="text-gray-600">Enterprise-grade security for all transactions.</p>
-          </div>
+          
+          
           <div className="space-y-3">
             <div className="text-4xl">📞</div>
             <h4 className="font-semibent text-gray-900">24/7 Support</h4>
@@ -278,8 +186,6 @@ const PricingSection = () => {
           </div>
         </div>
       </div>
-    </section>
-  );
+    </section>;
 };
-
 export default PricingSection;

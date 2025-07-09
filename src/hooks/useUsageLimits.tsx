@@ -96,7 +96,7 @@ export const useUsageLimits = () => {
     if (current >= max) {
       toast({
         title: "Limit Reached",
-        description: `You've reached your ${type} limit. Upgrade your plan to continue.`,
+        description: `You've reached your ${type} limit (${max}). Upgrade your plan to continue.`,
         variant: "destructive",
       });
       return false;
@@ -117,13 +117,17 @@ export const useUsageLimits = () => {
     if (!user) return;
 
     try {
+      const fieldMap = {
+        automations: 'active_automations_count',
+        totalRuns: 'total_runs_used',
+        stepRuns: 'step_runs_used',
+        aiAgents: 'active_ai_agents_count'
+      };
+
       const { error } = await supabase
         .from('usage_tracking')
         .update({
-          [`${type === 'automations' ? 'active_automations_count' : 
-             type === 'totalRuns' ? 'total_runs_used' :
-             type === 'stepRuns' ? 'step_runs_used' : 'active_ai_agents_count'}`]: 
-             (limits?.currentUsage[type] || 0) + increment
+          [fieldMap[type]]: (limits?.currentUsage[type] || 0) + increment
         })
         .eq('user_id', user.id);
 

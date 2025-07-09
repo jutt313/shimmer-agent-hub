@@ -42,13 +42,48 @@ serve(async (req) => {
     if (!planType) throw new Error("Plan type is required");
     logStep("Plan type received", { planType });
 
-    // Plan configurations
+    // Updated plan configurations with new limits
     const planConfigs = {
-      starter: { price: 29.97, automations: 5, totalRuns: 2500, stepRuns: 1000, aiAgents: 5 },
-      professional: { price: 49.97, automations: 15, totalRuns: 10000, stepRuns: 5000, aiAgents: 15 },
-      business: { price: 99.97, automations: 50, totalRuns: 50000, stepRuns: 25000, aiAgents: 50 },
-      enterprise: { price: 149.97, automations: 100, totalRuns: 100000, stepRuns: 50000, aiAgents: 100 },
-      special: { price: 59.97, automations: 25, totalRuns: 25000, stepRuns: 12500, aiAgents: 25 }
+      starter: { 
+        price: 29.97, 
+        automations: 15, 
+        totalRuns: 2500, 
+        stepRuns: 30000, 
+        aiAgents: 15,
+        priceId: 'price_1RiuXWIxrHFbXTWxtIojw2gL'
+      },
+      professional: { 
+        price: 49.97, 
+        automations: 25, 
+        totalRuns: 10000, 
+        stepRuns: 50000, 
+        aiAgents: 25,
+        priceId: 'price_1RiuXxIxrHFbXTWxcCKoFS10'
+      },
+      business: { 
+        price: 99.97, 
+        automations: 75, 
+        totalRuns: 50000, 
+        stepRuns: 75000, 
+        aiAgents: 75,
+        priceId: 'price_1RiuYRIxrHFbXTWx6Sut9Ngy'
+      },
+      enterprise: { 
+        price: 149.97, 
+        automations: 150, 
+        totalRuns: 150000, 
+        stepRuns: 500000, 
+        aiAgents: 150,
+        priceId: 'price_1RiuYeIxrHFbXTWxne9oCDBE'
+      },
+      special: { 
+        price: 59.97, 
+        automations: 25, 
+        totalRuns: 25000, 
+        stepRuns: 50000, 
+        aiAgents: 25,
+        priceId: 'price_1RiuZ2IxrHFbXTWxnv011Gb0'
+      }
     };
 
     const config = planConfigs[planType as keyof typeof planConfigs];
@@ -70,20 +105,12 @@ serve(async (req) => {
       logStep("New customer created", { customerId });
     }
 
-    // Create checkout session
+    // Create checkout session using pre-created Price ID
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       line_items: [
         {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: `YusrAI ${planType.charAt(0).toUpperCase() + planType.slice(1)} Plan`,
-              description: `${config.automations} automations, ${config.totalRuns.toLocaleString()} runs/month`,
-            },
-            unit_amount: Math.round(config.price * 100),
-            recurring: { interval: "month" },
-          },
+          price: config.priceId,
           quantity: 1,
         },
       ],

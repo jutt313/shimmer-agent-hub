@@ -69,12 +69,8 @@ const SpecialOfferModal = ({ isOpen, onOpenChange }: SpecialOfferModalProps) => 
     if (!user) return;
 
     try {
-      // Create Stripe checkout for special offer
-      const { data, error } = await supabase.functions.invoke('create-subscription', {
-        body: { planType: 'special' }
-      });
-
-      if (error) throw error;
+      // Direct Stripe URL redirect
+      window.open('https://buy.stripe.com/test_aFabJ2297eota5B1zX04804', '_blank');
 
       // Mark offer as claimed
       await supabase
@@ -82,11 +78,6 @@ const SpecialOfferModal = ({ isOpen, onOpenChange }: SpecialOfferModalProps) => 
         .update({ is_claimed: true, claimed_at: new Date().toISOString() })
         .eq('user_id', user.id);
 
-      // Redirect to Stripe checkout
-      if (data.url) {
-        window.open(data.url, '_blank');
-      }
-      
       onOpenChange(false);
     } catch (error) {
       console.error('Error claiming special offer:', error);
@@ -123,12 +114,12 @@ const SpecialOfferModal = ({ isOpen, onOpenChange }: SpecialOfferModalProps) => 
             {[
               '25 Active Automations',
               '25,000 Total Runs/month',
-              '12,500 Step Runs/month',
+              '50,000 Step Runs/month',
               '25 AI Agents',
               '200+ Platform Integrations',
               'Priority Support',
               'Advanced Analytics',
-              'Team Collaboration'
+              'Custom Triggers'
             ].map((feature, index) => (
               <div key={index} className="flex items-center gap-2">
                 <Zap className="w-4 h-4 text-green-500" />

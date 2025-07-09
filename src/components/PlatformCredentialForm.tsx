@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { X, Eye, EyeOff, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -114,7 +113,8 @@ const PlatformCredentialForm = ({
 
     setTesting(true);
     try {
-      console.log('🧪 Testing platform credentials with new format:', platform.name);
+      console.log('🧪 Testing platform credentials:', platform.name);
+      console.log('📝 Credential fields being sent:', Object.keys(credentials));
       
       // Use the new dual-mode testing approach
       const { data, error } = await supabase.functions.invoke('test-credential', {
@@ -150,12 +150,25 @@ const PlatformCredentialForm = ({
           variant: "destructive",
         });
         
-        // Log detailed error for debugging
-        console.error('Test failed details:', {
+        // Enhanced error logging for debugging
+        console.error('🔍 Test failed details:', {
           platform: platform.name,
           error_type: errorType,
+          status_code: data.technical_details?.status_code,
+          credential_fields_sent: data.technical_details?.credential_fields_sent,
+          normalized_fields: data.technical_details?.normalized_fields,
+          auth_headers_used: data.technical_details?.auth_headers_used,
+          response_preview: data.technical_details?.response_preview,
           technical_details: data.technical_details
         });
+
+        // Show additional debugging info for specific error types
+        if (errorType === 'authentication') {
+          console.log('🔐 Authentication Debug Info:');
+          console.log('- Original field names:', Object.keys(credentials));
+          console.log('- Normalized field names:', data.technical_details?.normalized_fields);
+          console.log('- Auth headers used:', data.technical_details?.auth_headers_used);
+        }
       }
     } catch (error: any) {
       console.error('Test error:', error);

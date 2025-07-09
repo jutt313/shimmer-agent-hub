@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
@@ -33,6 +32,50 @@ interface PlatformConfig {
   }>;
 }
 
+// Normalize field names for API compatibility
+const normalizeFieldName = (fieldName: string): string => {
+  const normalizations: Record<string, string> = {
+    'API Key': 'api_key',
+    'api key': 'api_key',
+    'apikey': 'api_key',
+    'Integration Token': 'integration_token',
+    'integration token': 'integration_token',
+    'Bot Token': 'bot_token',
+    'bot token': 'bot_token',
+    'Access Token': 'access_token',
+    'access token': 'access_token',
+    'Client ID': 'client_id',
+    'client id': 'client_id',
+    'Client Secret': 'client_secret',
+    'client secret': 'client_secret',
+    'Database ID': 'database_id',
+    'database id': 'database_id',
+    'Username': 'username',
+    'Password': 'password',
+    'Token': 'token'
+  };
+
+  return normalizations[fieldName] || fieldName.toLowerCase().replace(/\s+/g, '_');
+};
+
+// Normalize credentials object with proper field names
+const normalizeCredentials = (credentials: Record<string, string>): Record<string, string> => {
+  const normalized: Record<string, string> = {};
+  
+  Object.entries(credentials).forEach(([key, value]) => {
+    const normalizedKey = normalizeFieldName(key);
+    normalized[normalizedKey] = value;
+    
+    // Also keep original key for backward compatibility
+    if (normalizedKey !== key) {
+      normalized[key] = value;
+    }
+  });
+
+  console.log('🔄 Normalized credentials:', Object.keys(normalized));
+  return normalized;
+};
+
 // Store credential testing insights
 const storeCredentialInsights = async (platformName: string, testStatus: string, errorDetails: any, supabase: any): Promise<void> => {
   try {
@@ -57,9 +100,135 @@ const storeCredentialInsights = async (platformName: string, testStatus: string,
       .from('universal_knowledge_store')
       .insert(insights);
 
-    console.log(`Stored credential insight for ${platformName}: ${testStatus}`);
+    console.log(`📊 Stored credential insight for ${platformName}: ${testStatus}`);
   } catch (error) {
-    console.error('Failed to store credential insights:', error);
+    console.error('❌ Failed to store credential insights:', error);
+  }
+};
+
+// Enhanced platform-specific authentication header building
+const buildAuthHeaders = (platformName: string, credentials: Record<string, string>): Record<string, string> => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'User-Agent': 'YusrAI-Automation/1.0',
+  };
+
+  const lowerPlatform = platformName.toLowerCase();
+  
+  console.log(`🔐 Building auth headers for ${platformName} with credentials:`, Object.keys(credentials));
+
+  // Platform-specific authentication
+  if (lowerPlatform.includes('typeform')) {
+    const token = credentials.api_key || credentials['API Key'] || credentials.token;
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      console.log('✅ Typeform: Added Bearer token');
+    } else {
+      console.log('❌ Typeform: No API key found');
+    }
+  } else if (lowerPlatform.includes('openai')) {
+    const apiKey = credentials.api_key || credentials['API Key'];
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+      console.log('✅ OpenAI: Added Bearer token');
+    } else {
+      console.log('❌ OpenAI: No API key found');
+    }
+  } else if (lowerPlatform.includes('notion')) {
+    const token = credentials.integration_token || credentials['Integration Token'];
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      headers['Notion-Version'] = '2022-06-28';
+      console.log('✅ Notion: Added Bearer token with version');
+    } else {
+      console.log('❌ Notion: No integration token found');
+    }
+  } else if (lowerPlatform.includes('slack')) {
+    const token = credentials.bot_token || credentials['Bot Token'] || credentials.token;
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      console.log('✅ Slack: Added Bearer token');
+    } else {
+      console.log('❌ Slack: No bot token found');
+    }
+  } else if (lowerPlatform.includes('gmail') || lowerPlatform.includes('google')) {
+    const token = credentials.access_token || credentials['Access Token'];
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      console.log('✅ Google: Added Bearer token');
+    } else {
+      console.log('❌ Google: No access token found');
+    }
+  } else if (lowerPlatform.includes('trello')) {
+    const apiKey = credentials.api_key || credentials['API Key'];
+    const token = credentials.token || credentials['Token'];
+    if (apiKey && token) {
+      // Trello uses query parameters, but we'll add them as headers for now
+      headers['Authorization'] = `OAuth oauth_consumer_key="${apiKey}", oauth_token="${token}"`;
+      console.log('✅ Trello: Added OAuth headers');
+    } else {
+      console.log('❌ Trello: Missing API key or token');
+    }
+  } else {
+    // Generic fallback
+    const apiKey = credentials.api_key || credentials['API Key'] || credentials.token;
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+      console.log(`✅ ${platformName}: Added generic Bearer token`);
+    } else {
+      console.log(`❌ ${platformName}: No API key found for generic auth`);
+    }
+  }
+
+  return headers;
+};
+
+// Get platform-specific test endpoint
+const getTestEndpoint = (platformName: string): { endpoint: string; method: string; baseURL: string } => {
+  const lowerPlatform = platformName.toLowerCase();
+  
+  if (lowerPlatform.includes('typeform')) {
+    return { 
+      endpoint: 'me', 
+      method: 'GET', 
+      baseURL: 'https://api.typeform.com' 
+    };
+  } else if (lowerPlatform.includes('openai')) {
+    return { 
+      endpoint: 'models', 
+      method: 'GET', 
+      baseURL: 'https://api.openai.com/v1' 
+    };
+  } else if (lowerPlatform.includes('notion')) {
+    return { 
+      endpoint: 'users/me', 
+      method: 'GET', 
+      baseURL: 'https://api.notion.com/v1' 
+    };
+  } else if (lowerPlatform.includes('slack')) {
+    return { 
+      endpoint: 'auth.test', 
+      method: 'GET', 
+      baseURL: 'https://slack.com/api' 
+    };
+  } else if (lowerPlatform.includes('gmail') || lowerPlatform.includes('google')) {
+    return { 
+      endpoint: 'users/me/profile', 
+      method: 'GET', 
+      baseURL: 'https://www.googleapis.com/gmail/v1' 
+    };
+  } else if (lowerPlatform.includes('trello')) {
+    return { 
+      endpoint: 'members/me', 
+      method: 'GET', 
+      baseURL: 'https://api.trello.com/1' 
+    };
+  } else {
+    return { 
+      endpoint: 'user', 
+      method: 'GET', 
+      baseURL: `https://api.${lowerPlatform}.com` 
+    };
   }
 };
 
@@ -344,7 +513,7 @@ serve(async (req) => {
       }
     }
 
-    // Handle platform credential testing - NEW DUAL MODE APPROACH
+    // Handle platform credential testing - ENHANCED MODE
     if (requestBody.type === 'platform') {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -357,93 +526,139 @@ serve(async (req) => {
       }
 
       console.log(`🧪 Testing raw credentials for platform: ${platform_name}`);
+      console.log(`📝 Original credentials:`, Object.keys(credential_fields));
 
-      // Get all automations to find platforms_config for this platform
-      let platformsConfig: PlatformConfig[] = [];
+      // Normalize credentials for API compatibility
+      const normalizedCredentials = normalizeCredentials(credential_fields);
       
-      if (user_id) {
-        const { data: automations, error: automationsError } = await supabase
-          .from('automations')
-          .select('platforms_config')
-          .eq('user_id', user_id)
-          .not('platforms_config', 'is', null);
-
-        if (!automationsError && automations && automations.length > 0) {
-          // Merge all platforms_config from user's automations
-          for (const automation of automations) {
-            if (automation.platforms_config && Array.isArray(automation.platforms_config)) {
-              platformsConfig = [...platformsConfig, ...automation.platforms_config];
-            }
-          }
-          
-          // Remove duplicates based on platform name
-          platformsConfig = platformsConfig.filter((config, index, self) => 
-            index === self.findIndex(c => c.name.toLowerCase() === config.name.toLowerCase())
-          );
-        }
-      }
-
-      // Build dynamic platform configuration
-      const platformConfig = buildDynamicPlatformConfig(
-        platform_name, 
-        platformsConfig, 
-        credential_fields
-      );
-
+      // Build authentication headers
+      const authHeaders = buildAuthHeaders(platform_name, normalizedCredentials);
+      
       // Get test endpoint
-      const testEndpoint = getDynamicTestEndpoint(platform_name, platformsConfig);
-
+      const testConfig = getTestEndpoint(platform_name);
+      
       // Build test URL
-      const testUrl = `${platformConfig.baseURL.replace(/\/$/, '')}/${testEndpoint.endpoint.replace(/^\//, '')}`;
+      const testUrl = `${testConfig.baseURL}/${testConfig.endpoint.replace(/^\//, '')}`;
 
       console.log(`🔗 Testing credential for ${platform_name} at: ${testUrl}`);
-      console.log(`📋 Test method: ${testEndpoint.method}`);
-      console.log(`🔑 Headers:`, Object.keys(platformConfig.headers));
+      console.log(`📋 Test method: ${testConfig.method}`);
+      console.log(`🔑 Auth headers set:`, Object.keys(authHeaders).filter(k => k.includes('Auth')));
 
-      // Make test request
-      const testResponse = await fetch(testUrl, {
-        method: testEndpoint.method,
-        headers: platformConfig.headers,
-        timeout: platformConfig.timeout,
-      });
+      // Make test request with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-      const testMessage = testResponse.ok 
-        ? `✅ Credential test successful for ${platform_name}` 
-        : `❌ Credential test failed for ${platform_name}: ${testResponse.status}`;
-
-      let responseText = '';
       try {
-        responseText = await testResponse.text();
-      } catch (error) {
-        console.error('Failed to read response text:', error);
+        const testResponse = await fetch(testUrl, {
+          method: testConfig.method,
+          headers: authHeaders,
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        let responseText = '';
+        try {
+          responseText = await testResponse.text();
+        } catch (error) {
+          console.error('Failed to read response text:', error);
+        }
+
+        const technicalDetails = {
+          status_code: testResponse.status,
+          response_preview: responseText.substring(0, 300),
+          test_url: testUrl,
+          test_method: testConfig.method,
+          platform_name: platform_name,
+          credential_fields_sent: Object.keys(credential_fields),
+          normalized_fields: Object.keys(normalizedCredentials),
+          auth_headers_used: Object.keys(authHeaders).filter(k => k.includes('Auth')),
+          timestamp: new Date().toISOString()
+        };
+
+        let userMessage = '';
+        let errorType = 'unknown';
+
+        if (testResponse.ok) {
+          userMessage = `✅ ${platform_name} credentials are working correctly!`;
+          console.log(`✅ Credential test successful for ${platform_name}`);
+        } else {
+          // Enhanced error categorization
+          switch (testResponse.status) {
+            case 401:
+              errorType = 'authentication';
+              userMessage = `❌ Authentication failed for ${platform_name}. Please check your API key/token is correct and has proper permissions.`;
+              break;
+            case 403:
+              errorType = 'permission';
+              userMessage = `❌ Permission denied for ${platform_name}. Your credentials may not have the required permissions.`;
+              break;
+            case 404:
+              errorType = 'endpoint';
+              userMessage = `❌ API endpoint not found for ${platform_name}. This might be a configuration issue.`;
+              break;
+            case 429:
+              errorType = 'rate_limit';
+              userMessage = `❌ Rate limit exceeded for ${platform_name}. Please try again later.`;
+              break;
+            case 500:
+              errorType = 'server_error';
+              userMessage = `❌ ${platform_name} server error. Please try again later.`;
+              break;
+            default:
+              errorType = 'unknown';
+              userMessage = `❌ Credential test failed for ${platform_name}: HTTP ${testResponse.status}`;
+          }
+          
+          console.log(`❌ Credential test failed for ${platform_name}: ${testResponse.status}`);
+        }
+
+        // Store credential insights for learning (async, don't await)
+        storeCredentialInsights(
+          platform_name, 
+          testResponse.ok ? 'success' : 'failed', 
+          { ...technicalDetails, error_type: errorType }, 
+          supabase
+        );
+
+        return new Response(JSON.stringify({
+          success: testResponse.ok,
+          user_message: userMessage,
+          technical_details: { ...technicalDetails, error_type: errorType }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        
+        let errorType = 'network';
+        let userMessage = '';
+        
+        if (fetchError.name === 'AbortError') {
+          errorType = 'timeout';
+          userMessage = `❌ Request timeout for ${platform_name}. The platform may be slow to respond.`;
+        } else {
+          errorType = 'network';
+          userMessage = `❌ Network error testing ${platform_name}. Please check your internet connection.`;
+        }
+
+        console.error(`❌ Network error testing ${platform_name}:`, fetchError.message);
+
+        return new Response(JSON.stringify({
+          success: false,
+          user_message: userMessage,
+          technical_details: {
+            error_type: errorType,
+            error_message: fetchError.message,
+            platform_name: platform_name,
+            test_url: testUrl,
+            timestamp: new Date().toISOString()
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
-
-      const technicalDetails = {
-        status_code: testResponse.status,
-        response_preview: responseText.substring(0, 200),
-        test_url: testUrl,
-        test_method: testEndpoint.method,
-        platform_config_source: platformsConfig.find(c => 
-          c.name.toLowerCase() === platform_name.toLowerCase()
-        ) ? 'dynamic' : 'fallback',
-        timestamp: new Date().toISOString()
-      };
-
-      // Store credential insights for learning (async, don't await)
-      storeCredentialInsights(
-        platform_name, 
-        testResponse.ok ? 'success' : 'failed', 
-        technicalDetails, 
-        supabase
-      );
-
-      return new Response(JSON.stringify({
-        success: testResponse.ok,
-        user_message: testMessage,
-        technical_details: technicalDetails
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
     }
 
     // Legacy support for old credential testing format

@@ -9,16 +9,56 @@ interface UsageLimits {
   maxTotalRuns: number;
   maxStepRuns: number;
   maxAiAgents: number;
+  maxPlatformIntegrations: number;
   currentUsage: {
     automations: number;
     totalRuns: number;
     stepRuns: number;
     aiAgents: number;
+    platformIntegrations: number;
   };
   planType: string;
   isTrialActive: boolean;
   trialEndsAt: string | null;
 }
+
+const PLAN_LIMITS = {
+  starter: {
+    maxAutomations: 15,
+    maxTotalRuns: 2500,
+    maxStepRuns: 50000, // 50K step runs
+    maxAiAgents: 15,
+    maxPlatformIntegrations: 60
+  },
+  professional: {
+    maxAutomations: 25,
+    maxTotalRuns: 10000,
+    maxStepRuns: 100000, // 100K step runs
+    maxAiAgents: 25,
+    maxPlatformIntegrations: 130
+  },
+  business: {
+    maxAutomations: 75,
+    maxTotalRuns: 50000,
+    maxStepRuns: 300000, // 300K step runs
+    maxAiAgents: 75,
+    maxPlatformIntegrations: 300
+  },
+  enterprise: {
+    maxAutomations: 150,
+    maxTotalRuns: 150000,
+    maxStepRuns: 1000000, // 1M step runs
+    maxAiAgents: 150,
+    maxPlatformIntegrations: 500
+  },
+  special: {
+    maxAutomations: 25,
+    maxTotalRuns: 25000,
+    maxStepRuns: 500000, // 500K step runs
+    maxAiAgents: 25,
+    maxPlatformIntegrations: 200
+  }
+};
 
 export const useUsageLimits = () => {
   const { user } = useAuth();
@@ -48,21 +88,34 @@ export const useUsageLimits = () => {
 
       if (usageError) throw usageError;
 
+      // Get current platform integrations count
+      const { data: platformCredentials, error: platformError } = await supabase
+        .from('platform_credentials')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('is_active', true);
+
+      if (platformError) throw platformError;
+
       // Check if trial is active
       const now = new Date();
       const trialEnd = subscription.trial_ends_at ? new Date(subscription.trial_ends_at) : null;
       const isTrialActive = trialEnd ? now < trialEnd : false;
 
+      const planLimits = PLAN_LIMITS[subscription.plan_type as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.starter;
+
       setLimits({
-        maxAutomations: subscription.max_automations,
-        maxTotalRuns: subscription.max_total_runs,
-        maxStepRuns: subscription.max_step_runs,
-        maxAiAgents: subscription.max_ai_agents,
+        maxAutomations: planLimits.maxAutomations,
+        maxTotalRuns: planLimits.maxTotalRuns,
+        maxStepRuns: planLimits.maxStepRuns,
+        maxAiAgents: planLimits.maxAiAgents,
+        maxPlatformIntegrations: planLimits.maxPlatformIntegrations,
         currentUsage: {
           automations: usage.active_automations_count,
           totalRuns: usage.total_runs_used,
           stepRuns: usage.step_runs_used,
           aiAgents: usage.active_ai_agents_count,
+          platformIntegrations: platformCredentials?.length || 0,
         },
         planType: subscription.plan_type,
         isTrialActive,
@@ -87,11 +140,25 @@ export const useUsageLimits = () => {
     }
   }, [user]);
 
-  const checkLimit = (type: 'automations' | 'aiAgents') => {
+  const checkLimit = (type: 'automations' | 'aiAgents' | 'platformIntegrations') => {
     if (!limits) return false;
 
     const current = limits.currentUsage[type];
-    const max = type === 'automations' ? limits.maxAutomations : limits.maxAiAgents;
+    let max: number;
+    
+    switch (type) {
+      case 'automations':
+        max = limits.maxAutomations;
+        break;
+      case 'aiAgents':
+        max = limits.maxAiAgents;
+        break;
+      case 'platformIntegrations':
+        max = limits.maxPlatformIntegrations;
+        break;
+      default:
+        return false;
+    }
 
     if (current >= max) {
       toast({

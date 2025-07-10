@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +21,7 @@ import {
 import KnowledgeChat from "@/components/KnowledgeChat";
 import JsonDataImporter from "@/components/JsonDataImporter";
 import PlatformCredentialManager from "@/components/PlatformCredentialManager";
+import ToolWorkflowDiagram from "@/components/ToolWorkflowDiagram";
 import { supabase } from "@/integrations/supabase/client";
 import { Json } from "@/integrations/supabase/types";
 
@@ -260,8 +260,9 @@ const KnowledgeAdmin = () => {
             </div>
           </div>
           
-          {/* Real-time Stats Badges */}
+          {/* Enhanced Action Bar */}
           <div className="flex items-center gap-3">
+            <ToolWorkflowDiagram />
             <Badge variant="outline" className="text-green-700 border-green-200 bg-green-50 px-3 py-1">
               <CheckCircle className="h-4 w-4 mr-1" />
               {stats.total_entries} Total Entries

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Check, Crown, Zap, Star, Gift } from 'lucide-react';
 
@@ -11,7 +10,7 @@ const PricingSection = () => {
     price: 29.97,
     icon: Zap,
     color: 'from-blue-500 to-cyan-500',
-    features: ['15 Active Automations', '2,500 Total Runs/month', '30,000 Step Runs/month', '15 AI Agents', '50+ Platform Integrations', 'Email Support', 'Basic Analytics'],
+    features: ['15 Active Automations', '2,500 Total Runs/month', '50,000 Step Runs/month', '15 AI Agents', '60+ Platform Integrations', 'Email Support', 'Basic Analytics'],
     popular: false,
     stripeUrl: 'https://buy.stripe.com/test_4gM14odRPdkp4Lh2E104800'
   }, {
@@ -20,7 +19,7 @@ const PricingSection = () => {
     price: 49.97,
     icon: Star,
     color: 'from-purple-500 to-pink-500',
-    features: ['25 Active Automations', '10,000 Total Runs/month', '50,000 Step Runs/month', '25 AI Agents', '100+ Platform Integrations', 'Priority Support', 'Advanced Analytics', 'Custom Triggers'],
+    features: ['25 Active Automations', '10,000 Total Runs/month', '100,000 Step Runs/month', '25 AI Agents', '130+ Platform Integrations', 'Priority Support', 'Advanced Analytics', 'Custom Triggers'],
     popular: true,
     stripeUrl: 'https://buy.stripe.com/test_fZubJ2dRPgwB0v15Qd04801'
   }, {
@@ -29,7 +28,7 @@ const PricingSection = () => {
     price: 99.97,
     icon: Crown,
     color: 'from-emerald-500 to-teal-500',
-    features: ['75 Active Automations', '50,000 Total Runs/month', '75,000 Step Runs/month', '75 AI Agents', '200+ Platform Integrations', 'Dedicated Support', 'Advanced Security', 'Custom Integrations'],
+    features: ['75 Active Automations', '50,000 Total Runs/month', '300,000 Step Runs/month', '75 AI Agents', '300+ Platform Integrations', 'Dedicated Support', 'Advanced Security', 'Custom Integrations'],
     popular: false,
     stripeUrl: 'https://buy.stripe.com/test_4gMaEY5lj5RXcdJfqN04802'
   }, {
@@ -38,7 +37,7 @@ const PricingSection = () => {
     price: 149.97,
     icon: Crown,
     color: 'from-gradient-start to-gradient-end',
-    features: ['150 Active Automations', '150,000 Total Runs/month', '500,000 Step Runs/month', '150 AI Agents', '500+ Platform Integrations', 'White-glove Support', 'Custom Integrations', 'Enterprise Security'],
+    features: ['150 Active Automations', '150,000 Total Runs/month', '1,000,000 Step Runs/month', '150 AI Agents', '500+ Platform Integrations', 'White-glove Support', 'Custom Integrations', 'Enterprise Security'],
     popular: false,
     stripeUrl: 'https://buy.stripe.com/test_28E4gAdRPbch1z5diF04803'
   }];
@@ -49,7 +48,7 @@ const PricingSection = () => {
     price: 59.97,
     icon: Gift,
     color: 'from-yellow-400 to-orange-500',
-    features: ['25 Active Automations', '25,000 Total Runs/month', '50,000 Step Runs/month', '25 AI Agents', '200+ Platform Integrations', 'Priority Support', 'Advanced Analytics', 'Custom Triggers'],
+    features: ['25 Active Automations', '25,000 Total Runs/month', '500,000 Step Runs/month', '25 AI Agents', '200+ Platform Integrations', 'Priority Support', 'Advanced Analytics', 'Custom Triggers'],
     badge: 'BETA SPECIAL',
     stripeUrl: 'https://buy.stripe.com/test_aFabJ2297eota5B1zX04804'
   };

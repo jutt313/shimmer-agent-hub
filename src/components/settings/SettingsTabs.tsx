@@ -1,11 +1,12 @@
 
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { User, Shield, Bot, Settings } from "lucide-react";
+import { User, Shield, Bot, Settings, BarChart3 } from "lucide-react";
 import ProfileTab from "./ProfileTab";
 import PlatformCredentialsTab from "./PlatformCredentialsTab";
 import AutomationsTab from "./AutomationsTab";
 import NotificationsTab from "./NotificationsTab";
+import UsageTab from "./UsageTab";
 
 const SettingsTabs = () => {
   const [activeTab, setActiveTab] = useState("profile");
@@ -18,7 +19,7 @@ const SettingsTabs = () => {
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 bg-white/80 backdrop-blur-sm rounded-2xl p-2 shadow-sm border">
+        <TabsList className="grid w-full grid-cols-5 bg-white/80 backdrop-blur-sm rounded-2xl p-2 shadow-sm border">
           <TabsTrigger 
             value="profile" 
             className="flex items-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300"
@@ -41,6 +42,13 @@ const SettingsTabs = () => {
             Credentials
           </TabsTrigger>
           <TabsTrigger 
+            value="usage" 
+            className="flex items-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300"
+          >
+            <BarChart3 className="w-4 h-4" />
+            Usage
+          </TabsTrigger>
+          <TabsTrigger 
             value="notifications" 
             className="flex items-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300"
           >
@@ -59,6 +67,10 @@ const SettingsTabs = () => {
 
         <TabsContent value="credentials">
           <PlatformCredentialsTab />
+        </TabsContent>
+
+        <TabsContent value="usage">
+          <UsageTab />
         </TabsContent>
 
         <TabsContent value="notifications">

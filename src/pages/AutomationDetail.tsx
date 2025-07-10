@@ -15,7 +15,6 @@ import AutomationDiagramDisplay from "@/components/AutomationDiagramDisplay";
 import { AutomationBlueprint } from "@/types/automation";
 import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
 import AutomationExecutionPanel from "@/components/AutomationExecutionPanel";
-import { agentStateManager } from '@/utils/agentStateManager';
 
 interface Automation {
   id: string;
@@ -332,7 +331,7 @@ const AutomationDetail = () => {
     setSendingMessage(true);
 
     try {
-      console.log('🚀 Sending message with agent state context:', messageText.substring(0, 50));
+      console.log('🚀 Sending message with full conversation context:', messageText.substring(0, 50));
 
       // Save user message to database
       await supabase
@@ -343,7 +342,7 @@ const AutomationDetail = () => {
           message_content: messageText
         });
 
-      // Prepare automation context with agent decisions
+      // Prepare automation context for AI
       const automationContext = {
         id: automation.id,
         title: automation.title,
@@ -352,17 +351,13 @@ const AutomationDetail = () => {
         automation_blueprint: automation.automation_blueprint
       };
 
-      // Get agent status summary for AI context
-      const agentStatusSummary = agentStateManager.getStatusSummary();
-
-      // Call the chat-ai function with FULL conversation context + agent state
+      // Call the chat-ai function with FULL conversation context
       const { data, error } = await supabase.functions.invoke('chat-ai', {
         body: {
           message: messageText,
           messages: messages,
           automationId: automation.id,
-          automationContext: automationContext,
-          agentStatusSummary: agentStatusSummary // Include agent decisions
+          automationContext: automationContext
         }
       });
 
@@ -462,18 +457,6 @@ const AutomationDetail = () => {
         }
       }
 
-      // Handle agent state after receiving AI response
-      if (structuredData?.agents && Array.isArray(structuredData.agents)) {
-        // Check if this is a new agent recommendation or repeat
-        const newAgents = structuredData.agents.filter(agent => 
-          !agentStateManager.hasDecisionFor(agent.name)
-        );
-        
-        if (newAgents.length === 0 && structuredData.agents.length > 0) {
-          console.log('⚠️ AI recommended already handled agents, this should not happen');
-        }
-      }
-
       // Update automation blueprint and generate new diagram if available
       if (structuredData?.automation_blueprint) {
         console.log('🔧 Updating automation blueprint and generating new diagram');
@@ -538,10 +521,6 @@ const AutomationDetail = () => {
   const handleAgentSaved = (agentName: string, agentId: string) => {
     setShowAIAgentForm(false);
     setSelectedAgent(null);
-    
-    // Update agent state manager
-    agentStateManager.addAgent(agentName, { name: agentName, id: agentId });
-    
     if (automation) {
       const confirmationMessage = `I've successfully configured your new AI Agent: "${agentName}"!`;
       
@@ -552,26 +531,18 @@ const AutomationDetail = () => {
         timestamp: new Date()
       }]);
 
-      // Include agent status in the message to AI
-      const agentStatusSummary = agentStateManager.getStatusSummary();
-      const enhancedMessage = `Please incorporate the newly configured AI Agent "${agentName}" (ID: ${agentId}) into this automation's blueprint. ${agentStatusSummary} Please update the blueprint and explain its role and impact on the workflow.`;
-
-      handleSendMessage(enhancedMessage).then(() => {
+      handleSendMessage(`Please incorporate the newly configured AI Agent "${agentName}" (ID: ${agentId}) into this automation's blueprint and explain its role and impact on the workflow with full awareness of our conversation.`).then(() => {
         setNewMessage("");
       });
     }
   };
 
   const handleAgentAdd = (agent: any) => {
-    console.log('🤖 Adding agent from chat:', agent.name);
-    agentStateManager.addAgent(agent.name, agent);
     setSelectedAgent(agent);
     setShowAIAgentForm(true);
   };
 
   const handleAgentDismiss = (agentName: string) => {
-    console.log('❌ Dismissing agent from chat:', agentName);
-    agentStateManager.dismissAgent(agentName);
     setDismissedAgents(prev => new Set([...prev, agentName]));
   };
 
@@ -696,10 +667,6 @@ const AutomationDetail = () => {
                 onAgentDismiss={handleAgentDismiss}
                 automationId={automation.id}
                 isLoading={sendingMessage}
-                onSendMessage={handleSendMessage}
-                platformCredentialStatus={Object.fromEntries(
-                  currentPlatforms.map(p => [p.name, 'saved'])
-                )}
               />
             </div>
           </div>

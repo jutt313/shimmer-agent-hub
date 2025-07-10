@@ -1,14 +1,13 @@
-
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Bot, Plus, X, Play } from "lucide-react";
+import { Bot, Plus, X, Send, Play } from "lucide-react";
 import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useErrorRecovery } from "@/hooks/useErrorRecovery";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { agentStateManager } from '@/utils/agentStateManager';
 
 interface Message {
   id: number;
@@ -44,13 +43,9 @@ const ChatCard = ({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { handleError } = useErrorRecovery();
+  const [inputMessage, setInputMessage] = useState("");
   const { toast } = useToast();
   const { user } = useAuth();
-
-  // Initialize agent state manager
-  useEffect(() => {
-    agentStateManager.setAutomationId(automationId);
-  }, [automationId]);
 
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
@@ -128,23 +123,6 @@ const ChatCard = ({
     }
   };
 
-  // Enhanced agent handling
-  const handleAgentAdd = (agent: any) => {
-    console.log(`🤖 User adding agent: ${agent.name}`);
-    agentStateManager.addAgent(agent.name, agent);
-    if (onAgentAdd) {
-      onAgentAdd(agent);
-    }
-  };
-
-  const handleAgentDismiss = (agentName: string) => {
-    console.log(`❌ User dismissing agent: ${agentName}`);
-    agentStateManager.dismissAgent(agentName);
-    if (onAgentDismiss) {
-      onAgentDismiss(agentName);
-    }
-  };
-
   // Check if all platforms are configured and agents handled
   const checkReadyForExecution = () => {
     // Get platforms from latest bot message
@@ -166,7 +144,7 @@ const ChatCard = ({
     return allPlatformsConfigured && allAgentsHandled && platforms.length > 0;
   };
 
-  // Enhanced automation execution with agent state
+  // FIXED: Proper automation execution handler
   const handleExecuteAutomation = async () => {
     if (!user?.id) {
       toast({
@@ -188,16 +166,12 @@ const ChatCard = ({
     }
 
     try {
-      console.log('🚀 Executing automation with agent state');
-      
-      // Include agent decisions in execution data
-      const agentDecisions = agentStateManager.getAllDecisions();
+      console.log('🚀 Executing automation via execute-automation function');
       
       const { data, error } = await supabase.functions.invoke('execute-automation', {
         body: {
           automation_id: automationId,
           automation_data: latestBotMessage.structuredData,
-          agent_decisions: agentDecisions,
           trigger_data: {
             executed_at: new Date().toISOString(),
             trigger_type: 'manual',
@@ -229,6 +203,19 @@ const ChatCard = ({
         description: "An unexpected error occurred during execution",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleSendMessage = () => {
+    if (!inputMessage.trim() || !onSendMessage) return;
+    onSendMessage(inputMessage);
+    setInputMessage("");
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
     }
   };
 
@@ -365,7 +352,7 @@ const ChatCard = ({
         );
       }
 
-      // Enhanced AI Agents rendering with state management
+      // Simplified AI Agents - Show only names with buttons
       if (Array.isArray(structuredData.agents) && structuredData.agents.length > 0) {
         content.push(
           <div key="agents" className="mb-4">
@@ -376,10 +363,7 @@ const ChatCard = ({
                   return null;
                 }
 
-                const agentStatus = agentStateManager.getAgentStatus(agent.name);
-                
-                // Don't show agents that have been handled
-                if (agentStatus !== 'pending') {
+                if (dismissedAgents.has(agent.name)) {
                   return null;
                 }
                 
@@ -393,7 +377,7 @@ const ChatCard = ({
                     <div className="flex gap-2 ml-4">
                       <Button
                         size="sm"
-                        onClick={() => handleAgentAdd(agent)}
+                        onClick={() => onAgentAdd?.(agent)}
                         className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-3 py-1 text-xs h-7"
                       >
                         <Plus className="w-3 h-3 mr-1" />
@@ -402,7 +386,7 @@ const ChatCard = ({
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleAgentDismiss(agent.name)}
+                        onClick={() => onAgentDismiss?.(agent.name)}
                         className="border-gray-300 text-gray-600 hover:bg-gray-100 px-2 py-1 text-xs h-7"
                       >
                         <X className="w-3 h-3" />
@@ -411,19 +395,6 @@ const ChatCard = ({
                   </div>
                 );
               }).filter(Boolean)}
-            </div>
-          </div>
-        );
-      }
-
-      // Show agent decision summary if any decisions made
-      const agentSummary = agentStateManager.getStatusSummary();
-      if (agentSummary) {
-        content.push(
-          <div key="agent-summary" className="mb-4">
-            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-sm text-blue-800 font-medium">Agent Status:</p>
-              <p className="text-xs text-blue-600 mt-1">{agentSummary}</p>
             </div>
           </div>
         );
@@ -541,6 +512,41 @@ const ChatCard = ({
           <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
+
+      {/* Enhanced Input Area */}
+      {onSendMessage && (
+        <div className="relative z-10 p-4 border-t border-gray-200/50 bg-white/80 backdrop-blur-sm">
+          <div className="flex items-end gap-3 max-w-4xl mx-auto">
+            <div className="flex-shrink-0">
+              <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-600 rounded-full flex items-center justify-center">
+                <Bot className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            <div className="flex-1 relative">
+              <Textarea
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Ask me anything about your automation..."
+                className="resize-none min-h-[44px] max-h-[120px] rounded-xl border-0 bg-white/70 shadow-md focus:shadow-lg transition-shadow pr-12 focus:ring-2 focus:ring-purple-400 focus:ring-offset-2"
+                style={{ 
+                  boxShadow: '0 0 15px rgba(147, 51, 234, 0.1)',
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(240,248,255,0.9) 100%)'
+                }}
+                rows={1}
+              />
+              <Button
+                onClick={handleSendMessage}
+                disabled={!inputMessage.trim() || isLoading}
+                size="sm"
+                className="absolute right-2 bottom-2 bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white rounded-lg h-8 w-8 p-0"
+              >
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

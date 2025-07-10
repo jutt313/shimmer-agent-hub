@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -7,18 +6,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// FULLY DYNAMIC AUTOMATION EXECUTOR - ZERO HARDCODED PLATFORM LOGIC
-class UniversalAutomationExecutor {
+// AUTOMATION-SPECIFIC CREDENTIAL EXECUTOR
+class AutomationSpecificExecutor {
   private context: any;
   private blueprint: any;
-  private platformsConfig: any[];
-  private credentials: Record<string, Record<string, string>> = {};
+  private automationCredentials: Record<string, Record<string, string>> = {};
   private supabaseClient: any;
   private universalIntegrator: any;
 
-  constructor(blueprint: any, runId: string, userId: string, automationId: string, platformsConfig: any[] = [], supabaseClient: any) {
+  constructor(blueprint: any, runId: string, userId: string, automationId: string, supabaseClient: any) {
     this.blueprint = blueprint;
-    this.platformsConfig = platformsConfig;
     this.supabaseClient = supabaseClient;
     this.context = {
       variables: blueprint.variables || {},
@@ -35,9 +32,9 @@ class UniversalAutomationExecutor {
 
   async execute(): Promise<{ success: boolean; result?: any; error?: string }> {
     try {
-      console.log('🚀 Starting 100% DYNAMIC automation execution for blueprint:', this.blueprint.description);
+      console.log('🚀 Starting AUTOMATION-SPECIFIC credential execution for blueprint:', this.blueprint.description);
       
-      await this.loadCredentials();
+      await this.loadAutomationCredentials();
       
       for (let i = 0; i < this.blueprint.steps.length; i++) {
         this.context.stepIndex = i;
@@ -72,7 +69,7 @@ class UniversalAutomationExecutor {
         }
       }
       
-      console.log('✅ 100% DYNAMIC automation execution completed successfully');
+      console.log('✅ AUTOMATION-SPECIFIC execution completed successfully');
       return { success: true, result: this.context.variables };
       
     } catch (error: any) {
@@ -81,28 +78,32 @@ class UniversalAutomationExecutor {
     }
   }
 
-  private async loadCredentials(): Promise<void> {
+  private async loadAutomationCredentials(): Promise<void> {
+    console.log('🔑 Loading AUTOMATION-SPECIFIC credentials...');
+    
     const { data: credentials, error } = await this.supabaseClient
-      .from('platform_credentials')
+      .from('automation_platform_credentials')
       .select('*')
+      .eq('automation_id', this.context.automationId)
       .eq('user_id', this.context.userId)
       .eq('is_active', true);
 
     if (error) {
-      console.error('Failed to load credentials:', error);
+      console.error('Failed to load automation credentials:', error);
       return;
     }
 
     credentials?.forEach((cred: any) => {
       try {
         const decryptedCreds = JSON.parse(cred.credentials);
-        this.credentials[cred.platform_name.toLowerCase()] = decryptedCreds;
+        this.automationCredentials[cred.platform_name.toLowerCase()] = decryptedCreds;
+        console.log(`✅ Loaded AUTOMATION-SPECIFIC credentials for: ${cred.platform_name}`);
       } catch (e) {
         console.error(`Failed to parse credentials for ${cred.platform_name}:`, e);
       }
     });
 
-    console.log('🔑 Loaded credentials for platforms:', Object.keys(this.credentials));
+    console.log('🔑 Loaded AUTOMATION-SPECIFIC credentials for platforms:', Object.keys(this.automationCredentials));
   }
 
   private async executeStep(step: any): Promise<void> {
@@ -131,7 +132,7 @@ class UniversalAutomationExecutor {
     this.logStep(step.id, 'completed', `Completed step: ${step.name}`);
   }
 
-  // 🎯 CRITICAL: 100% DYNAMIC ACTION EXECUTION - ZERO HARDCODED PLATFORM LOGIC
+  // 🎯 CRITICAL: AUTOMATION-SPECIFIC CREDENTIAL USAGE
   private async executeUniversalAction(step: any): Promise<void> {
     const { action } = step;
     if (!action) throw new Error('Action configuration missing');
@@ -140,16 +141,17 @@ class UniversalAutomationExecutor {
     const method = action.method;
     const parameters = this.resolveVariables(action.parameters);
 
-    console.log(`🌍 UNIVERSAL EXECUTION: ${platformName}.${method}`, parameters);
+    console.log(`🌍 AUTOMATION-SPECIFIC EXECUTION: ${platformName}.${method}`, parameters);
 
-    const platformCreds = this.credentials[platformName];
+    // Use AUTOMATION-SPECIFIC credentials
+    const platformCreds = this.automationCredentials[platformName];
     if (!platformCreds) {
-      throw new Error(`No credentials found for platform: ${platformName}`);
+      throw new Error(`No AUTOMATION-SPECIFIC credentials found for platform: ${platformName}`);
     }
 
+    console.log(`🔐 Using AUTOMATION-SPECIFIC credentials for ${platformName}`);
+
     try {
-      // 🚀 PROOF: 100% RELIANCE ON UNIVERSAL PLATFORM INTEGRATOR
-      // NO HARDCODED PLATFORM LOGIC - EVERYTHING IS DYNAMICALLY DISCOVERED
       const result = await this.universalIntegrator.callPlatformAPI(
         platformName,
         method,
@@ -157,17 +159,15 @@ class UniversalAutomationExecutor {
         platformCreds
       );
 
-      console.log(`✅ UNIVERSAL API CALL SUCCESS for ${platformName}.${method}:`, result);
+      console.log(`✅ AUTOMATION-SPECIFIC API CALL SUCCESS for ${platformName}.${method}:`, result);
 
       // Store result in output variable if specified
       if (action.output_variable) {
         this.context.variables[action.output_variable] = result;
       }
 
-      console.log(`🎯 DYNAMIC EXECUTION COMPLETE - No hardcoded logic used`);
-
     } catch (error: any) {
-      console.error(`❌ UNIVERSAL API CALL FAILED for ${platformName}.${method}:`, error);
+      console.error(`❌ AUTOMATION-SPECIFIC API CALL FAILED for ${platformName}.${method}:`, error);
       throw error;
     }
   }
@@ -606,7 +606,7 @@ serve(async (req) => {
 
     const { data: automation, error: automationError } = await supabaseClient
       .from('automations')
-      .select('id, title, user_id, automation_blueprint, platforms_config')
+      .select('id, title, user_id, automation_blueprint')
       .eq('id', automation_id)
       .single()
 
@@ -633,7 +633,7 @@ serve(async (req) => {
         body: {
           userId: automation.user_id,
           title: 'Automation Started',
-          message: `Your automation "${automation.title}" has started running with 100% dynamic execution.`,
+          message: `Your automation "${automation.title}" has started running with AUTOMATION-SPECIFIC credentials.`,
           type: 'automation_status',
           category: 'execution',
           metadata: { automation_id: automation.id, run_id: runId }
@@ -664,15 +664,14 @@ serve(async (req) => {
         throw runError
       }
 
-      console.log(`🚀 Starting 100% DYNAMIC automation execution for: ${automation.title}`)
+      console.log(`🚀 Starting AUTOMATION-SPECIFIC execution for: ${automation.title}`)
       
-      // 🎯 CRITICAL PROOF: ZERO HARDCODED PLATFORM LOGIC
-      const executor = new UniversalAutomationExecutor(
+      // 🎯 CRITICAL: USING AUTOMATION-SPECIFIC CREDENTIALS
+      const executor = new AutomationSpecificExecutor(
         automation.automation_blueprint,
         runId,
         automation.user_id,
         automation.id,
-        automation.platforms_config || [],
         supabaseClient
       );
 
@@ -692,7 +691,7 @@ serve(async (req) => {
               completed_at: endTime.toISOString(),
               result: executionResult.result,
               success: true,
-              execution_type: '100% DYNAMIC - ZERO HARDCODED LOGIC'
+              execution_type: 'AUTOMATION-SPECIFIC CREDENTIALS'
             }
           })
           .eq('id', runId)
@@ -701,14 +700,14 @@ serve(async (req) => {
           body: {
             userId: automation.user_id,
             title: 'Automation Completed',
-            message: `Your automation "${automation.title}" completed successfully with 100% dynamic execution.`,
+            message: `Your automation "${automation.title}" completed successfully with automation-specific credentials.`,
             type: 'automation_status',
             category: 'execution',
             metadata: { automation_id: automation.id, run_id: runId, duration_ms: duration }
           }
         });
 
-        console.log(`✅ 100% DYNAMIC automation execution completed: ${automation.title}`)
+        console.log(`✅ AUTOMATION-SPECIFIC execution completed: ${automation.title}`)
 
         return new Response(
           JSON.stringify({ 
@@ -718,7 +717,7 @@ serve(async (req) => {
             duration_ms: duration,
             automation_title: automation.title,
             execution_result: executionResult.result,
-            execution_type: '100% DYNAMIC - ZERO HARDCODED PLATFORM LOGIC'
+            execution_type: 'AUTOMATION-SPECIFIC CREDENTIALS'
           }),
           { 
             status: 200, 
@@ -730,7 +729,7 @@ serve(async (req) => {
       }
 
     } catch (executionError) {
-      console.error('💥 Error during 100% DYNAMIC automation execution:', executionError)
+      console.error('💥 Error during AUTOMATION-SPECIFIC execution:', executionError)
       
       const endTime = new Date()
       const duration = endTime.getTime() - startTime.getTime()
@@ -745,7 +744,7 @@ serve(async (req) => {
             failed_at: endTime.toISOString(),
             error: executionError.message,
             success: false,
-            execution_type: '100% DYNAMIC - ZERO HARDCODED LOGIC'
+            execution_type: 'AUTOMATION-SPECIFIC CREDENTIALS'
           }
         })
         .eq('id', runId)
@@ -763,7 +762,7 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify({ 
-          error: '100% Dynamic automation execution failed',
+          error: 'AUTOMATION-SPECIFIC execution failed',
           run_id: runId,
           details: executionError.message
         }),

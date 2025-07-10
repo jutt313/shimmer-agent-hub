@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -750,18 +749,13 @@ const AutomationDetail = () => {
         </div>
       )}
 
-      {/* Add Execute Button between Platform Buttons and Input Section */}
+      {/* Replace the old AutomationExecuteButton with the new AutomationExecutionPanel */}
       {!showDashboard && !showDiagram && automation?.automation_blueprint && (
-        <div className="px-6 pb-2 flex justify-center">
-          <AutomationExecuteButton
-            automationId={automation.id}
-            blueprint={automation.automation_blueprint}
-            disabled={false}
-            onExecutionComplete={(result) => {
-              console.log('✅ Automation execution completed:', result);
-            }}
-          />
-        </div>
+        <AutomationExecutionPanel
+          automationId={automation.id}
+          blueprint={automation.automation_blueprint}
+          title={automation.title}
+        />
       )}
       
       {/* Input Section - Keep multi-line support for chat */}

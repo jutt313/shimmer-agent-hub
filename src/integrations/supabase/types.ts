@@ -274,6 +274,39 @@ export type Database = {
           },
         ]
       }
+      automation_agent_decisions: {
+        Row: {
+          agent_data: Json | null
+          agent_name: string
+          automation_id: string
+          created_at: string
+          decision: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_data?: Json | null
+          agent_name: string
+          automation_id: string
+          created_at?: string
+          decision: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_data?: Json | null
+          agent_name?: string
+          automation_id?: string
+          created_at?: string
+          decision?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       automation_chats: {
         Row: {
           automation_id: string
@@ -343,6 +376,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      automation_platform_credentials: {
+        Row: {
+          automation_id: string
+          created_at: string
+          credential_type: string
+          credentials: string
+          id: string
+          is_active: boolean
+          is_tested: boolean
+          platform_name: string
+          test_message: string | null
+          test_status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          automation_id: string
+          created_at?: string
+          credential_type?: string
+          credentials: string
+          id?: string
+          is_active?: boolean
+          is_tested?: boolean
+          platform_name: string
+          test_message?: string | null
+          test_status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          automation_id?: string
+          created_at?: string
+          credential_type?: string
+          credentials?: string
+          id?: string
+          is_active?: boolean
+          is_tested?: boolean
+          platform_name?: string
+          test_message?: string | null
+          test_status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       automation_runs: {
         Row: {

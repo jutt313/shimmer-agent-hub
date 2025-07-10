@@ -1,11 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, ExternalLink, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Loader2, ExternalLink, CheckCircle, AlertCircle, Eye, EyeOff, Lock, Edit3 } from 'lucide-react';
 import { SecureCredentialManager } from '@/utils/secureCredentials';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -43,6 +43,7 @@ const PlatformCredentialForm = ({
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [saveAttempts, setSaveAttempts] = useState(0);
   const [hasBeenSaved, setHasBeenSaved] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Initialize credentials object
   useEffect(() => {
@@ -113,8 +114,6 @@ const PlatformCredentialForm = ({
     return true;
   };
 
-  // Removed ensureUserProfile - no longer needed since foreign key constraint is removed
-
   const handleSave = async () => {
     if (!user) {
       toast({
@@ -154,12 +153,13 @@ const PlatformCredentialForm = ({
       if (success) {
         console.log('✅ Credentials saved successfully');
         setHasBeenSaved(true);
+        setIsEditMode(false);
         toast({
           title: "Success",
           description: `${platform.name} credentials saved successfully!`,
         });
         onCredentialSaved();
-        setTimeout(() => onClose(), 1500); // Delay close to show success state
+        setTimeout(() => onClose(), 1500);
       } else {
         throw new Error('Failed to save credentials - SecureCredentialManager returned false');
       }
@@ -275,157 +275,212 @@ const PlatformCredentialForm = ({
     return getInputType(field) === 'password';
   };
 
+  const isMultiLineField = (field: string, value: string) => {
+    const lowerField = field.toLowerCase();
+    return (
+      lowerField.includes('token') || 
+      lowerField.includes('key') || 
+      lowerField.includes('secret') ||
+      value.length > 50
+    );
+  };
+
+  const isReadOnlyMode = hasBeenSaved && !isEditMode;
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto bg-gradient-to-br from-background to-background/95 border border-primary/20 shadow-2xl shadow-primary/10">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 border-2 border-purple-300/30 shadow-2xl shadow-purple-500/20">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl font-semibold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+          <DialogTitle className="flex items-center gap-3 text-2xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent">
             Setup {platform.name} Credentials
             {testStatus === 'success' && (
-              <CheckCircle className="h-5 w-5 text-green-500 animate-pulse" />
+              <CheckCircle className="h-6 w-6 text-emerald-500 animate-pulse" />
             )}
             {testStatus === 'error' && (
-              <AlertCircle className="h-5 w-5 text-red-500" />
+              <AlertCircle className="h-6 w-6 text-red-500" />
             )}
             {hasBeenSaved && (
-              <div className="text-sm text-green-600 font-normal">✓ Saved</div>
+              <div className="flex items-center gap-2">
+                <Lock className="h-5 w-5 text-emerald-600" />
+                <span className="text-sm font-semibold text-emerald-600 bg-emerald-100 px-3 py-1 rounded-full">
+                  Saved & Secured
+                </span>
+              </div>
             )}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
           {platform.credentials.map((cred, index) => {
             const normalizedField = cred.field.toLowerCase().replace(/\s+/g, '_');
             const inputType = getInputType(cred.field);
             const showPassword = showPasswords[normalizedField];
+            const currentValue = credentials[normalizedField] || '';
+            const isMultiLine = isMultiLineField(cred.field, currentValue);
             
             return (
-              <div key={index} className="space-y-2">
+              <div key={index} className="space-y-4 p-4 rounded-xl bg-white/70 backdrop-blur-sm border border-purple-200/50 shadow-sm">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor={normalizedField} className="text-sm font-medium">
+                  <Label htmlFor={normalizedField} className="text-base font-semibold text-purple-800">
                     {cred.field}
+                    {isReadOnlyMode && (
+                      <Lock className="inline h-4 w-4 ml-2 text-emerald-600" />
+                    )}
                   </Label>
                   {cred.link && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => window.open(cred.link, '_blank')}
-                      className="text-blue-600 hover:text-blue-700 p-0 h-auto"
+                      className="text-purple-600 hover:text-purple-700 hover:bg-purple-100 p-2 h-auto rounded-lg transition-all"
                     >
-                      <ExternalLink className="h-3 w-3 mr-1" />
+                      <ExternalLink className="h-4 w-4 mr-1" />
                       Get Key
                     </Button>
                   )}
                 </div>
                 
                 <div className="relative">
-                  <Input
-                    id={normalizedField}
-                    type={inputType === 'password' && !showPassword ? 'password' : 'text'}
-                    placeholder={cred.placeholder}
-                    value={credentials[normalizedField] || ''}
-                    onChange={(e) => handleInputChange(cred.field, e.target.value)}
-                    className="pr-10 rounded-xl border-2 border-muted-foreground/20 focus:border-primary/60 focus:ring-4 focus:ring-primary/20 transition-all duration-300 hover:border-primary/40 bg-background/50 backdrop-blur-sm"
-                  />
+                  {isMultiLine ? (
+                    <Textarea
+                      id={normalizedField}
+                      placeholder={cred.placeholder}
+                      value={currentValue}
+                      onChange={(e) => handleInputChange(cred.field, e.target.value)}
+                      readOnly={isReadOnlyMode}
+                      className={`min-h-[120px] resize-y rounded-xl border-2 transition-all duration-300 ${
+                        isReadOnlyMode 
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-800 cursor-not-allowed' 
+                          : 'border-purple-300/50 focus:border-purple-500 focus:ring-4 focus:ring-purple-200 hover:border-purple-400 bg-white/80'
+                      }`}
+                      rows={4}
+                    />
+                  ) : (
+                    <Input
+                      id={normalizedField}
+                      type={inputType === 'password' && !showPassword ? 'password' : 'text'}
+                      placeholder={cred.placeholder}
+                      value={currentValue}
+                      onChange={(e) => handleInputChange(cred.field, e.target.value)}
+                      readOnly={isReadOnlyMode}
+                      className={`h-12 rounded-xl border-2 transition-all duration-300 ${
+                        isReadOnlyMode 
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-800 cursor-not-allowed' 
+                          : 'border-purple-300/50 focus:border-purple-500 focus:ring-4 focus:ring-purple-200 hover:border-purple-400 bg-white/80'
+                      }`}
+                    />
+                  )}
                   
-                  {shouldShowPasswordToggle(cred.field) && (
+                  {shouldShowPasswordToggle(cred.field) && !isReadOnlyMode && (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      className="absolute right-2 top-2 h-8 w-8 p-0 hover:bg-purple-100 rounded-lg"
                       onClick={() => togglePasswordVisibility(cred.field)}
                     >
                       {showPassword ? (
-                        <EyeOff className="h-4 w-4 text-gray-400" />
+                        <EyeOff className="h-4 w-4 text-purple-600" />
                       ) : (
-                        <Eye className="h-4 w-4 text-gray-400" />
+                        <Eye className="h-4 w-4 text-purple-600" />
                       )}
                     </Button>
                   )}
                 </div>
                 
-                <p className="text-xs text-gray-500">{cred.why_needed}</p>
+                <p className="text-sm text-purple-600/80 leading-relaxed">{cred.why_needed}</p>
               </div>
             );
           })}
 
           {testStatus !== 'idle' && (
-            <div className={`p-4 rounded-xl text-sm transition-all duration-300 ${
+            <div className={`p-6 rounded-xl text-sm transition-all duration-500 transform ${
               testStatus === 'success' 
-                ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border-2 border-green-200 shadow-lg shadow-green-200/50' 
+                ? 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-800 border-2 border-emerald-300 shadow-lg shadow-emerald-200/50 scale-105' 
                 : testStatus === 'error'
-                  ? 'bg-gradient-to-r from-red-50 to-rose-50 text-red-700 border-2 border-red-200 shadow-lg shadow-red-200/50'
-                  : 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border-2 border-blue-200 shadow-lg shadow-blue-200/50'
+                  ? 'bg-gradient-to-r from-red-100 to-rose-100 text-red-800 border-2 border-red-300 shadow-lg shadow-red-200/50'
+                  : 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 border-2 border-blue-300 shadow-lg shadow-blue-200/50'
             }`}>
-              <div className="flex items-center gap-2">
-                {testStatus === 'testing' && <Loader2 className="h-4 w-4 animate-spin" />}
-                {testStatus === 'success' && <CheckCircle className="h-4 w-4 animate-bounce" />}
-                {testStatus === 'error' && <AlertCircle className="h-4 w-4" />}
-                <span className="font-medium">{testMessage}</span>
+              <div className="flex items-center gap-3">
+                {testStatus === 'testing' && <Loader2 className="h-5 w-5 animate-spin" />}
+                {testStatus === 'success' && <CheckCircle className="h-5 w-5 animate-bounce" />}
+                {testStatus === 'error' && <AlertCircle className="h-5 w-5" />}
+                <span className="font-semibold text-base">{testMessage}</span>
               </div>
             </div>
           )}
 
-          <div className="flex gap-4 pt-6">
-            <Button
-              onClick={handleTest}
-              variant="outline"
-              disabled={isTestingCredentials || isLoading}
-              className={`flex-1 rounded-xl h-12 font-medium transition-all duration-300 ${
-                testStatus === 'success' 
-                  ? 'border-green-500 bg-green-50 text-green-700 hover:bg-green-100 shadow-lg shadow-green-200/50' 
-                  : testStatus === 'error'
-                    ? 'border-red-500 bg-red-50 text-red-700 hover:bg-red-100'
-                    : 'border-primary/60 hover:border-primary hover:bg-primary/10 hover:shadow-lg hover:shadow-primary/20'
-              }`}
-            >
-              {isTestingCredentials ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Testing...
-                </>
-              ) : testStatus === 'success' ? (
-                <>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Tested ✓
-                </>
-              ) : (
-                'Test Credentials'
-              )}
-            </Button>
-            
-            <Button
-              onClick={handleSave}
-              disabled={isLoading || isTestingCredentials || testStatus !== 'success'}
-              className={`flex-1 rounded-xl h-12 font-medium transition-all duration-300 ${
-                hasBeenSaved 
-                  ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-lg shadow-green-200/50' 
-                  : testStatus === 'success'
-                    ? 'bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-700 shadow-lg shadow-primary/30'
-                    : 'opacity-50 cursor-not-allowed'
-              }`}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : hasBeenSaved ? (
-                <>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Saved ✓
-                </>
-              ) : testStatus === 'success' ? (
-                'Save Credentials'
-              ) : (
-                'Test First to Save'
-              )}
-            </Button>
+          <div className="flex gap-4 pt-8">
+            {isReadOnlyMode ? (
+              <Button
+                onClick={() => setIsEditMode(true)}
+                className="flex-1 h-14 rounded-xl font-bold text-base bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+              >
+                <Edit3 className="h-5 w-5 mr-2" />
+                Edit Credentials
+              </Button>
+            ) : (
+              <>
+                <Button
+                  onClick={handleTest}
+                  variant="outline"
+                  disabled={isTestingCredentials || isLoading}
+                  className={`flex-1 h-14 rounded-xl font-bold text-base transition-all duration-300 transform hover:scale-105 ${
+                    testStatus === 'success' 
+                      ? 'border-2 border-emerald-500 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 shadow-lg shadow-emerald-200/50' 
+                      : testStatus === 'error'
+                        ? 'border-2 border-red-500 bg-red-100 text-red-700 hover:bg-red-200'
+                        : 'border-2 border-purple-400 hover:border-purple-500 hover:bg-purple-100 hover:shadow-lg hover:shadow-purple-200/50 bg-white text-purple-700'
+                  }`}
+                >
+                  {isTestingCredentials ? (
+                    <>
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                      Testing...
+                    </>
+                  ) : testStatus === 'success' ? (
+                    <>
+                      <CheckCircle className="h-5 w-5 mr-2" />
+                      Tested ✓
+                    </>
+                  ) : (
+                    'Test Credentials'
+                  )}
+                </Button>
+                
+                <Button
+                  onClick={handleSave}
+                  disabled={isLoading || isTestingCredentials || testStatus !== 'success'}
+                  className={`flex-1 h-14 rounded-xl font-bold text-base transition-all duration-300 transform hover:scale-105 ${
+                    hasBeenSaved 
+                      ? 'bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-lg shadow-emerald-200/50' 
+                      : testStatus === 'success'
+                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-lg shadow-purple-300/50'
+                        : 'opacity-50 cursor-not-allowed bg-gray-400'
+                  } text-white`}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : hasBeenSaved ? (
+                    <>
+                      <CheckCircle className="h-5 w-5 mr-2" />
+                      Saved ✓
+                    </>
+                  ) : testStatus === 'success' ? (
+                    'Save Credentials'
+                  ) : (
+                    'Test First to Save'
+                  )}
+                </Button>
+              </>
+            )}
           </div>
           
-          {testStatus !== 'success' && (
-            <p className="text-xs text-muted-foreground text-center pt-2">
+          {testStatus !== 'success' && !isReadOnlyMode && (
+            <p className="text-sm text-purple-600/70 text-center pt-3 font-medium">
               💡 Test your credentials first to ensure they work before saving
             </p>
           )}

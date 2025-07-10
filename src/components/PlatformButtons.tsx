@@ -1,7 +1,11 @@
 
-import { Button } from "@/components/ui/button";
-import { useState } from "react";
-import PlatformCredentialForm from "./PlatformCredentialForm";
+import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import PlatformCredentialForm from './PlatformCredentialForm';
+import { SecureCredentialManager } from '@/utils/secureCredentials';
+import { useAuth } from '@/contexts/AuthContext';
+import { CheckCircle, Settings, Lock } from 'lucide-react';
+import { platformIcons } from '@/utils/platformIcons';
 
 interface Platform {
   name: string;
@@ -15,73 +19,145 @@ interface Platform {
 
 interface PlatformButtonsProps {
   platforms: Platform[];
-  credentialStatus?: { [key: string]: 'saved' | 'tested' | 'unsaved' };
-  onCredentialStatusChange?: (platformName: string, status: 'saved' | 'tested' | 'unsaved') => void;
+  onCredentialChange?: () => void;
 }
 
-const PlatformButtons = ({ 
-  platforms, 
-  credentialStatus = {},
-  onCredentialStatusChange 
-}: PlatformButtonsProps) => {
+const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps) => {
+  const { user } = useAuth();
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
+  const [savedPlatforms, setSavedPlatforms] = useState<Set<string>>(new Set());
+  const [testedPlatforms, setTestedPlatforms] = useState<Set<string>>(new Set());
 
-  // Don't render anything if no platforms
-  if (!platforms || platforms.length === 0) {
-    return null;
-  }
+  useEffect(() => {
+    if (!user) return;
 
-  const getButtonColor = (platformName: string) => {
-    const status = credentialStatus[platformName] || 'unsaved';
-    switch (status) {
-      case 'saved':
-      case 'tested':
-        return 'bg-gradient-to-r from-green-400/90 to-emerald-500/90 hover:from-green-500 hover:to-emerald-600 border-green-300';
-      case 'unsaved':
-      default:
-        return 'bg-gradient-to-r from-red-400/90 to-rose-500/90 hover:from-red-500 hover:to-rose-600 border-red-300';
+    const checkSavedCredentials = async () => {
+      const saved = new Set<string>();
+      const tested = new Set<string>();
+
+      for (const platform of platforms) {
+        try {
+          const credentials = await SecureCredentialManager.getCredentials(
+            user.id,
+            platform.name
+          );
+          if (credentials && Object.keys(credentials).length > 0) {
+            saved.add(platform.name);
+            // Assume if credentials are saved, they were tested
+            tested.add(platform.name);
+          }
+        } catch (error) {
+          console.error(`Error checking credentials for ${platform.name}:`, error);
+        }
+      }
+
+      setSavedPlatforms(saved);
+      setTestedPlatforms(tested);
+    };
+
+    checkSavedCredentials();
+  }, [user, platforms]);
+
+  const handlePlatformClick = (platform: Platform) => {
+    setSelectedPlatform(platform);
+  };
+
+  const handleFormClose = () => {
+    setSelectedPlatform(null);
+  };
+
+  const handleCredentialSaved = () => {
+    if (selectedPlatform) {
+      setSavedPlatforms(prev => new Set([...prev, selectedPlatform.name]));
+      setTestedPlatforms(prev => new Set([...prev, selectedPlatform.name]));
+      onCredentialChange?.();
     }
   };
 
-  const handleCredentialSaved = (platformName: string) => {
-    onCredentialStatusChange?.(platformName, 'saved');
+  const handleCredentialTested = () => {
+    if (selectedPlatform) {
+      setTestedPlatforms(prev => new Set([...prev, selectedPlatform.name]));
+    }
   };
 
-  const handleCredentialTested = (platformName: string) => {
-    onCredentialStatusChange?.(platformName, 'tested');
+  const getButtonStatus = (platformName: string) => {
+    if (savedPlatforms.has(platformName)) return 'saved';
+    if (testedPlatforms.has(platformName)) return 'tested';
+    return 'unsaved';
+  };
+
+  const getButtonStyles = (status: string) => {
+    switch (status) {
+      case 'saved':
+        return 'bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white border-2 border-emerald-400 shadow-lg shadow-emerald-200/50 transform hover:scale-105';
+      case 'tested':
+        return 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white border-2 border-blue-400 shadow-lg shadow-blue-200/50 transform hover:scale-105';
+      case 'unsaved':
+      default:
+        return 'bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-white border-2 border-amber-300 shadow-lg shadow-amber-200/50 transform hover:scale-105';
+    }
+  };
+
+  const getButtonIcon = (status: string) => {
+    switch (status) {
+      case 'saved':
+        return <Lock className="h-4 w-4" />;
+      case 'tested':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'unsaved':
+      default:
+        return <Settings className="h-4 w-4" />;
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'saved':
+        return 'Secured';
+      case 'tested':
+        return 'Tested';
+      case 'unsaved':
+      default:
+        return 'Setup';
+    }
   };
 
   return (
     <>
-      <div className="w-full px-4 mb-3">
-        <div className="max-w-4xl mx-auto">
-          <div className="grid grid-cols-6 gap-2 justify-center">
-            {platforms.map((platform, index) => (
-              <Button
-                key={`${platform.name}-${index}`}
-                onClick={() => {
-                  setSelectedPlatform(platform);
-                }}
-                className={`rounded-xl text-white px-3 py-2 text-xs font-medium shadow-md hover:shadow-lg transition-all duration-300 border-0 backdrop-blur-sm transform hover:scale-105 ${getButtonColor(platform.name)}`}
-                style={{
-                  boxShadow: '0 2px 15px rgba(147, 51, 234, 0.3)'
-                }}
-              >
-                {platform.name}
-              </Button>
-            ))}
-          </div>
-        </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 p-6">
+        {platforms.map((platform) => {
+          const status = getButtonStatus(platform.name);
+          const IconComponent = platformIcons[platform.name] || Settings;
+          
+          return (
+            <Button
+              key={platform.name}
+              onClick={() => handlePlatformClick(platform)}
+              className={`
+                h-auto min-h-[80px] p-4 rounded-xl font-bold text-sm 
+                transition-all duration-300 flex flex-col items-center gap-2
+                ${getButtonStyles(status)}
+              `}
+            >
+              <div className="flex items-center gap-2">
+                <IconComponent className="h-5 w-5" />
+                {getButtonIcon(status)}
+              </div>
+              <div className="text-center">
+                <div className="font-bold">{platform.name}</div>
+                <div className="text-xs opacity-90">{getStatusText(status)}</div>
+              </div>
+            </Button>
+          );
+        })}
       </div>
 
       {selectedPlatform && (
         <PlatformCredentialForm
           platform={selectedPlatform}
-          onClose={() => {
-            setSelectedPlatform(null);
-          }}
-          onCredentialSaved={() => handleCredentialSaved(selectedPlatform.name)}
-          onCredentialTested={() => handleCredentialTested(selectedPlatform.name)}
+          onClose={handleFormClose}
+          onCredentialSaved={handleCredentialSaved}
+          onCredentialTested={handleCredentialTested}
         />
       )}
     </>

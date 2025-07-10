@@ -35,8 +35,8 @@ const AutomationExecutionPanel = ({
       // Extract platforms from blueprint steps
       if (blueprint.steps) {
         blueprint.steps.forEach(step => {
-          if (step.platform && step.platform !== 'system') {
-            platforms.add(step.platform);
+          if (step.action?.integration && step.action.integration !== 'system') {
+            platforms.add(step.action.integration);
           }
         });
       }

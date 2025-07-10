@@ -5,7 +5,7 @@ import PlatformCredentialForm from './PlatformCredentialForm';
 import { SecureCredentialManager } from '@/utils/secureCredentials';
 import { useAuth } from '@/contexts/AuthContext';
 import { CheckCircle, Settings, Lock } from 'lucide-react';
-import { platformIcons } from '@/utils/platformIcons';
+import { getPlatformIconConfig } from '@/utils/platformIcons';
 
 interface Platform {
   name: string;
@@ -127,7 +127,8 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 p-6">
         {platforms.map((platform) => {
           const status = getButtonStatus(platform.name);
-          const IconComponent = platformIcons[platform.name] || Settings;
+          const iconConfig = getPlatformIconConfig(platform.name);
+          const IconComponent = iconConfig.icon;
           
           return (
             <Button

@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { agentStateManager } from '@/utils/agentStateManager';
 
 interface Message {
   id: number;
@@ -46,6 +47,11 @@ const ChatCard = ({
   const [inputMessage, setInputMessage] = useState("");
   const { toast } = useToast();
   const { user } = useAuth();
+
+  // Initialize agent state manager
+  useEffect(() => {
+    agentStateManager.setAutomationId(automationId);
+  }, [automationId]);
 
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
@@ -123,6 +129,23 @@ const ChatCard = ({
     }
   };
 
+  // Enhanced agent handling
+  const handleAgentAdd = (agent: any) => {
+    console.log(`🤖 User adding agent: ${agent.name}`);
+    agentStateManager.addAgent(agent.name, agent);
+    if (onAgentAdd) {
+      onAgentAdd(agent);
+    }
+  };
+
+  const handleAgentDismiss = (agentName: string) => {
+    console.log(`❌ User dismissing agent: ${agentName}`);
+    agentStateManager.dismissAgent(agentName);
+    if (onAgentDismiss) {
+      onAgentDismiss(agentName);
+    }
+  };
+
   // Check if all platforms are configured and agents handled
   const checkReadyForExecution = () => {
     // Get platforms from latest bot message
@@ -144,7 +167,7 @@ const ChatCard = ({
     return allPlatformsConfigured && allAgentsHandled && platforms.length > 0;
   };
 
-  // FIXED: Proper automation execution handler
+  // Enhanced automation execution with agent state
   const handleExecuteAutomation = async () => {
     if (!user?.id) {
       toast({
@@ -166,12 +189,16 @@ const ChatCard = ({
     }
 
     try {
-      console.log('🚀 Executing automation via execute-automation function');
+      console.log('🚀 Executing automation with agent state');
+      
+      // Include agent decisions in execution data
+      const agentDecisions = agentStateManager.getAllDecisions();
       
       const { data, error } = await supabase.functions.invoke('execute-automation', {
         body: {
           automation_id: automationId,
           automation_data: latestBotMessage.structuredData,
+          agent_decisions: agentDecisions,
           trigger_data: {
             executed_at: new Date().toISOString(),
             trigger_type: 'manual',
@@ -352,7 +379,7 @@ const ChatCard = ({
         );
       }
 
-      // Simplified AI Agents - Show only names with buttons
+      // Enhanced AI Agents rendering with state management
       if (Array.isArray(structuredData.agents) && structuredData.agents.length > 0) {
         content.push(
           <div key="agents" className="mb-4">
@@ -363,7 +390,10 @@ const ChatCard = ({
                   return null;
                 }
 
-                if (dismissedAgents.has(agent.name)) {
+                const agentStatus = agentStateManager.getAgentStatus(agent.name);
+                
+                // Don't show agents that have been handled
+                if (agentStatus !== 'pending') {
                   return null;
                 }
                 
@@ -377,7 +407,7 @@ const ChatCard = ({
                     <div className="flex gap-2 ml-4">
                       <Button
                         size="sm"
-                        onClick={() => onAgentAdd?.(agent)}
+                        onClick={() => handleAgentAdd(agent)}
                         className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-3 py-1 text-xs h-7"
                       >
                         <Plus className="w-3 h-3 mr-1" />
@@ -386,7 +416,7 @@ const ChatCard = ({
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => onAgentDismiss?.(agent.name)}
+                        onClick={() => handleAgentDismiss(agent.name)}
                         className="border-gray-300 text-gray-600 hover:bg-gray-100 px-2 py-1 text-xs h-7"
                       >
                         <X className="w-3 h-3" />
@@ -395,6 +425,19 @@ const ChatCard = ({
                   </div>
                 );
               }).filter(Boolean)}
+            </div>
+          </div>
+        );
+      }
+
+      // Show agent decision summary if any decisions made
+      const agentSummary = agentStateManager.getStatusSummary();
+      if (agentSummary) {
+        content.push(
+          <div key="agent-summary" className="mb-4">
+            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <p className="text-sm text-blue-800 font-medium">Agent Status:</p>
+              <p className="text-xs text-blue-600 mt-1">{agentSummary}</p>
             </div>
           </div>
         );

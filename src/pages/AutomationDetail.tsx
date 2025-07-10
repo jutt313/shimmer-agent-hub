@@ -14,6 +14,7 @@ import BlueprintCard from "@/components/BlueprintCard";
 import AutomationDiagramDisplay from "@/components/AutomationDiagramDisplay";
 import { AutomationBlueprint } from "@/types/automation";
 import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
+import AutomationExecutionPanel from "@/components/AutomationExecutionPanel";
 
 interface Automation {
   id: string;
@@ -706,11 +707,28 @@ const AutomationDetail = () => {
       {/* Platform Buttons - Reduced spacing */}
       {!showDashboard && !showDiagram && currentPlatforms && currentPlatforms.length > 0 && (
         <div className="px-6 pb-2">
-          <PlatformButtons platforms={currentPlatforms} />
+          <PlatformButtons 
+            platforms={currentPlatforms} 
+            onCredentialChange={() => {
+              // Trigger re-check of credentials
+              window.location.reload();
+            }}
+          />
+        </div>
+      )}
+
+      {/* Execution Panel - Show when credentials are configured and automation has blueprint */}
+      {!showDashboard && !showDiagram && automation?.automation_blueprint && (
+        <div className="px-6 pb-2">
+          <AutomationExecutionPanel
+            automationId={automation.id}
+            blueprint={automation.automation_blueprint}
+            title={automation.title}
+          />
         </div>
       )}
       
-      {/* Input Section - Fixed positioning and reduced spacing */}
+      {/* Input Section - Fixed positioning and reduced spacing with multi-line support */}
       {!showDashboard && !showDiagram && (
         <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent px-6 pt-2 pb-4">
           <div className="flex gap-3 items-end">
@@ -726,13 +744,20 @@ const AutomationDetail = () => {
             </Button>
             
             <div className="flex-1 relative min-w-0">
-              <Input 
+              <textarea
                 value={newMessage} 
                 onChange={e => setNewMessage(e.target.value)} 
-                onKeyPress={handleKeyPress} 
-                placeholder={sendingMessage ? "YusrAI is thinking with full context..." : "Ask about this automation..."} 
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && !sendingMessage) {
+                    e.preventDefault();
+                    handleSendMessage(newMessage);
+                    setNewMessage("");
+                  }
+                }}
+                placeholder={sendingMessage ? "YusrAI is thinking with full context..." : "Describe the automation you want to build..."} 
                 disabled={sendingMessage}
-                className="rounded-3xl bg-white/90 backdrop-blur-sm border-0 px-5 py-3 text-base focus:outline-none focus:ring-0 shadow-lg w-full" 
+                rows={newMessage.split('\n').length || 1}
+                className="w-full resize-none rounded-3xl bg-white/90 backdrop-blur-sm border-0 px-5 py-3 text-base focus:outline-none focus:ring-0 shadow-lg min-h-[48px] max-h-32 overflow-y-auto" 
                 style={{
                   boxShadow: '0 0 25px rgba(154, 94, 255, 0.2)'
                 }} 

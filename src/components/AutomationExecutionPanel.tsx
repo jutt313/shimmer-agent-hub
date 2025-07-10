@@ -80,113 +80,101 @@ const AutomationExecutionPanel = ({
 
   if (isCheckingCredentials) {
     return (
-      <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-purple-800">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            Checking Execution Readiness...
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center py-4">
+        <Loader2 className="h-4 w-4 animate-spin text-purple-600 mr-2" />
+        <span className="text-sm text-gray-600">Checking credentials...</span>
+      </div>
     );
   }
 
   return (
-    <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 shadow-lg">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-xl font-bold text-purple-800">
-          <Play className="h-6 w-6" />
-          Automation Execution
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Credential Status */}
-        <div className="space-y-4">
-          <h3 className="font-semibold text-purple-700 flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            Platform Credentials Status
-          </h3>
-          
-          {requiredPlatforms.length === 0 ? (
-            <div className="flex items-center gap-2 text-green-700 bg-green-100 p-3 rounded-lg">
-              <CheckCircle className="h-5 w-5" />
-              <span>No external credentials required</span>
-            </div>
-          ) : (
-            <div className="grid gap-2">
-              {requiredPlatforms.map(platform => (
-                <div 
-                  key={platform}
-                  className={`flex items-center gap-2 p-3 rounded-lg ${
-                    credentialStatus[platform]
-                      ? 'text-green-700 bg-green-100 border border-green-200'
-                      : 'text-red-700 bg-red-100 border border-red-200'
-                  }`}
-                >
-                  {credentialStatus[platform] ? (
-                    <CheckCircle className="h-5 w-5" />
-                  ) : (
-                    <AlertTriangle className="h-5 w-5" />
-                  )}
-                  <span className="font-medium">{platform}</span>
-                  <span className="text-sm opacity-75">
-                    {credentialStatus[platform] ? 'Ready ✓' : 'Missing credentials'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Execution Button */}
-        <div className="pt-4 border-t border-purple-200">
-          {allCredentialsReady || requiredPlatforms.length === 0 ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-green-700 bg-green-100 p-4 rounded-xl border border-green-200">
-                <CheckCircle className="h-6 w-6" />
-                <div>
-                  <div className="font-semibold">Ready for Execution</div>
-                  <div className="text-sm opacity-75">
-                    All required credentials are configured and tested
-                  </div>
-                </div>
-              </div>
-              
-              <AutomationExecuteButton
-                automationId={automationId}
-                blueprint={blueprint}
-                disabled={false}
-              />
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-amber-700 bg-amber-100 p-4 rounded-xl border border-amber-200">
-                <AlertTriangle className="h-6 w-6" />
-                <div>
-                  <div className="font-semibold">Credentials Required</div>
-                  <div className="text-sm opacity-75">
-                    Configure credentials for: {missingCredentials.join(', ')}
-                  </div>
-                </div>
-              </div>
-              
-              <Button 
-                disabled
-                className="w-full h-14 bg-gray-400 text-gray-600 cursor-not-allowed rounded-xl"
+    <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-purple-200/50 p-4 shadow-lg">
+      {/* Credential Status */}
+      <div className="mb-4">
+        <h3 className="font-semibold text-purple-700 flex items-center gap-2 mb-3">
+          <Shield className="h-4 w-4" />
+          Platform Status
+        </h3>
+        
+        {requiredPlatforms.length === 0 ? (
+          <div className="flex items-center gap-2 text-green-700 bg-green-100 p-2 rounded-lg text-sm">
+            <CheckCircle className="h-4 w-4" />
+            <span>No external credentials required</span>
+          </div>
+        ) : (
+          <div className="grid gap-2">
+            {requiredPlatforms.map(platform => (
+              <div 
+                key={platform}
+                className={`flex items-center gap-2 p-2 rounded-lg text-sm ${
+                  credentialStatus[platform]
+                    ? 'text-green-700 bg-green-100 border border-green-200'
+                    : 'text-red-700 bg-red-100 border border-red-200'
+                }`}
               >
-                <Play className="h-5 w-5 mr-2" />
-                Configure Credentials First
-              </Button>
+                {credentialStatus[platform] ? (
+                  <CheckCircle className="h-4 w-4" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4" />
+                )}
+                <span className="font-medium">{platform}</span>
+                <span className="text-xs opacity-75">
+                  {credentialStatus[platform] ? 'Ready ✓' : 'Missing credentials'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Execution Button */}
+      <div className="border-t border-purple-200/50 pt-4">
+        {allCredentialsReady || requiredPlatforms.length === 0 ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-green-700 bg-green-100 p-3 rounded-xl border border-green-200 text-sm">
+              <CheckCircle className="h-4 w-4" />
+              <div>
+                <div className="font-semibold">Ready for Execution</div>
+                <div className="text-xs opacity-75">
+                  All required credentials are configured
+                </div>
+              </div>
             </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+            
+            <Button
+              className="w-full h-12 bg-gradient-to-r from-purple-500 via-blue-500 to-green-500 hover:from-purple-600 hover:via-blue-600 hover:to-green-600 text-white rounded-xl font-semibold text-base shadow-lg hover:shadow-xl transition-all duration-300"
+              onClick={() => {
+                // Execute automation logic would go here
+                console.log('Executing automation:', automationId);
+              }}
+            >
+              <Play className="h-5 w-5 mr-2" />
+              Execute Your Automation
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-amber-700 bg-amber-100 p-3 rounded-xl border border-amber-200 text-sm">
+              <AlertTriangle className="h-4 w-4" />
+              <div>
+                <div className="font-semibold">Credentials Required</div>
+                <div className="text-xs opacity-75">
+                  Configure credentials for: {missingCredentials.join(', ')}
+                </div>
+              </div>
+            </div>
+            
+            <Button 
+              disabled
+              className="w-full h-12 bg-gray-400 text-gray-600 cursor-not-allowed rounded-xl font-semibold text-base"
+            >
+              <Play className="h-5 w-5 mr-2" />
+              Configure Credentials First
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 

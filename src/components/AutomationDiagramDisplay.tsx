@@ -11,7 +11,6 @@ import {
   Edge,
   useNodesState,
   useEdgesState,
-  useReactFlow,
   NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -93,24 +92,26 @@ const endNodeStyle: React.CSSProperties = {
   textAlign: 'center' as const,
 };
 
-const CustomAINodeComponent = ({ data }: NodeProps<NodeData>) => {
+const CustomAINodeComponent = ({ data }: NodeProps) => {
+  const nodeData = data as NodeData;
+  
   const handleAgentAdd = () => {
-    if (data?.agentData && data?.showActions && data?.onAgentAdd) {
-      data.onAgentAdd(data.agentData);
+    if (nodeData?.agentData && nodeData?.showActions && nodeData?.onAgentAdd) {
+      nodeData.onAgentAdd(nodeData.agentData);
     }
   };
 
   const handleAgentDismiss = () => {
-    if (data?.agentData && data?.showActions && data?.onAgentDismiss && data?.agentData?.name) {
-      data.onAgentDismiss(data.agentData.name);
+    if (nodeData?.agentData && nodeData?.showActions && nodeData?.onAgentDismiss && nodeData?.agentData?.name) {
+      nodeData.onAgentDismiss(nodeData.agentData.name);
     }
   };
 
   return (
     <div style={aiAgentNodeStyle}>
-      <h4>{data?.label || 'AI Agent'}</h4>
-      <p>{data?.description || 'AI Agent Description'}</p>
-      {data?.showActions && (
+      <h4>{nodeData?.label || 'AI Agent'}</h4>
+      <p>{nodeData?.description || 'AI Agent Description'}</p>
+      {nodeData?.showActions && (
         <div className="flex gap-2 mt-2">
           <Button size="sm" onClick={handleAgentAdd} className="bg-green-500 hover:bg-green-700 text-white">
             <Plus className="w-4 h-4 mr-2" />
@@ -126,33 +127,45 @@ const CustomAINodeComponent = ({ data }: NodeProps<NodeData>) => {
   );
 };
 
-const CustomTriggerNodeComponent = ({ data }: NodeProps<NodeData>) => (
-  <div style={triggerNodeStyle}>
-    <h4>{data?.label || 'Trigger'}</h4>
-    <p>{data?.description || 'Trigger Description'}</p>
-  </div>
-);
+const CustomTriggerNodeComponent = ({ data }: NodeProps) => {
+  const nodeData = data as NodeData;
+  return (
+    <div style={triggerNodeStyle}>
+      <h4>{nodeData?.label || 'Trigger'}</h4>
+      <p>{nodeData?.description || 'Trigger Description'}</p>
+    </div>
+  );
+};
 
-const CustomActionNodeComponent = ({ data }: NodeProps<NodeData>) => (
-  <div style={actionNodeStyle}>
-    <h4>{data?.label || 'Action'}</h4>
-    <p>{data?.description || 'Action Description'}</p>
-  </div>
-);
+const CustomActionNodeComponent = ({ data }: NodeProps) => {
+  const nodeData = data as NodeData;
+  return (
+    <div style={actionNodeStyle}>
+      <h4>{nodeData?.label || 'Action'}</h4>
+      <p>{nodeData?.description || 'Action Description'}</p>
+    </div>
+  );
+};
 
-const CustomConditionNodeComponent = ({ data }: NodeProps<NodeData>) => (
-  <div style={conditionNodeStyle}>
-    <h4>{data?.label || 'Condition'}</h4>
-    <p>{data?.description || 'Condition Description'}</p>
-  </div>
-);
+const CustomConditionNodeComponent = ({ data }: NodeProps) => {
+  const nodeData = data as NodeData;
+  return (
+    <div style={conditionNodeStyle}>
+      <h4>{nodeData?.label || 'Condition'}</h4>
+      <p>{nodeData?.description || 'Condition Description'}</p>
+    </div>
+  );
+};
 
-const CustomEndNodeComponent = ({ data }: NodeProps<NodeData>) => (
-  <div style={endNodeStyle}>
-    <h4>{data?.label || 'End'}</h4>
-    <p>{data?.description || 'End Description'}</p>
-  </div>
-);
+const CustomEndNodeComponent = ({ data }: NodeProps) => {
+  const nodeData = data as NodeData;
+  return (
+    <div style={endNodeStyle}>
+      <h4>{nodeData?.label || 'End'}</h4>
+      <p>{nodeData?.description || 'End Description'}</p>
+    </div>
+  );
+};
 
 const AutomationDiagramDisplay = ({
   automationBlueprint,
@@ -166,7 +179,6 @@ const AutomationDiagramDisplay = ({
 }: AutomationDiagramDisplayProps) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const { fitView } = useReactFlow();
 
   const nodeTypes = useMemo(() => ({
     aiAgentNode: CustomAINodeComponent,
@@ -351,10 +363,6 @@ const AutomationDiagramDisplay = ({
     setEdges(layoutedEdges);
   }, [layoutedNodes, layoutedEdges, setNodes, setEdges]);
 
-  useEffect(() => {
-    fitView({ padding: 0.1 });
-  }, [nodes, edges, fitView]);
-
   const handleRegenerate = () => {
     if (onRegenerateDiagram) {
       onRegenerateDiagram();
@@ -369,6 +377,7 @@ const AutomationDiagramDisplay = ({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         nodeTypes={nodeTypes}
+        fitView
         fitViewOptions={{ padding: 0.1 }}
         className="bg-gray-50 rounded-lg"
       >

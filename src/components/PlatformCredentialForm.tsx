@@ -41,67 +41,51 @@ const PlatformCredentialForm = ({
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [testMessage, setTestMessage] = useState<string>('');
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
-  const [existingCredentials, setExistingCredentials] = useState<Record<string, string> | null>(null);
   const [isReadOnly, setIsReadOnly] = useState(false);
   const [isCheckingExisting, setIsCheckingExisting] = useState(true);
 
-  // Initialize credentials object
-  useEffect(() => {
-    const initialCredentials: Record<string, string> = {};
-    platform.credentials.forEach(cred => {
-      const normalizedField = cred.field.toLowerCase().replace(/\s+/g, '_');
-      initialCredentials[normalizedField] = '';
-    });
-    setCredentials(initialCredentials);
-  }, [platform]);
-
-  // Load existing credentials EVERY TIME the form opens
+  // Initialize credentials and check for existing ones
   useEffect(() => {
     if (!user) return;
 
-    const loadExistingCredentials = async () => {
-      console.log(`🔍 Checking for existing credentials for ${platform.name}...`);
+    const initializeForm = async () => {
+      console.log(`🔍 Initializing form for ${platform.name}...`);
       setIsCheckingExisting(true);
       
+      // Initialize empty credentials structure
+      const initialCredentials: Record<string, string> = {};
+      platform.credentials.forEach(cred => {
+        const normalizedField = cred.field.toLowerCase().replace(/\s+/g, '_');
+        initialCredentials[normalizedField] = '';
+      });
+      
       try {
-        const existingCreds = await SecureCredentialManager.getCredentials(
-          user.id,
-          platform.name
-        );
-        
-        console.log(`📊 Existing credentials check result for ${platform.name}:`, !!existingCreds);
+        // Check for existing credentials
+        const existingCreds = await SecureCredentialManager.getCredentials(user.id, platform.name);
         
         if (existingCreds && Object.keys(existingCreds).length > 0) {
-          console.log(`✅ Found existing credentials for ${platform.name}, setting read-only mode`);
-          setExistingCredentials(existingCreds);
-          setIsReadOnly(true);
-          setTestStatus('success');
-          setTestMessage('Credentials are saved and verified');
+          console.log(`✅ Found existing credentials for ${platform.name}`);
           
-          // Show masked versions for display
+          // Show masked versions in read-only mode
           const maskedCreds: Record<string, string> = {};
           Object.keys(existingCreds).forEach(key => {
             maskedCreds[key] = '••••••••••••••••';
           });
+          
           setCredentials(maskedCreds);
+          setIsReadOnly(true);
+          setTestStatus('success');
+          setTestMessage('Credentials are saved and verified');
         } else {
-          console.log(`❌ No existing credentials found for ${platform.name}, setting editable mode`);
-          setExistingCredentials(null);
+          console.log(`❌ No existing credentials for ${platform.name}`);
+          setCredentials(initialCredentials);
           setIsReadOnly(false);
           setTestStatus('idle');
           setTestMessage('');
-          
-          // Initialize empty credentials for editing
-          const initialCredentials: Record<string, string> = {};
-          platform.credentials.forEach(cred => {
-            const normalizedField = cred.field.toLowerCase().replace(/\s+/g, '_');
-            initialCredentials[normalizedField] = '';
-          });
-          setCredentials(initialCredentials);
         }
       } catch (error) {
-        console.error(`❌ Error loading existing credentials for ${platform.name}:`, error);
-        setExistingCredentials(null);
+        console.error(`❌ Error checking existing credentials for ${platform.name}:`, error);
+        setCredentials(initialCredentials);
         setIsReadOnly(false);
         setTestStatus('idle');
         setTestMessage('');
@@ -110,11 +94,11 @@ const PlatformCredentialForm = ({
       }
     };
 
-    loadExistingCredentials();
-  }, [user, platform.name]); // Re-run when platform changes
+    initializeForm();
+  }, [user, platform.name, platform.credentials]);
 
   const handleInputChange = (field: string, value: string) => {
-    if (isReadOnly) return; // Prevent editing if read-only
+    if (isReadOnly) return;
     
     const normalizedField = field.toLowerCase().replace(/\s+/g, '_');
     setCredentials(prev => ({
@@ -132,7 +116,7 @@ const PlatformCredentialForm = ({
   };
 
   const validateCredentials = () => {
-    if (isReadOnly) return true; // Skip validation for read-only
+    if (isReadOnly) return true;
     
     const requiredFields = platform.credentials.map(cred => 
       cred.field.toLowerCase().replace(/\s+/g, '_')
@@ -229,9 +213,14 @@ const PlatformCredentialForm = ({
       if (success) {
         console.log(`✅ Successfully saved credentials for ${platform.name}`);
         
-        // Update local state to read-only immediately
+        // Update form to read-only immediately
+        const maskedCreds: Record<string, string> = {};
+        Object.keys(filteredCredentials).forEach(key => {
+          maskedCreds[key] = '••••••••••••••••';
+        });
+        
+        setCredentials(maskedCreds);
         setIsReadOnly(true);
-        setExistingCredentials(filteredCredentials);
         setTestStatus('success');
         setTestMessage('Credentials are saved and verified');
         

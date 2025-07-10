@@ -1,5 +1,7 @@
-import React, { useMemo } from 'react';
-import ReactFlow, {
+
+import React, { useMemo, useEffect } from 'react';
+import {
+  ReactFlow,
   addEdge,
   applyEdgeChanges,
   applyNodeChanges,
@@ -11,8 +13,8 @@ import ReactFlow, {
   useEdgesState,
   useReactFlow,
   NodeProps,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import { Button } from "@/components/ui/button";
 import { Plus, X } from "lucide-react";
 import { agentStateManager } from '@/utils/agentStateManager';
@@ -28,54 +30,54 @@ interface AutomationDiagramDisplayProps {
   onRegenerateDiagram?: (userFeedback?: string) => void;
 }
 
-const aiAgentNodeStyle = {
+const aiAgentNodeStyle: React.CSSProperties = {
   background: '#D4E3FF',
   border: '2px solid #7A9DDC',
   borderRadius: '8px',
   padding: '10px',
   color: '#333',
   width: '200px',
-  textAlign: 'center',
+  textAlign: 'center' as const,
 };
 
-const triggerNodeStyle = {
+const triggerNodeStyle: React.CSSProperties = {
   background: '#E2F7D4',
   border: '2px solid #9DDC7A',
   borderRadius: '8px',
   padding: '10px',
   color: '#333',
   width: '200px',
-  textAlign: 'center',
+  textAlign: 'center' as const,
 };
 
-const actionNodeStyle = {
+const actionNodeStyle: React.CSSProperties = {
   background: '#FFF3CD',
   border: '2px solid #DDA64B',
   borderRadius: '8px',
   padding: '10px',
   color: '#333',
   width: '200px',
-  textAlign: 'center',
+  textAlign: 'center' as const,
 };
 
-const conditionNodeStyle = {
+const conditionNodeStyle: React.CSSProperties = {
   background: '#FFD4D4',
   border: '2px solid #DC7A7A',
   borderRadius: '8px',
   padding: '10px',
   color: '#333',
   width: '200px',
-  textAlign: 'center',
+  textAlign: 'center' as const,
 };
 
-const endNodeStyle = {
+const endNodeStyle: React.CSSProperties = {
   background: '#EEEEEE',
   border: '2px solid #999999',
   borderRadius: '8px',
   padding: '10px',
   color: '#333',
   width: '150px',
-  textAlign: 'center',
+  textAlign: 'center' as const,
 };
 
 const CustomAINodeComponent = ({ data }: NodeProps) => {
@@ -312,24 +314,24 @@ const AutomationDiagramDisplay = ({
   };
 
   const processedNodes = useMemo(() => {
-    if (!diagramData?.nodes) return [];
+    if (!automationDiagramData?.nodes) return [];
     
     console.log('🔄 Processing diagram nodes with agent logic');
-    const processed = processNodesWithAgentLogic(diagramData.nodes, messages);
+    const processed = processNodesWithAgentLogic(automationDiagramData.nodes, messages);
     console.log('✅ Processed nodes:', processed.length, 'agents found:', processed.filter(n => n.data?.isRecommended).length);
     
     return processed;
-  }, [diagramData?.nodes, messages, onAgentAdd, onAgentDismiss]);
+  }, [automationDiagramData?.nodes, messages, onAgentAdd, onAgentDismiss]);
 
   const { nodes: layoutedNodes, edges: layoutedEdges } = useMemo(() => {
-    if (!isValidDiagramData(diagramData)) {
+    if (!isValidDiagramData(automationDiagramData)) {
       console.warn('⚠️ Invalid diagram data, using empty diagram');
       return { nodes: [], edges: [] };
     }
   
     console.log('📏 Applying layout to diagram');
-    return applyLayout(processedNodes, diagramData.edges);
-  }, [processedNodes, diagramData]);
+    return applyLayout(processedNodes, automationDiagramData.edges);
+  }, [processedNodes, automationDiagramData]);
 
   useEffect(() => {
     setNodes(layoutedNodes);

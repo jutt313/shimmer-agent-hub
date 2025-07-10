@@ -5,7 +5,7 @@ export interface AgentDecision {
   id: string;
   automation_id: string;
   agent_name: string;
-  decision: 'pending' | 'added' | 'dismissed';
+  decision: string; // Changed from union type to string to match database
   agent_data?: any;
 }
 

@@ -704,14 +704,13 @@ const AutomationDetail = () => {
         </div>
       </div>
       
-      {/* Platform Buttons - NO page reload trigger */}
+      {/* Platform Buttons - Now with improved credential state management */}
       {!showDashboard && !showDiagram && currentPlatforms && currentPlatforms.length > 0 && (
         <div className="px-6 pb-2">
           <PlatformButtons 
             platforms={currentPlatforms} 
             onCredentialChange={() => {
-              // Just refresh the execution panel, don't reload the page
-              console.log('Credentials updated');
+              console.log('🔄 Credential change detected in AutomationDetail');
             }}
           />
         </div>

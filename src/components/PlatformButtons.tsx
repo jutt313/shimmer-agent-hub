@@ -26,57 +26,80 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
   const [savedPlatforms, setSavedPlatforms] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
+  // Function to refresh credential status for all platforms
+  const refreshCredentialStatus = async () => {
     if (!user) return;
 
-    const checkSavedCredentials = async () => {
-      const saved = new Set<string>();
+    console.log('🔄 Refreshing credential status for all platforms...');
+    const saved = new Set<string>();
 
-      for (const platform of platforms) {
-        try {
-          const credentials = await SecureCredentialManager.getCredentials(
-            user.id,
-            platform.name
-          );
-          if (credentials && Object.keys(credentials).length > 0) {
-            saved.add(platform.name);
-          }
-        } catch (error) {
-          console.error(`Error checking credentials for ${platform.name}:`, error);
+    for (const platform of platforms) {
+      try {
+        const credentials = await SecureCredentialManager.getCredentials(
+          user.id,
+          platform.name
+        );
+        if (credentials && Object.keys(credentials).length > 0) {
+          saved.add(platform.name);
+          console.log(`✅ Found saved credentials for ${platform.name}`);
+        } else {
+          console.log(`❌ No credentials found for ${platform.name}`);
         }
+      } catch (error) {
+        console.error(`Error checking credentials for ${platform.name}:`, error);
       }
+    }
 
-      setSavedPlatforms(saved);
-    };
+    console.log('🔄 Setting saved platforms:', Array.from(saved));
+    setSavedPlatforms(saved);
+  };
 
-    checkSavedCredentials();
+  // Initial load of credential status
+  useEffect(() => {
+    refreshCredentialStatus();
   }, [user, platforms]);
 
   const handlePlatformClick = (platform: Platform) => {
+    console.log(`🔘 Opening credential form for ${platform.name}`);
     setSelectedPlatform(platform);
   };
 
-  const handleFormClose = () => {
+  const handleFormClose = async () => {
+    console.log('🔄 Form closed, refreshing credential status...');
     setSelectedPlatform(null);
+    
+    // Refresh credential status after form closes
+    await refreshCredentialStatus();
   };
 
-  const handleCredentialSaved = (platformName: string) => {
-    // Update state without reloading
-    setSavedPlatforms(prev => new Set([...prev, platformName]));
+  const handleCredentialSaved = async (platformName: string) => {
+    console.log(`✅ Credential saved for ${platformName}, updating state...`);
+    
+    // Immediately update state to show green button
+    setSavedPlatforms(prev => {
+      const updated = new Set([...prev, platformName]);
+      console.log('🔄 Updated saved platforms:', Array.from(updated));
+      return updated;
+    });
     
     // Call the callback if provided
     if (onCredentialChange) {
       onCredentialChange();
     }
+    
+    // Refresh all credential statuses to ensure consistency
+    setTimeout(() => refreshCredentialStatus(), 500);
   };
 
   const handleCredentialTested = (platformName: string) => {
-    // Handle testing state if needed
-    console.log(`Credentials tested for ${platformName}`);
+    console.log(`🧪 Credentials tested for ${platformName}`);
   };
 
   const getButtonStyles = (platformName: string) => {
-    if (savedPlatforms.has(platformName)) {
+    const isSaved = savedPlatforms.has(platformName);
+    console.log(`🎨 Button style for ${platformName}: ${isSaved ? 'saved (green)' : 'not saved (yellow)'}`);
+    
+    if (isSaved) {
       return 'bg-green-500 hover:bg-green-600 text-white border border-green-400';
     }
     return 'bg-yellow-500 hover:bg-yellow-600 text-white border border-yellow-400';

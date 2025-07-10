@@ -43,6 +43,7 @@ const PlatformCredentialForm = ({
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [existingCredentials, setExistingCredentials] = useState<Record<string, string> | null>(null);
   const [isReadOnly, setIsReadOnly] = useState(false);
+  const [isCheckingExisting, setIsCheckingExisting] = useState(true);
 
   // Initialize credentials object
   useEffect(() => {
@@ -54,18 +55,24 @@ const PlatformCredentialForm = ({
     setCredentials(initialCredentials);
   }, [platform]);
 
-  // Load existing credentials
+  // Load existing credentials EVERY TIME the form opens
   useEffect(() => {
     if (!user) return;
 
     const loadExistingCredentials = async () => {
+      console.log(`🔍 Checking for existing credentials for ${platform.name}...`);
+      setIsCheckingExisting(true);
+      
       try {
         const existingCreds = await SecureCredentialManager.getCredentials(
           user.id,
           platform.name
         );
         
+        console.log(`📊 Existing credentials check result for ${platform.name}:`, !!existingCreds);
+        
         if (existingCreds && Object.keys(existingCreds).length > 0) {
+          console.log(`✅ Found existing credentials for ${platform.name}, setting read-only mode`);
           setExistingCredentials(existingCreds);
           setIsReadOnly(true);
           setTestStatus('success');
@@ -77,14 +84,34 @@ const PlatformCredentialForm = ({
             maskedCreds[key] = '••••••••••••••••';
           });
           setCredentials(maskedCreds);
+        } else {
+          console.log(`❌ No existing credentials found for ${platform.name}, setting editable mode`);
+          setExistingCredentials(null);
+          setIsReadOnly(false);
+          setTestStatus('idle');
+          setTestMessage('');
+          
+          // Initialize empty credentials for editing
+          const initialCredentials: Record<string, string> = {};
+          platform.credentials.forEach(cred => {
+            const normalizedField = cred.field.toLowerCase().replace(/\s+/g, '_');
+            initialCredentials[normalizedField] = '';
+          });
+          setCredentials(initialCredentials);
         }
       } catch (error) {
-        console.error('Error loading existing credentials:', error);
+        console.error(`❌ Error loading existing credentials for ${platform.name}:`, error);
+        setExistingCredentials(null);
+        setIsReadOnly(false);
+        setTestStatus('idle');
+        setTestMessage('');
+      } finally {
+        setIsCheckingExisting(false);
       }
     };
 
     loadExistingCredentials();
-  }, [user, platform.name]);
+  }, [user, platform.name]); // Re-run when platform changes
 
   const handleInputChange = (field: string, value: string) => {
     if (isReadOnly) return; // Prevent editing if read-only
@@ -191,6 +218,8 @@ const PlatformCredentialForm = ({
         Object.entries(credentials).filter(([_, value]) => value.trim() !== '')
       );
 
+      console.log(`💾 Saving credentials for ${platform.name}...`);
+
       const success = await SecureCredentialManager.storeCredentials(
         user.id,
         platform.name,
@@ -198,24 +227,29 @@ const PlatformCredentialForm = ({
       );
 
       if (success) {
-        // Don't reload the page, just update the state
+        console.log(`✅ Successfully saved credentials for ${platform.name}`);
+        
+        // Update local state to read-only immediately
         setIsReadOnly(true);
         setExistingCredentials(filteredCredentials);
+        setTestStatus('success');
+        setTestMessage('Credentials are saved and verified');
         
         toast({
           title: "Success",
           description: `${platform.name} credentials saved successfully!`,
         });
         
-        // Call the callback without reloading
+        // Notify parent component immediately
         onCredentialSaved(platform.name);
         
         // Close the modal after a short delay
-        setTimeout(() => onClose(), 500);
+        setTimeout(() => onClose(), 1000);
       } else {
         throw new Error('Failed to save credentials');
       }
     } catch (error: any) {
+      console.error(`❌ Failed to save credentials for ${platform.name}:`, error);
       toast({
         title: "Save Failed",
         description: error.message || 'Failed to save credentials',
@@ -243,6 +277,24 @@ const PlatformCredentialForm = ({
   const shouldShowPasswordToggle = (field: string) => {
     return getInputType(field) === 'password' && !isReadOnly;
   };
+
+  // Show loading state while checking for existing credentials
+  if (isCheckingExisting) {
+    return (
+      <Dialog open={true} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-[500px] bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-purple-800">
+              Loading {platform.name} Credentials...
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center p-8">
+            <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={true} onOpenChange={onClose}>

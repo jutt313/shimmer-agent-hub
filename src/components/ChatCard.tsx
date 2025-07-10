@@ -1,10 +1,10 @@
+
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Bot, Plus, X, Send, Play } from "lucide-react";
+import { Bot, Plus, X, Play } from "lucide-react";
 import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useErrorRecovery } from "@/hooks/useErrorRecovery";
-import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -44,7 +44,6 @@ const ChatCard = ({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { handleError } = useErrorRecovery();
-  const [inputMessage, setInputMessage] = useState("");
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -230,19 +229,6 @@ const ChatCard = ({
         description: "An unexpected error occurred during execution",
         variant: "destructive",
       });
-    }
-  };
-
-  const handleSendMessage = () => {
-    if (!inputMessage.trim() || !onSendMessage) return;
-    onSendMessage(inputMessage);
-    setInputMessage("");
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
     }
   };
 
@@ -443,29 +429,6 @@ const ChatCard = ({
         );
       }
 
-      // Execution Button - Show when ready
-      if (checkReadyForExecution()) {
-        content.push(
-          <div key="execution" className="mb-4">
-            <div className="p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium text-gray-800 mb-1">Ready to Launch</h4>
-                  <p className="text-sm text-gray-600">All platforms configured and AI agents handled</p>
-                </div>
-                <Button
-                  onClick={handleExecuteAutomation}
-                  className="bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white px-6 py-2 rounded-xl shadow-lg"
-                >
-                  <Play className="w-4 h-4 mr-2" />
-                  Launch Automation
-                </Button>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
       return content;
     } catch (error: any) {
       console.error('Critical error in renderStructuredContent:', error);
@@ -555,41 +518,6 @@ const ChatCard = ({
           <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
-
-      {/* Enhanced Input Area */}
-      {onSendMessage && (
-        <div className="relative z-10 p-4 border-t border-gray-200/50 bg-white/80 backdrop-blur-sm">
-          <div className="flex items-end gap-3 max-w-4xl mx-auto">
-            <div className="flex-shrink-0">
-              <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-600 rounded-full flex items-center justify-center">
-                <Bot className="w-5 h-5 text-white" />
-              </div>
-            </div>
-            <div className="flex-1 relative">
-              <Textarea
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Ask me anything about your automation..."
-                className="resize-none min-h-[44px] max-h-[120px] rounded-xl border-0 bg-white/70 shadow-md focus:shadow-lg transition-shadow pr-12 focus:ring-2 focus:ring-purple-400 focus:ring-offset-2"
-                style={{ 
-                  boxShadow: '0 0 15px rgba(147, 51, 234, 0.1)',
-                  background: 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(240,248,255,0.9) 100%)'
-                }}
-                rows={1}
-              />
-              <Button
-                onClick={handleSendMessage}
-                disabled={!inputMessage.trim() || isLoading}
-                size="sm"
-                className="absolute right-2 bottom-2 bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white rounded-lg h-8 w-8 p-0"
-              >
-                <Send className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

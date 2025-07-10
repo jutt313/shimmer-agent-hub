@@ -696,7 +696,6 @@ const AutomationDetail = () => {
                 onAgentDismiss={handleAgentDismiss}
                 automationId={automation.id}
                 isLoading={sendingMessage}
-                onSendMessage={handleSendMessage}
                 platformCredentialStatus={Object.fromEntries(
                   currentPlatforms.map(p => [p.name, 'saved'])
                 )}
@@ -749,13 +748,18 @@ const AutomationDetail = () => {
         </div>
       )}
 
-      {/* Execution Panel - Show when credentials are configured and automation has blueprint */}
+      {/* Add Execute Button between Platform Buttons and Input Section */}
       {!showDashboard && !showDiagram && automation?.automation_blueprint && (
-        <AutomationExecutionPanel
-          automationId={automation.id}
-          blueprint={automation.automation_blueprint}
-          title={automation.title}
-        />
+        <div className="px-6 pb-2 flex justify-center">
+          <AutomationExecuteButton
+            automationId={automation.id}
+            blueprint={automation.automation_blueprint}
+            disabled={false}
+            onExecutionComplete={(result) => {
+              console.log('✅ Automation execution completed:', result);
+            }}
+          />
+        </div>
       )}
       
       {/* Input Section - Keep multi-line support for chat */}

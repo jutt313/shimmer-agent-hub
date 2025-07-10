@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Play, Square, Loader2 } from 'lucide-react';
+import { Play, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { automationRunner } from '@/utils/automationRunner';
 import { AutomationBlueprint } from '@/types/automation';

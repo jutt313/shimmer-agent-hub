@@ -1,60 +1,26 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { 
-  ReactFlow, 
-  Node, 
-  Edge, 
-  useNodesState, 
-  useEdgesState, 
-  Controls, 
-  Background, 
-  BackgroundVariant,
-  MiniMap,
-  ConnectionMode,
+import React, { useMemo } from 'react';
+import ReactFlow, {
   addEdge,
-  Connection
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
-import { Button } from '@/components/ui/button';
-import { 
-  RefreshCw, 
-  AlertCircle,
-  Loader2,
-  Code,
-  Settings,
-  Sparkles,
-  Maximize2
-} from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import CustomNodeMapper from './diagram/CustomNodeMapper';
-import JsonDebugModal from './diagram/JsonDebugModal';
-import DiagramErrorRecovery from './DiagramErrorRecovery';
-import { calculateEnhancedLayout } from '@/utils/diagramLayout';
-import { AutomationBlueprint, AutomationDiagramData } from '@/types/automation';
-
-const nodeTypes = {
-  triggerNode: CustomNodeMapper,
-  platformTriggerNode: CustomNodeMapper,
-  actionNode: CustomNodeMapper,
-  platformNode: CustomNodeMapper,
-  conditionNode: CustomNodeMapper,
-  dynamicConditionNode: CustomNodeMapper,
-  loopNode: CustomNodeMapper,
-  retryNode: CustomNodeMapper,
-  fallbackNode: CustomNodeMapper,
-  aiAgentNode: CustomNodeMapper,
-  delayNode: CustomNodeMapper,
-  default: CustomNodeMapper
-};
+  applyEdgeChanges,
+  applyNodeChanges,
+  Background,
+  Controls,
+  Node,
+  Edge,
+  useNodesState,
+  useEdgesState,
+  useReactFlow,
+  NodeProps,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
+import { Button } from "@/components/ui/button";
+import { Plus, X } from "lucide-react";
+import { agentStateManager } from '@/utils/agentStateManager';
 
 interface AutomationDiagramDisplayProps {
-  automationBlueprint?: AutomationBlueprint | null;
-  automationDiagramData?: AutomationDiagramData | null;
-  messages?: any[];
+  automationBlueprint: any;
+  automationDiagramData: { nodes: any[]; edges: any[] } | null;
+  messages: any[];
   onAgentAdd?: (agent: any) => void;
   onAgentDismiss?: (agentName: string) => void;
   dismissedAgents?: Set<string>;
@@ -62,534 +28,343 @@ interface AutomationDiagramDisplayProps {
   onRegenerateDiagram?: (userFeedback?: string) => void;
 }
 
-const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
+const aiAgentNodeStyle = {
+  background: '#D4E3FF',
+  border: '2px solid #7A9DDC',
+  borderRadius: '8px',
+  padding: '10px',
+  color: '#333',
+  width: '200px',
+  textAlign: 'center',
+};
+
+const triggerNodeStyle = {
+  background: '#E2F7D4',
+  border: '2px solid #9DDC7A',
+  borderRadius: '8px',
+  padding: '10px',
+  color: '#333',
+  width: '200px',
+  textAlign: 'center',
+};
+
+const actionNodeStyle = {
+  background: '#FFF3CD',
+  border: '2px solid #DDA64B',
+  borderRadius: '8px',
+  padding: '10px',
+  color: '#333',
+  width: '200px',
+  textAlign: 'center',
+};
+
+const conditionNodeStyle = {
+  background: '#FFD4D4',
+  border: '2px solid #DC7A7A',
+  borderRadius: '8px',
+  padding: '10px',
+  color: '#333',
+  width: '200px',
+  textAlign: 'center',
+};
+
+const endNodeStyle = {
+  background: '#EEEEEE',
+  border: '2px solid #999999',
+  borderRadius: '8px',
+  padding: '10px',
+  color: '#333',
+  width: '150px',
+  textAlign: 'center',
+};
+
+const CustomAINodeComponent = ({ data }: NodeProps) => {
+  const handleAgentAdd = () => {
+    if (data.agentData && data.showActions) {
+      data.onAgentAdd(data.agentData);
+    }
+  };
+
+  const handleAgentDismiss = () => {
+    if (data.agentData && data.showActions) {
+      data.onAgentDismiss(data.agentData.name);
+    }
+  };
+
+  return (
+    <div style={aiAgentNodeStyle}>
+      <h4>{data.label}</h4>
+      <p>{data.description}</p>
+      {data.showActions && (
+        <div className="flex gap-2 mt-2">
+          <Button size="sm" onClick={handleAgentAdd} className="bg-green-500 hover:bg-green-700 text-white">
+            <Plus className="w-4 h-4 mr-2" />
+            Add
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleAgentDismiss} className="border-red-500 text-red-500 hover:bg-red-100">
+            <X className="w-4 h-4 mr-2" />
+            Dismiss
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const CustomTriggerNodeComponent = ({ data }: NodeProps) => (
+  <div style={triggerNodeStyle}>
+    <h4>{data.label}</h4>
+    <p>{data.description}</p>
+  </div>
+);
+
+const CustomActionNodeComponent = ({ data }: NodeProps) => (
+  <div style={actionNodeStyle}>
+    <h4>{data.label}</h4>
+    <p>{data.description}</p>
+  </div>
+);
+
+const CustomConditionNodeComponent = ({ data }: NodeProps) => (
+  <div style={conditionNodeStyle}>
+    <h4>{data.label}</h4>
+    <p>{data.description}</p>
+  </div>
+);
+
+const CustomEndNodeComponent = ({ data }: NodeProps) => (
+  <div style={endNodeStyle}>
+    <h4>{data.label}</h4>
+    <p>{data.description}</p>
+  </div>
+);
+
+const AutomationDiagramDisplay = ({
   automationBlueprint,
   automationDiagramData,
-  messages = [],
+  messages,
   onAgentAdd,
   onAgentDismiss,
   dismissedAgents = new Set(),
   isGenerating = false,
   onRegenerateDiagram
-}) => {
-  const { toast } = useToast();
+}: AutomationDiagramDisplayProps) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [diagramError, setDiagramError] = useState<string | null>(null);
-  const [showJsonDebug, setShowJsonDebug] = useState(false);
-  const [showRegenerateForm, setShowRegenerateForm] = useState(false);
-  const [regenerateInput, setRegenerateInput] = useState('');
-  const [isRegenerating, setIsRegenerating] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [diagramStats, setDiagramStats] = useState({
-    totalNodes: 0,
-    totalEdges: 0,
-    conditionNodes: 0,
-    aiAgentNodes: 0,
-    platformNodes: 0,
-    stopNodes: 0
-  });
+  const { fitView } = useReactFlow();
 
-  const processNodeData = useCallback((nodeData: any) => {
-    console.log('🎯 Processing PERFECT node:', { 
-      label: nodeData.label, 
-      stepType: nodeData.stepType, 
-      platform: nodeData.platform,
-      isRecommended: nodeData.isRecommended 
-    });
+  const nodeTypes = useMemo(() => ({
+    aiAgentNode: CustomAINodeComponent,
+    triggerNode: CustomTriggerNodeComponent,
+    actionNode: CustomActionNodeComponent,
+    conditionNode: CustomConditionNodeComponent,
+    endNode: CustomEndNodeComponent,
+  }), []);
 
-    const processedData = {
-      ...nodeData,
-      onAdd: nodeData.isRecommended ? () => {
-        if (onAgentAdd) {
-          const agentData = {
-            name: nodeData.ai_agent_call?.agent_id || nodeData.label,
-            role: 'AI automation specialist',
-            goal: nodeData.explanation || 'Execute automation tasks intelligently',
-            rules: 'Follow automation best practices and user requirements',
-            memory: 'Remember automation context and patterns',
-            why_needed: nodeData.explanation || 'Essential for intelligent automation execution'
-          };
-          console.log('➕ Adding AI agent:', agentData.name);
-          onAgentAdd(agentData);
-          toast({
-            title: "🤖 AI Agent Added",
-            description: `${agentData.name} has been added to your automation`,
-          });
-        }
-      } : undefined,
-      onDismiss: nodeData.isRecommended ? () => {
-        if (onAgentDismiss) {
-          const agentName = nodeData.ai_agent_call?.agent_id || nodeData.label;
-          console.log('❌ Dismissing AI agent:', agentName);
-          onAgentDismiss(agentName);
-          toast({
-            title: "AI Agent Dismissed",
-            description: "Agent recommendation has been dismissed",
-          });
-        }
-      } : undefined
-    };
-
-    if (nodeData.isRecommended && dismissedAgents.has(nodeData.ai_agent_call?.agent_id || nodeData.label)) {
-      console.log('🚫 Node filtered out (dismissed):', nodeData.label);
-      return null;
-    }
-
-    return processedData;
-  }, [onAgentAdd, onAgentDismiss, dismissedAgents, toast]);
-
-  const handleRetryDiagram = useCallback(() => {
-    if (onRegenerateDiagram) {
-      setRetryCount(prev => prev + 1);
-      setDiagramError(null);
-      console.log(`🔄 Retrying diagram generation (attempt ${retryCount + 1})`);
-      onRegenerateDiagram();
-      toast({
-        title: "🔄 Retrying Generation",
-        description: "Using enhanced AI model with improved error handling",
-      });
-    }
-  }, [onRegenerateDiagram, retryCount, toast]);
-
-  const handleFallbackDiagram = useCallback(() => {
-    if (!automationBlueprint?.steps) return;
-    
-    console.log('🛠️ Creating fallback diagram');
-    
-    // Create a simple fallback diagram structure
-    const fallbackNodes = [
-      {
-        id: "fallback-trigger",
-        type: "triggerNode",
-        position: { x: 100, y: 300 },
-        data: {
-          label: `${automationBlueprint.trigger?.type || 'Manual'} Trigger`,
-          stepType: "trigger",
-          explanation: "This automation starts here",
-          platform: automationBlueprint.trigger?.platform || "System",
-          icon: "Play"
-        }
-      }
-    ];
-
-    const fallbackEdges: any[] = [];
-    let currentX = 600;
-
-    // Add basic steps
-    automationBlueprint.steps.forEach((step, index) => {
-      const nodeId = `fallback-step-${index}`;
-      fallbackNodes.push({
-        id: nodeId,
-        type: step.type === 'condition' ? 'conditionNode' : 'actionNode',
-        position: { x: currentX, y: 300 },
-        data: {
-          label: step.name || `Step ${index + 1}`,
-          stepType: step.type,
-          explanation: `${step.type} step in the automation`,
-          platform: (step.action as any)?.integration || 'System',
-          icon: step.type === 'condition' ? 'GitFork' : 'PlugZap'
-        }
-      });
-
-      // Connect to previous node
-      const sourceId = index === 0 ? "fallback-trigger" : `fallback-step-${index - 1}`;
-      fallbackEdges.push({
-        id: `fallback-edge-${index}`,
-        source: sourceId,
-        target: nodeId,
-        type: 'straight',
-        animated: true,
-        style: { 
-          stroke: '#8b5cf6', 
-          strokeWidth: 3,
-          strokeDasharray: '8,4'
-        }
-      });
-
-      currentX += 500;
-    });
-
-    // Add end node
-    fallbackNodes.push({
-      id: "fallback-end",
-      type: "fallbackNode",
-      position: { x: currentX, y: 300 },
-      data: {
-        label: "✅ Complete",
-        stepType: "end",
-        explanation: "Automation completed",
-        platform: "System",
-        icon: "Flag"
-      }
-    });
-
-    fallbackEdges.push({
-      id: "fallback-edge-end",
-      source: fallbackNodes[fallbackNodes.length - 2].id,
-      target: "fallback-end",
-      type: 'straight',
-      animated: true,
-      style: { 
-        stroke: '#8b5cf6', 
-        strokeWidth: 3,
-        strokeDasharray: '8,4'
-      }
-    });
-
-    setNodes(fallbackNodes);
-    setEdges(fallbackEdges);
-    setDiagramError(null);
-    
-    const stats = {
-      totalNodes: fallbackNodes.length,
-      totalEdges: fallbackEdges.length,
-      conditionNodes: fallbackNodes.filter(n => n.type?.includes('condition')).length,
-      aiAgentNodes: 0,
-      platformNodes: fallbackNodes.filter(n => n.data?.platform && n.data.platform !== 'System').length,
-      stopNodes: 1
-    };
-    
-    setDiagramStats(stats);
-    
-    toast({
-      title: "📋 Fallback Diagram Created",
-      description: "Basic diagram structure generated successfully",
-    });
-  }, [automationBlueprint, toast]);
-
-  useEffect(() => {
-    console.log('🎯 Processing PERFECT diagram with animated dotted lines and gradients');
-    
+  const processNodesWithAgentLogic = (nodes: Node[], messages: any[]) => {
     try {
-      if (automationDiagramData?.nodes && automationDiagramData?.edges) {
-        console.log('✅ Using PERFECT diagram data:', {
-          nodes: automationDiagramData.nodes.length,
-          edges: automationDiagramData.edges.length,
-          source: automationDiagramData.metadata?.source || 'unknown',
-          animatedDottedLines: true
-        });
+      if (!Array.isArray(nodes)) return [];
 
-        const processedNodes = automationDiagramData.nodes
-          .map(node => {
-            const processedData = processNodeData(node.data);
-            if (!processedData) return null;
-            
-            return {
-              ...node,
-              data: processedData,
-              type: node.type || 'actionNode'
-            };
-          })
-          .filter(Boolean) as Node[];
+      return nodes.map(node => {
+        // Check if this is an AI agent node
+        if (node.type === 'aiAgentNode' || node.data?.stepType === 'aiAgent' || node.data?.stepType === 'ai_agent_call') {
+          console.log('🤖 Processing AI agent node:', node.id, node.data);
+          
+          // Get the latest agent recommendations from messages
+          const latestBotMessage = messages?.filter(msg => msg.isBot).pop();
+          const recommendedAgents = latestBotMessage?.structuredData?.agents || [];
+          
+          // Find matching agent from recommendations
+          const matchingAgent = recommendedAgents.find(agent => 
+            agent.name && (
+              node.data?.label?.includes(agent.name) ||
+              node.data?.platform?.includes(agent.name) ||
+              node.id?.includes(agent.name.toLowerCase().replace(/\s+/g, '-'))
+            )
+          );
 
-        console.log('📊 Processed PERFECT nodes:', {
-          original: automationDiagramData.nodes.length,
-          processed: processedNodes.length,
-          aiRecommendations: processedNodes.filter(n => n.data?.isRecommended).length
-        });
-
-        // Apply PERFECT left-to-right layout with animated dotted lines
-        const { nodes: layoutedNodes, edges: layoutedEdges } = calculateEnhancedLayout(
-          processedNodes,
-          automationDiagramData.edges.map(edge => ({
-            ...edge,
-            animated: true, // ANIMATED!
-            type: 'straight',
-            style: {
-              stroke: '#8b5cf6',
-              strokeWidth: 3,
-              strokeDasharray: '8,4', // DOTTED ------
-              filter: 'drop-shadow(0 2px 4px rgba(139, 92, 246, 0.3))',
-              ...edge.style
-            }
-          }))
-        );
-
-        setNodes(layoutedNodes);
-        setEdges(layoutedEdges);
-        
-        const stats = {
-          totalNodes: layoutedNodes.length,
-          totalEdges: layoutedEdges.length,
-          conditionNodes: layoutedNodes.filter(n => n.type?.includes('condition')).length,
-          aiAgentNodes: layoutedNodes.filter(n => n.data?.isRecommended || n.type === 'aiAgentNode').length,
-          platformNodes: layoutedNodes.filter(n => n.data?.platform).length,
-          stopNodes: layoutedNodes.filter(n => n.data?.stepType === 'stop' || n.data?.stepType === 'end').length
-        };
-        
-        setDiagramStats(stats);
-        setDiagramError(null);
-        
-        console.log('📊 PERFECT animated dotted diagram statistics:', stats);
-        
-        if (stats.aiAgentNodes > 0) {
-          toast({
-            title: "🤖 AI Recommendations Found",
-            description: `${stats.aiAgentNodes} AI agent recommendations detected`,
+          // Get agent status from state manager
+          const agentName = matchingAgent?.name || node.data?.label || node.data?.platform || 'Unknown Agent';
+          const agentStatus = agentStateManager.getAgentStatus(agentName);
+          
+          console.log('🔍 Agent status check:', {
+            agentName,
+            status: agentStatus,
+            hasMatchingAgent: !!matchingAgent,
+            nodeId: node.id
           });
+
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              isRecommended: true, // Always show AI agents as recommended
+              agentData: matchingAgent || {
+                name: agentName,
+                role: node.data?.stepType || 'AI Agent',
+                platform: node.data?.platform,
+                why_needed: 'AI agent for automation enhancement'
+              },
+              status: agentStatus,
+              showActions: agentStatus === 'pending', // Only show add/dismiss if pending
+              onAgentAdd: onAgentAdd,
+              onAgentDismiss: onAgentDismiss
+            }
+          };
         }
-        
-      } else if (automationBlueprint?.steps?.length > 0) {
-        console.log('⚠️ No diagram data available, generating PERFECT animated diagram...');
-        setDiagramError('Creating perfect animated dotted diagram with gradients...');
-        
-      } else {
-        console.log('❌ No diagram data or blueprint available');
-        setDiagramError('No automation data available to display');
-        setNodes([]);
-        setEdges([]);
-        setDiagramStats({
-          totalNodes: 0,
-          totalEdges: 0,
-          conditionNodes: 0,
-          aiAgentNodes: 0,
-          platformNodes: 0,
-          stopNodes: 0
-        });
-      }
+
+        return node;
+      });
     } catch (error) {
-      console.error('💥 Error processing PERFECT diagram:', error);
-      setDiagramError(`Error processing diagram: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setNodes([]);
-      setEdges([]);
-    }
-  }, [automationDiagramData, automationBlueprint, processNodeData]);
-
-  const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
-  );
-
-  const handleRegenerateWithInput = async () => {
-    if (onRegenerateDiagram) {
-      setIsRegenerating(true);
-      try {
-        console.log('🎯 Regenerating PERFECT diagram with feedback:', regenerateInput);
-        await onRegenerateDiagram(regenerateInput.trim() || undefined);
-        setShowRegenerateForm(false);
-        setRegenerateInput('');
-        toast({
-          title: "🎯 Creating Perfect Animated Diagram",
-          description: "Generating with dotted lines, gradients, and mobile optimization",
-        });
-      } catch (error) {
-        console.error('Error regenerating diagram:', error);
-        toast({
-          title: "Regeneration Failed",
-          description: "Failed to regenerate diagram. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsRegenerating(false);
-      }
+      console.error('❌ Error processing nodes with agent logic:', error);
+      return nodes || [];
     }
   };
 
-  const handleQuickRegenerate = () => {
+  const isValidDiagramData = (data: any): boolean => {
+    if (!data || typeof data !== 'object') {
+      console.warn('⚠️ Diagram data is null or not an object');
+      return false;
+    }
+  
+    if (!Array.isArray(data.nodes) || !Array.isArray(data.edges)) {
+      console.warn('⚠️ Diagram data missing nodes or edges arrays');
+      return false;
+    }
+  
+    // Check if nodes and edges are non-empty arrays
+    if (data.nodes.length === 0 || data.edges.length === 0) {
+      console.warn('⚠️ Diagram data has empty nodes or edges');
+      return false;
+    }
+  
+    // Check if nodes have required properties
+    for (const node of data.nodes) {
+      if (!node.id || !node.type || !node.position || typeof node.position.x !== 'number' || typeof node.position.y !== 'number') {
+        console.warn('⚠️ Invalid node structure:', node);
+        return false;
+      }
+    }
+  
+    // Check if edges have required properties
+    for (const edge of data.edges) {
+      if (!edge.id || !edge.source || !edge.target) {
+        console.warn('⚠️ Invalid edge structure:', edge);
+        return false;
+      }
+    }
+  
+    return true;
+  };
+
+  const applyLayout = (nodes: Node[], edges: Edge[]) => {
+    if (!Array.isArray(nodes) || nodes.length === 0 || !Array.isArray(edges)) {
+      console.warn('⚠️ No nodes or edges to apply layout');
+      return { nodes: [], edges: [] };
+    }
+  
+    const initialNodeY = 50;
+    const nodeSpacingX = 300;
+    const nodeSpacingY = 200;
+  
+    // Group nodes by their Y position
+    const groupedNodes: { [y: number]: Node[] } = {};
+    nodes.forEach(node => {
+      const y = node.position.y || initialNodeY;
+      if (!groupedNodes[y]) {
+        groupedNodes[y] = [];
+      }
+      groupedNodes[y].push(node);
+    });
+  
+    // Sort nodes within each group by their X position
+    Object.keys(groupedNodes).forEach(y => {
+      groupedNodes[Number(y)].sort((a, b) => (a.position.x || 0) - (b.position.x || 0));
+    });
+  
+    let currentX = 50;
+    let currentY = initialNodeY;
+  
+    const updatedNodes = nodes.map(node => {
+      const y = node.position.y || initialNodeY;
+      const group = groupedNodes[y];
+      const index = group.findIndex(n => n.id === node.id);
+  
+      const updatedNode = {
+        ...node,
+        position: {
+          x: currentX,
+          y: currentY,
+        },
+      };
+  
+      currentX += nodeSpacingX;
+  
+      if (index === group.length - 1) {
+        currentX = 50;
+        currentY += nodeSpacingY;
+      }
+  
+      return updatedNode;
+    });
+  
+    return { nodes: updatedNodes, edges };
+  };
+
+  const processedNodes = useMemo(() => {
+    if (!diagramData?.nodes) return [];
+    
+    console.log('🔄 Processing diagram nodes with agent logic');
+    const processed = processNodesWithAgentLogic(diagramData.nodes, messages);
+    console.log('✅ Processed nodes:', processed.length, 'agents found:', processed.filter(n => n.data?.isRecommended).length);
+    
+    return processed;
+  }, [diagramData?.nodes, messages, onAgentAdd, onAgentDismiss]);
+
+  const { nodes: layoutedNodes, edges: layoutedEdges } = useMemo(() => {
+    if (!isValidDiagramData(diagramData)) {
+      console.warn('⚠️ Invalid diagram data, using empty diagram');
+      return { nodes: [], edges: [] };
+    }
+  
+    console.log('📏 Applying layout to diagram');
+    return applyLayout(processedNodes, diagramData.edges);
+  }, [processedNodes, diagramData]);
+
+  useEffect(() => {
+    setNodes(layoutedNodes);
+    setEdges(layoutedEdges);
+  }, [layoutedNodes, layoutedEdges, setNodes, setEdges]);
+
+  useEffect(() => {
+    fitView({ padding: 0.1 });
+  }, [nodes, edges, fitView]);
+
+  const handleRegenerate = () => {
     if (onRegenerateDiagram) {
-      console.log('🎯 Quick regenerating PERFECT animated diagram');
       onRegenerateDiagram();
-      toast({
-        title: "🎯 Creating Perfect Animated Diagram",
-        description: "Generating with dotted lines and gradient colors",
-      });
     }
   };
 
   return (
-    <div className="h-full w-full relative bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* MOBILE-OPTIMIZED Header Controls */}
-      <div className="absolute top-1 sm:top-2 md:top-4 right-1 sm:right-2 md:right-4 z-10 flex flex-col sm:flex-row gap-1 sm:gap-2">
-        <Button
-          onClick={() => setShowJsonDebug(true)}
-          size="sm"
-          variant="outline"
-          className="bg-white/95 backdrop-blur-sm shadow-lg hover:bg-white border-purple-200 hover:border-purple-300 rounded-xl text-xs px-2 py-1 sm:px-4 sm:py-2"
-        >
-          <Code className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-          <span className="hidden md:inline">Debug</span>
+    <div className="w-full h-full">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        nodeTypes={nodeTypes}
+        fitViewOptions={{ padding: 0.1 }}
+        className="bg-gray-50 rounded-lg"
+      >
+        <Controls />
+        <Background color="#aaa" gap={16} />
+      </ReactFlow>
+      <div className="mt-4 flex justify-end">
+        <Button onClick={handleRegenerate} disabled={isGenerating}>
+          {isGenerating ? 'Generating...' : 'Regenerate Diagram'}
         </Button>
-        
-        <Dialog open={showRegenerateForm} onOpenChange={setShowRegenerateForm}>
-          <DialogTrigger asChild>
-            <Button
-              size="sm"
-              variant="outline"
-              className="bg-white/95 backdrop-blur-sm shadow-lg hover:bg-white border-orange-200 hover:border-orange-300 rounded-xl text-xs px-2 py-1 sm:px-4 sm:py-2"
-            >
-              <Settings className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-              <span className="hidden md:inline">Perfect</span>
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="w-[95vw] max-w-md mx-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-sm sm:text-base">
-                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
-                Perfect Your Diagram
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="feedback" className="text-xs sm:text-sm font-medium">
-                  Enhancement Request (Optional)
-                </Label>
-                <Textarea
-                  id="feedback"
-                  placeholder="e.g., 'More animated effects', 'Brighter gradients', 'Better mobile layout'..."
-                  value={regenerateInput}
-                  onChange={(e) => setRegenerateInput(e.target.value)}
-                  className="mt-2 min-h-[100px] text-xs sm:text-sm"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button 
-                  onClick={handleRegenerateWithInput} 
-                  className="flex-1 text-xs sm:text-sm"
-                  disabled={isRegenerating}
-                >
-                  {isRegenerating ? (
-                    <>
-                      <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
-                      Perfecting...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                      Perfect
-                    </>
-                  )}
-                </Button>
-                <Button variant="outline" onClick={() => setShowRegenerateForm(false)} className="text-xs sm:text-sm">
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-        
-        {onRegenerateDiagram && (
-          <Button
-            onClick={handleQuickRegenerate}
-            size="sm"
-            disabled={isGenerating}
-            className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white shadow-lg rounded-xl text-xs px-2 py-1 sm:px-4 sm:py-2"
-          >
-            {isGenerating ? (
-              <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 animate-spin" />
-            ) : (
-              <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-            )}
-            <span className="hidden sm:inline">{isGenerating ? 'Creating...' : 'Regenerate'}</span>
-          </Button>
-        )}
       </div>
-
-      {/* MOBILE-OPTIMIZED Statistics Badge */}
-      {diagramStats.totalNodes > 0 && (
-        <div className="absolute top-1 sm:top-2 md:top-4 left-1 sm:left-2 md:left-4 z-10">
-          <Badge variant="secondary" className="bg-white/95 backdrop-blur-sm shadow-lg text-gray-700 px-2 py-1 rounded-xl text-xs font-medium">
-            <span className="hidden lg:inline">
-              {diagramStats.totalNodes} steps • {diagramStats.totalEdges} connections
-            </span>
-            <span className="hidden sm:inline lg:hidden">
-              {diagramStats.totalNodes} • {diagramStats.totalEdges}
-            </span>
-            <span className="sm:hidden">
-              {diagramStats.totalNodes}/{diagramStats.totalEdges}
-            </span>
-            {diagramStats.aiAgentNodes > 0 && (
-              <span className="ml-1 sm:ml-2 text-emerald-600 font-bold">
-                • {diagramStats.aiAgentNodes} 🤖
-              </span>
-            )}
-          </Badge>
-        </div>
-      )}
-
-      {/* MOBILE-OPTIMIZED Diagram Container */}
-      <div className="h-full w-full rounded-none sm:rounded-xl overflow-hidden shadow-none sm:shadow-xl border-0 sm:border border-gray-200">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          nodeTypes={nodeTypes}
-          connectionMode={ConnectionMode.Loose}
-          fitView
-          fitViewOptions={{
-            padding: 0.05, // Less padding on mobile
-            minZoom: 0.2,  // Allow more zoom out on mobile
-            maxZoom: 1.5
-          }}
-          defaultViewport={{ x: 0, y: 0, zoom: 0.5 }} // Start more zoomed out on mobile
-          className="bg-gradient-to-br from-blue-50 via-white to-purple-50"
-          panOnScroll
-          panOnDrag={[1, 2]}
-          proOptions={{ hideAttribution: true }}
-          defaultEdgeOptions={{
-            type: 'straight',
-            animated: true, // ANIMATED!
-            style: {
-              stroke: '#8b5cf6',
-              strokeWidth: 3,
-              strokeDasharray: '8,4' // DOTTED ------
-            }
-          }}
-        >
-          <Background 
-            variant={BackgroundVariant.Dots}
-            gap={24} // Smaller gap on mobile
-            size={1}
-            color="#e5e7eb"
-            style={{ opacity: 0.3 }}
-          />
-          
-          <Controls 
-            position="bottom-right"
-            showInteractive={false}
-            className="bg-white/95 backdrop-blur-sm shadow-lg rounded-xl border border-gray-200 [&>button]:!bg-white/90 [&>button]:hover:!bg-gray-100 [&>button]:text-xs [&>button]:p-1 sm:[&>button]:p-2"
-          />
-          
-          <MiniMap 
-            nodeStrokeColor="#8b5cf6"
-            nodeColor="#f8fafc"
-            nodeBorderRadius={16}
-            maskColor="rgba(139, 92, 246, 0.1)"
-            position="bottom-left"
-            pannable
-            zoomable
-            className="bg-white/95 backdrop-blur-sm shadow-lg rounded-xl border border-gray-200 hidden lg:block"
-            style={{
-              width: '220px', // Smaller on mobile
-              height: '140px'
-            }}
-          />
-        </ReactFlow>
-      </div>
-
-      {/* Enhanced Error State with Comprehensive Recovery */}
-      {diagramError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/95 backdrop-blur-sm p-2 sm:p-4">
-          <DiagramErrorRecovery
-            error={diagramError}
-            onRetry={handleRetryDiagram}
-            onFallbackDiagram={handleFallbackDiagram}
-            isRetrying={isGenerating}
-          />
-        </div>
-      )}
-
-      {/* JSON Debug Modal - Mobile Optimized */}
-      {showJsonDebug && (
-        <JsonDebugModal
-          isOpen={showJsonDebug}
-          onClose={() => setShowJsonDebug(false)}
-          diagramData={automationDiagramData}
-          blueprintData={automationBlueprint}
-        />
-      )}
     </div>
   );
 };

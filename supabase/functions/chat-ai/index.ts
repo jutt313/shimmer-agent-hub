@@ -1,548 +1,165 @@
 
-import "https://deno.land/x/xhr@0.1.0/mod.ts"
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Initialize Supabase client
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Enhanced system prompt with agent state awareness
+const ENHANCED_SYSTEM_PROMPT = `You are YusrAI, an expert automation creator. You create comprehensive automation blueprints with platforms, credentials, and AI agents.
 
-// Get OpenAI API key
-const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
-if (!openaiApiKey) {
-  console.error('❌ OpenAI API key not found')
+## CRITICAL AGENT STATE AWARENESS:
+- NEVER recommend agents that have been added or dismissed by the user
+- Always check the agentStatusSummary for current agent decisions
+- If agents are marked as "Added" or "Dismissed" - DO NOT recommend them again
+- Only recommend NEW agents that haven't been handled yet
+
+## RESPONSE FORMAT (ALWAYS JSON):
+{
+  "summary": "Brief explanation of what you're creating",
+  "steps": ["step1", "step2", "step3"],
+  "platforms": [
+    {
+      "name": "PlatformName",
+      "credentials": [
+        {
+          "field": "api_key",
+          "why_needed": "Required for API access",
+          "link": "https://platform.com/settings/api"
+        }
+      ]
+    }
+  ],
+  "agents": [
+    {
+      "name": "AgentName",
+      "role": "Data Processor",
+      "why_needed": "Enhances automation with AI",
+      "platform": "OpenAI"
+    }
+  ],
+  "automation_blueprint": {
+    "title": "Automation Title",
+    "description": "What this automation does",
+    "trigger": {
+      "type": "webhook",
+      "platform": "Webhook"
+    },
+    "steps": [
+      {
+        "id": "step-1",
+        "type": "api_call",
+        "platform": "PlatformName",
+        "action": "create_record",
+        "description": "Step description"
+      }
+    ]
+  }
 }
 
+## AGENT RECOMMENDATION RULES:
+1. Check agentStatusSummary FIRST before recommending any agents
+2. NEVER recommend agents marked as "Added" or "Dismissed"
+3. Only suggest NEW agents that would genuinely improve the automation
+4. If all needed agents are handled, focus on platform setup and execution
+5. Be intelligent about agent suggestions - don't over-recommend
+
+Always respond with valid JSON only.`;
+
 serve(async (req) => {
-  // Handle CORS preflight requests
+  console.log('🚀 Enhanced Chat AI function called with agent state awareness');
+  
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    console.log('🔄 Processing chat request')
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openAIApiKey) {
+      console.error('❌ OpenAI API key not found');
+      return new Response(JSON.stringify({ error: 'OpenAI API key not configured' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const { message, messages, automationId, automationContext, agentStatusSummary } = await req.json();
     
-    const { message, messages = [], automationId, automationContext } = await req.json()
-    
-    if (!message) {
-      throw new Error('Message is required')
-    }
+    console.log('📝 Chat AI processing request:', {
+      messageLength: message?.length || 0,
+      historyCount: messages?.length || 0,
+      automationId: automationId || 'none',
+      agentStatus: agentStatusSummary || 'none'
+    });
 
-    console.log('📚 Processing message:', message.substring(0, 100) + '...')
-    console.log('🔧 Messages history length:', messages.length)
+    // Build conversation context with agent state awareness
+    let conversationContext = `
+AUTOMATION CONTEXT:
+- Title: ${automationContext?.title || 'New Automation'}
+- Status: ${automationContext?.status || 'draft'}
+- ID: ${automationId || 'new'}
 
-    // Get universal knowledge as separate memory
-    console.log('🔍 Accessing universal knowledge store...')
-    
-    const { data: universalKnowledge } = await supabase
-      .from('universal_knowledge_store')
-      .select('*')
-      .order('usage_count', { ascending: false })
-      .limit(100);
+AGENT STATUS SUMMARY:
+${agentStatusSummary || 'No agent decisions made yet.'}
 
-    console.log(`📊 Universal knowledge entries retrieved: ${universalKnowledge?.length || 0}`);
+CONVERSATION HISTORY:
+${messages?.slice(-5).map(msg => `${msg.isBot ? 'AI' : 'User'}: ${msg.text.substring(0, 200)}...`).join('\n') || 'No previous messages'}
 
-    // Build universal knowledge context as separate memory
-    let universalKnowledgeMemory = '';
-    if (universalKnowledge && universalKnowledge.length > 0) {
-      const platformData = universalKnowledge
-        .filter(k => k.category === 'platform_knowledge')
-        .map(k => {
-          const credentialFields = k.credential_fields || [];
-          return `
-🔧 PLATFORM: ${k.platform_name || k.title}
-📋 CREDENTIALS: ${credentialFields.map(c => `${c.field} (${c.type || 'string'})`).join(', ')}
-📝 DESCRIPTION: ${k.platform_description || k.summary}
-💡 USE CASES: ${(k.use_cases || []).join(', ')}
-⚙️ INTEGRATION: ${k.details?.integration_type || 'API'}
-`;
-        }).join('\n');
+CURRENT USER MESSAGE: ${message}
 
-      const generalKnowledge = universalKnowledge
-        .filter(k => k.category !== 'platform_knowledge')
-        .map(k => `- ${k.title}: ${k.summary}\n  Solution: ${k.details?.solution || 'No solution recorded'}`)
-        .join('\n');
+Remember: DO NOT recommend agents that are already Added or Dismissed. Focus on NEW improvements and platform configuration.`;
 
-      universalKnowledgeMemory = `
-UNIVERSAL KNOWLEDGE STORE (SEPARATE MEMORY):
-This is your separate memory containing platform knowledge and solutions. Reference this when needed.
+    console.log('🎯 Enhanced conversation context prepared with agent awareness');
 
-PLATFORM KNOWLEDGE:
-${platformData}
-
-GENERAL KNOWLEDGE:
-${generalKnowledge}
-`;
-    }
-
-    console.log('📖 Universal knowledge memory prepared');
-
-    // COMPLETELY REWRITTEN SYSTEM PROMPT - FIXED CREDENTIAL HANDLING
-    const systemPrompt = `You are YusrAI, the world's most advanced automation architect with access to a universal knowledge store.
-
-CRITICAL PLATFORM CLARIFICATION REQUIREMENT:
-When users mention generic terms like "CRM", "email", "mail", "messaging", "calendar", "social media", etc., you MUST ask clarification questions to identify the SPECIFIC platform they want to use.
-
-Examples of when to ask clarification:
-- User says "CRM" → Ask: "Which CRM platform would you like to use? (HubSpot, Salesforce, Pipedrive, etc.)"
-- User says "email" or "mail" → Ask: "Which email platform? (Gmail, Outlook, SendGrid, Mailchimp, etc.)"
-- User says "messaging" → Ask: "Which messaging platform? (Slack, Discord, WhatsApp, etc.)"
-- User says "calendar" → Ask: "Which calendar platform? (Google Calendar, Outlook Calendar, etc.)"
-
-NEVER assume or suggest multiple platform options in the platforms array. ALWAYS ask for clarification first.
-
-CRITICAL CREDENTIAL SECURITY RULE:
-NEVER ask for sensitive credentials (API Keys, Tokens, Passwords, Client IDs, Client Secrets, Database URLs, Connection Strings) in clarification_questions. These must ONLY be collected in the platforms array with complete credential requirements.
-
-COMPREHENSIVE CREDENTIAL COLLECTION RULE:
-For EVERY platform identified, you MUST provide ALL necessary credentials in the platforms array including:
-- API Keys, Access Tokens, Refresh Tokens
-- Client IDs, Client Secrets, App IDs  
-- Database URLs, Connection Strings, Endpoints
-- Usernames, Email Addresses (when needed for setup)
-- Organization IDs, Workspace IDs, Team IDs
-- Webhook URLs, Callback URLs
-- Service Account Keys, Certificate Files
-- Region Settings, Environment Variables
-- Custom Headers, Authentication Methods
-
-NEVER simplify credential requirements - always ask for the complete set needed for each platform.
-
-Universal Knowledge Store Access:
-${universalKnowledgeMemory}
-
-MANDATORY RESPONSE STRUCTURE:
-You must ALWAYS return a complete JSON response with ALL required fields. NEVER return partial responses or null values.
-
-CRITICAL RESPONSE BEHAVIOR:
-- If clarification_questions is NOT empty, you STILL must return summary, steps, platforms, agents, and automation_blueprint
-- The frontend needs complete data structure in every response
-- Clarification questions are additional to the main response, not a replacement
-
-JSON Structure - ALWAYS COMPLETE:
-{
-  "summary": "Comprehensive 3-4 line description outlining the automation with identified platforms",
-  "steps": [
-    "Step 1: [GRANULAR_ATOMIC_ACTION] using [PLATFORM/SERVICE]",
-    "Step 2: [GRANULAR_ATOMIC_ACTION]",
-    "Step 3: [GRANULAR_ATOMIC_ACTION]",
-    "Step 4: [GRANULAR_ATOMIC_ACTION]"
-  ],
-  "platforms": [
-    {
-      "name": "Platform Name",
-      "credentials": [
-        {
-          "field": "API Key",
-          "placeholder": "Enter your API key",
-          "link": "direct_url_to_get_credential",
-          "why_needed": "Required for API authentication and access"
-        },
-        {
-          "field": "Client ID", 
-          "placeholder": "Enter your client ID",
-          "link": "direct_url_to_get_credential",
-          "why_needed": "Required for OAuth authentication"
-        },
-        {
-          "field": "Client Secret",
-          "placeholder": "Enter your client secret", 
-          "link": "direct_url_to_get_credential",
-          "why_needed": "Required for secure OAuth flow"
-        },
-        {
-          "field": "Organization ID",
-          "placeholder": "Enter your organization ID",
-          "link": "direct_url_to_get_credential", 
-          "why_needed": "Required to identify your organization"
-        },
-        {
-          "field": "Webhook URL",
-          "placeholder": "Enter webhook endpoint URL",
-          "link": "direct_url_to_get_credential",
-          "why_needed": "Required for receiving real-time notifications"
-        }
-      ]
-    }
-  ],
-  "platforms_to_remove": [],
-  "agents": [
-    {
-      "name": "SpecificAgentName",
-      "role": "Detailed role using platform knowledge",
-      "goal": "Specific objective referencing platform capabilities", 
-      "rules": "Rules incorporating platform-specific constraints",
-      "memory": "Initial memory including platform configuration details",
-      "why_needed": "Explanation referencing specific platform integration needs"
-    }
-  ],
-  "clarification_questions": [],
-  "automation_blueprint": {
-    "version": "1.0.0",
-    "description": "Automation blueprint reflecting the detailed plan",
-    "trigger": {
-      "type": "manual|scheduled|webhook|event",
-      "schedule": "cron expression if scheduled",
-      "webhook_url": "if webhook trigger"
-    },
-    "variables": {},
-    "steps": [
-      {
-        "id": "granular_step_1",
-        "name": "Detailed Step Name",
-        "type": "action|trigger|condition|ai_agent|loop|delay|retry|fallback",
-        "action": {
-          "integration": "platform_name",
-          "method": "specific_api_method", 
-          "parameters": {}
-        }
-      }
-    ],
-    "error_handling": {
-      "retry_attempts": 3
-    }
-  },
-  "conversation_updates": {
-    "knowledge_applied": "Universal knowledge entries used",
-    "platform_count": "number of platforms referenced"
-  },
-  "is_update": false,
-  "recheck_status": "ready_for_implementation"
-}
-
-CRITICAL SUCCESS REQUIREMENTS:
-- MUST identify ALL platforms and their complete credential requirements
-- MUST provide granular, atomic steps  
-- MUST use universal knowledge store as separate memory
-- MUST return complete JSON structure for every request - NEVER partial or null responses
-- MUST ensure JSON response is valid and complete in all scenarios
-- MUST ask for ALL credentials needed for each platform (API Keys, Tokens, IDs, URLs, etc.)
-
-Context:
-Previous conversation: ${JSON.stringify(messages.slice(-3))}
-Current automation context: ${JSON.stringify(automationContext)}`
-
-    // Prepare messages for OpenAI
-    const openaiMessages = [
-      { role: "system", content: systemPrompt },
-      ...messages.map((msg: any) => ({
-        role: msg.isBot ? "assistant" : "user",
-        content: msg.text || msg.message_content || ""
-      })),
-      { role: "user", content: message }
-    ]
-
-    console.log('📡 Making OpenAI request...')
-
-    // Call OpenAI API
-    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
+        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: openaiMessages,
-        max_tokens: 4000,
-        temperature: 0.1,
-        response_format: { type: "json_object" }
+        model: 'gpt-4.1-2025-04-14',
+        messages: [
+          { role: 'system', content: ENHANCED_SYSTEM_PROMPT },
+          { role: 'user', content: conversationContext }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.3,
+        max_tokens: 3000
       }),
-    })
+    });
 
-    if (!openaiResponse.ok) {
-      const errorText = await openaiResponse.text()
-      console.error('❌ OpenAI API error:', openaiResponse.status, errorText)
-      throw new Error(`OpenAI API error: ${openaiResponse.status} - ${errorText}`)
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ OpenAI API error:', response.status, errorText);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
 
-    const openaiData = await openaiResponse.json()
-    const aiResponse = openaiData.choices[0]?.message?.content
+    const data = await response.json();
+    const aiResponse = JSON.parse(data.choices[0].message.content);
 
-    console.log('🔍 Raw OpenAI response received, length:', aiResponse?.length || 0)
+    console.log('✅ Enhanced AI response generated with agent state awareness:', {
+      hasSummary: !!aiResponse.summary,
+      stepsCount: aiResponse.steps?.length || 0,
+      platformsCount: aiResponse.platforms?.length || 0,
+      agentsCount: aiResponse.agents?.length || 0,
+      hasBlueprint: !!aiResponse.automation_blueprint
+    });
 
-    if (!aiResponse) {
-      console.error('❌ No response content from OpenAI')
-      throw new Error('No response from OpenAI')
-    }
-
-    console.log('✅ Received OpenAI response')
-
-    // ENHANCED JSON PARSING WITH COMPREHENSIVE FALLBACK
-    let parsedResponse
-    try {
-      parsedResponse = JSON.parse(aiResponse)
-      console.log('✅ JSON parsing successful')
-      console.log('📊 Response structure:', {
-        hasSummary: !!parsedResponse.summary,
-        stepsCount: parsedResponse.steps?.length || 0,
-        platformsCount: parsedResponse.platforms?.length || 0,
-        agentsCount: parsedResponse.agents?.length || 0,
-        clarificationCount: parsedResponse.clarification_questions?.length || 0,
-        hasBlueprint: !!parsedResponse.automation_blueprint
-      })
-      
-      // VALIDATE COMPLETE STRUCTURE - NEVER ALLOW INCOMPLETE RESPONSES
-      if (!parsedResponse.summary) {
-        console.warn('⚠️ Response missing summary, adding comprehensive default')
-        parsedResponse.summary = "I'm analyzing your automation request and will provide detailed steps with complete platform integrations."
-      }
-      
-      if (!parsedResponse.steps || !Array.isArray(parsedResponse.steps)) {
-        console.warn('⚠️ Response missing steps, adding defaults')
-        parsedResponse.steps = [
-          "Step 1: Analyze automation requirements and identify necessary platforms",
-          "Step 2: Configure platform integrations with complete credential requirements", 
-          "Step 3: Set up data flow and processing logic between platforms",
-          "Step 4: Test the automation workflow and handle error scenarios"
-        ]
-      }
-
-      if (!parsedResponse.platforms || !Array.isArray(parsedResponse.platforms)) {
-        console.warn('⚠️ Response missing platforms, adding default structure') 
-        parsedResponse.platforms = []
-      }
-
-      if (!parsedResponse.agents || !Array.isArray(parsedResponse.agents)) {
-        console.warn('⚠️ Response missing agents, adding default')
-        parsedResponse.agents = [{
-          name: "AutomationArchitect",
-          role: "Platform integration specialist with comprehensive automation knowledge",
-          goal: "Create seamless automations with complete platform credential management",
-          rules: "Always collect ALL required platform credentials, provide clear step-by-step guidance, ensure robust error handling",
-          memory: `Universal knowledge store available: ${universalKnowledge?.length || 0} platform entries for comprehensive automation building`,
-          why_needed: "Essential for building reliable, production-ready automations with proper platform integrations"
-        }]
-      }
-
-      if (!parsedResponse.automation_blueprint) {
-        console.warn('⚠️ Response missing automation blueprint, adding default')
-        parsedResponse.automation_blueprint = {
-          version: "1.0.0",
-          description: "Comprehensive automation workflow with universal knowledge integration",
-          trigger: { type: "manual" },
-          variables: {},
-          steps: [],
-          error_handling: { retry_attempts: 3 }
-        }
-      }
-
-      if (!parsedResponse.clarification_questions) {
-        parsedResponse.clarification_questions = []
-      }
-
-      if (!parsedResponse.conversation_updates) {
-        parsedResponse.conversation_updates = {
-          knowledge_applied: `${universalKnowledge?.length || 0} universal knowledge entries processed`,
-          platform_analysis_complete: "Complete automation structure prepared"
-        }
-      }
-
-      if (!parsedResponse.platforms_to_remove) {
-        parsedResponse.platforms_to_remove = []
-      }
-
-      parsedResponse.is_update = parsedResponse.is_update || false
-      parsedResponse.recheck_status = parsedResponse.recheck_status || "ready_for_implementation"
-      
-    } catch (parseError) {
-      console.error('❌ JSON parse error:', parseError)
-      console.error('❌ Raw OpenAI response (first 500 chars):', aiResponse.substring(0, 500))
-      
-      // COMPREHENSIVE FALLBACK RESPONSE - NEVER RETURN BLANK
-      parsedResponse = {
-        summary: "I understand your automation request. Let me break this down into actionable steps with comprehensive platform integrations.",
-        steps: [
-          "Step 1: Analyze your automation requirements and identify necessary platforms",
-          "Step 2: Configure platform integrations with complete credential requirements", 
-          "Step 3: Set up data flow and processing logic between platforms",
-          "Step 4: Test the automation workflow and handle error scenarios",
-          "Step 5: Deploy and monitor the automation for optimal performance"
-        ],
-        platforms: [{
-          name: "Platform Configuration Required",
-          credentials: [
-            {
-              field: "API Key",
-              placeholder: "Enter your API key for platform authentication",
-              link: "#",
-              why_needed: "Required for secure platform integration and API access"
-            },
-            {
-              field: "Client ID", 
-              placeholder: "Enter your application client ID",
-              link: "#",
-              why_needed: "Required for OAuth authentication flow"
-            },
-            {
-              field: "Client Secret",
-              placeholder: "Enter your application client secret",
-              link: "#", 
-              why_needed: "Required for secure OAuth token exchange"
-            }
-          ]
-        }],
-        platforms_to_remove: [],
-        agents: [{
-          name: "AutomationArchitect",
-          role: "Platform integration specialist with comprehensive automation knowledge",
-          goal: "Create seamless automations with complete platform credential management",
-          rules: "Always collect ALL required platform credentials, provide clear step-by-step guidance, ensure robust error handling",
-          memory: `Universal knowledge store available: ${universalKnowledge?.length || 0} platform entries for comprehensive automation building`,
-          why_needed: "Essential for building reliable, production-ready automations with proper platform integrations"
-        }],
-        clarification_questions: [],
-        automation_blueprint: {
-          version: "1.0.0",
-          description: "Comprehensive automation workflow with universal knowledge integration",
-          trigger: { type: "manual" },
-          variables: {},
-          steps: [{
-            id: "platform_setup",
-            name: "Platform Configuration Setup",
-            type: "action",
-            action: {
-              integration: "universal_platform_connector",
-              method: "configure_credentials",
-              parameters: {
-                platform_type: "user_specified",
-                credential_requirements: "complete_set"
-              }
-            }
-          }],
-          error_handling: {
-            retry_attempts: 3
-          }
-        },
-        conversation_updates: {
-          universal_knowledge_applied: `${universalKnowledge?.length || 0} universal knowledge entries processed`,
-          platform_analysis_complete: "Ready for specific platform selection and credential configuration",
-          automation_readiness: "Complete automation structure prepared"
-        },
-        is_update: false,
-        recheck_status: "ready_for_platform_specification"
-      }
-    }
-
-    // FINAL COMPREHENSIVE VALIDATION - ENSURE RESPONSE IS NEVER NULL OR INCOMPLETE
-    if (!parsedResponse || typeof parsedResponse !== 'object') {
-      console.error('❌ Parsed response is invalid, using emergency comprehensive fallback')
-      parsedResponse = {
-        summary: "I'm ready to help you create a comprehensive automation with complete platform integrations and credential management.",
-        steps: [
-          "Step 1: Identify and specify the exact platforms for your automation",
-          "Step 2: Configure complete credential sets for each platform including API keys, tokens, and IDs",
-          "Step 3: Define the automation workflow and data processing steps with error handling", 
-          "Step 4: Set up monitoring, logging, and performance optimization for reliability"
-        ],
-        platforms: [],
-        platforms_to_remove: [],
-        agents: [{
-          name: "ComprehensiveAutomationAgent",
-          role: "Advanced automation architect with complete platform integration expertise",
-          goal: "Build robust automations with comprehensive credential management and error handling",
-          rules: "Collect ALL platform credentials, ensure security, provide complete setup guidance",
-          memory: "Ready to integrate any platform with complete credential requirements",
-          why_needed: "Essential for creating production-ready automations with proper security and monitoring"
-        }],
-        clarification_questions: ["Which specific platforms would you like to integrate for this automation?"],
-        automation_blueprint: {
-          version: "1.0.0",
-          description: "Platform-specific automation ready for comprehensive configuration",
-          trigger: { type: "manual" },
-          variables: {},
-          steps: [],
-          error_handling: { retry_attempts: 3 }
-        },
-        conversation_updates: {
-          status: "awaiting_platform_specification",
-          readiness: "complete_automation_framework_prepared"
-        },
-        is_update: false,
-        recheck_status: "ready_for_complete_specification"
-      }
-    }
-
-    // CRITICAL: ALWAYS RETURN COMPLETE RESPONSE - NEVER STRIP DATA
-    console.log('🎯 Final response validation passed')
-    console.log('📤 Response summary:', parsedResponse.summary?.substring(0, 100) + '...')
-    console.log('🔧 Platforms count:', parsedResponse.platforms?.length || 0)
-    console.log('❓ Clarification questions count:', parsedResponse.clarification_questions?.length || 0)
-
-    // Update universal knowledge usage
-    if (universalKnowledge && universalKnowledge.length > 0) {
-      console.log(`📈 Updating usage count for ${universalKnowledge.length} universal knowledge entries`);
-      for (const knowledge of universalKnowledge) {
-        await supabase
-          .from('universal_knowledge_store')
-          .update({ 
-            usage_count: (knowledge.usage_count || 0) + 1,
-            last_used: new Date().toISOString()
-          })
-          .eq('id', knowledge.id);
-      }
-      console.log('✅ Successfully updated all universal knowledge usage counts');
-    }
-
-    console.log('🚀 Returning complete validated response')
-    
-    return new Response(JSON.stringify(parsedResponse), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return new Response(JSON.stringify(aiResponse), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
 
   } catch (error) {
-    console.error('💥 Error in chat-ai function:', error)
-    
-    // ENHANCED ERROR RESPONSE - COMPREHENSIVE FALLBACK
-    const errorResponse = {
-      summary: "I encountered a technical issue, but I'm ready to help you create your automation with complete platform integrations. Please rephrase your request and I'll provide a comprehensive solution.",
-      steps: [
-        "Step 1: Rephrase your automation requirements with specific platform preferences",
-        "Step 2: I'll identify all required platforms with complete credential requirements including API keys, tokens, and IDs", 
-        "Step 3: Provide comprehensive setup information for each platform integration with security best practices",
-        "Step 4: Build your automation with proper error handling, monitoring, and performance optimization"
-      ],
-      platforms: [],
-      platforms_to_remove: [],
-      agents: [{
-        name: "ErrorRecoveryAgent",
-        role: "Technical issue resolution specialist with comprehensive automation knowledge",
-        goal: "Recover from technical issues while providing complete automation solutions with full credential management",
-        rules: "Always provide helpful responses, collect ALL platform credentials (API keys, tokens, IDs, URLs), never return empty responses",
-        memory: "Technical issue encountered - ready to provide complete automation assistance with comprehensive platform integration",
-        why_needed: "Essential for maintaining reliability and providing consistent automation building support"
-      }],
-      clarification_questions: [
-        "Could you please rephrase your automation request with specific platform names?",
-        "What specific outcome are you trying to achieve with this automation?"
-      ],
-      automation_blueprint: {
-        version: "1.0.0",
-        description: "Error recovery workflow - ready for complete automation building with comprehensive platform integration",
-        trigger: { type: "manual" },
-        variables: {},
-        steps: [],
-        error_handling: {
-          retry_attempts: 3
-        }
-      },
-      conversation_updates: {
-        error_recovery_active: "Technical issue resolved - ready for complete automation assistance",
-        platform_support_ready: "All platform integrations available for comprehensive automation building with full credential collection"
-      },
-      is_update: false,
-      recheck_status: "error_recovered_ready_for_complete_request"
-    }
-
-    return new Response(JSON.stringify(errorResponse), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    })
+    console.error('💥 Enhanced Chat AI error:', error);
+    return new Response(JSON.stringify({ 
+      error: 'Failed to process chat request with agent state',
+      details: error.message 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
-})
+});

@@ -41,6 +41,8 @@ const PlatformCredentialForm = ({
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [testMessage, setTestMessage] = useState<string>('');
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+  const [existingCredentials, setExistingCredentials] = useState<Record<string, string> | null>(null);
+  const [isReadOnly, setIsReadOnly] = useState(false);
 
   // Initialize credentials object
   useEffect(() => {
@@ -63,8 +65,18 @@ const PlatformCredentialForm = ({
           platform.name
         );
         
-        if (existingCreds) {
-          setCredentials(existingCreds);
+        if (existingCreds && Object.keys(existingCreds).length > 0) {
+          setExistingCredentials(existingCreds);
+          setIsReadOnly(true);
+          setTestStatus('success');
+          setTestMessage('Credentials are saved and verified');
+          
+          // Show masked versions for display
+          const maskedCreds: Record<string, string> = {};
+          Object.keys(existingCreds).forEach(key => {
+            maskedCreds[key] = '••••••••••••••••';
+          });
+          setCredentials(maskedCreds);
         }
       } catch (error) {
         console.error('Error loading existing credentials:', error);
@@ -75,6 +87,8 @@ const PlatformCredentialForm = ({
   }, [user, platform.name]);
 
   const handleInputChange = (field: string, value: string) => {
+    if (isReadOnly) return; // Prevent editing if read-only
+    
     const normalizedField = field.toLowerCase().replace(/\s+/g, '_');
     setCredentials(prev => ({
       ...prev,
@@ -91,6 +105,8 @@ const PlatformCredentialForm = ({
   };
 
   const validateCredentials = () => {
+    if (isReadOnly) return true; // Skip validation for read-only
+    
     const requiredFields = platform.credentials.map(cred => 
       cred.field.toLowerCase().replace(/\s+/g, '_')
     );
@@ -110,7 +126,7 @@ const PlatformCredentialForm = ({
   };
 
   const handleTest = async () => {
-    if (!user || !validateCredentials()) return;
+    if (!user || !validateCredentials() || isReadOnly) return;
 
     setIsTestingCredentials(true);
     setTestStatus('testing');
@@ -166,7 +182,7 @@ const PlatformCredentialForm = ({
   };
 
   const handleSave = async () => {
-    if (!user || !validateCredentials()) return;
+    if (!user || !validateCredentials() || isReadOnly) return;
 
     setIsLoading(true);
 
@@ -182,12 +198,20 @@ const PlatformCredentialForm = ({
       );
 
       if (success) {
+        // Don't reload the page, just update the state
+        setIsReadOnly(true);
+        setExistingCredentials(filteredCredentials);
+        
         toast({
           title: "Success",
           description: `${platform.name} credentials saved successfully!`,
         });
+        
+        // Call the callback without reloading
         onCredentialSaved(platform.name);
-        setTimeout(() => onClose(), 1000);
+        
+        // Close the modal after a short delay
+        setTimeout(() => onClose(), 500);
       } else {
         throw new Error('Failed to save credentials');
       }
@@ -217,7 +241,7 @@ const PlatformCredentialForm = ({
   };
 
   const shouldShowPasswordToggle = (field: string) => {
-    return getInputType(field) === 'password';
+    return getInputType(field) === 'password' && !isReadOnly;
   };
 
   return (
@@ -225,7 +249,7 @@ const PlatformCredentialForm = ({
       <DialogContent className="sm:max-w-[500px] bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-purple-800">
-            Setup {platform.name} Credentials
+            {isReadOnly ? `${platform.name} Credentials (Saved)` : `Setup ${platform.name} Credentials`}
           </DialogTitle>
         </DialogHeader>
 
@@ -242,7 +266,7 @@ const PlatformCredentialForm = ({
                   <Label htmlFor={normalizedField} className="text-sm font-medium text-purple-700">
                     {cred.field}
                   </Label>
-                  {cred.link && (
+                  {cred.link && !isReadOnly && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -259,10 +283,14 @@ const PlatformCredentialForm = ({
                   <Input
                     id={normalizedField}
                     type={inputType === 'password' && !showPassword ? 'password' : 'text'}
-                    placeholder={cred.placeholder}
+                    placeholder={isReadOnly ? 'Saved and verified' : cred.placeholder}
                     value={currentValue}
                     onChange={(e) => handleInputChange(cred.field, e.target.value)}
-                    className="border-purple-300 focus:border-purple-500 focus:ring-purple-200"
+                    className={`border-purple-300 focus:border-purple-500 focus:ring-purple-200 ${
+                      isReadOnly ? 'bg-green-50 border-green-300 text-green-800' : ''
+                    }`}
+                    readOnly={isReadOnly}
+                    disabled={isReadOnly}
                   />
                   
                   {shouldShowPasswordToggle(cred.field) && (
@@ -282,7 +310,9 @@ const PlatformCredentialForm = ({
                   )}
                 </div>
                 
-                <p className="text-xs text-purple-600">{cred.why_needed}</p>
+                {!isReadOnly && (
+                  <p className="text-xs text-purple-600">{cred.why_needed}</p>
+                )}
               </div>
             );
           })}
@@ -304,43 +334,55 @@ const PlatformCredentialForm = ({
             </div>
           )}
 
-          <div className="flex gap-3 pt-4">
-            <Button
-              onClick={handleTest}
-              variant="outline"
-              disabled={isTestingCredentials || isLoading}
-              className="flex-1 border-purple-400 text-purple-700 hover:bg-purple-100"
-            >
-              {isTestingCredentials ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Testing...
-                </>
-              ) : testStatus === 'success' ? (
-                <>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Tested ✓
-                </>
-              ) : (
-                'Test Credentials'
-              )}
-            </Button>
-            
-            <Button
-              onClick={handleSave}
-              disabled={isLoading || isTestingCredentials || testStatus !== 'success'}
-              className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Save Credentials'
-              )}
-            </Button>
-          </div>
+          {isReadOnly ? (
+            <div className="flex justify-center pt-4">
+              <Button
+                onClick={onClose}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Credentials Saved
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-3 pt-4">
+              <Button
+                onClick={handleTest}
+                variant="outline"
+                disabled={isTestingCredentials || isLoading}
+                className="flex-1 border-purple-400 text-purple-700 hover:bg-purple-100"
+              >
+                {isTestingCredentials ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Testing...
+                  </>
+                ) : testStatus === 'success' ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Tested ✓
+                  </>
+                ) : (
+                  'Test Credentials'
+                )}
+              </Button>
+              
+              <Button
+                onClick={handleSave}
+                disabled={isLoading || isTestingCredentials || testStatus !== 'success'}
+                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Credentials'
+                )}
+              </Button>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

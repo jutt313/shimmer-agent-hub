@@ -25,14 +25,12 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
   const { user } = useAuth();
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
   const [savedPlatforms, setSavedPlatforms] = useState<Set<string>>(new Set());
-  const [testedPlatforms, setTestedPlatforms] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user) return;
 
     const checkSavedCredentials = async () => {
       const saved = new Set<string>();
-      const tested = new Set<string>();
 
       for (const platform of platforms) {
         try {
@@ -42,7 +40,6 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
           );
           if (credentials && Object.keys(credentials).length > 0) {
             saved.add(platform.name);
-            tested.add(platform.name);
           }
         } catch (error) {
           console.error(`Error checking credentials for ${platform.name}:`, error);
@@ -50,14 +47,12 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
       }
 
       setSavedPlatforms(saved);
-      setTestedPlatforms(tested);
     };
 
     checkSavedCredentials();
   }, [user, platforms]);
 
   const handlePlatformClick = (platform: Platform) => {
-    // Only allow clicking if not saved, or if saved but user wants to edit
     setSelectedPlatform(platform);
   };
 
@@ -66,38 +61,31 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
   };
 
   const handleCredentialSaved = (platformName: string) => {
+    // Update state without reloading
     setSavedPlatforms(prev => new Set([...prev, platformName]));
-    setTestedPlatforms(prev => new Set([...prev, platformName]));
-    onCredentialChange?.();
+    
+    // Call the callback if provided
+    if (onCredentialChange) {
+      onCredentialChange();
+    }
   };
 
   const handleCredentialTested = (platformName: string) => {
-    setTestedPlatforms(prev => new Set([...prev, platformName]));
+    // Handle testing state if needed
+    console.log(`Credentials tested for ${platformName}`);
   };
 
-  const getButtonStatus = (platformName: string) => {
-    if (savedPlatforms.has(platformName)) return 'saved';
-    if (testedPlatforms.has(platformName)) return 'tested';
-    return 'unsaved';
-  };
-
-  const getButtonStyles = (status: string) => {
-    switch (status) {
-      case 'saved':
-        return 'bg-green-500 hover:bg-green-600 text-white border border-green-400';
-      case 'tested':
-        return 'bg-blue-500 hover:bg-blue-600 text-white border border-blue-400';
-      case 'unsaved':
-      default:
-        return 'bg-yellow-500 hover:bg-yellow-600 text-white border border-yellow-400';
+  const getButtonStyles = (platformName: string) => {
+    if (savedPlatforms.has(platformName)) {
+      return 'bg-green-500 hover:bg-green-600 text-white border border-green-400';
     }
+    return 'bg-yellow-500 hover:bg-yellow-600 text-white border border-yellow-400';
   };
 
   return (
     <>
       <div className="flex flex-wrap gap-2 p-4">
         {platforms.map((platform) => {
-          const status = getButtonStatus(platform.name);
           const iconConfig = getPlatformIconConfig(platform.name);
           const IconComponent = iconConfig.icon;
           
@@ -108,7 +96,7 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
               className={`
                 h-8 px-3 rounded-full text-xs font-medium 
                 transition-all duration-200 flex items-center gap-1
-                ${getButtonStyles(status)}
+                ${getButtonStyles(platform.name)}
               `}
             >
               <IconComponent className="h-3 w-3" />

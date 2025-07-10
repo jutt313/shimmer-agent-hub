@@ -704,14 +704,14 @@ const AutomationDetail = () => {
         </div>
       </div>
       
-      {/* Platform Buttons - Reduced spacing */}
+      {/* Platform Buttons - NO page reload trigger */}
       {!showDashboard && !showDiagram && currentPlatforms && currentPlatforms.length > 0 && (
         <div className="px-6 pb-2">
           <PlatformButtons 
             platforms={currentPlatforms} 
             onCredentialChange={() => {
-              // Trigger re-check of credentials
-              window.location.reload();
+              // Just refresh the execution panel, don't reload the page
+              console.log('Credentials updated');
             }}
           />
         </div>
@@ -719,16 +719,14 @@ const AutomationDetail = () => {
 
       {/* Execution Panel - Show when credentials are configured and automation has blueprint */}
       {!showDashboard && !showDiagram && automation?.automation_blueprint && (
-        <div className="px-6 pb-2">
-          <AutomationExecutionPanel
-            automationId={automation.id}
-            blueprint={automation.automation_blueprint}
-            title={automation.title}
-          />
-        </div>
+        <AutomationExecutionPanel
+          automationId={automation.id}
+          blueprint={automation.automation_blueprint}
+          title={automation.title}
+        />
       )}
       
-      {/* Input Section - Fixed positioning and reduced spacing with multi-line support */}
+      {/* Input Section - Keep multi-line support for chat */}
       {!showDashboard && !showDiagram && (
         <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent px-6 pt-2 pb-4">
           <div className="flex gap-3 items-end">
@@ -756,7 +754,7 @@ const AutomationDetail = () => {
                 }}
                 placeholder={sendingMessage ? "YusrAI is thinking with full context..." : "Describe the automation you want to build..."} 
                 disabled={sendingMessage}
-                rows={newMessage.split('\n').length || 1}
+                rows={Math.min(Math.max(newMessage.split('\n').length, 1), 4)}
                 className="w-full resize-none rounded-3xl bg-white/90 backdrop-blur-sm border-0 px-5 py-3 text-base focus:outline-none focus:ring-0 shadow-lg min-h-[48px] max-h-32 overflow-y-auto" 
                 style={{
                   boxShadow: '0 0 25px rgba(154, 94, 255, 0.2)'

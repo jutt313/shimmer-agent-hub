@@ -1,7 +1,5 @@
-
-import React, { useMemo, useEffect } from 'react';
-import {
-  ReactFlow,
+import React, { useMemo } from 'react';
+import ReactFlow, {
   addEdge,
   applyEdgeChanges,
   applyNodeChanges,
@@ -11,9 +9,10 @@ import {
   Edge,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   NodeProps,
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
+} from 'reactflow';
+import 'reactflow/dist/style.css';
 import { Button } from "@/components/ui/button";
 import { Plus, X } from "lucide-react";
 import { agentStateManager } from '@/utils/agentStateManager';
@@ -29,89 +28,74 @@ interface AutomationDiagramDisplayProps {
   onRegenerateDiagram?: (userFeedback?: string) => void;
 }
 
-interface NodeData {
-  label?: string;
-  description?: string;
-  stepType?: string;
-  platform?: string;
-  agentData?: any;
-  showActions?: boolean;
-  onAgentAdd?: (agent: any) => void;
-  onAgentDismiss?: (agentName: string) => void;
-  isRecommended?: boolean;
-  status?: string;
-}
-
-const aiAgentNodeStyle: React.CSSProperties = {
+const aiAgentNodeStyle = {
   background: '#D4E3FF',
   border: '2px solid #7A9DDC',
   borderRadius: '8px',
   padding: '10px',
   color: '#333',
   width: '200px',
-  textAlign: 'center' as const,
+  textAlign: 'center',
 };
 
-const triggerNodeStyle: React.CSSProperties = {
+const triggerNodeStyle = {
   background: '#E2F7D4',
   border: '2px solid #9DDC7A',
   borderRadius: '8px',
   padding: '10px',
   color: '#333',
   width: '200px',
-  textAlign: 'center' as const,
+  textAlign: 'center',
 };
 
-const actionNodeStyle: React.CSSProperties = {
+const actionNodeStyle = {
   background: '#FFF3CD',
   border: '2px solid #DDA64B',
   borderRadius: '8px',
   padding: '10px',
   color: '#333',
   width: '200px',
-  textAlign: 'center' as const,
+  textAlign: 'center',
 };
 
-const conditionNodeStyle: React.CSSProperties = {
+const conditionNodeStyle = {
   background: '#FFD4D4',
   border: '2px solid #DC7A7A',
   borderRadius: '8px',
   padding: '10px',
   color: '#333',
   width: '200px',
-  textAlign: 'center' as const,
+  textAlign: 'center',
 };
 
-const endNodeStyle: React.CSSProperties = {
+const endNodeStyle = {
   background: '#EEEEEE',
   border: '2px solid #999999',
   borderRadius: '8px',
   padding: '10px',
   color: '#333',
   width: '150px',
-  textAlign: 'center' as const,
+  textAlign: 'center',
 };
 
 const CustomAINodeComponent = ({ data }: NodeProps) => {
-  const nodeData = data as NodeData;
-  
   const handleAgentAdd = () => {
-    if (nodeData?.agentData && nodeData?.showActions && nodeData?.onAgentAdd) {
-      nodeData.onAgentAdd(nodeData.agentData);
+    if (data.agentData && data.showActions) {
+      data.onAgentAdd(data.agentData);
     }
   };
 
   const handleAgentDismiss = () => {
-    if (nodeData?.agentData && nodeData?.showActions && nodeData?.onAgentDismiss && nodeData?.agentData?.name) {
-      nodeData.onAgentDismiss(nodeData.agentData.name);
+    if (data.agentData && data.showActions) {
+      data.onAgentDismiss(data.agentData.name);
     }
   };
 
   return (
     <div style={aiAgentNodeStyle}>
-      <h4>{nodeData?.label || 'AI Agent'}</h4>
-      <p>{nodeData?.description || 'AI Agent Description'}</p>
-      {nodeData?.showActions && (
+      <h4>{data.label}</h4>
+      <p>{data.description}</p>
+      {data.showActions && (
         <div className="flex gap-2 mt-2">
           <Button size="sm" onClick={handleAgentAdd} className="bg-green-500 hover:bg-green-700 text-white">
             <Plus className="w-4 h-4 mr-2" />
@@ -127,45 +111,33 @@ const CustomAINodeComponent = ({ data }: NodeProps) => {
   );
 };
 
-const CustomTriggerNodeComponent = ({ data }: NodeProps) => {
-  const nodeData = data as NodeData;
-  return (
-    <div style={triggerNodeStyle}>
-      <h4>{nodeData?.label || 'Trigger'}</h4>
-      <p>{nodeData?.description || 'Trigger Description'}</p>
-    </div>
-  );
-};
+const CustomTriggerNodeComponent = ({ data }: NodeProps) => (
+  <div style={triggerNodeStyle}>
+    <h4>{data.label}</h4>
+    <p>{data.description}</p>
+  </div>
+);
 
-const CustomActionNodeComponent = ({ data }: NodeProps) => {
-  const nodeData = data as NodeData;
-  return (
-    <div style={actionNodeStyle}>
-      <h4>{nodeData?.label || 'Action'}</h4>
-      <p>{nodeData?.description || 'Action Description'}</p>
-    </div>
-  );
-};
+const CustomActionNodeComponent = ({ data }: NodeProps) => (
+  <div style={actionNodeStyle}>
+    <h4>{data.label}</h4>
+    <p>{data.description}</p>
+  </div>
+);
 
-const CustomConditionNodeComponent = ({ data }: NodeProps) => {
-  const nodeData = data as NodeData;
-  return (
-    <div style={conditionNodeStyle}>
-      <h4>{nodeData?.label || 'Condition'}</h4>
-      <p>{nodeData?.description || 'Condition Description'}</p>
-    </div>
-  );
-};
+const CustomConditionNodeComponent = ({ data }: NodeProps) => (
+  <div style={conditionNodeStyle}>
+    <h4>{data.label}</h4>
+    <p>{data.description}</p>
+  </div>
+);
 
-const CustomEndNodeComponent = ({ data }: NodeProps) => {
-  const nodeData = data as NodeData;
-  return (
-    <div style={endNodeStyle}>
-      <h4>{nodeData?.label || 'End'}</h4>
-      <p>{nodeData?.description || 'End Description'}</p>
-    </div>
-  );
-};
+const CustomEndNodeComponent = ({ data }: NodeProps) => (
+  <div style={endNodeStyle}>
+    <h4>{data.label}</h4>
+    <p>{data.description}</p>
+  </div>
+);
 
 const AutomationDiagramDisplay = ({
   automationBlueprint,
@@ -179,6 +151,7 @@ const AutomationDiagramDisplay = ({
 }: AutomationDiagramDisplayProps) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const { fitView } = useReactFlow();
 
   const nodeTypes = useMemo(() => ({
     aiAgentNode: CustomAINodeComponent,
@@ -202,17 +175,17 @@ const AutomationDiagramDisplay = ({
           const recommendedAgents = latestBotMessage?.structuredData?.agents || [];
           
           // Find matching agent from recommendations
-          const matchingAgent = recommendedAgents.find((agent: any) => 
+          const matchingAgent = recommendedAgents.find(agent => 
             agent.name && (
-              String(node.data?.label || '').includes(String(agent.name)) ||
-              String(node.data?.platform || '').includes(String(agent.name)) ||
-              node.id?.includes(String(agent.name).toLowerCase().replace(/\s+/g, '-'))
+              node.data?.label?.includes(agent.name) ||
+              node.data?.platform?.includes(agent.name) ||
+              node.id?.includes(agent.name.toLowerCase().replace(/\s+/g, '-'))
             )
           );
 
           // Get agent status from state manager
           const agentName = matchingAgent?.name || node.data?.label || node.data?.platform || 'Unknown Agent';
-          const agentStatus = agentStateManager.getAgentStatus(String(agentName));
+          const agentStatus = agentStateManager.getAgentStatus(agentName);
           
           console.log('🔍 Agent status check:', {
             agentName,
@@ -339,29 +312,33 @@ const AutomationDiagramDisplay = ({
   };
 
   const processedNodes = useMemo(() => {
-    if (!automationDiagramData?.nodes) return [];
+    if (!diagramData?.nodes) return [];
     
     console.log('🔄 Processing diagram nodes with agent logic');
-    const processed = processNodesWithAgentLogic(automationDiagramData.nodes, messages);
+    const processed = processNodesWithAgentLogic(diagramData.nodes, messages);
     console.log('✅ Processed nodes:', processed.length, 'agents found:', processed.filter(n => n.data?.isRecommended).length);
     
     return processed;
-  }, [automationDiagramData?.nodes, messages, onAgentAdd, onAgentDismiss]);
+  }, [diagramData?.nodes, messages, onAgentAdd, onAgentDismiss]);
 
   const { nodes: layoutedNodes, edges: layoutedEdges } = useMemo(() => {
-    if (!isValidDiagramData(automationDiagramData)) {
+    if (!isValidDiagramData(diagramData)) {
       console.warn('⚠️ Invalid diagram data, using empty diagram');
       return { nodes: [], edges: [] };
     }
   
     console.log('📏 Applying layout to diagram');
-    return applyLayout(processedNodes, automationDiagramData.edges);
-  }, [processedNodes, automationDiagramData]);
+    return applyLayout(processedNodes, diagramData.edges);
+  }, [processedNodes, diagramData]);
 
   useEffect(() => {
     setNodes(layoutedNodes);
     setEdges(layoutedEdges);
   }, [layoutedNodes, layoutedEdges, setNodes, setEdges]);
+
+  useEffect(() => {
+    fitView({ padding: 0.1 });
+  }, [nodes, edges, fitView]);
 
   const handleRegenerate = () => {
     if (onRegenerateDiagram) {
@@ -377,7 +354,6 @@ const AutomationDiagramDisplay = ({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         nodeTypes={nodeTypes}
-        fitView
         fitViewOptions={{ padding: 0.1 }}
         className="bg-gray-50 rounded-lg"
       >

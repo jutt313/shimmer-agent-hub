@@ -30,6 +30,19 @@ interface AutomationDiagramDisplayProps {
   onRegenerateDiagram?: (userFeedback?: string) => void;
 }
 
+interface NodeData {
+  label?: string;
+  description?: string;
+  stepType?: string;
+  platform?: string;
+  agentData?: any;
+  showActions?: boolean;
+  onAgentAdd?: (agent: any) => void;
+  onAgentDismiss?: (agentName: string) => void;
+  isRecommended?: boolean;
+  status?: string;
+}
+
 const aiAgentNodeStyle: React.CSSProperties = {
   background: '#D4E3FF',
   border: '2px solid #7A9DDC',
@@ -80,24 +93,24 @@ const endNodeStyle: React.CSSProperties = {
   textAlign: 'center' as const,
 };
 
-const CustomAINodeComponent = ({ data }: NodeProps) => {
+const CustomAINodeComponent = ({ data }: NodeProps<NodeData>) => {
   const handleAgentAdd = () => {
-    if (data.agentData && data.showActions) {
+    if (data?.agentData && data?.showActions && data?.onAgentAdd) {
       data.onAgentAdd(data.agentData);
     }
   };
 
   const handleAgentDismiss = () => {
-    if (data.agentData && data.showActions) {
+    if (data?.agentData && data?.showActions && data?.onAgentDismiss && data?.agentData?.name) {
       data.onAgentDismiss(data.agentData.name);
     }
   };
 
   return (
     <div style={aiAgentNodeStyle}>
-      <h4>{data.label}</h4>
-      <p>{data.description}</p>
-      {data.showActions && (
+      <h4>{data?.label || 'AI Agent'}</h4>
+      <p>{data?.description || 'AI Agent Description'}</p>
+      {data?.showActions && (
         <div className="flex gap-2 mt-2">
           <Button size="sm" onClick={handleAgentAdd} className="bg-green-500 hover:bg-green-700 text-white">
             <Plus className="w-4 h-4 mr-2" />
@@ -113,31 +126,31 @@ const CustomAINodeComponent = ({ data }: NodeProps) => {
   );
 };
 
-const CustomTriggerNodeComponent = ({ data }: NodeProps) => (
+const CustomTriggerNodeComponent = ({ data }: NodeProps<NodeData>) => (
   <div style={triggerNodeStyle}>
-    <h4>{data.label}</h4>
-    <p>{data.description}</p>
+    <h4>{data?.label || 'Trigger'}</h4>
+    <p>{data?.description || 'Trigger Description'}</p>
   </div>
 );
 
-const CustomActionNodeComponent = ({ data }: NodeProps) => (
+const CustomActionNodeComponent = ({ data }: NodeProps<NodeData>) => (
   <div style={actionNodeStyle}>
-    <h4>{data.label}</h4>
-    <p>{data.description}</p>
+    <h4>{data?.label || 'Action'}</h4>
+    <p>{data?.description || 'Action Description'}</p>
   </div>
 );
 
-const CustomConditionNodeComponent = ({ data }: NodeProps) => (
+const CustomConditionNodeComponent = ({ data }: NodeProps<NodeData>) => (
   <div style={conditionNodeStyle}>
-    <h4>{data.label}</h4>
-    <p>{data.description}</p>
+    <h4>{data?.label || 'Condition'}</h4>
+    <p>{data?.description || 'Condition Description'}</p>
   </div>
 );
 
-const CustomEndNodeComponent = ({ data }: NodeProps) => (
+const CustomEndNodeComponent = ({ data }: NodeProps<NodeData>) => (
   <div style={endNodeStyle}>
-    <h4>{data.label}</h4>
-    <p>{data.description}</p>
+    <h4>{data?.label || 'End'}</h4>
+    <p>{data?.description || 'End Description'}</p>
   </div>
 );
 
@@ -177,17 +190,17 @@ const AutomationDiagramDisplay = ({
           const recommendedAgents = latestBotMessage?.structuredData?.agents || [];
           
           // Find matching agent from recommendations
-          const matchingAgent = recommendedAgents.find(agent => 
+          const matchingAgent = recommendedAgents.find((agent: any) => 
             agent.name && (
-              node.data?.label?.includes(agent.name) ||
-              node.data?.platform?.includes(agent.name) ||
-              node.id?.includes(agent.name.toLowerCase().replace(/\s+/g, '-'))
+              String(node.data?.label || '').includes(String(agent.name)) ||
+              String(node.data?.platform || '').includes(String(agent.name)) ||
+              node.id?.includes(String(agent.name).toLowerCase().replace(/\s+/g, '-'))
             )
           );
 
           // Get agent status from state manager
           const agentName = matchingAgent?.name || node.data?.label || node.data?.platform || 'Unknown Agent';
-          const agentStatus = agentStateManager.getAgentStatus(agentName);
+          const agentStatus = agentStateManager.getAgentStatus(String(agentName));
           
           console.log('🔍 Agent status check:', {
             agentName,

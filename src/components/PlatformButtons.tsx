@@ -1,7 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { 
   Dialog, 
   DialogContent, 
@@ -9,7 +7,7 @@ import {
   DialogTitle,
   DialogDescription 
 } from '@/components/ui/dialog';
-import { CheckCircle, AlertCircle, Settings, X } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useParams } from 'react-router-dom';
 import AutomationPlatformCredentialForm from './AutomationPlatformCredentialForm';
@@ -87,43 +85,18 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
     onCredentialChange?.();
   };
 
-  const getStatusBadge = (platform: Platform) => {
+  const getButtonStyle = (platform: Platform) => {
     const status = credentialStatus[platform.name];
-    if (!status) return null;
-
-    if (!status.configured) {
-      return (
-        <Badge variant="destructive" className="ml-2">
-          <AlertCircle className="w-3 h-3 mr-1" />
-          Not Configured
-        </Badge>
-      );
+    
+    if (!status || !status.configured) {
+      return "bg-gradient-to-r from-gray-400 to-gray-500 text-white hover:from-gray-500 hover:to-gray-600";
     }
-
-    if (!status.tested) {
-      return (
-        <Badge variant="secondary" className="ml-2">
-          <Settings className="w-3 h-3 mr-1" />
-          Untested
-        </Badge>
-      );
+    
+    if (status.tested && status.status === 'success') {
+      return "bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600";
     }
-
-    if (status.status === 'success') {
-      return (
-        <Badge variant="default" className="ml-2 bg-green-600">
-          <CheckCircle className="w-3 h-3 mr-1" />
-          Ready
-        </Badge>
-      );
-    }
-
-    return (
-      <Badge variant="destructive" className="ml-2">
-        <X className="w-3 h-3 mr-1" />
-        Failed
-      </Badge>
-    );
+    
+    return "bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600";
   };
 
   if (!platforms || platforms.length === 0) return null;
@@ -141,15 +114,17 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
         
         <div className="flex flex-wrap gap-2">
           {platforms.map((platform) => (
-            <Button
+            <button
               key={platform.name}
               onClick={() => setSelectedPlatform(platform)}
-              variant="outline"
-              className="rounded-xl border-2 hover:border-purple-300 hover:bg-purple-50 transition-all duration-200 flex items-center"
+              className={`
+                px-4 py-2 text-sm font-medium rounded-full
+                transition-all duration-200 hover:scale-105 hover:shadow-md
+                ${getButtonStyle(platform)}
+              `}
             >
-              <span className="capitalize">{platform.name}</span>
-              {getStatusBadge(platform)}
-            </Button>
+              {platform.name}
+            </button>
           ))}
         </div>
 
@@ -163,7 +138,7 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
           <DialogHeader>
             <DialogTitle>Configure {selectedPlatform?.name} Credentials</DialogTitle>
             <DialogDescription>
-              These credentials will be used only for this automation and kept separate from other automations.
+              Test your credentials first, then save them securely for this automation.
             </DialogDescription>
           </DialogHeader>
           

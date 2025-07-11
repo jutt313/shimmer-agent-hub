@@ -15,7 +15,7 @@ export interface AutomationCredential {
 
 export class AutomationCredentialManager {
   /**
-   * Save credentials for a specific automation
+   * Save credentials for a specific automation (ONLY after successful test)
    */
   static async saveCredentials(
     automationId: string,
@@ -33,14 +33,15 @@ export class AutomationCredentialManager {
           credential_type: 'api_key',
           credentials: JSON.stringify(credentials),
           is_active: true,
-          is_tested: false
+          is_tested: true, // Only save if tested
+          test_status: 'success' // Only save if test passed
         }, {
           onConflict: 'automation_id,platform_name'
         });
 
       if (error) throw error;
 
-      console.log(`✅ Saved credentials for ${platformName} in automation ${automationId}`);
+      console.log(`✅ Saved tested credentials for ${platformName} in automation ${automationId}`);
       return { success: true };
     } catch (error: any) {
       console.error(`❌ Failed to save credentials for ${platformName}:`, error);
@@ -99,57 +100,57 @@ export class AutomationCredentialManager {
   }
 
   /**
-   * Test credentials for a platform
+   * Test credentials for a platform - REAL API TESTING
    */
   static async testCredentials(
     automationId: string,
     platformName: string,
+    credentials: Record<string, string>,
     userId: string
   ): Promise<{ success: boolean; message: string }> {
     try {
-      const credentials = await this.getCredentials(automationId, platformName, userId);
-      if (!credentials) {
-        return { success: false, message: 'No credentials found' };
+      console.log(`🧪 Testing REAL credentials for ${platformName}...`);
+
+      // Make REAL API call to test-credential edge function
+      const response = await supabase.functions.invoke('test-credential', {
+        body: {
+          type: 'platform',
+          platform_name: platformName,
+          credential_fields: credentials,
+          user_id: userId
+        }
+      });
+
+      if (response.error) {
+        console.error(`❌ Test failed for ${platformName}:`, response.error);
+        return { 
+          success: false, 
+          message: `Test failed: ${response.error.message}` 
+        };
       }
 
-      // Test the credentials based on platform
-      let testResult = { success: false, message: 'Test not implemented' };
-      
-      // Basic test - just check if credentials exist and have required fields
-      if (platformName.toLowerCase().includes('openai')) {
-        testResult = credentials.api_key ? 
-          { success: true, message: 'OpenAI credentials configured' } :
-          { success: false, message: 'OpenAI API key missing' };
-      } else if (platformName.toLowerCase().includes('typeform')) {
-        testResult = credentials.api_key ? 
-          { success: true, message: 'Typeform credentials configured' } :
-          { success: false, message: 'Typeform API key missing' };
-      } else if (platformName.toLowerCase().includes('gmail')) {
-        testResult = credentials.access_token ? 
-          { success: true, message: 'Gmail credentials configured' } :
-          { success: false, message: 'Gmail access token missing' };
+      const result = response.data;
+      console.log(`📊 Test result for ${platformName}:`, result);
+
+      if (result.success) {
+        console.log(`✅ Real credential test SUCCESS for ${platformName}`);
+        return { 
+          success: true, 
+          message: result.user_message || `${platformName} credentials work perfectly!` 
+        };
       } else {
-        testResult = Object.keys(credentials).length > 0 ? 
-          { success: true, message: 'Credentials configured' } :
-          { success: false, message: 'No credentials configured' };
+        console.log(`❌ Real credential test FAILED for ${platformName}`);
+        return { 
+          success: false, 
+          message: result.user_message || `${platformName} credentials are invalid` 
+        };
       }
-
-      // Update test status in database
-      await supabase
-        .from('automation_platform_credentials')
-        .update({
-          is_tested: true,
-          test_status: testResult.success ? 'success' : 'failed',
-          test_message: testResult.message
-        })
-        .eq('automation_id', automationId)
-        .eq('platform_name', platformName.toLowerCase())
-        .eq('user_id', userId);
-
-      return testResult;
     } catch (error: any) {
-      console.error(`❌ Failed to test credentials for ${platformName}:`, error);
-      return { success: false, message: error.message };
+      console.error(`💥 Critical error testing ${platformName}:`, error);
+      return { 
+        success: false, 
+        message: `Network error: ${error.message}` 
+      };
     }
   }
 

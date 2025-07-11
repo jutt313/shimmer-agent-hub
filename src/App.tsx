@@ -1,11 +1,10 @@
 
-import { StrictMode, useState, useEffect } from "react";
+import { StrictMode } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "./contexts/AuthContext";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
-import HelpChatModal from "./components/HelpChatModal";
 import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
@@ -36,30 +35,6 @@ favicon.href = '/lovable-uploads/6b9580a6-e2cd-4056-95a9-7f730cbf6025.png';
 document.getElementsByTagName('head')[0].appendChild(favicon);
 
 function App() {
-  const [helpChatOpen, setHelpChatOpen] = useState(false);
-  const [helpChatData, setHelpChatData] = useState<{
-    message: string;
-    context: string;
-  }>({ message: '', context: '' });
-
-  useEffect(() => {
-    // Global help chat event listener for notification-to-chat integration
-    const handleOpenHelpChat = (event: CustomEvent) => {
-      console.log('🚀 Global help chat opened:', event.detail);
-      setHelpChatData({
-        message: event.detail.message || '',
-        context: event.detail.context || ''
-      });
-      setHelpChatOpen(true);
-    };
-
-    window.addEventListener('open-help-chat', handleOpenHelpChat as EventListener);
-    
-    return () => {
-      window.removeEventListener('open-help-chat', handleOpenHelpChat as EventListener);
-    };
-  }, []);
-
   return (
     <StrictMode>
       <ErrorBoundary>
@@ -122,17 +97,6 @@ function App() {
               </Routes>
               <Toaster />
               <SonnerToaster />
-              
-              {/* Global Help Chat Modal for notification-to-chat integration */}
-              <HelpChatModal
-                isOpen={helpChatOpen}
-                onClose={() => {
-                  setHelpChatOpen(false);
-                  setHelpChatData({ message: '', context: '' });
-                }}
-                initialMessage={helpChatData.message}
-                initialContext={helpChatData.context}
-              />
             </BrowserRouter>
           </AuthProvider>
         </QueryClientProvider>

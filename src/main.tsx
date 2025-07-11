@@ -1,15 +1,5 @@
 
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import App from './App'
-import './index.css'
-import { initializeComprehensiveNotificationSystem } from './utils/notificationSystemInitializer'
+import { createRoot } from "react-dom/client";
+import App from "./App";
 
-// Initialize comprehensive notification system before app starts
-initializeComprehensiveNotificationSystem();
-
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+createRoot(document.getElementById("root")!).render(<App />);

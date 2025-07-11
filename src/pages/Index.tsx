@@ -4,8 +4,6 @@ import { useNavigate } from "react-router-dom";
 import ChatCard from "@/components/ChatCard";
 import AIAgentForm from "@/components/AIAgentForm";
 import SettingsDropdown from "@/components/SettingsDropdown";
-import NotificationDropdown from "@/components/NotificationDropdown";
-import ErrorIndicator from "@/components/ErrorIndicator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -247,7 +245,6 @@ const Index = () => {
         
         {user ? (
           <div className="flex gap-4">
-            <NotificationDropdown />
             <SettingsDropdown />
             <Button 
               onClick={() => navigate("/automations")}
@@ -332,9 +329,6 @@ const Index = () => {
           onAgentSaved={handleAgentConfigSaved}
         />
       )}
-
-      {/* Error Indicator - Always visible for comprehensive error detection */}
-      <ErrorIndicator />
     </div>
   );
 };

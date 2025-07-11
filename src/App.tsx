@@ -1,107 +1,72 @@
-
-import { StrictMode } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AuthProvider } from "./contexts/AuthContext";
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as SonnerToaster } from "sonner";
-import Index from "./pages/Index";
-import Landing from "./pages/Landing";
-import Auth from "./pages/Auth";
-import Automations from "./pages/Automations";
-import AutomationDetail from "./pages/AutomationDetail";
-import KnowledgeAdmin from "./pages/KnowledgeAdmin";
-import DeveloperPortal from "./pages/DeveloperPortal";
-import Documentation from "./pages/Documentation";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import TermsConditions from "./pages/TermsConditions";
-import CookiePolicy from "./pages/CookiePolicy";
-import Disclaimer from "./pages/Disclaimer";
-import Support from "./pages/Support";
-import NotFound from "./pages/NotFound";
-import ProtectedRoute from "./components/ProtectedRoute";
-import AdminRoute from "./components/AdminRoute";
-import Settings from "./pages/Settings";
-import "./index.css";
-import ErrorBoundary from "./components/ErrorBoundary";
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { Toaster } from '@/components/ui/toaster';
+import { useGlobalNotificationHandler } from '@/hooks/useGlobalNotificationHandler';
+import Home from './pages/Home';
+import Automations from './pages/Automations';
+import Integrations from './pages/Integrations';
+import AccountSettings from './pages/AccountSettings';
+import KnowledgeBase from './pages/KnowledgeBase';
+import Support from './pages/Support';
+import Pricing from './pages/Pricing';
+import Login from './pages/Login';
+import SignUp from './pages/SignUp';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import NotFound from './pages/NotFound';
+import PublicLayout from '@/layouts/PublicLayout';
+import PrivateLayout from '@/layouts/PrivateLayout';
+import DiagramPage from '@/pages/DiagramPage';
+import AIagents from '@/pages/AIagents';
+import WebhooksPage from '@/pages/WebhooksPage';
+import { useEffect } from 'react';
+import { useAuth } from './contexts/AuthContext';
+import { globalErrorLogger } from './utils/errorLogger';
 
 const queryClient = new QueryClient();
 
-// Set favicon
-const favicon = (document.querySelector("link[rel*='icon']") as HTMLLinkElement) || document.createElement('link');
-favicon.type = 'image/png';
-favicon.rel = 'shortcut icon';
-favicon.href = '/lovable-uploads/6b9580a6-e2cd-4056-95a9-7f730cbf6025.png';
-document.getElementsByTagName('head')[0].appendChild(favicon);
+// Global notification handler component
+const GlobalNotificationHandler = ({ children }: { children: React.ReactNode }) => {
+  useGlobalNotificationHandler();
+  return <>{children}</>;
+};
 
 function App() {
   return (
-    <StrictMode>
-      <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <GlobalNotificationHandler>
+          <Router>
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
               <Routes>
-                <Route path="/" element={<Landing />} />
-                <Route path="/app" element={<Index />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/documentation" element={<Documentation />} />
-                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-                <Route path="/terms-conditions" element={<TermsConditions />} />
-                <Route path="/cookie-policy" element={<CookiePolicy />} />
-                <Route path="/disclaimer" element={<Disclaimer />} />
-                <Route path="/support" element={<Support />} />
-                <Route 
-                  path="/admin/knowledge" 
-                  element={
-                    <ProtectedRoute>
-                      <AdminRoute>
-                        <KnowledgeAdmin />
-                      </AdminRoute>
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/automations" 
-                  element={
-                    <ProtectedRoute>
-                      <Automations />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/automations/:id" 
-                  element={
-                    <ProtectedRoute>
-                      <AutomationDetail />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/developer" 
-                  element={
-                    <ProtectedRoute>
-                      <DeveloperPortal />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/settings" 
-                  element={
-                    <ProtectedRoute>
-                      <Settings />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route path="*" element={<NotFound />} />
+                {/* Public Routes */}
+                <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
+                <Route path="/pricing" element={<PublicLayout><Pricing /></PublicLayout>} />
+                <Route path="/support" element={<PublicLayout><Support /></PublicLayout>} />
+                <Route path="/login" element={<PublicLayout><Login /></PublicLayout>} />
+                <Route path="/signup" element={<PublicLayout><SignUp /></PublicLayout>} />
+                <Route path="/forgot-password" element={<PublicLayout><ForgotPassword /></PublicLayout>} />
+                <Route path="/reset-password" element={<PublicLayout><ResetPassword /></PublicLayout>} />
+
+                {/* Private Routes */}
+                <Route path="/automations" element={<PrivateLayout><Automations /></PrivateLayout>} />
+                <Route path="/integrations" element={<PrivateLayout><Integrations /></PrivateLayout>} />
+                <Route path="/account-settings" element={<PrivateLayout><AccountSettings /></PrivateLayout>} />
+                <Route path="/knowledge-base" element={<PrivateLayout><KnowledgeBase /></PrivateLayout>} />
+                <Route path="/diagram/:automationId" element={<PrivateLayout><DiagramPage /></PrivateLayout>} />
+                <Route path="/ai-agents" element={<PrivateLayout><AIagents /></PrivateLayout>} />
+                <Route path="/webhooks" element={<PrivateLayout><WebhooksPage /></PrivateLayout>} />
+
+                {/* Not Found Route */}
+                <Route path="*" element={<PublicLayout><NotFound /></PublicLayout>} />
               </Routes>
               <Toaster />
-              <SonnerToaster />
-            </BrowserRouter>
-          </AuthProvider>
-        </QueryClientProvider>
-      </ErrorBoundary>
-    </StrictMode>
+            </div>
+          </Router>
+        </GlobalNotificationHandler>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

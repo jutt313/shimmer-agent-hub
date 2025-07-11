@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,7 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Plus, Edit, Trash2 } from 'lucide-react';
-import { toast } from '@/components/ui/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
@@ -64,25 +65,15 @@ import {
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
+import { supabase } from '@/integrations/supabase/client';
 
 const formSchema = z.object({
-  name: z.string().min(2, {
-    message: "Automation name must be at least 2 characters.",
+  title: z.string().min(2, {
+    message: "Automation title must be at least 2 characters.",
   }),
   description: z.string().optional(),
-  triggerType: z.enum(['manual', 'scheduled', 'webhook']).default('manual'),
-  schedule: z.string().optional(),
-  webhookUrl: z.string().url().optional(),
-  isActive: z.boolean().default(false),
-  ownerId: z.string().uuid().optional(),
-  teamId: z.string().uuid().optional(),
-  tags: z.array(z.string()).optional(),
-  metadata: z.record(z.any()).optional(),
-  createdAt: z.date().optional(),
-  updatedAt: z.date().optional(),
+  status: z.enum(['active', 'inactive', 'draft']).default('draft'),
 });
-
-import { supabase } from '@/integrations/supabase/client';
 
 const Automations = () => {
   const [automations, setAutomations] = useState<any[]>([]);
@@ -102,18 +93,11 @@ const Automations = () => {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: "",
+      title: "",
       description: "",
-      triggerType: 'manual',
-      schedule: "",
-      webhookUrl: "",
-      isActive: false,
+      status: 'draft',
     },
   })
-
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values)
-  }
 
   useEffect(() => {
     const fetchAutomations = async () => {
@@ -123,7 +107,7 @@ const Automations = () => {
         const { data, error } = await supabase
           .from('automations')
           .select('*')
-          .eq('owner_id', user.id);
+          .eq('user_id', user.id);
 
         if (error) {
           console.error('Error fetching automations:', error);
@@ -142,7 +126,7 @@ const Automations = () => {
     };
 
     fetchAutomations();
-  }, [user]);
+  }, [user, toast]);
 
   const handleCreateAutomation = async (automationData: any) => {
     try {
@@ -161,8 +145,7 @@ const Automations = () => {
         .insert([
           { 
             ...automationData, 
-            owner_id: user.id,
-            is_active: automationData.isActive,
+            user_id: user.id,
           }
         ])
         .select()
@@ -184,7 +167,7 @@ const Automations = () => {
       form.reset();
       
       if (data) {
-        notifyAutomationCreated(data.id, data.name || 'New Automation');
+        notifyAutomationCreated(data.id, data.title || 'New Automation');
         toast({
           title: "Success",
           description: "Automation created successfully!",
@@ -229,7 +212,7 @@ const Automations = () => {
           automation.id === automationId ? { ...automation, ...updates } : automation
         )
       );
-      notifyAutomationUpdated(automationId, updates.name || 'Automation');
+      notifyAutomationUpdated(automationId, updates.title || 'Automation');
       toast({
         title: "Success",
         description: "Automation updated successfully!",
@@ -285,7 +268,7 @@ const Automations = () => {
         <h1 className="text-2xl font-bold">Automations</h1>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button variant="primary">
+            <Button>
               <Plus className="mr-2 h-4 w-4" />
               Create Automation
             </Button>
@@ -303,12 +286,12 @@ const Automations = () => {
               })} className="space-y-4">
                 <FormField
                   control={form.control}
-                  name="name"
+                  name="title"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Name</FormLabel>
+                      <FormLabel>Title</FormLabel>
                       <FormControl>
-                        <Input placeholder="Automation Name" {...field} />
+                        <Input placeholder="Automation Title" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -333,73 +316,23 @@ const Automations = () => {
                 />
                 <FormField
                   control={form.control}
-                  name="triggerType"
+                  name="status"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Trigger Type</FormLabel>
+                      <FormLabel>Status</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select a trigger type" />
+                            <SelectValue placeholder="Select a status" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="manual">Manual</SelectItem>
-                          <SelectItem value="scheduled">Scheduled</SelectItem>
-                          <SelectItem value="webhook">Webhook</SelectItem>
+                          <SelectItem value="draft">Draft</SelectItem>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                {form.getValues('triggerType') === 'scheduled' && (
-                  <FormField
-                    control={form.control}
-                    name="schedule"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Schedule</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Cron expression" {...field} />
-                        </FormControl>
-                        <FormDescription>
-                          Enter a cron expression to define the schedule.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-                {form.getValues('triggerType') === 'webhook' && (
-                  <FormField
-                    control={form.control}
-                    name="webhookUrl"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Webhook URL</FormLabel>
-                        <FormControl>
-                          <Input placeholder="https://example.com/webhook" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-                <FormField
-                  control={form.control}
-                  name="isActive"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel>Active</FormLabel>
-                        <FormDescription>
-                          Set the automation to active or inactive.
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
                     </FormItem>
                   )}
                 />
@@ -421,18 +354,18 @@ const Automations = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[100px]">Name</TableHead>
+                <TableHead className="w-[100px]">Title</TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead>Trigger</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {automations.map((automation) => (
                 <TableRow key={automation.id}>
-                  <TableCell className="font-medium">{automation.name}</TableCell>
+                  <TableCell className="font-medium">{automation.title}</TableCell>
                   <TableCell>{automation.description}</TableCell>
-                  <TableCell>{automation.trigger_type}</TableCell>
+                  <TableCell>{automation.status}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

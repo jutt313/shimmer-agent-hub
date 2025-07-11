@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -5,17 +6,33 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { AutomationCredentialManager } from '@/integrations/AutomationCredentialManager';
-import { PlatformCredentialField } from '@/integrations/AutomationCredentialManager';
+import { AutomationCredentialManager } from '@/utils/automationCredentialManager';
 import { Loader2 } from 'lucide-react';
+
+interface Platform {
+  name: string;
+  credentials: Array<{
+    field: string;
+    placeholder: string;
+    link: string;
+    why_needed: string;
+  }>;
+}
+
+interface PlatformCredentialField {
+  field: string;
+  placeholder: string;
+  link: string;
+  why_needed: string;
+}
 
 interface AutomationPlatformCredentialFormProps {
   automationId: string;
-  platformName: string;
+  platform: Platform;
   onCredentialSaved: () => void;
 }
 
-const AutomationPlatformCredentialForm = ({ automationId, platformName, onCredentialSaved }: AutomationPlatformCredentialFormProps) => {
+const AutomationPlatformCredentialForm = ({ automationId, platform, onCredentialSaved }: AutomationPlatformCredentialFormProps) => {
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [platformFields, setPlatformFields] = useState<PlatformCredentialField[]>([]);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -24,18 +41,18 @@ const AutomationPlatformCredentialForm = ({ automationId, platformName, onCreden
   const { toast } = useToast();
 
   useEffect(() => {
-    const fetchFields = async () => {
+    const initializeFields = async () => {
       try {
-        const fields = await AutomationCredentialManager.getCredentialFields(platformName);
-        setPlatformFields(fields);
+        // Use the platform.credentials directly since we have them
+        setPlatformFields(platform.credentials);
         // Initialize credentials state with empty strings for each field
         const initialCredentials: Record<string, string> = {};
-        fields.forEach(field => {
+        platform.credentials.forEach(field => {
           initialCredentials[field.field] = '';
         });
         setCredentials(initialCredentials);
       } catch (error) {
-        console.error('Error fetching credential fields:', error);
+        console.error('Error initializing credential fields:', error);
         toast({
           title: "Error",
           description: "Failed to load credential fields",
@@ -44,8 +61,8 @@ const AutomationPlatformCredentialForm = ({ automationId, platformName, onCreden
       }
     };
 
-    fetchFields();
-  }, [platformName, toast]);
+    initializeFields();
+  }, [platform, toast]);
 
   const handleInputChange = (field: string, value: string) => {
     setCredentials(prev => ({ ...prev, [field]: value }));
@@ -55,7 +72,7 @@ const AutomationPlatformCredentialForm = ({ automationId, platformName, onCreden
     if (!user?.id) return;
 
     try {
-      await AutomationCredentialManager.saveCredentials(user.id, automationId, platformName, credentials);
+      await AutomationCredentialManager.saveCredentials(user.id, automationId, platform.name, credentials);
       toast({
         title: "Success",
         description: "Credentials saved successfully!",
@@ -82,20 +99,20 @@ const AutomationPlatformCredentialForm = ({ automationId, platformName, onCreden
       const result = await AutomationCredentialManager.testCredentials(
         user.id,
         automationId,
-        platformName,
+        platform.name,
         credentials
       );
 
       if (result.success) {
         setTestResult({ success: true, message: result.message || 'Credentials are working correctly!' });
-        notifyCredentialTest(platformName, true);
+        notifyCredentialTest(platform.name, true);
         toast({
           title: "Test Successful",
           description: "Your credentials are working correctly!",
         });
       } else {
         setTestResult({ success: false, message: result.message || 'Credential test failed' });
-        notifyCredentialTest(platformName, false, result.message);
+        notifyCredentialTest(platform.name, false, result.message);
         toast({
           title: "Test Failed",
           description: result.message || 'Please check your credentials',
@@ -106,8 +123,8 @@ const AutomationPlatformCredentialForm = ({ automationId, platformName, onCreden
       console.error('Credential test error:', error);
       const errorMessage = error.message || 'Failed to test credentials';
       setTestResult({ success: false, message: errorMessage });
-      notifyCredentialTest(platformName, false, errorMessage);
-      notifySystemError('Credential test failed', { platform: platformName, error: errorMessage });
+      notifyCredentialTest(platform.name, false, errorMessage);
+      notifySystemError('Credential test failed', { platform: platform.name, error: errorMessage });
       toast({
         title: "Test Error",
         description: "Check notifications for detailed error information",
@@ -123,10 +140,10 @@ const AutomationPlatformCredentialForm = ({ automationId, platformName, onCreden
       <Card>
         <CardHeader>
           <h3 className="text-lg font-semibold">
-            {platformName} Credentials
+            {platform.name} Credentials
           </h3>
           <p className="text-sm text-muted-foreground">
-            Enter your {platformName} credentials to connect your account.
+            Enter your {platform.name} credentials to connect your account.
           </p>
         </CardHeader>
         <CardContent className="grid gap-4">

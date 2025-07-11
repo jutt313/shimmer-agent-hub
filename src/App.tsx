@@ -1,28 +1,26 @@
+
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { Toaster } from '@/components/ui/toaster';
 import { useGlobalNotificationHandler } from '@/hooks/useGlobalNotificationHandler';
-import Home from './pages/Home';
+import Home from '@/pages/Index';
 import Automations from './pages/Automations';
-import Integrations from './pages/Integrations';
-import AccountSettings from './pages/AccountSettings';
-import KnowledgeBase from './pages/KnowledgeBase';
+import Integrations from '@/pages/Settings';
+import AccountSettings from '@/pages/Settings';
+import KnowledgeBase from '@/pages/DocumentationLibrary';
 import Support from './pages/Support';
-import Pricing from './pages/Pricing';
-import Login from './pages/Login';
-import SignUp from './pages/SignUp';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
+import Pricing from '@/pages/Landing';
+import Login from '@/pages/Auth';
+import SignUp from '@/pages/Auth';
+import ForgotPassword from '@/pages/Auth';
+import ResetPassword from '@/pages/Auth';
 import NotFound from './pages/NotFound';
-import PublicLayout from '@/layouts/PublicLayout';
-import PrivateLayout from '@/layouts/PrivateLayout';
-import DiagramPage from '@/pages/DiagramPage';
-import AIagents from '@/pages/AIagents';
-import WebhooksPage from '@/pages/WebhooksPage';
-import { useEffect } from 'react';
-import { useAuth } from './contexts/AuthContext';
-import { globalErrorLogger } from './utils/errorLogger';
+import PublicLayout from '@/pages/Landing';
+import PrivateLayout from '@/pages/Settings';
+import DiagramPage from '@/pages/AutomationDetail';
+import AIagents from '@/pages/Settings';
+import WebhooksPage from '@/pages/Settings';
 
 const queryClient = new QueryClient();
 
@@ -41,25 +39,25 @@ function App() {
             <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
               <Routes>
                 {/* Public Routes */}
-                <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
-                <Route path="/pricing" element={<PublicLayout><Pricing /></PublicLayout>} />
-                <Route path="/support" element={<PublicLayout><Support /></PublicLayout>} />
-                <Route path="/login" element={<PublicLayout><Login /></PublicLayout>} />
-                <Route path="/signup" element={<PublicLayout><SignUp /></PublicLayout>} />
-                <Route path="/forgot-password" element={<PublicLayout><ForgotPassword /></PublicLayout>} />
-                <Route path="/reset-password" element={<PublicLayout><ResetPassword /></PublicLayout>} />
+                <Route path="/" element={<Home />} />
+                <Route path="/pricing" element={<Pricing />} />
+                <Route path="/support" element={<Support />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<SignUp />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
 
                 {/* Private Routes */}
-                <Route path="/automations" element={<PrivateLayout><Automations /></PrivateLayout>} />
-                <Route path="/integrations" element={<PrivateLayout><Integrations /></PrivateLayout>} />
-                <Route path="/account-settings" element={<PrivateLayout><AccountSettings /></PrivateLayout>} />
-                <Route path="/knowledge-base" element={<PrivateLayout><KnowledgeBase /></PrivateLayout>} />
-                <Route path="/diagram/:automationId" element={<PrivateLayout><DiagramPage /></PrivateLayout>} />
-                <Route path="/ai-agents" element={<PrivateLayout><AIagents /></PrivateLayout>} />
-                <Route path="/webhooks" element={<PrivateLayout><WebhooksPage /></PrivateLayout>} />
+                <Route path="/automations" element={<Automations />} />
+                <Route path="/integrations" element={<Integrations />} />
+                <Route path="/account-settings" element={<AccountSettings />} />
+                <Route path="/knowledge-base" element={<KnowledgeBase />} />
+                <Route path="/diagram/:automationId" element={<DiagramPage />} />
+                <Route path="/ai-agents" element={<AIagents />} />
+                <Route path="/webhooks" element={<WebhooksPage />} />
 
                 {/* Not Found Route */}
-                <Route path="*" element={<PublicLayout><NotFound /></PublicLayout>} />
+                <Route path="*" element={<NotFound />} />
               </Routes>
               <Toaster />
             </div>

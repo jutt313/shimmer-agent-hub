@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -94,10 +93,10 @@ const AutomationPlatformCredentialForm = ({
       console.log(`🧪 Testing credentials for ${platform.name}...`);
       
       const result = await AutomationCredentialManager.testCredentials(
+        user.id,
         automationId,
         platform.name,
-        credentials,
-        user.id
+        credentials
       );
 
       setTestResult(result);

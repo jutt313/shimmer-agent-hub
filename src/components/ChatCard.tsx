@@ -1,7 +1,6 @@
-
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Bot, Plus, X, Play } from "lucide-react";
+import { Plus, X, Play, User } from 'lucide-react';
 import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
 import { useEffect, useRef } from "react";
 import { useErrorRecovery } from "@/hooks/useErrorRecovery";
@@ -474,6 +473,24 @@ const ChatCard = ({
                     boxShadow: '0 0 25px rgba(92, 142, 246, 0.25)'
                   }}
                 >
+                  {message.isBot && (
+                    <div className="flex items-center gap-2 mb-2">
+                      <img 
+                        src="/lovable-uploads/cf9c8f76-d8e9-4790-b043-40ba7239140d.png" 
+                        alt="YusrAI" 
+                        className="w-5 h-5 object-contain"
+                      />
+                      <span className="text-sm font-medium text-blue-600">YusrAI</span>
+                    </div>
+                  )}
+                  
+                  {message.isBot ? (
+                    <div className="flex items-start gap-2">
+                      <User className="w-4 h-4 mt-1 flex-shrink-0 text-white" />
+                      <span className="text-sm">You</span>
+                    </div>
+                  ) : null}
+
                   {/* Render structured content for bot messages if available */}
                   {message.isBot && structuredData ? (
                     <div className="leading-relaxed">
@@ -497,12 +514,16 @@ const ChatCard = ({
             );
           })}
           
-          {/* Loading indicator */}
+          {/* Loading indicator with your logo */}
           {isLoading && (
             <div className="flex justify-start">
               <div className="max-w-4xl px-6 py-4 rounded-2xl bg-white border border-blue-100/50 text-gray-800 shadow-lg backdrop-blur-sm">
                 <div className="flex items-center space-x-3">
-                  <Bot className="w-5 h-5 animate-pulse text-blue-500" />
+                  <img 
+                    src="/lovable-uploads/cf9c8f76-d8e9-4790-b043-40ba7239140d.png" 
+                    alt="YusrAI" 
+                    className="w-5 h-5 object-contain animate-pulse"
+                  />
                   <span className="font-medium">YusrAI is creating your automation...</span>
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>

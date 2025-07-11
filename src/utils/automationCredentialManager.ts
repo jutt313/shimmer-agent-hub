@@ -1,5 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
+import { triggerCredentialTestNotification } from './automationNotificationTriggers';
 
 export interface AutomationCredential {
   id: string;
@@ -103,53 +103,62 @@ export class AutomationCredentialManager {
    * Test credentials for a platform - REAL API TESTING
    */
   static async testCredentials(
+    userId: string,
     automationId: string,
     platformName: string,
-    credentials: Record<string, string>,
-    userId: string
-  ): Promise<{ success: boolean; message: string }> {
+    credentials: Record<string, string>
+  ): Promise<{ success: boolean; message: string; details?: any }> {
     try {
-      console.log(`🧪 Testing REAL credentials for ${platformName}...`);
-
-      // Make REAL API call to test-credential edge function
-      const response = await supabase.functions.invoke('test-credential', {
+      console.log(`🧪 Testing ${platformName} credentials for user ${userId}`);
+      
+      // Use the real test-credential edge function
+      const { data, error } = await supabase.functions.invoke('test-credential', {
         body: {
-          type: 'platform',
           platform_name: platformName,
-          credential_fields: credentials,
+          credentials: credentials,
           user_id: userId
         }
       });
 
-      if (response.error) {
-        console.error(`❌ Test failed for ${platformName}:`, response.error);
-        return { 
-          success: false, 
-          message: `Test failed: ${response.error.message}` 
+      if (error) {
+        console.error('Test credential error:', error);
+        
+        // Send notification about failed test
+        await triggerCredentialTestNotification(userId, platformName, false);
+        
+        return {
+          success: false,
+          message: `Failed to test ${platformName} credentials: ${error.message}`,
+          details: error
         };
       }
 
-      const result = response.data;
-      console.log(`📊 Test result for ${platformName}:`, result);
+      const testResult = data?.success ? {
+        success: true,
+        message: data.message || `${platformName} credentials are working correctly!`,
+        details: data.details
+      } : {
+        success: false,
+        message: data?.message || `${platformName} credentials test failed`,
+        details: data?.details
+      };
 
-      if (result.success) {
-        console.log(`✅ Real credential test SUCCESS for ${platformName}`);
-        return { 
-          success: true, 
-          message: result.user_message || `${platformName} credentials work perfectly!` 
-        };
-      } else {
-        console.log(`❌ Real credential test FAILED for ${platformName}`);
-        return { 
-          success: false, 
-          message: result.user_message || `${platformName} credentials are invalid` 
-        };
-      }
+      // Send notification about test result
+      await triggerCredentialTestNotification(userId, platformName, testResult.success);
+
+      console.log(`✅ ${platformName} test result:`, testResult);
+      return testResult;
+
     } catch (error: any) {
-      console.error(`💥 Critical error testing ${platformName}:`, error);
-      return { 
-        success: false, 
-        message: `Network error: ${error.message}` 
+      console.error(`❌ Error testing ${platformName} credentials:`, error);
+      
+      // Send notification about failed test
+      await triggerCredentialTestNotification(userId, platformName, false);
+      
+      return {
+        success: false,
+        message: `Error testing ${platformName} credentials: ${error.message}`,
+        details: error
       };
     }
   }

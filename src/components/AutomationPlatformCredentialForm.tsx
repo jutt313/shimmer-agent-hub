@@ -1,112 +1,97 @@
-
 import React, { useState, useEffect } from 'react';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
-import { useToast } from '@/components/ui/use-toast';
+import { Input } from '@/components/ui/input';
+import { Eye, EyeOff, TestTube, Save, CheckCircle, XCircle, Loader2, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AutomationCredentialManager } from '@/utils/automationCredentialManager';
-import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
-interface Platform {
-  name: string;
-  credentials: Array<{
-    field: string;
-    placeholder: string;
-    link: string;
-    why_needed: string;
-  }>;
-}
-
-interface PlatformCredentialField {
-  field: string;
-  placeholder: string;
-  link: string;
-  why_needed: string;
-}
-
-interface AutomationPlatformCredentialFormProps {
+interface PlatformCredentialFormProps {
   automationId: string;
-  platform: Platform;
-  onCredentialSaved: () => void;
+  platform: {
+    name: string;
+    credentials: Array<{
+      field: string;
+      placeholder: string;
+      link: string;
+      why_needed: string;
+    }>;
+  };
+  onCredentialSaved?: () => void;
 }
 
-const AutomationPlatformCredentialForm = ({ automationId, platform, onCredentialSaved }: AutomationPlatformCredentialFormProps) => {
-  const [credentials, setCredentials] = useState<Record<string, string>>({});
-  const [platformFields, setPlatformFields] = useState<PlatformCredentialField[]>([]);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [testing, setTesting] = useState(false);
+const AutomationPlatformCredentialForm = ({ 
+  automationId, 
+  platform, 
+  onCredentialSaved 
+}: PlatformCredentialFormProps) => {
   const { user } = useAuth();
-  const { toast } = useToast();
+  const [credentials, setCredentials] = useState<Record<string, string>>({});
+  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+  const [isTesting, setIsTesting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [canSave, setCanSave] = useState(false);
 
   useEffect(() => {
-    const initializeFields = async () => {
-      try {
-        // Use the platform.credentials directly since we have them
-        setPlatformFields(platform.credentials);
-        // Initialize credentials state with empty strings for each field
-        const initialCredentials: Record<string, string> = {};
-        platform.credentials.forEach(field => {
-          initialCredentials[field.field] = '';
-        });
-        setCredentials(initialCredentials);
-      } catch (error) {
-        console.error('Error initializing credential fields:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load credential fields",
-          variant: "destructive",
-        });
-      }
-    };
+    if (user && automationId && platform.name) {
+      loadExistingCredentials();
+    }
+  }, [user, automationId, platform.name]);
 
-    initializeFields();
-  }, [platform, toast]);
-
-  const handleInputChange = (field: string, value: string) => {
-    setCredentials(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleSaveCredentials = async () => {
-    if (!user?.id) return;
+  const loadExistingCredentials = async () => {
+    if (!user) return;
 
     try {
-      // Correct parameter order: automationId, platformName, credentials, userId
-      const result = await AutomationCredentialManager.saveCredentials(
+      const existingCredentials = await AutomationCredentialManager.getCredentials(
         automationId,
         platform.name,
-        credentials,
         user.id
       );
-      
-      if (result.success) {
-        toast({
-          title: "Success",
-          description: "Credentials saved successfully!",
-        });
-        onCredentialSaved();
-      } else {
-        throw new Error(result.error || 'Failed to save credentials');
+
+      if (existingCredentials) {
+        setCredentials(existingCredentials);
+        setCanSave(true); // If credentials exist, they were already tested
+        setTestResult({ success: true, message: 'Credentials already tested and saved' });
       }
-    } catch (error: any) {
-      console.error('Error saving credentials:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to save credentials",
-        variant: "destructive",
-      });
+    } catch (error) {
+      console.error('Failed to load existing credentials:', error);
+    } finally {
+      setIsLoaded(true);
     }
   };
 
-  // Import notification triggers
-  const { notifyCredentialTest, notifySystemError } = require('@/utils/globalNotificationTriggers');
+  const handleCredentialChange = (field: string, value: string) => {
+    setCredentials(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    // Reset test result and save ability when credentials change
+    setTestResult(null);
+    setCanSave(false);
+  };
 
-  const handleTestCredentials = async () => {
-    if (!user?.id) return;
+  const togglePasswordVisibility = (field: string) => {
+    setShowPasswords(prev => ({
+      ...prev,
+      [field]: !prev[field]
+    }));
+  };
+
+  const hasAllCredentials = platform.credentials.every(cred => 
+    credentials[cred.field] && credentials[cred.field].trim() !== ''
+  );
+
+  const handleTest = async () => {
+    if (!user || !hasAllCredentials) return;
+
+    setIsTesting(true);
+    setTestResult(null);
     
-    setTesting(true);
     try {
+      console.log(`🧪 Testing credentials for ${platform.name}...`);
+      
       const result = await AutomationCredentialManager.testCredentials(
         user.id,
         automationId,
@@ -114,95 +99,164 @@ const AutomationPlatformCredentialForm = ({ automationId, platform, onCredential
         credentials
       );
 
+      setTestResult(result);
+      
       if (result.success) {
-        setTestResult({ success: true, message: result.message || 'Credentials are working correctly!' });
-        notifyCredentialTest(platform.name, true);
-        toast({
-          title: "Test Successful",
-          description: "Your credentials are working correctly!",
-        });
+        setCanSave(true);
+        toast.success(`✅ ${platform.name} credentials tested successfully!`);
       } else {
-        setTestResult({ success: false, message: result.message || 'Credential test failed' });
-        notifyCredentialTest(platform.name, false, result.message);
-        toast({
-          title: "Test Failed",
-          description: result.message || 'Please check your credentials',
-          variant: "destructive"
-        });
+        setCanSave(false);
+        toast.error(`❌ Test failed: ${result.message}`);
       }
     } catch (error: any) {
-      console.error('Credential test error:', error);
-      const errorMessage = error.message || 'Failed to test credentials';
-      setTestResult({ success: false, message: errorMessage });
-      notifyCredentialTest(platform.name, false, errorMessage);
-      notifySystemError('Credential test failed', { platform: platform.name, error: errorMessage });
-      toast({
-        title: "Test Error",
-        description: "Check notifications for detailed error information",
-        variant: "destructive"
-      });
+      setTestResult({ success: false, message: error.message });
+      setCanSave(false);
+      toast.error(`💥 Error testing credentials: ${error.message}`);
     } finally {
-      setTesting(false);
+      setIsTesting(false);
     }
   };
-  
+
+  const handleSave = async () => {
+    if (!user || !canSave) return;
+
+    setIsSaving(true);
+    try {
+      const result = await AutomationCredentialManager.saveCredentials(
+        automationId,
+        platform.name,
+        credentials,
+        user.id
+      );
+
+      if (result.success) {
+        toast.success(`✅ ${platform.name} credentials saved successfully!`);
+        onCredentialSaved?.();
+      } else {
+        toast.error(`❌ Failed to save credentials: ${result.error}`);
+      }
+    } catch (error: any) {
+      toast.error(`💥 Error saving credentials: ${error.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-6 w-6 animate-spin text-purple-500" />
+        <span className="ml-2 text-gray-600">Loading...</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <h3 className="text-lg font-semibold">
-            {platform.name} Credentials
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            Enter your {platform.name} credentials to connect your account.
-          </p>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          {platformFields.map((field) => (
-            <div key={field.field} className="grid gap-2">
-              <Label htmlFor={field.field}>{field.field}</Label>
-              <Input
-                id={field.field}
-                type="text"
-                placeholder={field.placeholder}
-                value={credentials[field.field] || ''}
-                onChange={(e) => handleInputChange(field.field, e.target.value)}
-              />
-              {field.link && (
-                <a href={field.link} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-500 hover:underline">
-                  Where to find this?
+    <div className="bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 rounded-2xl p-6 border border-purple-200">
+      <div className="space-y-4">
+        {platform.credentials.map((cred) => (
+          <div key={cred.field} className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-gray-700">{cred.field}</label>
+              {cred.link && (
+                <a
+                  href={cred.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center text-xs text-purple-600 hover:text-purple-800"
+                >
+                  <ExternalLink className="w-3 h-3 mr-1" />
+                  Get Key
                 </a>
               )}
-              {field.why_needed && (
-                <p className="text-sm text-muted-foreground">
-                  Why needed: {field.why_needed}
-                </p>
-              )}
             </div>
-          ))}
-        </CardContent>
-        <CardFooter className="flex justify-between">
-          <Button type="button" onClick={handleTestCredentials} disabled={testing}>
-            {testing ? (
+
+            <div className="relative">
+              <Input
+                type={showPasswords[cred.field] ? "text" : "password"}
+                placeholder={cred.placeholder}
+                value={credentials[cred.field] || ''}
+                onChange={(e) => handleCredentialChange(cred.field, e.target.value)}
+                className="rounded-xl border-purple-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-200 pr-10"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-purple-100"
+                onClick={() => togglePasswordVisibility(cred.field)}
+              >
+                {showPasswords[cred.field] ? (
+                  <EyeOff className="h-4 w-4 text-gray-400" />
+                ) : (
+                  <Eye className="h-4 w-4 text-gray-400" />
+                )}
+              </Button>
+            </div>
+
+            <p className="text-xs text-gray-600">{cred.why_needed}</p>
+          </div>
+        ))}
+
+        {testResult && (
+          <div className={`p-3 rounded-xl border ${
+            testResult.success 
+              ? 'bg-green-50 border-green-200 text-green-800' 
+              : 'bg-red-50 border-red-200 text-red-800'
+          }`}>
+            <div className="flex items-center gap-2">
+              {testResult.success ? (
+                <CheckCircle className="h-4 w-4" />
+              ) : (
+                <XCircle className="h-4 w-4" />
+              )}
+              <span className="text-sm font-medium">{testResult.message}</span>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-4">
+          <Button
+            onClick={handleTest}
+            disabled={!hasAllCredentials || isTesting}
+            className="flex-1 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+          >
+            {isTesting ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Testing...
               </>
             ) : (
-              "Test Credentials"
+              <>
+                <TestTube className="w-4 h-4 mr-2" />
+                Test Credentials
+              </>
             )}
           </Button>
-          <Button type="button" onClick={handleSaveCredentials}>
-            Save Credentials
-          </Button>
-        </CardFooter>
-      </Card>
 
-      {testResult && (
-        <div className={`p-4 rounded-md ${testResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-          {testResult.message}
+          <Button
+            onClick={handleSave}
+            disabled={!canSave || isSaving || isTesting}
+            className="flex-1 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Save Credentials
+              </>
+            )}
+          </Button>
         </div>
-      )}
+
+        <p className="text-xs text-center text-gray-500 pt-2">
+          Test your credentials first, then save them securely
+        </p>
+      </div>
     </div>
   );
 };

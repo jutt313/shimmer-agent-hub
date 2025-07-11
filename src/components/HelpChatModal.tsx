@@ -38,28 +38,19 @@ const HelpChatModal = ({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Initialize chat with context-aware welcome message
+  // Initialize chat with welcome message and handle initial message
   useEffect(() => {
     if (isOpen && !isInitialized) {
-      let welcomeContent = `Hi! I'm your AI assistant specialized in automation and platform troubleshooting. I can help you with automations, errors, platform integrations, and technical issues.`;
-      
-      if (initialContext) {
-        welcomeContent += `\n\nI see you need help with a specific notification. Let me analyze the details and provide targeted assistance.`;
-      }
-      
       const welcomeMessage: ChatMessage = {
         role: 'assistant',
-        content: welcomeContent,
+        content: `Hi! I'm your AI assistant. I can help you with automations, troubleshooting, and platform features. How can I assist you today?${initialContext ? `\n\nContext: ${initialContext}` : ''}`,
         timestamp: new Date().toISOString()
       };
-      
       setMessages([welcomeMessage]);
-      
       if (initialMessage) {
         setInputMessage(initialMessage);
         setTimeout(() => inputRef.current?.focus(), 100);
       }
-      
       setIsInitialized(true);
     }
   }, [isOpen, isInitialized, initialMessage, initialContext]);
@@ -97,21 +88,11 @@ const HelpChatModal = ({
     setIsLoading(true);
     
     try {
-      // Enhanced context for notification-based help
-      let enhancedMessage = userMessage.content;
-      let category = 'general_help';
-      
-      if (initialContext) {
-        enhancedMessage = `${userMessage.content}\n\nContext from notification:\n${initialContext}`;
-        category = 'notification_help';
-      }
-      
       const { data, error } = await supabase.functions.invoke('knowledge-ai-chat', {
         body: {
-          message: enhancedMessage,
-          category,
-          userRole: 'user',
-          context: initialContext ? 'notification_assistance' : 'general'
+          message: userMessage.content,
+          category: 'general_help',
+          userRole: 'user'
         }
       });
       
@@ -119,7 +100,7 @@ const HelpChatModal = ({
       
       const assistantMessage: ChatMessage = {
         role: 'assistant',
-        content: data.response || 'I apologize, but I encountered an issue processing your request. Please try again or rephrase your question.',
+        content: data.response || 'Sorry, I encountered an issue. Please try again.',
         timestamp: new Date().toISOString()
       };
       
@@ -128,7 +109,7 @@ const HelpChatModal = ({
       console.error('Help chat error:', error);
       const errorMessage: ChatMessage = {
         role: 'assistant',
-        content: 'I am having trouble connecting right now. Please check your connection and try again. If this persists, the issue might be with my AI service.',
+        content: 'I\'m having trouble connecting. Please check your connection and try again.',
         timestamp: new Date().toISOString()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -152,7 +133,7 @@ const HelpChatModal = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md h-[600px] bg-white border border-blue-200 shadow-2xl rounded-2xl p-0 flex flex-col">
-        {/* Header */}
+        {/* Header with Custom Logo */}
         <div className="flex items-center justify-between p-4 border-b border-blue-100 bg-gradient-to-r from-blue-50 to-purple-50 rounded-t-2xl">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
@@ -162,12 +143,7 @@ const HelpChatModal = ({
                 className="w-6 h-6 object-contain"
               />
             </div>
-            <div>
-              <h3 className="font-semibold text-gray-800">AI Help Assistant</h3>
-              {initialContext && (
-                <p className="text-xs text-blue-600">Notification Help Mode</p>
-              )}
-            </div>
+            <h3 className="font-semibold text-gray-800">AI Help Assistant</h3>
           </div>
           <Button
             variant="ghost"
@@ -207,7 +183,7 @@ const HelpChatModal = ({
                         <User className="w-4 h-4 mt-1 flex-shrink-0" />
                       )}
                       <div className="flex-1">
-                        <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                         <p className={`text-xs mt-1 opacity-70 ${
                           message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
                         }`}>
@@ -232,7 +208,7 @@ const HelpChatModal = ({
                         className="w-4 h-4 object-contain"
                       />
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">Analyzing and thinking...</span>
+                      <span className="text-sm">Thinking...</span>
                     </div>
                   </div>
                 </div>
@@ -241,14 +217,14 @@ const HelpChatModal = ({
           </ScrollArea>
         </div>
 
-        {/* Input Area */}
+        {/* Input Area with Glow Effect */}
         <div className="p-4 border-t border-blue-100 bg-gradient-to-r from-blue-50/50 to-purple-50/50">
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-xl blur-sm opacity-20"></div>
             <div className="relative flex gap-2">
               <Input 
                 ref={inputRef}
-                placeholder={initialContext ? "Ask about this notification..." : "Ask me anything..."} 
+                placeholder="Ask me anything..." 
                 value={inputMessage} 
                 onChange={e => setInputMessage(e.target.value)} 
                 onKeyPress={handleKeyPress} 

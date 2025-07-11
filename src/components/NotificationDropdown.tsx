@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Bell, Check, Trash2, MessageCircle } from 'lucide-react';
+import { Bell, Check, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -11,7 +11,6 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import HelpChatModal from './HelpChatModal';
 
 interface Notification {
   id: string;
@@ -21,7 +20,6 @@ interface Notification {
   is_read: boolean;
   created_at: string;
   category: string;
-  metadata?: any;
 }
 
 const NotificationDropdown = () => {
@@ -29,11 +27,6 @@ const NotificationDropdown = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [helpChatOpen, setHelpChatOpen] = useState(false);
-  const [chatContext, setChatContext] = useState<{
-    message: string;
-    context: string;
-  } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -111,37 +104,16 @@ const NotificationDropdown = () => {
     }
   };
 
-  const handleChatFromNotification = (notification: Notification) => {
-    const contextMessage = `I need help with this notification: ${notification.title}`;
-    const detailedContext = `
-Notification Details:
-- Type: ${notification.type}
-- Category: ${notification.category}
-- Message: ${notification.message}
-- Created: ${new Date(notification.created_at).toLocaleString()}
-${notification.metadata ? `- Additional Info: ${JSON.stringify(notification.metadata, null, 2)}` : ''}
-
-Please help me understand this issue and provide guidance on how to resolve it.`;
-
-    setChatContext({
-      message: contextMessage,
-      context: detailedContext
-    });
-    setHelpChatOpen(true);
-  };
-
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'error':
         return '❌';
-      case 'automation_status':
-        return '⚙️';
-      case 'platform_integration':
-        return '🔗';
-      case 'ai_agent':
-        return '🤖';
-      case 'knowledge_system':
-        return '📚';
+      case 'success':
+        return '✅';
+      case 'warning':
+        return '⚠️';
+      case 'info':
+        return 'ℹ️';
       default:
         return '📢';
     }
@@ -159,138 +131,117 @@ Please help me understand this issue and provide guidance on how to resolve it.`
   };
 
   return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="relative rounded-full p-2 hover:bg-gray-100">
-            <Bell className="w-5 h-5" />
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" className="relative rounded-full p-2 hover:bg-gray-100">
+          <Bell className="w-5 h-5" />
+          {unreadCount > 0 && (
+            <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-red-500 text-white">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </Badge>
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80 p-0 bg-white border shadow-lg">
+        <div className="p-4 border-b">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-gray-900">Notifications</h3>
             {unreadCount > 0 && (
-              <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-red-500 text-white">
-                {unreadCount > 9 ? '9+' : unreadCount}
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
+                {unreadCount} new
               </Badge>
             )}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-80 p-0 bg-white border shadow-lg">
-          <div className="p-4 border-b">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900">Notifications</h3>
-              {unreadCount > 0 && (
-                <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
-                  {unreadCount} new
-                </Badge>
-              )}
-            </div>
           </div>
-          
-          <ScrollArea className="max-h-96">
-            {loading ? (
-              <div className="p-4 text-center text-gray-500">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                Loading notifications...
-              </div>
-            ) : notifications.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <Bell className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                <p className="text-sm">No notifications yet</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  You'll see automation updates here
-                </p>
-              </div>
-            ) : (
-              <div className="divide-y">
-                {notifications.map((notification) => (
-                  <div
-                    key={notification.id}
-                    className={`p-4 hover:bg-gray-50 transition-colors ${
-                      !notification.is_read ? 'bg-blue-50' : ''
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm">
-                            {getNotificationIcon(notification.type)}
-                          </span>
-                          <p className="font-medium text-sm text-gray-900 truncate">
-                            {notification.title}
-                          </p>
-                          {!notification.is_read && (
-                            <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-                          )}
-                        </div>
-                        <p className="text-xs text-gray-600 line-clamp-2 mb-2">
-                          {notification.message}
+        </div>
+        
+        <ScrollArea className="max-h-96">
+          {loading ? (
+            <div className="p-4 text-center text-gray-500">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto mb-2"></div>
+              Loading notifications...
+            </div>
+          ) : notifications.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              <Bell className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+              <p className="text-sm">No notifications yet</p>
+              <p className="text-xs text-gray-400 mt-1">
+                You'll see automation updates here
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {notifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`p-4 hover:bg-gray-50 transition-colors ${
+                    !notification.is_read ? 'bg-blue-50' : ''
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm">
+                          {getNotificationIcon(notification.type)}
+                        </span>
+                        <p className="font-medium text-sm text-gray-900 truncate">
+                          {notification.title}
                         </p>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-400">
-                            {formatTimeAgo(notification.created_at)}
-                          </span>
-                          <div className="flex items-center gap-1">
+                        {!notification.is_read && (
+                          <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-600 line-clamp-2 mb-2">
+                        {notification.message}
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-400">
+                          {formatTimeAgo(notification.created_at)}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {!notification.is_read && (
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleChatFromNotification(notification)}
-                              className="h-6 w-6 p-0 hover:bg-green-100"
-                              title="Get help with this notification"
+                              onClick={() => markAsRead(notification.id)}
+                              className="h-6 w-6 p-0 hover:bg-blue-100"
                             >
-                              <MessageCircle className="w-3 h-3 text-green-600" />
+                              <Check className="w-3 h-3 text-blue-600" />
                             </Button>
-                            {!notification.is_read && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => markAsRead(notification.id)}
-                                className="h-6 w-6 p-0 hover:bg-blue-100"
-                              >
-                                <Check className="w-3 h-3 text-blue-600" />
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => deleteNotification(notification.id)}
-                              className="h-6 w-6 p-0 hover:bg-red-100"
-                            >
-                              <Trash2 className="w-3 h-3 text-red-600" />
-                            </Button>
-                          </div>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteNotification(notification.id)}
+                            className="h-6 w-6 p-0 hover:bg-red-100"
+                          >
+                            <Trash2 className="w-3 h-3 text-red-600" />
+                          </Button>
                         </div>
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </ScrollArea>
-          
-          {notifications.length > 0 && (
-            <div className="p-3 border-t">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full text-blue-600 hover:bg-blue-50"
-                onClick={() => {
-                  console.log('View all notifications - Coming soon');
-                }}
-              >
-                View all notifications
-              </Button>
+                </div>
+              ))}
             </div>
           )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <HelpChatModal
-        isOpen={helpChatOpen}
-        onClose={() => {
-          setHelpChatOpen(false);
-          setChatContext(null);
-        }}
-        initialMessage={chatContext?.message}
-        initialContext={chatContext?.context}
-      />
-    </>
+        </ScrollArea>
+        
+        {notifications.length > 0 && (
+          <div className="p-3 border-t">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-blue-600 hover:bg-blue-50"
+              onClick={() => {
+                console.log('View all notifications - Coming soon');
+              }}
+            >
+              View all notifications
+            </Button>
+          </div>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 

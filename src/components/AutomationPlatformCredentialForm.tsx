@@ -72,17 +72,28 @@ const AutomationPlatformCredentialForm = ({ automationId, platform, onCredential
     if (!user?.id) return;
 
     try {
-      await AutomationCredentialManager.saveCredentials(user.id, automationId, platform.name, credentials);
-      toast({
-        title: "Success",
-        description: "Credentials saved successfully!",
-      });
-      onCredentialSaved();
-    } catch (error) {
+      // Correct parameter order: automationId, platformName, credentials, userId
+      const result = await AutomationCredentialManager.saveCredentials(
+        automationId,
+        platform.name,
+        credentials,
+        user.id
+      );
+      
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: "Credentials saved successfully!",
+        });
+        onCredentialSaved();
+      } else {
+        throw new Error(result.error || 'Failed to save credentials');
+      }
+    } catch (error: any) {
       console.error('Error saving credentials:', error);
       toast({
         title: "Error",
-        description: "Failed to save credentials",
+        description: error.message || "Failed to save credentials",
         variant: "destructive",
       });
     }

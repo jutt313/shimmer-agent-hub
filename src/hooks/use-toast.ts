@@ -1,4 +1,7 @@
+
 import * as React from "react"
+import { useAuth } from "@/contexts/AuthContext"
+import { createNotificationFromToast } from "@/utils/toastNotificationBridge"
 
 import type {
   ToastActionElement,
@@ -90,8 +93,6 @@ export const reducer = (state: State, action: Action): State => {
     case "DISMISS_TOAST": {
       const { toastId } = action
 
-      // ! Side effects ! - This could be extracted into a dismissToast() action,
-      // but I'll keep it here for simplicity
       if (toastId) {
         addToRemoveQueue(toastId)
       } else {
@@ -139,6 +140,13 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
+// Global user context for toast-to-notification conversion
+let globalUserId: string | undefined = undefined
+
+export const setGlobalUserId = (userId: string | undefined) => {
+  globalUserId = userId
+}
+
 function toast({ ...props }: Toast) {
   const id = genId()
 
@@ -161,6 +169,18 @@ function toast({ ...props }: Toast) {
     },
   })
 
+  // Convert toast to notification if user is authenticated
+  if (globalUserId && props.title) {
+    createNotificationFromToast(globalUserId, {
+      title: typeof props.title === 'string' ? props.title : String(props.title),
+      description: typeof props.description === 'string' ? props.description : String(props.description || ''),
+      variant: props.variant,
+      duration: props.duration
+    }).catch(error => {
+      console.error('Failed to convert toast to notification:', error)
+    })
+  }
+
   return {
     id: id,
     dismiss,
@@ -170,6 +190,12 @@ function toast({ ...props }: Toast) {
 
 function useToast() {
   const [state, setState] = React.useState<State>(memoryState)
+  const { user } = useAuth()
+
+  // Update global user ID when user changes
+  React.useEffect(() => {
+    setGlobalUserId(user?.id)
+  }, [user?.id])
 
   React.useEffect(() => {
     listeners.push(setState)

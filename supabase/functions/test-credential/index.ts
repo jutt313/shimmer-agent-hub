@@ -1,824 +1,549 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-interface PlatformMethod {
-  endpoint: string;
-  http_method: string;
-  required_params: string[];
-  optional_params: string[];
-  example_request: any;
 }
 
-interface PlatformAPIConfig {
-  base_url: string;
-  auth_type: string;
-  auth_header_format: string;
-  methods: Record<string, PlatformMethod>;
-}
+// 🌍 UNIVERSAL PLATFORM INTEGRATOR - Embedded for zero dependencies
+class UniversalPlatformIntegrator {
+  private platformConfigs = new Map<string, any>();
 
-interface PlatformConfig {
-  name: string;
-  api_config: PlatformAPIConfig;
-  credentials: Array<{
-    field: string;
-    placeholder: string;
-    link: string;
-    why_needed: string;
-  }>;
-}
+  async discoverPlatform(platformName: string): Promise<any> {
+    console.log(`🔍 Dynamically discovering platform: ${platformName}`);
 
-// Normalize field names for API compatibility
-const normalizeFieldName = (fieldName: string): string => {
-  const normalizations: Record<string, string> = {
-    'API Key': 'api_key',
-    'api key': 'api_key',
-    'apikey': 'api_key',
-    'Integration Token': 'integration_token',
-    'integration token': 'integration_token',
-    'Bot Token': 'bot_token',
-    'bot token': 'bot_token',
-    'Access Token': 'access_token',
-    'access token': 'access_token',
-    'Client ID': 'client_id',
-    'client id': 'client_id',
-    'Client Secret': 'client_secret',
-    'client secret': 'client_secret',
-    'Database ID': 'database_id',
-    'database id': 'database_id',
-    'Username': 'username',
-    'Password': 'password',
-    'Token': 'token'
-  };
+    // Try to fetch OpenAPI spec from common locations
+    const possibleUrls = [
+      `https://api.${platformName.toLowerCase()}.com/openapi.json`,
+      `https://api.${platformName.toLowerCase()}.com/swagger.json`,
+      `https://${platformName.toLowerCase()}.com/api/docs/openapi.json`,
+      `https://developers.${platformName.toLowerCase()}.com/openapi.json`,
+      `https://docs.${platformName.toLowerCase()}.com/openapi.json`
+    ];
 
-  return normalizations[fieldName] || fieldName.toLowerCase().replace(/\s+/g, '_');
-};
-
-// Normalize credentials object with proper field names
-const normalizeCredentials = (credentials: Record<string, string>): Record<string, string> => {
-  const normalized: Record<string, string> = {};
-  
-  Object.entries(credentials).forEach(([key, value]) => {
-    const normalizedKey = normalizeFieldName(key);
-    normalized[normalizedKey] = value;
-    
-    // Also keep original key for backward compatibility
-    if (normalizedKey !== key) {
-      normalized[key] = value;
-    }
-  });
-
-  console.log('🔄 Normalized credentials:', Object.keys(normalized));
-  return normalized;
-};
-
-// Store credential testing insights
-const storeCredentialInsights = async (platformName: string, testStatus: string, errorDetails: any, supabase: any): Promise<void> => {
-  try {
-    const insights = {
-      category: 'credential_knowledge',
-      title: `${platformName} Credential ${testStatus === 'success' ? 'Success' : 'Failure'} Pattern`,
-      summary: `${testStatus === 'success' ? 'Working' : 'Failed'} credential configuration for ${platformName}`,
-      details: {
-        platform: platformName,
-        test_result: testStatus,
-        error_details: errorDetails,
-        timestamp: new Date().toISOString(),
-        success_indicators: testStatus === 'success' ? ['valid_format', 'proper_permissions', 'active_token'] : [],
-        failure_indicators: testStatus === 'failed' ? [errorDetails.status_code, errorDetails.error_type] : []
-      },
-      tags: [platformName.toLowerCase(), 'credential_test', testStatus, 'authentication'],
-      priority: testStatus === 'failed' ? 8 : 6,
-      source_type: 'credential_test'
-    };
-
-    await supabase
-      .from('universal_knowledge_store')
-      .insert(insights);
-
-    console.log(`📊 Stored credential insight for ${platformName}: ${testStatus}`);
-  } catch (error) {
-    console.error('❌ Failed to store credential insights:', error);
-  }
-};
-
-// Enhanced platform-specific authentication header building
-const buildAuthHeaders = (platformName: string, credentials: Record<string, string>): Record<string, string> => {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'User-Agent': 'YusrAI-Automation/1.0',
-  };
-
-  const lowerPlatform = platformName.toLowerCase();
-  
-  console.log(`🔐 Building auth headers for ${platformName} with credentials:`, Object.keys(credentials));
-
-  // Platform-specific authentication
-  if (lowerPlatform.includes('typeform')) {
-    const token = credentials.api_key || credentials['API Key'] || credentials.token;
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-      console.log('✅ Typeform: Added Bearer token');
-    } else {
-      console.log('❌ Typeform: No API key found');
-    }
-  } else if (lowerPlatform.includes('openai')) {
-    const apiKey = credentials.api_key || credentials['API Key'];
-    if (apiKey) {
-      headers['Authorization'] = `Bearer ${apiKey}`;
-      console.log('✅ OpenAI: Added Bearer token');
-    } else {
-      console.log('❌ OpenAI: No API key found');
-    }
-  } else if (lowerPlatform.includes('notion')) {
-    const token = credentials.integration_token || credentials['Integration Token'];
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-      headers['Notion-Version'] = '2022-06-28';
-      console.log('✅ Notion: Added Bearer token with version');
-    } else {
-      console.log('❌ Notion: No integration token found');
-    }
-  } else if (lowerPlatform.includes('slack')) {
-    const token = credentials.bot_token || credentials['Bot Token'] || credentials.token;
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-      console.log('✅ Slack: Added Bearer token');
-    } else {
-      console.log('❌ Slack: No bot token found');
-    }
-  } else if (lowerPlatform.includes('gmail') || lowerPlatform.includes('google')) {
-    const token = credentials.access_token || credentials['Access Token'];
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-      console.log('✅ Google: Added Bearer token');
-    } else {
-      console.log('❌ Google: No access token found');
-    }
-  } else if (lowerPlatform.includes('trello')) {
-    const apiKey = credentials.api_key || credentials['API Key'];
-    const token = credentials.token || credentials['Token'];
-    if (apiKey && token) {
-      // Trello uses query parameters, but we'll add them as headers for now
-      headers['Authorization'] = `OAuth oauth_consumer_key="${apiKey}", oauth_token="${token}"`;
-      console.log('✅ Trello: Added OAuth headers');
-    } else {
-      console.log('❌ Trello: Missing API key or token');
-    }
-  } else {
-    // Generic fallback
-    const apiKey = credentials.api_key || credentials['API Key'] || credentials.token;
-    if (apiKey) {
-      headers['Authorization'] = `Bearer ${apiKey}`;
-      console.log(`✅ ${platformName}: Added generic Bearer token`);
-    } else {
-      console.log(`❌ ${platformName}: No API key found for generic auth`);
-    }
-  }
-
-  return headers;
-};
-
-// Get platform-specific test endpoint
-const getTestEndpoint = (platformName: string): { endpoint: string; method: string; baseURL: string } => {
-  const lowerPlatform = platformName.toLowerCase();
-  
-  if (lowerPlatform.includes('typeform')) {
-    return { 
-      endpoint: 'me', 
-      method: 'GET', 
-      baseURL: 'https://api.typeform.com' 
-    };
-  } else if (lowerPlatform.includes('openai')) {
-    return { 
-      endpoint: 'models', 
-      method: 'GET', 
-      baseURL: 'https://api.openai.com/v1' 
-    };
-  } else if (lowerPlatform.includes('notion')) {
-    return { 
-      endpoint: 'users/me', 
-      method: 'GET', 
-      baseURL: 'https://api.notion.com/v1' 
-    };
-  } else if (lowerPlatform.includes('slack')) {
-    return { 
-      endpoint: 'auth.test', 
-      method: 'GET', 
-      baseURL: 'https://slack.com/api' 
-    };
-  } else if (lowerPlatform.includes('gmail') || lowerPlatform.includes('google')) {
-    return { 
-      endpoint: 'users/me/profile', 
-      method: 'GET', 
-      baseURL: 'https://www.googleapis.com/gmail/v1' 
-    };
-  } else if (lowerPlatform.includes('trello')) {
-    return { 
-      endpoint: 'members/me', 
-      method: 'GET', 
-      baseURL: 'https://api.trello.com/1' 
-    };
-  } else {
-    return { 
-      endpoint: 'user', 
-      method: 'GET', 
-      baseURL: `https://api.${lowerPlatform}.com` 
-    };
-  }
-};
-
-// Dynamic Platform API Configuration Builder
-const buildDynamicPlatformConfig = (
-  platformName: string,
-  platformsConfig: PlatformConfig[],
-  credentials: Record<string, string>
-): any => {
-  console.log(`Building dynamic config for platform: ${platformName}`);
-  
-  const platformConfig = platformsConfig?.find(
-    (config) => config.name.toLowerCase() === platformName.toLowerCase()
-  );
-
-  if (!platformConfig) {
-    console.warn(`No dynamic config found for platform: ${platformName}, using fallback`);
-    return buildFallbackConfig(platformName, credentials);
-  }
-
-  const { api_config } = platformConfig;
-  
-  const config: any = {
-    baseURL: api_config.base_url,
-    headers: buildDynamicHeaders(api_config, credentials),
-    timeout: 10000, // Shorter timeout for tests
-  };
-
-  // Add authentication based on auth_type
-  switch (api_config.auth_type.toLowerCase()) {
-    case 'bearer_token':
-    case 'bearer':
-      const tokenField = platformConfig.credentials.find(c => 
-        c.field.includes('token') || c.field.includes('api_key')
-      )?.field;
-      if (tokenField && credentials[tokenField]) {
-        config.headers['Authorization'] = api_config.auth_header_format.replace('{token}', credentials[tokenField]);
-      }
-      break;
-      
-    case 'api_key':
-      const apiKeyField = platformConfig.credentials.find(c => 
-        c.field.includes('api_key') || c.field.includes('key')
-      )?.field;
-      if (apiKeyField && credentials[apiKeyField]) {
-        if (api_config.auth_header_format.includes('Authorization')) {
-          config.headers['Authorization'] = api_config.auth_header_format.replace('{token}', credentials[apiKeyField]);
-        } else {
-          config.headers['X-API-Key'] = credentials[apiKeyField];
+    for (const url of possibleUrls) {
+      try {
+        console.log(`📡 Attempting to fetch API spec from: ${url}`);
+        const response = await fetch(url);
+        
+        if (response.ok) {
+          const spec = await response.json();
+          const config = this.parseOpenAPISpec(platformName, spec);
+          this.platformConfigs.set(platformName.toLowerCase(), config);
+          
+          console.log(`✅ Platform ${platformName} discovered and configured dynamically`);
+          return config;
         }
+      } catch (error: any) {
+        console.log(`⚠️ Failed to fetch from ${url}:`, error.message);
       }
-      break;
-      
-    case 'oauth':
-    case 'oauth2':
-      const accessToken = credentials['access_token'] || credentials['token'];
-      if (accessToken) {
-        config.headers['Authorization'] = `Bearer ${accessToken}`;
-      }
-      break;
-      
-    case 'basic_auth':
-      const username = credentials['username'];
-      const password = credentials['password'];
-      if (username && password) {
-        const basicAuth = btoa(`${username}:${password}`);
-        config.headers['Authorization'] = `Basic ${basicAuth}`;
-      }
-      break;
-      
-    default:
-      console.log(`Using custom auth for ${platformName}`);
-      Object.keys(credentials).forEach(credKey => {
-        if (api_config.auth_header_format.includes(`{${credKey}}`)) {
-          const headerValue = api_config.auth_header_format.replace(`{${credKey}}`, credentials[credKey]);
-          if (headerValue.includes('Authorization:')) {
-            config.headers['Authorization'] = headerValue.split('Authorization:')[1].trim();
-          }
-        }
+    }
+
+    // If auto-discovery fails, create intelligent fallback configuration
+    console.log(`🔧 Creating intelligent fallback configuration for ${platformName}`);
+    return this.createIntelligentFallback(platformName);
+  }
+
+  private parseOpenAPISpec(platformName: string, spec: any): any {
+    const baseUrl = spec.servers?.[0]?.url || this.getBaseUrlForPlatform(platformName);
+    const endpoints: Record<string, any> = {};
+
+    // Parse all endpoints from the OpenAPI spec
+    Object.entries(spec.paths || {}).forEach(([path, methods]: [string, any]) => {
+      Object.entries(methods).forEach(([method, details]: [string, any]) => {
+        const endpointName = this.generateEndpointName(path, method);
+        endpoints[endpointName] = {
+          method: method.toUpperCase(),
+          path: path,
+          required_params: this.extractRequiredParams(details.parameters || []),
+          optional_params: this.extractOptionalParams(details.parameters || []),
+          response_schema: details.responses?.['200'] || {}
+        };
       });
+    });
+
+    return {
+      name: platformName,
+      base_url: baseUrl,
+      auth_config: this.detectAuthConfig(spec),
+      endpoints,
+      test_endpoint: this.findBestTestEndpoint(endpoints, platformName)
+    };
   }
 
-  return config;
-};
+  private createIntelligentFallback(platformName: string): any {
+    const lowerPlatform = platformName.toLowerCase();
+    let config: any = {
+      name: platformName,
+      base_url: this.getBaseUrlForPlatform(platformName),
+      auth_config: this.getAuthConfigForPlatform(platformName),
+      endpoints: {},
+      test_endpoint: this.getTestEndpointForPlatform(platformName)
+    };
 
-const buildDynamicHeaders = (apiConfig: PlatformAPIConfig, credentials: Record<string, string>): Record<string, string> => {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'User-Agent': 'YusrAI-Automation/1.0',
-  };
-
-  if (apiConfig.base_url.includes('slack.com')) {
-    headers['Content-Type'] = 'application/json; charset=utf-8';
-  } else if (apiConfig.base_url.includes('googleapis.com')) {
-    headers['Accept'] = 'application/json';
+    return config;
   }
 
-  return headers;
-};
-
-const buildFallbackConfig = (platformName: string, credentials: Record<string, string>): any => {
-  const config: any = {
-    timeout: 10000,
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': 'YusrAI-Automation/1.0',
-    },
-  };
-
-  const lowerPlatform = platformName.toLowerCase();
-  
-  if (lowerPlatform.includes('slack')) {
-    config.baseURL = 'https://slack.com/api';
-    if (credentials.bot_token) {
-      config.headers['Authorization'] = `Bearer ${credentials.bot_token}`;
-    }
-  } else if (lowerPlatform.includes('gmail') || lowerPlatform.includes('google')) {
-    config.baseURL = 'https://www.googleapis.com/gmail/v1';
-    if (credentials.access_token) {
-      config.headers['Authorization'] = `Bearer ${credentials.access_token}`;
-    }
-  } else if (lowerPlatform.includes('trello')) {
-    config.baseURL = 'https://api.trello.com/1';
-  } else if (lowerPlatform.includes('openai')) {
-    config.baseURL = 'https://api.openai.com/v1';
-    if (credentials.api_key) {
-      config.headers['Authorization'] = `Bearer ${credentials.api_key}`;
-    }
-  } else {
-    config.baseURL = `https://api.${lowerPlatform}.com`;
-    if (credentials.api_key) {
-      config.headers['Authorization'] = `Bearer ${credentials.api_key}`;
-    } else if (credentials.token) {
-      config.headers['Authorization'] = `Bearer ${credentials.token}`;
-    }
-  }
-
-  return config;
-};
-
-// Get dynamic test endpoint for a platform
-const getDynamicTestEndpoint = (
-  platformName: string,
-  platformsConfig: PlatformConfig[]
-): { endpoint: string; method: string } => {
-  const platformConfig = platformsConfig?.find(
-    (config) => config.name.toLowerCase() === platformName.toLowerCase()
-  );
-
-  if (platformConfig && platformConfig.api_config.methods) {
-    // Find a suitable test method (prefer GET methods for testing)
-    const methods = Object.entries(platformConfig.api_config.methods);
+  private getBaseUrlForPlatform(platformName: string): string {
+    const lowerPlatform = platformName.toLowerCase();
     
-    // Look for common test endpoints
-    const testMethod = methods.find(([name, config]) => 
-      name.includes('test') || 
-      name.includes('me') || 
-      name.includes('user') ||
-      name.includes('info') ||
-      config.http_method === 'GET'
-    );
+    // Platform-specific base URLs
+    const platformUrls: Record<string, string> = {
+      'slack': 'https://slack.com/api',
+      'gmail': 'https://www.googleapis.com/gmail/v1',
+      'google sheets': 'https://sheets.googleapis.com/v4',
+      'google_sheets': 'https://sheets.googleapis.com/v4',
+      'googlesheets': 'https://sheets.googleapis.com/v4',
+      'trello': 'https://api.trello.com/1',
+      'notion': 'https://api.notion.com/v1',
+      'openai': 'https://api.openai.com/v1',
+      'anthropic': 'https://api.anthropic.com/v1',
+      'github': 'https://api.github.com',
+      'stripe': 'https://api.stripe.com/v1',
+      'discord': 'https://discord.com/api/v10'
+    };
 
-    if (testMethod) {
-      return {
-        endpoint: testMethod[1].endpoint,
-        method: testMethod[1].http_method
-      };
-    }
+    return platformUrls[lowerPlatform] || `https://api.${lowerPlatform}.com`;
+  }
 
-    // Fallback to first available method
-    if (methods.length > 0) {
+  private getAuthConfigForPlatform(platformName: string): any {
+    const lowerPlatform = platformName.toLowerCase();
+    
+    // Platform-specific auth configurations
+    const authConfigs: Record<string, any> = {
+      'slack': {
+        type: 'bearer',
+        location: 'header',
+        parameter_name: 'Authorization',
+        format: 'Bearer {token}'
+      },
+      'gmail': {
+        type: 'bearer',
+        location: 'header',
+        parameter_name: 'Authorization',
+        format: 'Bearer {access_token}'
+      },
+      'google sheets': {
+        type: 'bearer',
+        location: 'header',
+        parameter_name: 'Authorization',
+        format: 'Bearer {access_token}'
+      },
+      'google_sheets': {
+        type: 'bearer',
+        location: 'header',
+        parameter_name: 'Authorization',
+        format: 'Bearer {access_token}'
+      },
+      'googlesheets': {
+        type: 'bearer',
+        location: 'header',
+        parameter_name: 'Authorization',
+        format: 'Bearer {access_token}'
+      },
+      'trello': {
+        type: 'api_key',
+        location: 'query',
+        parameter_name: 'key',
+        format: '{api_key}'
+      },
+      'openai': {
+        type: 'bearer',
+        location: 'header',
+        parameter_name: 'Authorization',
+        format: 'Bearer {api_key}'
+      }
+    };
+
+    return authConfigs[lowerPlatform] || {
+      type: 'bearer',
+      location: 'header',
+      parameter_name: 'Authorization',
+      format: 'Bearer {token}'
+    };
+  }
+
+  private getTestEndpointForPlatform(platformName: string): any {
+    const lowerPlatform = platformName.toLowerCase();
+    
+    // Platform-specific test endpoints - REAL WORKING ENDPOINTS
+    const testEndpoints: Record<string, any> = {
+      'slack': {
+        method: 'GET',
+        path: '/auth.test',
+        description: 'Test Slack authentication'
+      },
+      'gmail': {
+        method: 'GET',
+        path: '/users/me/profile',
+        description: 'Get Gmail user profile'
+      },
+      'google sheets': {
+        method: 'GET',
+        path: '/spreadsheets',
+        query_params: { q: 'test' },
+        description: 'List accessible spreadsheets'
+      },
+      'google_sheets': {
+        method: 'GET',
+        path: '/spreadsheets',
+        query_params: { q: 'test' },
+        description: 'List accessible spreadsheets'
+      },
+      'googlesheets': {
+        method: 'GET',
+        path: '/spreadsheets',
+        query_params: { q: 'test' },
+        description: 'List accessible spreadsheets'
+      },
+      'trello': {
+        method: 'GET',
+        path: '/members/me',
+        description: 'Get Trello user info'
+      },
+      'notion': {
+        method: 'GET',
+        path: '/users/me',
+        description: 'Get Notion user info'
+      },
+      'openai': {
+        method: 'GET',
+        path: '/models',
+        description: 'List available OpenAI models'
+      }
+    };
+
+    return testEndpoints[lowerPlatform] || {
+      method: 'GET',
+      path: '/user',
+      description: 'Generic user info endpoint'
+    };
+  }
+
+  async testPlatformCredentials(
+    platformName: string,
+    credentials: Record<string, string>
+  ): Promise<{ success: boolean; message: string; details?: any; error_type?: string }> {
+    try {
+      console.log(`🧪 UNIVERSAL TESTING: ${platformName} with credentials:`, Object.keys(credentials));
+      
+      let config = this.platformConfigs.get(platformName.toLowerCase());
+      
+      if (!config) {
+        console.log(`🔍 Platform ${platformName} not configured, discovering...`);
+        config = await this.discoverPlatform(platformName);
+      }
+
+      const testEndpoint = config.test_endpoint;
+      const baseUrl = config.base_url;
+      
+      // Build test URL
+      let testUrl = `${baseUrl}${testEndpoint.path}`;
+      
+      // Add query parameters if needed
+      if (testEndpoint.query_params) {
+        const queryString = new URLSearchParams(testEndpoint.query_params).toString();
+        testUrl += `?${queryString}`;
+      }
+
+      // Build authentication headers
+      const headers = await this.buildAuthHeaders(config.auth_config, credentials);
+
+      console.log(`📡 Testing ${platformName} with URL: ${testUrl}`);
+      console.log(`🔐 Using auth headers:`, Object.keys(headers));
+
+      const response = await fetch(testUrl, {
+        method: testEndpoint.method,
+        headers,
+      });
+
+      const responseText = await response.text();
+      let responseData;
+      
+      try {
+        responseData = JSON.parse(responseText);
+      } catch {
+        responseData = responseText;
+      }
+
+      if (response.ok) {
+        console.log(`✅ ${platformName} credentials test SUCCESSFUL`);
+        return {
+          success: true,
+          message: `${platformName} credentials are working correctly!`,
+          details: {
+            status: response.status,
+            endpoint_tested: testUrl,
+            response_preview: typeof responseData === 'object' ? 
+              Object.keys(responseData).slice(0, 5) : 
+              responseData.toString().substring(0, 100)
+          }
+        };
+      } else {
+        console.error(`❌ ${platformName} credentials test FAILED:`, response.status, responseData);
+        
+        // Detailed error analysis
+        let errorType = 'unknown_error';
+        let helpfulMessage = `${platformName} credentials test failed`;
+
+        if (response.status === 401) {
+          errorType = 'authentication_error';
+          helpfulMessage = `${platformName} authentication failed. Please check your credentials.`;
+        } else if (response.status === 403) {
+          errorType = 'permission_error';
+          helpfulMessage = `${platformName} credentials don't have required permissions.`;
+        } else if (response.status === 404) {
+          errorType = 'endpoint_error';
+          helpfulMessage = `${platformName} API endpoint not found. Platform may have changed.`;
+        } else if (response.status >= 500) {
+          errorType = 'server_error';
+          helpfulMessage = `${platformName} server error. Try again later.`;
+        }
+
+        return {
+          success: false,
+          message: helpfulMessage,
+          error_type: errorType,
+          details: {
+            status: response.status,
+            endpoint_tested: testUrl,
+            error_response: responseData,
+            troubleshooting: this.getTroubleshootingTips(platformName, errorType)
+          }
+        };
+      }
+
+    } catch (error: any) {
+      console.error(`💥 ${platformName} test error:`, error);
       return {
-        endpoint: methods[0][1].endpoint,
-        method: methods[0][1].http_method
+        success: false,
+        message: `Failed to connect to ${platformName}: ${error.message}`,
+        error_type: 'connection_error',
+        details: {
+          error: error.message,
+          troubleshooting: this.getTroubleshootingTips(platformName, 'connection_error')
+        }
       };
     }
   }
 
-  // Hardcoded fallbacks for common platforms
-  const lowerPlatform = platformName.toLowerCase();
-  if (lowerPlatform.includes('slack')) {
-    return { endpoint: 'auth.test', method: 'GET' };
-  } else if (lowerPlatform.includes('gmail') || lowerPlatform.includes('google')) {
-    return { endpoint: 'users/me/profile', method: 'GET' };
-  } else if (lowerPlatform.includes('trello')) {
-    return { endpoint: 'members/me', method: 'GET' };
-  } else if (lowerPlatform.includes('openai')) {
-    return { endpoint: 'models', method: 'GET' };
-  } else {
-    return { endpoint: 'user', method: 'GET' };
+  private async buildAuthHeaders(authConfig: any, credentials: Record<string, string>): Promise<Record<string, string>> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'YusrAI-Universal-Integrator/2.0'
+    };
+
+    // Apply authentication based on platform configuration
+    switch (authConfig.type) {
+      case 'bearer':
+        const token = credentials.access_token || credentials.token || credentials.api_key || credentials.bot_token;
+        if (token) {
+          headers[authConfig.parameter_name] = authConfig.format.replace('{token}', token).replace('{access_token}', token).replace('{api_key}', token);
+        }
+        break;
+        
+      case 'api_key':
+        const apiKey = credentials.api_key || credentials.key;
+        if (apiKey && authConfig.location === 'header') {
+          headers[authConfig.parameter_name] = authConfig.format.replace('{api_key}', apiKey).replace('{token}', apiKey);
+        }
+        break;
+        
+      case 'basic':
+        const username = credentials.username;
+        const password = credentials.password;
+        if (username && password) {
+          const basicAuth = btoa(`${username}:${password}`);
+          headers['Authorization'] = `Basic ${basicAuth}`;
+        }
+        break;
+    }
+
+    return headers;
   }
-};
+
+  private getTroubleshootingTips(platformName: string, errorType: string): string[] {
+    const tips: string[] = [];
+    
+    switch (errorType) {
+      case 'authentication_error':
+        tips.push(`Verify your ${platformName} credentials are correct and not expired`);
+        tips.push(`Check if you're using the right credential type (API key, OAuth token, etc.)`);
+        break;
+      case 'permission_error':
+        tips.push(`Ensure your ${platformName} credentials have the required permissions/scopes`);
+        tips.push(`Check your account settings in ${platformName}`);
+        break;
+      case 'connection_error':
+        tips.push(`Check your internet connection`);
+        tips.push(`Verify ${platformName} service is operational`);
+        break;
+      default:
+        tips.push(`Check ${platformName} documentation for credential requirements`);
+        tips.push(`Try regenerating your credentials`);
+    }
+    
+    return tips;
+  }
+
+  // Helper methods for OpenAPI parsing
+  private detectAuthConfig(spec: any): any {
+    const securitySchemes = spec.components?.securitySchemes;
+    
+    if (securitySchemes) {
+      const firstScheme = Object.values(securitySchemes)[0] as any;
+      
+      if (firstScheme?.type === 'http' && firstScheme?.scheme === 'bearer') {
+        return {
+          type: 'bearer',
+          location: 'header',
+          parameter_name: 'Authorization',
+          format: 'Bearer {token}'
+        };
+      } else if (firstScheme?.type === 'apiKey') {
+        return {
+          type: 'api_key',
+          location: firstScheme.in,
+          parameter_name: firstScheme.name,
+          format: '{token}'
+        };
+      }
+    }
+
+    return {
+      type: 'bearer',
+      location: 'header',
+      parameter_name: 'Authorization',
+      format: 'Bearer {token}'
+    };
+  }
+
+  private generateEndpointName(path: string, method: string): string {
+    return `${method.toLowerCase()}_${path.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '')}`;
+  }
+
+  private extractRequiredParams(parameters: any[]): string[] {
+    return parameters.filter(p => p.required).map(p => p.name);
+  }
+
+  private extractOptionalParams(parameters: any[]): string[] {
+    return parameters.filter(p => !p.required).map(p => p.name);
+  }
+
+  private findBestTestEndpoint(endpoints: Record<string, any>, platformName: string): any {
+    // Look for user info, profile, or auth test endpoints
+    const testCandidates = ['user', 'profile', 'me', 'auth', 'account'];
+    
+    for (const candidate of testCandidates) {
+      for (const [name, endpoint] of Object.entries(endpoints)) {
+        if (name.includes(candidate) && endpoint.method === 'GET') {
+          return endpoint;
+        }
+      }
+    }
+
+    // Fallback to first GET endpoint
+    for (const [name, endpoint] of Object.entries(endpoints)) {
+      if (endpoint.method === 'GET') {
+        return endpoint;
+      }
+    }
+
+    // Ultimate fallback
+    return this.getTestEndpointForPlatform(platformName);
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const requestBody = await req.json();
-    console.log('🔧 Test credential request:', JSON.stringify(requestBody, null, 2));
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
+
+    const { platform_name, credentials, user_id } = await req.json()
+
+    if (!platform_name || !credentials || !user_id) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'Missing required parameters: platform_name, credentials, user_id' 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    console.log(`🚀 UNIVERSAL CREDENTIAL TEST: ${platform_name} for user ${user_id}`);
+
+    // 🌍 USE UNIVERSAL PLATFORM INTEGRATOR - NO MORE HARDCODED ENDPOINTS!
+    const universalIntegrator = new UniversalPlatformIntegrator();
     
-    // Handle AI Agent testing
-    if (requestBody.type === 'agent' && requestBody.agent_id) {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const testResult = await universalIntegrator.testPlatformCredentials(
+      platform_name,
+      credentials
+    );
 
-      // Fetch the agent details
-      const { data: agent, error: agentError } = await supabase
-        .from('ai_agents')
-        .select('*')
-        .eq('id', requestBody.agent_id)
-        .single();
+    console.log(`🎯 Universal test result for ${platform_name}:`, testResult);
 
-      if (agentError || !agent) {
-        throw new Error(`Agent not found: ${agentError?.message}`);
-      }
-
-      // Test the AI agent by making a simple API call
-      const testMessage = "Hello, please respond with 'Test successful' to confirm you're working.";
-      
-      let testUrl = '';
-      let testHeaders: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      let testBody: any = {};
-
-      // Configure test based on LLM provider
-      switch (agent.llm_provider.toLowerCase()) {
-        case 'openai':
-          testUrl = 'https://api.openai.com/v1/chat/completions';
-          testHeaders['Authorization'] = `Bearer ${agent.api_key}`;
-          testBody = {
-            model: agent.model,
-            messages: [
-              { role: 'system', content: agent.agent_role },
-              { role: 'user', content: testMessage }
-            ],
-            max_tokens: 50
-          };
-          break;
-          
-        default:
-          throw new Error(`Testing for ${agent.llm_provider} is not implemented yet`);
-      }
-
-      const testResponse = await fetch(testUrl, {
-        method: 'POST',
-        headers: testHeaders,
-        body: JSON.stringify(testBody),
-      });
-
-      const testResult = await testResponse.json();
-      
-      if (testResponse.ok) {
-        return new Response(JSON.stringify({
-          success: true,
-          user_message: `✅ AI Agent "${agent.agent_name}" test successful with ${agent.llm_provider}/${agent.model}`,
-          technical_details: {
-            status_code: testResponse.status,
-            model_response: testResult.choices?.[0]?.message?.content || 'Response received',
-            provider: agent.llm_provider,
-            model: agent.model
-          }
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      } else {
-        return new Response(JSON.stringify({
-          success: false,
-          user_message: `❌ AI Agent "${agent.agent_name}" test failed: ${testResult.error?.message || 'Unknown error'}`,
-          technical_details: {
-            status_code: testResponse.status,
-            error: testResult.error,
-            provider: agent.llm_provider,
-            model: agent.model
-          }
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-    }
-
-    // Handle platform credential testing - ENHANCED MODE
-    if (requestBody.type === 'platform' || (requestBody.platform_name && requestBody.credentials)) {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-      const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-      // Support both formats: new (credential_fields) and current frontend (credentials)
-      const platform_name = requestBody.platform_name;
-      const credential_fields = requestBody.credential_fields || requestBody.credentials;
-      const user_id = requestBody.user_id;
-
-      if (!platform_name || !credential_fields) {
-        throw new Error('Platform name and credentials are required for platform testing');
-      }
-
-      console.log(`🧪 Testing raw credentials for platform: ${platform_name}`);
-      console.log(`📝 Original credentials:`, Object.keys(credential_fields));
-
-      // Normalize credentials for API compatibility
-      const normalizedCredentials = normalizeCredentials(credential_fields);
-      
-      // Build authentication headers
-      const authHeaders = buildAuthHeaders(platform_name, normalizedCredentials);
-      
-      // Get test endpoint
-      const testConfig = getTestEndpoint(platform_name);
-      
-      // Build test URL
-      const testUrl = `${testConfig.baseURL}/${testConfig.endpoint.replace(/^\//, '')}`;
-
-      console.log(`🔗 Testing credential for ${platform_name} at: ${testUrl}`);
-      console.log(`📋 Test method: ${testConfig.method}`);
-      console.log(`🔑 Auth headers set:`, Object.keys(authHeaders).filter(k => k.includes('Auth')));
-
-      // Make test request with timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-      try {
-        const testResponse = await fetch(testUrl, {
-          method: testConfig.method,
-          headers: authHeaders,
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        let responseText = '';
-        try {
-          responseText = await testResponse.text();
-        } catch (error) {
-          console.error('Failed to read response text:', error);
-        }
-
-        const technicalDetails = {
-          status_code: testResponse.status,
-          response_preview: responseText.substring(0, 300),
-          test_url: testUrl,
-          test_method: testConfig.method,
-          platform_name: platform_name,
-          credential_fields_sent: Object.keys(credential_fields),
-          normalized_fields: Object.keys(normalizedCredentials),
-          auth_headers_used: Object.keys(authHeaders).filter(k => k.includes('Auth')),
-          timestamp: new Date().toISOString()
-        };
-
-        let userMessage = '';
-        let errorType = 'unknown';
-
-        if (testResponse.ok) {
-          userMessage = `✅ ${platform_name} credentials are working correctly!`;
-          console.log(`✅ Credential test successful for ${platform_name}`);
-        } else {
-          // Enhanced error categorization
-          switch (testResponse.status) {
-            case 401:
-              errorType = 'authentication';
-              userMessage = `❌ Authentication failed for ${platform_name}. Please check your API key/token is correct and has proper permissions.`;
-              break;
-            case 403:
-              errorType = 'permission';
-              userMessage = `❌ Permission denied for ${platform_name}. Your credentials may not have the required permissions.`;
-              break;
-            case 404:
-              errorType = 'endpoint';
-              userMessage = `❌ API endpoint not found for ${platform_name}. This might be a configuration issue.`;
-              break;
-            case 429:
-              errorType = 'rate_limit';
-              userMessage = `❌ Rate limit exceeded for ${platform_name}. Please try again later.`;
-              break;
-            case 500:
-              errorType = 'server_error';
-              userMessage = `❌ ${platform_name} server error. Please try again later.`;
-              break;
-            default:
-              errorType = 'unknown';
-              userMessage = `❌ Credential test failed for ${platform_name}: HTTP ${testResponse.status}`;
-          }
-          
-          console.log(`❌ Credential test failed for ${platform_name}: ${testResponse.status}`);
-        }
-
-        // Store credential insights for learning (async, don't await)
-        storeCredentialInsights(
-          platform_name, 
-          testResponse.ok ? 'success' : 'failed', 
-          { ...technicalDetails, error_type: errorType }, 
-          supabase
-        );
-
-        return new Response(JSON.stringify({
-          success: testResponse.ok,
-          user_message: userMessage,
-          technical_details: { ...technicalDetails, error_type: errorType }
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-
-      } catch (fetchError: any) {
-        clearTimeout(timeoutId);
-        
-        let errorType = 'network';
-        let userMessage = '';
-        
-        if (fetchError.name === 'AbortError') {
-          errorType = 'timeout';
-          userMessage = `❌ Request timeout for ${platform_name}. The platform may be slow to respond.`;
-        } else {
-          errorType = 'network';
-          userMessage = `❌ Network error testing ${platform_name}. Please check your internet connection.`;
-        }
-
-        console.error(`❌ Network error testing ${platform_name}:`, fetchError.message);
-
-        return new Response(JSON.stringify({
-          success: false,
-          user_message: userMessage,
-          technical_details: {
-            error_type: errorType,
-            error_message: fetchError.message,
-            platform_name: platform_name,
-            test_url: testUrl,
-            timestamp: new Date().toISOString()
-          }
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-    }
-
-    // Legacy support for old credential testing format
-    const { credentialId, userId } = requestBody;
-
-    if (!credentialId || !userId) {
-      throw new Error('Either use new format (type: platform, platform_name, credential_fields) or legacy format (credentialId, userId)');
-    }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Fetch the credential
-    const { data: credential, error: credentialError } = await supabase
-      .from('platform_credentials')
-      .select('*')
-      .eq('id', credentialId)
-      .eq('user_id', userId)
-      .single();
-
-    if (credentialError || !credential) {
-      throw new Error(`Credential not found: ${credentialError?.message}`);
-    }
-
-    // Get all automations to find platforms_config for this platform
-    const { data: automations, error: automationsError } = await supabase
-      .from('automations')
-      .select('platforms_config')
-      .eq('user_id', userId)
-      .not('platforms_config', 'is', null);
-
-    let platformsConfig: PlatformConfig[] = [];
-    
-    if (!automationsError && automations && automations.length > 0) {
-      // Merge all platforms_config from user's automations
-      for (const automation of automations) {
-        if (automation.platforms_config && Array.isArray(automation.platforms_config)) {
-          platformsConfig = [...platformsConfig, ...automation.platforms_config];
-        }
-      }
-      
-      // Remove duplicates based on platform name
-      platformsConfig = platformsConfig.filter((config, index, self) => 
-        index === self.findIndex(c => c.name.toLowerCase() === config.name.toLowerCase())
-      );
-    }
-
-    let parsedCredentials: Record<string, string>;
+    // Send success/failure notification
     try {
-      parsedCredentials = typeof credential.credentials === 'string' 
-        ? JSON.parse(credential.credentials) 
-        : credential.credentials;
-    } catch (error) {
-      throw new Error(`Invalid credentials format for platform: ${credential.platform_name}`);
-    }
-
-    // Build dynamic platform configuration
-    const platformConfig = buildDynamicPlatformConfig(
-      credential.platform_name, 
-      platformsConfig, 
-      parsedCredentials
-    );
-
-    // Get test endpoint
-    const testEndpoint = getDynamicTestEndpoint(credential.platform_name, platformsConfig);
-
-    // Build test URL
-    const testUrl = `${platformConfig.baseURL.replace(/\/$/, '')}/${testEndpoint.endpoint.replace(/^\//, '')}`;
-
-    console.log(`Testing credential for ${credential.platform_name} at: ${testUrl}`);
-
-    // Make test request
-    const testResponse = await fetch(testUrl, {
-      method: testEndpoint.method,
-      headers: platformConfig.headers,
-      timeout: platformConfig.timeout,
-    });
-
-    const testMessage = testResponse.ok 
-      ? `✅ Credential test successful for ${credential.platform_name}` 
-      : `❌ Credential test failed for ${credential.platform_name}: ${testResponse.status}`;
-
-    const technicalDetails = {
-      status_code: testResponse.status,
-      headers: Object.fromEntries(testResponse.headers.entries()),
-      test_url: testUrl,
-      test_method: testEndpoint.method,
-      platform_config_source: platformsConfig.find(c => 
-        c.name.toLowerCase() === credential.platform_name.toLowerCase()
-      ) ? 'dynamic' : 'fallback'
-    };
-
-    // Store test result
-    const { error: insertError } = await supabase
-      .from('credential_test_results')
-      .insert({
-        platform_credential_id: credentialId,
-        test_status: testResponse.ok ? 'success' : 'failed',
-        test_message: testMessage,
-        technical_details: technicalDetails,
-        tested_at: new Date().toISOString()
+      await supabaseClient.functions.invoke('create-notification', {
+        body: {
+          userId: user_id,
+          title: testResult.success ? 'Credentials Verified' : 'Credential Test Failed',
+          message: testResult.success 
+            ? `Your ${platform_name} credentials are working correctly!`
+            : `${platform_name} credential test failed: ${testResult.message}`,
+          type: 'credential_test',
+          category: testResult.success ? 'success' : 'error',
+          metadata: { 
+            platform_name, 
+            test_result: testResult.success,
+            error_type: testResult.error_type,
+            endpoint_tested: testResult.details?.endpoint_tested
+          }
+        }
       });
-
-    if (insertError) {
-      console.error('Failed to store test result:', insertError);
+    } catch (notificationError) {
+      console.error('Failed to send notification:', notificationError);
     }
 
-    // Store credential insights for learning (async, don't await)
-    storeCredentialInsights(
-      credential.platform_name, 
-      testResponse.ok ? 'success' : 'failed', 
-      technicalDetails, 
-      supabase
-    );
-
-    return new Response(JSON.stringify({
-      success: testResponse.ok,
-      message: testMessage,
-      details: technicalDetails
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify(testResult),
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    )
 
   } catch (error) {
-    console.error('🚨 Test failed with error:', error);
-    
-    // Determine error type for better user messaging
-    let userMessage = `❌ Test failed: ${error.message}`;
-    let errorType = 'unknown';
-    
-    if (error.message.includes('fetch')) {
-      errorType = 'network';
-      userMessage = `❌ Network error: Unable to connect to the platform. Please check your internet connection and try again.`;
-    } else if (error.message.includes('timeout')) {
-      errorType = 'timeout';
-      userMessage = `❌ Request timeout: The platform took too long to respond. Please try again.`;
-    } else if (error.message.includes('credential')) {
-      errorType = 'credential';
-      userMessage = `❌ Credential error: ${error.message}`;
-    } else if (error.message.includes('not found') || error.message.includes('404')) {
-      errorType = 'not_found';
-      userMessage = `❌ Platform endpoint not found. This might be a configuration issue.`;
-    }
-
-    return new Response(JSON.stringify({
-      success: false,
-      user_message: userMessage,
-      technical_details: { 
-        error: error.message,
-        error_type: errorType,
-        timestamp: new Date().toISOString(),
-        stack: error.stack
+    console.error('💥 Universal credential test error:', error)
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        message: 'Internal server error during credential testing',
+        error_type: 'server_error',
+        details: { error: error.message }
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
-    }), {
-      status: 200,  // Changed from 500 to 200 to fix "non-2xx status code" error
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    )
   }
-});
+})

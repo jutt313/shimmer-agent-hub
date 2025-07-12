@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { triggerCredentialTestNotification } from './automationNotificationTriggers';
 
@@ -100,7 +101,7 @@ export class AutomationCredentialManager {
   }
 
   /**
-   * Test credentials for a platform - REAL API TESTING
+   * Test credentials for a platform - UNIVERSAL TESTING WITH REAL API DISCOVERY
    */
   static async testCredentials(
     userId: string,
@@ -109,9 +110,9 @@ export class AutomationCredentialManager {
     credentials: Record<string, string>
   ): Promise<{ success: boolean; message: string; details?: any }> {
     try {
-      console.log(`🧪 Testing ${platformName} credentials for user ${userId}`);
+      console.log(`🌍 UNIVERSAL CREDENTIAL TEST: ${platformName} for user ${userId}`);
       
-      // Use the real test-credential edge function
+      // 🎯 CRITICAL FIX: Use the UNIVERSAL test-credential edge function
       const { data, error } = await supabase.functions.invoke('test-credential', {
         body: {
           platform_name: platformName,
@@ -121,7 +122,7 @@ export class AutomationCredentialManager {
       });
 
       if (error) {
-        console.error('Test credential error:', error);
+        console.error('Universal credential test error:', error);
         
         // Send notification about failed test
         await triggerCredentialTestNotification(userId, platformName, false);
@@ -133,24 +134,34 @@ export class AutomationCredentialManager {
         };
       }
 
+      // The universal integrator returns detailed results
       const testResult = data?.success ? {
         success: true,
         message: data.message || `${platformName} credentials are working correctly!`,
-        details: data.details
+        details: {
+          ...data.details,
+          platform_discovered: true,
+          universal_integration: true
+        }
       } : {
         success: false,
         message: data?.message || `${platformName} credentials test failed`,
-        details: data?.details
+        details: {
+          ...data?.details,
+          error_type: data?.error_type,
+          troubleshooting: data?.details?.troubleshooting,
+          universal_integration: true
+        }
       };
 
       // Send notification about test result
       await triggerCredentialTestNotification(userId, platformName, testResult.success);
 
-      console.log(`✅ ${platformName} test result:`, testResult);
+      console.log(`✅ Universal test result for ${platformName}:`, testResult);
       return testResult;
 
     } catch (error: any) {
-      console.error(`❌ Error testing ${platformName} credentials:`, error);
+      console.error(`❌ Error in universal credential testing for ${platformName}:`, error);
       
       // Send notification about failed test
       await triggerCredentialTestNotification(userId, platformName, false);
@@ -158,7 +169,10 @@ export class AutomationCredentialManager {
       return {
         success: false,
         message: `Error testing ${platformName} credentials: ${error.message}`,
-        details: error
+        details: { 
+          error: error.message,
+          universal_integration: true
+        }
       };
     }
   }

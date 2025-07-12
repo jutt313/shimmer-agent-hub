@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// 🌍 UNIVERSAL PLATFORM INTEGRATOR - Embedded for zero dependencies
+// UNIVERSAL PLATFORM INTEGRATOR WITH OAUTH2 SUPPORT
 class UniversalPlatformIntegrator {
   private platformConfigs = new Map<string, any>();
 
@@ -41,7 +41,7 @@ class UniversalPlatformIntegrator {
       }
     }
 
-    // If auto-discovery fails, create intelligent fallback configuration
+    // Create intelligent fallback configuration
     console.log(`🔧 Creating intelligent fallback configuration for ${platformName}`);
     return this.createIntelligentFallback(platformName);
   }
@@ -75,21 +75,18 @@ class UniversalPlatformIntegrator {
 
   private createIntelligentFallback(platformName: string): any {
     const lowerPlatform = platformName.toLowerCase();
-    let config: any = {
+    return {
       name: platformName,
       base_url: this.getBaseUrlForPlatform(platformName),
       auth_config: this.getAuthConfigForPlatform(platformName),
       endpoints: {},
       test_endpoint: this.getTestEndpointForPlatform(platformName)
     };
-
-    return config;
   }
 
   private getBaseUrlForPlatform(platformName: string): string {
     const lowerPlatform = platformName.toLowerCase();
     
-    // Platform-specific base URLs
     const platformUrls: Record<string, string> = {
       'slack': 'https://slack.com/api',
       'gmail': 'https://www.googleapis.com/gmail/v1',
@@ -111,37 +108,40 @@ class UniversalPlatformIntegrator {
   private getAuthConfigForPlatform(platformName: string): any {
     const lowerPlatform = platformName.toLowerCase();
     
-    // Platform-specific auth configurations
     const authConfigs: Record<string, any> = {
       'slack': {
         type: 'bearer',
         location: 'header',
         parameter_name: 'Authorization',
-        format: 'Bearer {token}'
+        format: 'Bearer {bot_token}'
       },
       'gmail': {
-        type: 'bearer',
+        type: 'oauth2',
         location: 'header',
         parameter_name: 'Authorization',
-        format: 'Bearer {access_token}'
+        format: 'Bearer {access_token}',
+        oauth2_endpoint: 'https://oauth2.googleapis.com/token'
       },
       'google sheets': {
-        type: 'bearer',
+        type: 'oauth2',
         location: 'header',
         parameter_name: 'Authorization',
-        format: 'Bearer {access_token}'
+        format: 'Bearer {access_token}',
+        oauth2_endpoint: 'https://oauth2.googleapis.com/token'
       },
       'google_sheets': {
-        type: 'bearer',
+        type: 'oauth2',
         location: 'header',
         parameter_name: 'Authorization',
-        format: 'Bearer {access_token}'
+        format: 'Bearer {access_token}',
+        oauth2_endpoint: 'https://oauth2.googleapis.com/token'
       },
       'googlesheets': {
-        type: 'bearer',
+        type: 'oauth2',
         location: 'header',
         parameter_name: 'Authorization',
-        format: 'Bearer {access_token}'
+        format: 'Bearer {access_token}',
+        oauth2_endpoint: 'https://oauth2.googleapis.com/token'
       },
       'trello': {
         type: 'api_key',
@@ -168,7 +168,6 @@ class UniversalPlatformIntegrator {
   private getTestEndpointForPlatform(platformName: string): any {
     const lowerPlatform = platformName.toLowerCase();
     
-    // Platform-specific test endpoints - REAL WORKING ENDPOINTS
     const testEndpoints: Record<string, any> = {
       'slack': {
         method: 'GET',
@@ -182,21 +181,21 @@ class UniversalPlatformIntegrator {
       },
       'google sheets': {
         method: 'GET',
-        path: '/spreadsheets',
-        query_params: { q: 'test' },
-        description: 'List accessible spreadsheets'
+        path: '/spreadsheets/{spreadsheet_id}',
+        description: 'Get Google Sheets spreadsheet details',
+        requires_spreadsheet_id: true
       },
       'google_sheets': {
         method: 'GET',
-        path: '/spreadsheets',
-        query_params: { q: 'test' },
-        description: 'List accessible spreadsheets'
+        path: '/spreadsheets/{spreadsheet_id}',
+        description: 'Get Google Sheets spreadsheet details',
+        requires_spreadsheet_id: true
       },
       'googlesheets': {
         method: 'GET',
-        path: '/spreadsheets',
-        query_params: { q: 'test' },
-        description: 'List accessible spreadsheets'
+        path: '/spreadsheets/{spreadsheet_id}',
+        description: 'Get Google Sheets spreadsheet details',
+        requires_spreadsheet_id: true
       },
       'trello': {
         method: 'GET',
@@ -222,6 +221,49 @@ class UniversalPlatformIntegrator {
     };
   }
 
+  // OAUTH2 TOKEN EXCHANGE
+  async getOAuth2AccessToken(
+    clientId: string,
+    clientSecret: string,
+    oauth2Endpoint: string
+  ): Promise<{ success: boolean; access_token?: string; error?: string }> {
+    try {
+      console.log(`🔑 Exchanging OAuth2 credentials for access token`);
+      
+      const response = await fetch(oauth2Endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'client_credentials',
+          client_id: clientId,
+          client_secret: clientSecret,
+          scope: 'https://www.googleapis.com/auth/spreadsheets.readonly'
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          success: false,
+          error: `OAuth2 token exchange failed: ${response.status} ${errorText}`
+        };
+      }
+
+      const tokenData = await response.json();
+      return {
+        success: true,
+        access_token: tokenData.access_token
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: `OAuth2 token exchange error: ${error.message}`
+      };
+    }
+  }
+
   async testPlatformCredentials(
     platformName: string,
     credentials: Record<string, string>
@@ -239,9 +281,80 @@ class UniversalPlatformIntegrator {
       const testEndpoint = config.test_endpoint;
       const baseUrl = config.base_url;
       
-      // Build test URL
+      // Handle OAuth2 platforms (Google Sheets, Gmail, etc.)
+      let accessToken = '';
+      if (config.auth_config.type === 'oauth2') {
+        if (credentials.client_id && credentials.client_secret) {
+          console.log(`🔑 OAuth2 platform detected, exchanging credentials for access token`);
+          
+          const tokenResult = await this.getOAuth2AccessToken(
+            credentials.client_id,
+            credentials.client_secret,
+            config.auth_config.oauth2_endpoint
+          );
+
+          if (!tokenResult.success) {
+            return {
+              success: false,
+              message: `OAuth2 authentication failed for ${platformName}`,
+              error_type: 'oauth2_error',
+              details: {
+                error: tokenResult.error,
+                troubleshooting: [
+                  `Verify your Client ID and Client Secret are correct`,
+                  `Ensure your Google Cloud Console project has the Sheets API enabled`,
+                  `Check that your service account has proper permissions`
+                ]
+              }
+            };
+          }
+
+          accessToken = tokenResult.access_token!;
+        } else {
+          return {
+            success: false,
+            message: `${platformName} requires Client ID and Client Secret for OAuth2 authentication`,
+            error_type: 'missing_credentials',
+            details: {
+              required_fields: ['client_id', 'client_secret'],
+              provided_fields: Object.keys(credentials),
+              troubleshooting: [
+                `Go to Google Cloud Console`,
+                `Create OAuth2 credentials`,
+                `Enable Google Sheets API`,
+                `Add your credentials to the form`
+              ]
+            }
+          };
+        }
+      }
+
+      // Build test URL with proper endpoint
       let testUrl = `${baseUrl}${testEndpoint.path}`;
       
+      // Handle Google Sheets specific endpoint that requires spreadsheet_id
+      if (testEndpoint.requires_spreadsheet_id) {
+        if (!credentials.spreadsheet_id) {
+          return {
+            success: false,
+            message: `${platformName} requires a Spreadsheet ID for testing`,
+            error_type: 'missing_spreadsheet_id',
+            details: {
+              required_fields: ['spreadsheet_id'],
+              provided_fields: Object.keys(credentials),
+              troubleshooting: [
+                'Open your Google Sheet',
+                'Copy the Spreadsheet ID from the URL',
+                'The ID is the long string between /d/ and /edit in the URL',
+                'Example: https://docs.google.com/spreadsheets/d/SPREADSHEET_ID_HERE/edit'
+              ]
+            }
+          };
+        }
+        
+        testUrl = testUrl.replace('{spreadsheet_id}', credentials.spreadsheet_id);
+      }
+
       // Add query parameters if needed
       if (testEndpoint.query_params) {
         const queryString = new URLSearchParams(testEndpoint.query_params).toString();
@@ -249,7 +362,10 @@ class UniversalPlatformIntegrator {
       }
 
       // Build authentication headers
-      const headers = await this.buildAuthHeaders(config.auth_config, credentials);
+      const headers = await this.buildAuthHeaders(config.auth_config, {
+        ...credentials,
+        access_token: accessToken || credentials.access_token
+      });
 
       console.log(`📡 Testing ${platformName} with URL: ${testUrl}`);
       console.log(`🔐 Using auth headers:`, Object.keys(headers));
@@ -270,6 +386,23 @@ class UniversalPlatformIntegrator {
 
       if (response.ok) {
         console.log(`✅ ${platformName} credentials test SUCCESSFUL`);
+        
+        // Special handling for Google Sheets success response
+        if (platformName.toLowerCase().includes('google') && platformName.toLowerCase().includes('sheet')) {
+          const sheetTitle = responseData.properties?.title || 'Unknown Sheet';
+          return {
+            success: true,
+            message: `Google Sheets connection successful! Connected to: "${sheetTitle}"`,
+            details: {
+              status: response.status,
+              endpoint_tested: testUrl,
+              spreadsheet_title: sheetTitle,
+              spreadsheet_id: credentials.spreadsheet_id,
+              oauth2_success: true
+            }
+          };
+        }
+        
         return {
           success: true,
           message: `${platformName} credentials are working correctly!`,
@@ -284,19 +417,38 @@ class UniversalPlatformIntegrator {
       } else {
         console.error(`❌ ${platformName} credentials test FAILED:`, response.status, responseData);
         
-        // Detailed error analysis
         let errorType = 'unknown_error';
         let helpfulMessage = `${platformName} credentials test failed`;
+        let troubleshooting: string[] = [];
 
         if (response.status === 401) {
           errorType = 'authentication_error';
           helpfulMessage = `${platformName} authentication failed. Please check your credentials.`;
+          troubleshooting = [
+            'Verify your credentials are correct and not expired',
+            'For Google Sheets: Check your Client ID and Client Secret',
+            'Ensure your Google Cloud project has the Sheets API enabled'
+          ];
         } else if (response.status === 403) {
           errorType = 'permission_error';
           helpfulMessage = `${platformName} credentials don't have required permissions.`;
+          troubleshooting = [
+            'Check your account permissions in the platform',
+            'For Google Sheets: Ensure your service account has access to the spreadsheet',
+            'Verify the required scopes are granted'
+          ];
         } else if (response.status === 404) {
-          errorType = 'endpoint_error';
-          helpfulMessage = `${platformName} API endpoint not found. Platform may have changed.`;
+          errorType = 'resource_not_found';
+          if (platformName.toLowerCase().includes('google') && platformName.toLowerCase().includes('sheet')) {
+            helpfulMessage = `Google Sheets spreadsheet not found. Please check your Spreadsheet ID.`;
+            troubleshooting = [
+              'Verify the Spreadsheet ID is correct',
+              'Ensure the spreadsheet exists and is accessible',
+              'Check that your service account has permission to access this specific sheet'
+            ];
+          } else {
+            helpfulMessage = `${platformName} API endpoint not found. Platform may have changed.`;
+          }
         } else if (response.status >= 500) {
           errorType = 'server_error';
           helpfulMessage = `${platformName} server error. Try again later.`;
@@ -310,7 +462,7 @@ class UniversalPlatformIntegrator {
             status: response.status,
             endpoint_tested: testUrl,
             error_response: responseData,
-            troubleshooting: this.getTroubleshootingTips(platformName, errorType)
+            troubleshooting
           }
         };
       }
@@ -323,7 +475,11 @@ class UniversalPlatformIntegrator {
         error_type: 'connection_error',
         details: {
           error: error.message,
-          troubleshooting: this.getTroubleshootingTips(platformName, 'connection_error')
+          troubleshooting: [
+            'Check your internet connection',
+            `Verify ${platformName} service is operational`,
+            'Try testing your credentials again in a few minutes'
+          ]
         }
       };
     }
@@ -340,7 +496,18 @@ class UniversalPlatformIntegrator {
       case 'bearer':
         const token = credentials.access_token || credentials.token || credentials.api_key || credentials.bot_token;
         if (token) {
-          headers[authConfig.parameter_name] = authConfig.format.replace('{token}', token).replace('{access_token}', token).replace('{api_key}', token);
+          headers[authConfig.parameter_name] = authConfig.format
+            .replace('{token}', token)
+            .replace('{access_token}', token)
+            .replace('{api_key}', token)
+            .replace('{bot_token}', token);
+        }
+        break;
+        
+      case 'oauth2':
+        const oauthToken = credentials.access_token;
+        if (oauthToken) {
+          headers[authConfig.parameter_name] = authConfig.format.replace('{access_token}', oauthToken);
         }
         break;
         
@@ -362,30 +529,6 @@ class UniversalPlatformIntegrator {
     }
 
     return headers;
-  }
-
-  private getTroubleshootingTips(platformName: string, errorType: string): string[] {
-    const tips: string[] = [];
-    
-    switch (errorType) {
-      case 'authentication_error':
-        tips.push(`Verify your ${platformName} credentials are correct and not expired`);
-        tips.push(`Check if you're using the right credential type (API key, OAuth token, etc.)`);
-        break;
-      case 'permission_error':
-        tips.push(`Ensure your ${platformName} credentials have the required permissions/scopes`);
-        tips.push(`Check your account settings in ${platformName}`);
-        break;
-      case 'connection_error':
-        tips.push(`Check your internet connection`);
-        tips.push(`Verify ${platformName} service is operational`);
-        break;
-      default:
-        tips.push(`Check ${platformName} documentation for credential requirements`);
-        tips.push(`Try regenerating your credentials`);
-    }
-    
-    return tips;
   }
 
   // Helper methods for OpenAPI parsing
@@ -444,14 +587,7 @@ class UniversalPlatformIntegrator {
       }
     }
 
-    // Fallback to first GET endpoint
-    for (const [name, endpoint] of Object.entries(endpoints)) {
-      if (endpoint.method === 'GET') {
-        return endpoint;
-      }
-    }
-
-    // Ultimate fallback
+    // Fallback to platform-specific test endpoint
     return this.getTestEndpointForPlatform(platformName);
   }
 }
@@ -490,7 +626,7 @@ serve(async (req) => {
 
     console.log(`🚀 UNIVERSAL CREDENTIAL TEST: ${platform_name} for user ${user_id}`);
 
-    // 🌍 USE UNIVERSAL PLATFORM INTEGRATOR - NO MORE HARDCODED ENDPOINTS!
+    // USE UNIVERSAL PLATFORM INTEGRATOR WITH OAUTH2 SUPPORT
     const universalIntegrator = new UniversalPlatformIntegrator();
     
     const testResult = await universalIntegrator.testPlatformCredentials(

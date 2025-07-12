@@ -6,13 +6,244 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// AUTOMATION-SPECIFIC CREDENTIAL EXECUTOR - CONNECTED TO UNIVERSAL INTEGRATOR
-class AutomationSpecificExecutor {
+// TRUE UNIVERSAL PLATFORM INTEGRATOR FOR AUTOMATION EXECUTION
+class TrueUniversalExecutionIntegrator {
+  private platformConfigs = new Map<string, any>();
+
+  async discoverPlatform(platformName: string): Promise<any> {
+    console.log(`🔍 EXECUTION: TRUE UNIVERSAL DISCOVERY for ${platformName}`);
+
+    // Real OpenAPI spec discovery
+    const possibleUrls = [
+      `https://api.${platformName.toLowerCase()}.com/openapi.json`,
+      `https://api.${platformName.toLowerCase()}.com/swagger.json`,
+      `https://${platformName.toLowerCase()}.com/api/docs/openapi.json`,
+      `https://developers.${platformName.toLowerCase()}.com/openapi.json`
+    ];
+
+    for (const url of possibleUrls) {
+      try {
+        console.log(`📡 EXECUTION: Fetching API spec from: ${url}`);
+        const response = await fetch(url);
+        
+        if (response.ok) {
+          const spec = await response.json();
+          const config = this.parseOpenAPISpec(platformName, spec);
+          this.platformConfigs.set(platformName.toLowerCase(), config);
+          
+          console.log(`✅ EXECUTION: Platform ${platformName} discovered via OpenAPI`);
+          return config;
+        }
+      } catch (error: any) {
+        console.log(`⚠️ EXECUTION: Failed to fetch from ${url}:`, error.message);
+      }
+    }
+
+    console.log(`🔧 EXECUTION: Creating zero-hardcode config for ${platformName}`);
+    return this.createZeroHardcodeConfig(platformName);
+  }
+
+  private parseOpenAPISpec(platformName: string, spec: any): any {
+    const baseUrl = spec.servers?.[0]?.url || this.inferBaseUrl(platformName);
+    const endpoints: Record<string, any> = {};
+
+    Object.entries(spec.paths || {}).forEach(([path, methods]: [string, any]) => {
+      Object.entries(methods).forEach(([method, details]: [string, any]) => {
+        const endpointName = this.generateEndpointName(path, method);
+        endpoints[endpointName] = {
+          method: method.toUpperCase(),
+          path: path,
+          required_params: this.extractRequiredParams(details.parameters || []),
+          optional_params: this.extractOptionalParams(details.parameters || []),
+          response_schema: details.responses?.['200'] || {}
+        };
+      });
+    });
+
+    return {
+      name: platformName,
+      base_url: baseUrl,
+      auth_config: this.detectAuthConfig(spec),
+      endpoints
+    };
+  }
+
+  private createZeroHardcodeConfig(platformName: string): any {
+    return {
+      name: platformName,
+      base_url: this.inferBaseUrl(platformName),
+      auth_config: this.inferAuthConfig(platformName),
+      endpoints: {
+        'universal_call': {
+          method: 'POST',
+          path: '/api/v1/execute',
+          required_params: [],
+          optional_params: [],
+          response_schema: {}
+        }
+      }
+    };
+  }
+
+  private inferBaseUrl(platformName: string): string {
+    return `https://api.${platformName.toLowerCase()}.com`;
+  }
+
+  private inferAuthConfig(platformName: string): any {
+    return {
+      type: 'bearer',
+      location: 'header',
+      parameter_name: 'Authorization',
+      format: 'Bearer {access_token}'
+    };
+  }
+
+  async callPlatformAPI(
+    platformName: string, 
+    endpointName: string, 
+    parameters: Record<string, any>, 
+    credentials: Record<string, string>
+  ): Promise<any> {
+    console.log(`🚀 EXECUTION: TRUE UNIVERSAL API CALL: ${platformName}.${endpointName}`);
+
+    let config = this.platformConfigs.get(platformName.toLowerCase());
+    
+    if (!config) {
+      console.log(`🔍 EXECUTION: Platform ${platformName} not configured, discovering...`);
+      config = await this.discoverPlatform(platformName);
+    }
+
+    const endpoint = config.endpoints[endpointName] || config.endpoints['universal_call'];
+    const baseUrl = config.base_url;
+    
+    // Build request URL
+    let url = baseUrl + endpoint.path;
+
+    // Replace path parameters
+    Object.entries(parameters).forEach(([key, value]) => {
+      url = url.replace(`{${key}}`, encodeURIComponent(String(value)));
+    });
+
+    // Build headers with authentication
+    const headers = await this.buildAuthHeaders(config.auth_config, credentials);
+
+    // Build request options
+    const requestOptions: RequestInit = {
+      method: endpoint.method,
+      headers,
+    };
+
+    // Add body for POST/PUT/PATCH requests
+    if (['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
+      requestOptions.body = JSON.stringify(parameters);
+    } else if (endpoint.method === 'GET') {
+      // Add query parameters for GET requests
+      const queryParams = new URLSearchParams();
+      Object.entries(parameters).forEach(([key, value]) => {
+        if (!url.includes(`{${key}}`)) {
+          queryParams.append(key, String(value));
+        }
+      });
+      if (queryParams.toString()) {
+        url += '?' + queryParams.toString();
+      }
+    }
+
+    console.log(`📡 EXECUTION: Making ${endpoint.method} request to: ${url}`);
+
+    try {
+      const response = await fetch(url, requestOptions);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`TRUE UNIVERSAL API call failed: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log(`✅ EXECUTION: TRUE UNIVERSAL API call successful for ${platformName}`);
+      
+      return result;
+    } catch (error) {
+      console.error(`❌ EXECUTION: TRUE UNIVERSAL API call failed:`, error);
+      throw error;
+    }
+  }
+
+  private async buildAuthHeaders(authConfig: any, credentials: Record<string, string>): Promise<Record<string, string>> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'YusrAI-True-Universal-Execution/3.0'
+    };
+
+    switch (authConfig.type) {
+      case 'bearer':
+        const token = credentials.access_token || credentials.token || credentials.api_key;
+        if (token) {
+          headers[authConfig.parameter_name] = authConfig.format
+            .replace('{token}', token)
+            .replace('{access_token}', token)
+            .replace('{api_key}', token);
+        }
+        break;
+        
+      case 'api_key':
+        const apiKey = credentials.api_key || credentials.key;
+        if (apiKey && authConfig.location === 'header') {
+          headers[authConfig.parameter_name] = authConfig.format
+            .replace('{api_key}', apiKey)
+            .replace('{token}', apiKey);
+        }
+        break;
+    }
+
+    return headers;
+  }
+
+  // Helper methods
+  private detectAuthConfig(spec: any): any {
+    const securitySchemes = spec.components?.securitySchemes;
+    
+    if (securitySchemes) {
+      const firstScheme = Object.values(securitySchemes)[0] as any;
+      
+      if (firstScheme?.type === 'http' && firstScheme?.scheme === 'bearer') {
+        return {
+          type: 'bearer',
+          location: 'header',
+          parameter_name: 'Authorization',
+          format: 'Bearer {token}'
+        };
+      }
+    }
+
+    return {
+      type: 'bearer',
+      location: 'header',
+      parameter_name: 'Authorization',
+      format: 'Bearer {token}'
+    };
+  }
+
+  private generateEndpointName(path: string, method: string): string {
+    return `${method.toLowerCase()}_${path.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '')}`;
+  }
+
+  private extractRequiredParams(parameters: any[]): string[] {
+    return parameters.filter(p => p.required).map(p => p.name);
+  }
+
+  private extractOptionalParams(parameters: any[]): string[] {
+    return parameters.filter(p => !p.required).map(p => p.name);
+  }
+}
+
+// CLEAN AUTOMATION EXECUTOR - NO HARDCODED PLATFORM LOGIC
+class CleanAutomationExecutor {
   private context: any;
   private blueprint: any;
   private automationCredentials: Record<string, Record<string, string>> = {};
   private supabaseClient: any;
-  private universalIntegrator: any;
+  private universalIntegrator: TrueUniversalExecutionIntegrator;
 
   constructor(blueprint: any, runId: string, userId: string, automationId: string, supabaseClient: any) {
     this.blueprint = blueprint;
@@ -26,14 +257,13 @@ class AutomationSpecificExecutor {
       logs: []
     };
     
-    // 🎯 CRITICAL FIX: Initialize REAL Universal Platform Integrator
-    this.universalIntegrator = new UniversalPlatformIntegrator();
-    console.log('🌍 AutomationSpecificExecutor now using UNIVERSAL PLATFORM INTEGRATOR');
+    this.universalIntegrator = new TrueUniversalExecutionIntegrator();
+    console.log('🌍 CleanAutomationExecutor using TRUE UNIVERSAL PLATFORM INTEGRATOR');
   }
 
   async execute(): Promise<{ success: boolean; result?: any; error?: string }> {
     try {
-      console.log('🚀 Starting AUTOMATION-SPECIFIC credential execution for blueprint:', this.blueprint.description);
+      console.log('🚀 Starting CLEAN automation execution:', this.blueprint.description);
       
       await this.loadAutomationCredentials();
       
@@ -70,17 +300,17 @@ class AutomationSpecificExecutor {
         }
       }
       
-      console.log('✅ AUTOMATION-SPECIFIC execution completed successfully');
+      console.log('✅ CLEAN automation execution completed successfully');
       return { success: true, result: this.context.variables };
       
     } catch (error: any) {
-      console.error('💥 Automation execution failed:', error);
+      console.error('💥 Clean automation execution failed:', error);
       return { success: false, error: error.message };
     }
   }
 
   private async loadAutomationCredentials(): Promise<void> {
-    console.log('🔑 Loading AUTOMATION-SPECIFIC credentials...');
+    console.log('🔑 Loading automation credentials...');
     
     const { data: credentials, error } = await this.supabaseClient
       .from('automation_platform_credentials')
@@ -98,13 +328,13 @@ class AutomationSpecificExecutor {
       try {
         const decryptedCreds = JSON.parse(cred.credentials);
         this.automationCredentials[cred.platform_name.toLowerCase()] = decryptedCreds;
-        console.log(`✅ Loaded AUTOMATION-SPECIFIC credentials for: ${cred.platform_name}`);
+        console.log(`✅ Loaded credentials for: ${cred.platform_name}`);
       } catch (e) {
         console.error(`Failed to parse credentials for ${cred.platform_name}:`, e);
       }
     });
 
-    console.log('🔑 Loaded AUTOMATION-SPECIFIC credentials for platforms:', Object.keys(this.automationCredentials));
+    console.log('🔑 Loaded credentials for platforms:', Object.keys(this.automationCredentials));
   }
 
   private async executeStep(step: any): Promise<void> {
@@ -133,7 +363,7 @@ class AutomationSpecificExecutor {
     this.logStep(step.id, 'completed', `Completed step: ${step.name}`);
   }
 
-  // 🎯 CRITICAL: AUTOMATION-SPECIFIC CREDENTIAL USAGE WITH UNIVERSAL DISCOVERY
+  // 100% ROUTING THROUGH TRUE UNIVERSAL INTEGRATOR
   private async executeUniversalAction(step: any): Promise<void> {
     const { action } = step;
     if (!action) throw new Error('Action configuration missing');
@@ -142,18 +372,17 @@ class AutomationSpecificExecutor {
     const method = action.method;
     const parameters = this.resolveVariables(action.parameters);
 
-    console.log(`🌍 UNIVERSAL AUTOMATION EXECUTION: ${platformName}.${method}`, parameters);
+    console.log(`🌍 TRUE UNIVERSAL EXECUTION: ${platformName}.${method}`, parameters);
 
-    // Use AUTOMATION-SPECIFIC credentials
     const platformCreds = this.automationCredentials[platformName];
     if (!platformCreds) {
-      throw new Error(`No AUTOMATION-SPECIFIC credentials found for platform: ${platformName}`);
+      throw new Error(`No credentials found for platform: ${platformName}`);
     }
 
-    console.log(`🔐 Using AUTOMATION-SPECIFIC credentials for ${platformName} with UNIVERSAL discovery`);
+    console.log(`🔐 Using credentials for ${platformName} with TRUE UNIVERSAL discovery`);
 
     try {
-      // 🎯 CRITICAL FIX: Use UNIVERSAL platform integrator instead of hardcoded logic
+      // 100% ROUTING THROUGH TRUE UNIVERSAL INTEGRATOR
       const result = await this.universalIntegrator.callPlatformAPI(
         platformName,
         method,
@@ -161,15 +390,14 @@ class AutomationSpecificExecutor {
         platformCreds
       );
 
-      console.log(`✅ UNIVERSAL AUTOMATION API CALL SUCCESS for ${platformName}.${method}:`, result);
+      console.log(`✅ TRUE UNIVERSAL API SUCCESS for ${platformName}.${method}:`, result);
 
-      // Store result in output variable if specified
       if (action.output_variable) {
         this.context.variables[action.output_variable] = result;
       }
 
     } catch (error: any) {
-      console.error(`❌ UNIVERSAL AUTOMATION API CALL FAILED for ${platformName}.${method}:`, error);
+      console.error(`❌ TRUE UNIVERSAL API FAILED for ${platformName}.${method}:`, error);
       throw error;
     }
   }
@@ -354,492 +582,89 @@ class AutomationSpecificExecutor {
   }
 }
 
-// 🌍 UNIVERSAL PLATFORM INTEGRATOR - EMBEDDED FOR AUTOMATION EXECUTION
-class UniversalPlatformIntegrator {
-  private platformConfigs = new Map<string, any>();
-
-  async discoverPlatform(platformName: string): Promise<any> {
-    console.log(`🔍 AUTOMATION: Discovering platform: ${platformName}`);
-
-    // Try to fetch OpenAPI spec from common locations
-    const possibleUrls = [
-      `https://api.${platformName.toLowerCase()}.com/openapi.json`,
-      `https://api.${platformName.toLowerCase()}.com/swagger.json`,
-      `https://${platformName.toLowerCase()}.com/api/docs/openapi.json`,
-      `https://developers.${platformName.toLowerCase()}.com/openapi.json`
-    ];
-
-    for (const url of possibleUrls) {
-      try {
-        console.log(`📡 AUTOMATION: Attempting to fetch API spec from: ${url}`);
-        const response = await fetch(url);
-        
-        if (response.ok) {
-          const spec = await response.json();
-          const config = this.parseOpenAPISpec(platformName, spec);
-          this.platformConfigs.set(platformName.toLowerCase(), config);
-          
-          console.log(`✅ AUTOMATION: Platform ${platformName} discovered dynamically`);
-          return config;
-        }
-      } catch (error: any) {
-        console.log(`⚠️ AUTOMATION: Failed to fetch from ${url}:`, error.message);
-      }
-    }
-
-    console.log(`🔧 AUTOMATION: Creating intelligent fallback for ${platformName}`);
-    return this.createIntelligentConfig(platformName);
-  }
-
-  private parseOpenAPISpec(platformName: string, spec: any): any {
-    const baseUrl = spec.servers?.[0]?.url || this.getBaseUrlForPlatform(platformName);
-    const endpoints: Record<string, any> = {};
-
-    Object.entries(spec.paths || {}).forEach(([path, methods]: [string, any]) => {
-      Object.entries(methods).forEach(([method, details]: [string, any]) => {
-        const endpointName = this.generateEndpointName(path, method);
-        endpoints[endpointName] = {
-          method: method.toUpperCase(),
-          path: path,
-          required_params: this.extractRequiredParams(details.parameters || []),
-          optional_params: this.extractOptionalParams(details.parameters || []),
-          response_schema: details.responses?.['200'] || {}
-        };
-      });
-    });
-
-    return {
-      name: platformName,
-      base_url: baseUrl,
-      auth_config: this.detectAuthConfig(spec),
-      endpoints
-    };
-  }
-
-  private createIntelligentConfig(platformName: string): any {
-    return {
-      name: platformName,
-      base_url: this.getBaseUrlForPlatform(platformName),
-      auth_config: this.getAuthConfigForPlatform(platformName),
-      endpoints: {
-        'universal_call': {
-          method: 'POST',
-          path: '/api/v1/execute',
-          required_params: [],
-          optional_params: [],
-          response_schema: {}
-        }
-      }
-    };
-  }
-
-  private getBaseUrlForPlatform(platformName: string): string {
-    const lowerPlatform = platformName.toLowerCase();
-    
-    const platformUrls: Record<string, string> = {
-      'slack': 'https://slack.com/api',
-      'gmail': 'https://www.googleapis.com/gmail/v1',
-      'google sheets': 'https://sheets.googleapis.com/v4',
-      'google_sheets': 'https://sheets.googleapis.com/v4',
-      'googlesheets': 'https://sheets.googleapis.com/v4',
-      'trello': 'https://api.trello.com/1',
-      'notion': 'https://api.notion.com/v1',
-      'openai': 'https://api.openai.com/v1'
-    };
-
-    return platformUrls[lowerPlatform] || `https://api.${lowerPlatform}.com`;
-  }
-
-  private getAuthConfigForPlatform(platformName: string): any {
-    const lowerPlatform = platformName.toLowerCase();
-    
-    const authConfigs: Record<string, any> = {
-      'slack': {
-        type: 'bearer',
-        location: 'header',
-        parameter_name: 'Authorization',
-        format: 'Bearer {bot_token}'
-      },
-      'gmail': {
-        type: 'bearer',
-        location: 'header',
-        parameter_name: 'Authorization',
-        format: 'Bearer {access_token}'
-      },
-      'google sheets': {
-        type: 'bearer',
-        location: 'header',
-        parameter_name: 'Authorization',
-        format: 'Bearer {access_token}'
-      },
-      'google_sheets': {
-        type: 'bearer',
-        location: 'header',
-        parameter_name: 'Authorization',
-        format: 'Bearer {access_token}'
-      },
-      'googlesheets': {
-        type: 'bearer',
-        location: 'header',
-        parameter_name: 'Authorization',
-        format: 'Bearer {access_token}'
-      }
-    };
-
-    return authConfigs[lowerPlatform] || {
-      type: 'bearer',
-      location: 'header',
-      parameter_name: 'Authorization',
-      format: 'Bearer {token}'
-    };
-  }
-
-  async callPlatformAPI(platformName: string, endpointName: string, parameters: Record<string, any>, credentials: Record<string, string>): Promise<any> {
-    console.log(`🚀 AUTOMATION: UNIVERSAL API CALL: ${platformName}.${endpointName}`);
-
-    let config = this.platformConfigs.get(platformName.toLowerCase());
-    
-    if (!config) {
-      console.log(`🔍 AUTOMATION: Platform ${platformName} not configured, discovering...`);
-      config = await this.discoverPlatform(platformName);
-    }
-
-    const endpoint = config.endpoints[endpointName] || config.endpoints['universal_call'];
-    if (!endpoint) {
-      throw new Error(`Endpoint ${endpointName} not found for platform ${platformName}`);
-    }
-
-    const baseUrl = config.base_url;
-    let url = baseUrl + endpoint.path;
-
-    Object.entries(parameters).forEach(([key, value]) => {
-      url = url.replace(`{${key}}`, encodeURIComponent(String(value)));
-    });
-
-    const headers = await this.buildAuthHeaders(config.auth_config, credentials);
-
-    const requestOptions: RequestInit = {
-      method: endpoint.method,
-      headers,
-    };
-
-    if (['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
-      requestOptions.body = JSON.stringify(parameters);
-    } else if (endpoint.method === 'GET') {
-      const queryParams = new URLSearchParams();
-      Object.entries(parameters).forEach(([key, value]) => {
-        if (!url.includes(`{${key}}`)) {
-          queryParams.append(key, String(value));
-        }
-      });
-      if (queryParams.toString()) {
-        url += '?' + queryParams.toString();
-      }
-    }
-
-    console.log(`📡 AUTOMATION: Making UNIVERSAL ${endpoint.method} request to: ${url}`);
-
-    const response = await fetch(url, requestOptions);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`AUTOMATION UNIVERSAL API call failed: ${response.status} ${response.statusText} - ${errorText}`);
-    }
-
-    const result = await response.json();
-    console.log(`✅ AUTOMATION: UNIVERSAL API call successful for ${platformName}`);
-    
-    return result;
-  }
-
-  private async buildAuthHeaders(authConfig: any, credentials: Record<string, string>): Promise<Record<string, string>> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'User-Agent': 'YusrAI-Universal-Automation/2.0'
-    };
-
-    switch (authConfig.type) {
-      case 'bearer':
-        const token = credentials.access_token || credentials.token || credentials.api_key || credentials.bot_token;
-        if (token) {
-          headers[authConfig.parameter_name] = authConfig.format
-            .replace('{token}', token)
-            .replace('{access_token}', token)
-            .replace('{api_key}', token)
-            .replace('{bot_token}', token);
-        }
-        break;
-        
-      case 'api_key':
-        const apiKey = credentials.api_key || credentials.key;
-        if (apiKey) {
-          if (authConfig.location === 'header') {
-            headers[authConfig.parameter_name] = authConfig.format.replace('{api_key}', apiKey).replace('{token}', apiKey);
-          }
-        }
-        break;
-        
-      case 'basic':
-        const username = credentials.username;
-        const password = credentials.password;
-        if (username && password) {
-          const basicAuth = btoa(`${username}:${password}`);
-          headers['Authorization'] = `Basic ${basicAuth}`;
-        }
-        break;
-    }
-
-    return headers;
-  }
-
-  // Helper methods
-  private generateEndpointName(path: string, method: string): string {
-    return `${method.toLowerCase()}_${path.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '')}`;
-  }
-
-  private extractRequiredParams(parameters: any[]): string[] {
-    return parameters.filter(p => p.required).map(p => p.name);
-  }
-
-  private extractOptionalParams(parameters: any[]): string[] {
-    return parameters.filter(p => !p.required).map(p => p.name);
-  }
-
-  private detectAuthConfig(spec: any): any {
-    const securitySchemes = spec.components?.securitySchemes;
-    
-    if (securitySchemes) {
-      const firstScheme = Object.values(securitySchemes)[0] as any;
-      
-      if (firstScheme?.type === 'http' && firstScheme?.scheme === 'bearer') {
-        return {
-          type: 'bearer',
-          location: 'header',
-          parameter_name: 'Authorization',
-          format: 'Bearer {token}'
-        };
-      } else if (firstScheme?.type === 'apiKey') {
-        return {
-          type: 'api_key',
-          location: firstScheme.in,
-          parameter_name: firstScheme.name,
-          format: '{token}'
-        };
-      }
-    }
-
-    return {
-      type: 'bearer',
-      location: 'header',
-      parameter_name: 'Authorization',
-      format: 'Bearer {token}'
-    };
-  }
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseClient = createClient(
+    const { automation_id, trigger_data, user_id } = await req.json();
+
+    console.log('🚀 CLEAN AUTOMATION EXECUTION started:', { automation_id, user_id });
+
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    )
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
-    const { automation_id, trigger_data } = await req.json()
-
-    if (!automation_id) {
-      return new Response(
-        JSON.stringify({ error: 'Missing automation_id' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    const { data: automation, error: automationError } = await supabaseClient
+    // Get automation blueprint
+    const { data: automation, error: automationError } = await supabase
       .from('automations')
-      .select('id, title, user_id, automation_blueprint')
+      .select('*')
       .eq('id', automation_id)
-      .single()
+      .eq('user_id', user_id)
+      .single();
 
     if (automationError || !automation) {
-      console.error('Error fetching automation:', automationError)
-      return new Response(
-        JSON.stringify({ error: 'Automation not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      throw new Error(`Automation not found: ${automation_id}`);
     }
 
-    if (!automation.automation_blueprint) {
-      return new Response(
-        JSON.stringify({ error: 'Automation blueprint not configured' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    // Create run record
+    const { data: run, error: runError } = await supabase
+      .from('automation_runs')
+      .insert({
+        automation_id: automation_id,
+        user_id: user_id,
+        status: 'running',
+        trigger_data: trigger_data
+      })
+      .select()
+      .single();
+
+    if (runError || !run) {
+      throw new Error(`Failed to create run record: ${runError?.message}`);
     }
 
-    const runId = crypto.randomUUID()
-    const startTime = new Date()
+    // Execute automation with CLEAN executor
+    const executor = new CleanAutomationExecutor(
+      automation.automation_blueprint,
+      run.id,
+      user_id,
+      automation_id,
+      supabase
+    );
 
-    try {
-      await supabaseClient.functions.invoke('create-notification', {
-        body: {
-          userId: automation.user_id,
-          title: 'Automation Started',
-          message: `Your automation "${automation.title}" has started running with UNIVERSAL PLATFORM INTEGRATION.`,
-          type: 'automation_status',
-          category: 'execution',
-          metadata: { automation_id: automation.id, run_id: runId, universal_integration: true }
+    const result = await executor.execute();
+
+    // Update run status
+    await supabase
+      .from('automation_runs')
+      .update({
+        status: result.success ? 'completed' : 'failed',
+        details_log: {
+          ...run.details_log,
+          completed_at: new Date().toISOString(),
+          final_result: result,
+          execution_type: 'clean_universal'
         }
-      });
+      })
+      .eq('id', run.id);
 
-      const { data: run, error: runError } = await supabaseClient
-        .from('automation_runs')
-        .insert([
-          {
-            id: runId,
-            automation_id: automation_id,
-            user_id: automation.user_id,
-            status: 'running',
-            trigger_data: trigger_data || {},
-            run_timestamp: startTime.toISOString(),
-            details_log: {
-              started_at: startTime.toISOString(),
-              steps: []
-            }
-          }
-        ])
-        .select()
-        .single()
+    console.log('✅ CLEAN AUTOMATION EXECUTION completed:', result);
 
-      if (runError) {
-        console.error('Error creating automation run:', runError)
-        throw runError
-      }
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
 
-      console.log(`🚀 Starting UNIVERSAL AUTOMATION execution for: ${automation.title}`)
-      
-      // 🎯 CRITICAL: USING UNIVERSAL PLATFORM INTEGRATION
-      const executor = new AutomationSpecificExecutor(
-        automation.automation_blueprint,
-        runId,
-        automation.user_id,
-        automation.id,
-        supabaseClient
-      );
-
-      const executionResult = await executor.execute();
-      
-      const endTime = new Date()
-      const duration = endTime.getTime() - startTime.getTime()
-
-      if (executionResult.success) {
-        await supabaseClient
-          .from('automation_runs')
-          .update({
-            status: 'completed',
-            duration_ms: duration,
-            details_log: {
-              started_at: startTime.toISOString(),
-              completed_at: endTime.toISOString(),
-              result: executionResult.result,
-              success: true,
-              execution_type: 'UNIVERSAL PLATFORM INTEGRATION'
-            }
-          })
-          .eq('id', runId)
-
-        await supabaseClient.functions.invoke('create-notification', {
-          body: {
-            userId: automation.user_id,
-            title: 'Automation Completed',
-            message: `Your automation "${automation.title}" completed successfully with universal platform integration.`,
-            type: 'automation_status',
-            category: 'execution',
-            metadata: { automation_id: automation.id, run_id: runId, duration_ms: duration, universal_integration: true }
-          }
-        });
-
-        console.log(`✅ UNIVERSAL AUTOMATION execution completed: ${automation.title}`)
-
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            run_id: runId,
-            status: 'completed',
-            duration_ms: duration,
-            automation_title: automation.title,
-            execution_result: executionResult.result,
-            execution_type: 'UNIVERSAL PLATFORM INTEGRATION'
-          }),
-          { 
-            status: 200, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        )
-      } else {
-        throw new Error(executionResult.error || 'Unknown execution error');
-      }
-
-    } catch (executionError) {
-      console.error('💥 Error during UNIVERSAL AUTOMATION execution:', executionError)
-      
-      const endTime = new Date()
-      const duration = endTime.getTime() - startTime.getTime()
-      
-      await supabaseClient
-        .from('automation_runs')
-        .update({
-          status: 'failed',
-          duration_ms: duration,
-          details_log: {
-            started_at: startTime.toISOString(),
-            failed_at: endTime.toISOString(),
-            error: executionError.message,
-            success: false,
-            execution_type: 'UNIVERSAL PLATFORM INTEGRATION'
-          }
-        })
-        .eq('id', runId)
-
-      await supabaseClient.functions.invoke('create-notification', {
-        body: {
-          userId: automation.user_id,
-          title: 'Automation Failed',
-          message: `Your automation "${automation.title}" failed: ${executionError.message}`,
-          type: 'automation_status',
-          category: 'error',
-          metadata: { automation_id: automation.id, run_id: runId, error: executionError.message }
-        }
-      });
-
-      return new Response(
-        JSON.stringify({ 
-          error: 'UNIVERSAL AUTOMATION execution failed',
-          run_id: runId,
-          details: executionError.message
-        }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
-  } catch (error) {
-    console.error('Error in execute-automation function:', error)
+  } catch (error: any) {
+    console.error('❌ CLEAN AUTOMATION EXECUTION failed:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    )
+      JSON.stringify({ 
+        success: false, 
+        error: error.message,
+        execution_type: 'clean_universal'
+      }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
-})
+});

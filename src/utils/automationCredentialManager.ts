@@ -1,5 +1,4 @@
 import { supabase } from '@/integrations/supabase/client';
-import { triggerCredentialTestNotification } from './automationNotificationTriggers';
 
 export interface AutomationCredential {
   id: string;
@@ -13,6 +12,7 @@ export interface AutomationCredential {
   test_message?: string;
 }
 
+// CLEAN CREDENTIAL MANAGER - NO MORE HARDCODED VALIDATION
 export class AutomationCredentialManager {
   /**
    * Save credentials for a specific automation (ONLY after successful test)
@@ -30,11 +30,11 @@ export class AutomationCredentialManager {
           automation_id: automationId,
           user_id: userId,
           platform_name: platformName.toLowerCase(),
-          credential_type: 'oauth2', // Updated to support OAuth2
+          credential_type: 'oauth2',
           credentials: JSON.stringify(credentials),
           is_active: true,
-          is_tested: true, // Only save if tested
-          test_status: 'success' // Only save if test passed
+          is_tested: true,
+          test_status: 'success'
         }, {
           onConflict: 'automation_id,platform_name'
         });
@@ -100,7 +100,7 @@ export class AutomationCredentialManager {
   }
 
   /**
-   * Test credentials for a platform - ENHANCED WITH OAUTH2 SUPPORT
+   * Test credentials using TRUE UNIVERSAL test-credential function
    */
   static async testCredentials(
     userId: string,
@@ -109,50 +109,9 @@ export class AutomationCredentialManager {
     credentials: Record<string, string>
   ): Promise<{ success: boolean; message: string; details?: any }> {
     try {
-      console.log(`🌍 ENHANCED CREDENTIAL TEST: ${platformName} for user ${userId}`);
+      console.log(`🌍 TRUE UNIVERSAL CREDENTIAL TEST: ${platformName} for user ${userId}`);
       
-      // Validate required credentials for OAuth2 platforms
-      if (platformName.toLowerCase().includes('google')) {
-        const requiredFields = ['client_id', 'client_secret'];
-        const missingFields = requiredFields.filter(field => !credentials[field]);
-        
-        if (missingFields.length > 0) {
-          return {
-            success: false,
-            message: `Missing required fields for ${platformName}: ${missingFields.join(', ')}`,
-            details: {
-              error_type: 'missing_credentials',
-              required_fields: requiredFields,
-              missing_fields: missingFields,
-              troubleshooting: [
-                'Go to Google Cloud Console',
-                'Create OAuth2 credentials (not API key)',
-                'Enable Google Sheets API',
-                'Download the credentials JSON file',
-                'Use the client_id and client_secret from that file'
-              ]
-            }
-          };
-        }
-
-        if (platformName.toLowerCase().includes('sheet') && !credentials.spreadsheet_id) {
-          return {
-            success: false,
-            message: `Google Sheets requires a Spreadsheet ID for testing`,
-            details: {
-              error_type: 'missing_spreadsheet_id',
-              troubleshooting: [
-                'Open your Google Sheet in a browser',
-                'Copy the Spreadsheet ID from the URL',
-                'The ID is the long string between /d/ and /edit',
-                'Example: https://docs.google.com/spreadsheets/d/SPREADSHEET_ID_HERE/edit'
-              ]
-            }
-          };
-        }
-      }
-      
-      // Call the enhanced test-credential function
+      // Call the TRUE UNIVERSAL test-credential function
       const { data, error } = await supabase.functions.invoke('test-credential', {
         body: {
           platform_name: platformName,
@@ -162,10 +121,7 @@ export class AutomationCredentialManager {
       });
 
       if (error) {
-        console.error('Enhanced credential test error:', error);
-        
-        await triggerCredentialTestNotification(userId, platformName, false);
-        
+        console.error('TRUE UNIVERSAL credential test error:', error);
         return {
           success: false,
           message: `Failed to test ${platformName} credentials: ${error.message}`,
@@ -173,45 +129,18 @@ export class AutomationCredentialManager {
         };
       }
 
-      // Enhanced result with OAuth2 support
-      const testResult = data?.success ? {
-        success: true,
-        message: data.message || `${platformName} credentials are working correctly!`,
-        details: {
-          ...data.details,
-          platform_discovered: true,
-          oauth2_supported: true,
-          universal_integration: true
-        }
-      } : {
-        success: false,
-        message: data?.message || `${platformName} credentials test failed`,
-        details: {
-          ...data?.details,
-          error_type: data?.error_type,
-          troubleshooting: data?.details?.troubleshooting || [],
-          oauth2_supported: true,
-          universal_integration: true
-        }
-      };
-
-      await triggerCredentialTestNotification(userId, platformName, testResult.success);
-
-      console.log(`✅ Enhanced test result for ${platformName}:`, testResult);
-      return testResult;
+      console.log(`✅ TRUE UNIVERSAL test result for ${platformName}:`, data);
+      return data;
 
     } catch (error: any) {
-      console.error(`❌ Error in enhanced credential testing for ${platformName}:`, error);
-      
-      await triggerCredentialTestNotification(userId, platformName, false);
+      console.error(`❌ Error in TRUE UNIVERSAL credential testing for ${platformName}:`, error);
       
       return {
         success: false,
         message: `Error testing ${platformName} credentials: ${error.message}`,
         details: { 
           error: error.message,
-          oauth2_supported: true,
-          universal_integration: true
+          universal_discovery: true
         }
       };
     }

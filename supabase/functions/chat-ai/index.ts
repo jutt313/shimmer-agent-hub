@@ -83,7 +83,7 @@ ${generalKnowledge}
 
     console.log('📖 Universal knowledge memory prepared');
 
-    // COMPLETELY REWRITTEN SYSTEM PROMPT - FIXED CREDENTIAL HANDLING
+    // ENHANCED SYSTEM PROMPT - ADDING API CONFIGURATIONS TO EXISTING SYSTEM
     const systemPrompt = `You are YusrAI, the world's most advanced automation architect with access to a universal knowledge store.
 
 CRITICAL PLATFORM CLARIFICATION REQUIREMENT:
@@ -114,6 +114,15 @@ For EVERY platform identified, you MUST provide ALL necessary credentials in the
 
 NEVER simplify credential requirements - always ask for the complete set needed for each platform.
 
+🚀 NEW FEATURE: DYNAMIC API CONFIGURATION GENERATION
+For EVERY platform in the platforms array, you MUST also generate complete API configurations with:
+- Real API base URLs (research actual endpoints)
+- Authentication methods and headers
+- Test endpoints for credential validation
+- Complete API call structures
+- Error response patterns
+- Request/response examples
+
 Universal Knowledge Store Access:
 ${universalKnowledgeMemory}
 
@@ -125,7 +134,7 @@ CRITICAL RESPONSE BEHAVIOR:
 - The frontend needs complete data structure in every response
 - Clarification questions are additional to the main response, not a replacement
 
-JSON Structure - ALWAYS COMPLETE:
+JSON Structure - ALWAYS COMPLETE WITH NEW API CONFIGURATIONS:
 {
   "summary": "Comprehensive 3-4 line description outlining the automation with identified platforms",
   "steps": [
@@ -169,6 +178,70 @@ JSON Structure - ALWAYS COMPLETE:
           "why_needed": "Required for receiving real-time notifications"
         }
       ]
+    }
+  ],
+  "api_configurations": [
+    {
+      "platform_name": "Platform Name",
+      "base_url": "https://api.platformname.com/v1",
+      "auth_config": {
+        "type": "bearer|api_key|oauth2|basic",
+        "location": "header|query|body",
+        "parameter_name": "Authorization|X-API-Key|access_token",
+        "format": "Bearer {token}|{token}|Key {api_key}",
+        "oauth2_config": {
+          "authorization_url": "https://platform.com/oauth/authorize",
+          "token_url": "https://platform.com/oauth/token",
+          "scopes": ["read", "write"],
+          "grant_type": "authorization_code"
+        }
+      },
+      "test_endpoint": {
+        "method": "GET|POST",
+        "path": "/me|/user|/auth/test",
+        "description": "Test endpoint to validate credentials",
+        "expected_response": {
+          "success": {"status": 200, "contains": ["id", "name"]},
+          "failure": {"status": 401, "message": "Unauthorized"}
+        },
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "YusrAI-Universal-Integrator/3.0"
+        },
+        "sample_request": {
+          "url": "https://api.platformname.com/v1/me",
+          "method": "GET",
+          "headers": {"Authorization": "Bearer {access_token}"}
+        },
+        "sample_response": {
+          "success": {"id": "user123", "name": "John Doe", "email": "john@example.com"},
+          "error": {"error": "invalid_token", "message": "The access token is invalid"}
+        }
+      },
+      "common_endpoints": [
+        {
+          "name": "List Items",
+          "method": "GET",
+          "path": "/items",
+          "description": "Retrieve list of items"
+        },
+        {
+          "name": "Create Item", 
+          "method": "POST",
+          "path": "/items",
+          "description": "Create a new item"
+        }
+      ],
+      "error_patterns": [
+        {"status": 401, "pattern": "unauthorized|invalid.*token", "action": "refresh_credentials"},
+        {"status": 429, "pattern": "rate.*limit", "action": "retry_with_backoff"},
+        {"status": 403, "pattern": "forbidden|insufficient.*permissions", "action": "check_scopes"}
+      ],
+      "rate_limits": {
+        "requests_per_minute": 60,
+        "requests_per_hour": 1000,
+        "burst_limit": 10
+      }
     }
   ],
   "platforms_to_remove": [],
@@ -216,6 +289,14 @@ JSON Structure - ALWAYS COMPLETE:
   "recheck_status": "ready_for_implementation"
 }
 
+🎯 CRITICAL API CONFIGURATION REQUIREMENTS:
+- MUST generate real API endpoints for each platform (research actual URLs)
+- MUST include complete authentication configuration
+- MUST provide working test endpoints with expected responses
+- MUST include error handling patterns
+- MUST generate sample request/response structures
+- MUST include rate limiting information
+
 CRITICAL SUCCESS REQUIREMENTS:
 - MUST identify ALL platforms and their complete credential requirements
 - MUST provide granular, atomic steps  
@@ -223,6 +304,7 @@ CRITICAL SUCCESS REQUIREMENTS:
 - MUST return complete JSON structure for every request - NEVER partial or null responses
 - MUST ensure JSON response is valid and complete in all scenarios
 - MUST ask for ALL credentials needed for each platform (API Keys, Tokens, IDs, URLs, etc.)
+- MUST generate complete API configurations for dynamic testing and execution
 
 Context:
 Previous conversation: ${JSON.stringify(messages.slice(-3))}
@@ -285,7 +367,8 @@ Current automation context: ${JSON.stringify(automationContext)}`
         platformsCount: parsedResponse.platforms?.length || 0,
         agentsCount: parsedResponse.agents?.length || 0,
         clarificationCount: parsedResponse.clarification_questions?.length || 0,
-        hasBlueprint: !!parsedResponse.automation_blueprint
+        hasBlueprint: !!parsedResponse.automation_blueprint,
+        hasApiConfigurations: !!parsedResponse.api_configurations
       })
       
       // VALIDATE COMPLETE STRUCTURE - NEVER ALLOW INCOMPLETE RESPONSES
@@ -307,6 +390,65 @@ Current automation context: ${JSON.stringify(automationContext)}`
       if (!parsedResponse.platforms || !Array.isArray(parsedResponse.platforms)) {
         console.warn('⚠️ Response missing platforms, adding default structure') 
         parsedResponse.platforms = []
+      }
+
+      // NEW: Ensure API configurations are present
+      if (!parsedResponse.api_configurations || !Array.isArray(parsedResponse.api_configurations)) {
+        console.warn('⚠️ Response missing api_configurations, adding default structure')
+        parsedResponse.api_configurations = []
+        
+        // Generate default API configs for any platforms that exist
+        if (parsedResponse.platforms && parsedResponse.platforms.length > 0) {
+          parsedResponse.api_configurations = parsedResponse.platforms.map(platform => ({
+            platform_name: platform.name,
+            base_url: `https://api.${platform.name.toLowerCase().replace(/\s+/g, '')}.com/v1`,
+            auth_config: {
+              type: "bearer",
+              location: "header",
+              parameter_name: "Authorization",
+              format: "Bearer {token}"
+            },
+            test_endpoint: {
+              method: "GET",
+              path: "/me",
+              description: `Test ${platform.name} authentication`,
+              expected_response: {
+                success: {"status": 200, "contains": ["id", "name"]},
+                failure: {"status": 401, "message": "Unauthorized"}
+              },
+              headers: {
+                "Content-Type": "application/json",
+                "User-Agent": "YusrAI-Universal-Integrator/3.0"
+              },
+              sample_request: {
+                url: `https://api.${platform.name.toLowerCase().replace(/\s+/g, '')}.com/v1/me`,
+                method: "GET",
+                headers: {"Authorization": "Bearer {access_token}"}
+              },
+              sample_response: {
+                success: {"id": "user123", "name": "User", "authenticated": true},
+                error: {"error": "invalid_token", "message": "Authentication failed"}
+              }
+            },
+            common_endpoints: [
+              {
+                name: "Get User Info",
+                method: "GET", 
+                path: "/me",
+                description: "Get current user information"
+              }
+            ],
+            error_patterns: [
+              {"status": 401, "pattern": "unauthorized|invalid.*token", "action": "refresh_credentials"},
+              {"status": 429, "pattern": "rate.*limit", "action": "retry_with_backoff"}
+            ],
+            rate_limits: {
+              requests_per_minute: 60,
+              requests_per_hour: 1000,
+              burst_limit: 10
+            }
+          }))
+        }
       }
 
       if (!parsedResponse.agents || !Array.isArray(parsedResponse.agents)) {
@@ -388,6 +530,47 @@ Current automation context: ${JSON.stringify(automationContext)}`
             }
           ]
         }],
+        api_configurations: [{
+          platform_name: "Platform Configuration Required",
+          base_url: "https://api.platform.com/v1",
+          auth_config: {
+            type: "bearer",
+            location: "header", 
+            parameter_name: "Authorization",
+            format: "Bearer {token}"
+          },
+          test_endpoint: {
+            method: "GET",
+            path: "/me",
+            description: "Test platform authentication",
+            expected_response: {
+              success: {"status": 200, "contains": ["id", "name"]},
+              failure: {"status": 401, "message": "Unauthorized"}
+            },
+            headers: {
+              "Content-Type": "application/json",
+              "User-Agent": "YusrAI-Universal-Integrator/3.0"
+            },
+            sample_request: {
+              url: "https://api.platform.com/v1/me",
+              method: "GET",
+              headers: {"Authorization": "Bearer {access_token}"}
+            },
+            sample_response: {
+              success: {"id": "user123", "name": "User", "authenticated": true},
+              error: {"error": "invalid_token", "message": "Authentication failed"}
+            }
+          },
+          common_endpoints: [],
+          error_patterns: [
+            {"status": 401, "pattern": "unauthorized|invalid.*token", "action": "refresh_credentials"}
+          ],
+          rate_limits: {
+            requests_per_minute: 60,
+            requests_per_hour: 1000,
+            burst_limit: 10
+          }
+        }],
         platforms_to_remove: [],
         agents: [{
           name: "AutomationArchitect",
@@ -442,6 +625,7 @@ Current automation context: ${JSON.stringify(automationContext)}`
           "Step 4: Set up monitoring, logging, and performance optimization for reliability"
         ],
         platforms: [],
+        api_configurations: [],
         platforms_to_remove: [],
         agents: [{
           name: "ComprehensiveAutomationAgent",
@@ -473,6 +657,7 @@ Current automation context: ${JSON.stringify(automationContext)}`
     console.log('🎯 Final response validation passed')
     console.log('📤 Response summary:', parsedResponse.summary?.substring(0, 100) + '...')
     console.log('🔧 Platforms count:', parsedResponse.platforms?.length || 0)
+    console.log('🔌 API configurations count:', parsedResponse.api_configurations?.length || 0) 
     console.log('❓ Clarification questions count:', parsedResponse.clarification_questions?.length || 0)
 
     // Update universal knowledge usage
@@ -490,7 +675,7 @@ Current automation context: ${JSON.stringify(automationContext)}`
       console.log('✅ Successfully updated all universal knowledge usage counts');
     }
 
-    console.log('🚀 Returning complete validated response')
+    console.log('🚀 Returning complete validated response with API configurations')
     
     return new Response(JSON.stringify(parsedResponse), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -509,6 +694,7 @@ Current automation context: ${JSON.stringify(automationContext)}`
         "Step 4: Build your automation with proper error handling, monitoring, and performance optimization"
       ],
       platforms: [],
+      api_configurations: [],
       platforms_to_remove: [],
       agents: [{
         name: "ErrorRecoveryAgent",

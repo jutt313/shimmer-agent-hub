@@ -6,126 +6,84 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// TRUE UNIVERSAL PLATFORM INTEGRATOR FOR AUTOMATION EXECUTION
-class TrueUniversalExecutionIntegrator {
-  private platformConfigs = new Map<string, any>();
+// AI-POWERED EXECUTION INTEGRATOR
+class AIExecutionIntegrator {
+  private supabase: any;
+  private configCache = new Map<string, any>();
 
-  async discoverPlatform(platformName: string): Promise<any> {
-    console.log(`🔍 EXECUTION: TRUE UNIVERSAL DISCOVERY for ${platformName}`);
+  constructor(supabase: any) {
+    this.supabase = supabase;
+  }
 
-    // Real OpenAPI spec discovery
-    const possibleUrls = [
-      `https://api.${platformName.toLowerCase()}.com/openapi.json`,
-      `https://api.${platformName.toLowerCase()}.com/swagger.json`,
-      `https://${platformName.toLowerCase()}.com/api/docs/openapi.json`,
-      `https://developers.${platformName.toLowerCase()}.com/openapi.json`
-    ];
+  // Get AI-generated platform configuration for execution
+  async getAIExecutionConfig(platformName: string): Promise<any> {
+    console.log(`🤖 Getting AI execution config for ${platformName}`);
 
-    for (const url of possibleUrls) {
-      try {
-        console.log(`📡 EXECUTION: Fetching API spec from: ${url}`);
-        const response = await fetch(url);
-        
-        if (response.ok) {
-          const spec = await response.json();
-          const config = this.parseOpenAPISpec(platformName, spec);
-          this.platformConfigs.set(platformName.toLowerCase(), config);
-          
-          console.log(`✅ EXECUTION: Platform ${platformName} discovered via OpenAPI`);
-          return config;
-        }
-      } catch (error: any) {
-        console.log(`⚠️ EXECUTION: Failed to fetch from ${url}:`, error.message);
-      }
+    // Check cache first
+    const cached = this.configCache.get(platformName.toLowerCase());
+    if (cached) {
+      console.log(`⚡ Using cached execution config for ${platformName}`);
+      return cached;
     }
 
-    console.log(`🔧 EXECUTION: Creating zero-hardcode config for ${platformName}`);
-    return this.createZeroHardcodeConfig(platformName);
-  }
-
-  private parseOpenAPISpec(platformName: string, spec: any): any {
-    const baseUrl = spec.servers?.[0]?.url || this.inferBaseUrl(platformName);
-    const endpoints: Record<string, any> = {};
-
-    Object.entries(spec.paths || {}).forEach(([path, methods]: [string, any]) => {
-      Object.entries(methods).forEach(([method, details]: [string, any]) => {
-        const endpointName = this.generateEndpointName(path, method);
-        endpoints[endpointName] = {
-          method: method.toUpperCase(),
-          path: path,
-          required_params: this.extractRequiredParams(details.parameters || []),
-          optional_params: this.extractOptionalParams(details.parameters || []),
-          response_schema: details.responses?.['200'] || {}
-        };
-      });
-    });
-
-    return {
-      name: platformName,
-      base_url: baseUrl,
-      auth_config: this.detectAuthConfig(spec),
-      endpoints
-    };
-  }
-
-  private createZeroHardcodeConfig(platformName: string): any {
-    return {
-      name: platformName,
-      base_url: this.inferBaseUrl(platformName),
-      auth_config: this.inferAuthConfig(platformName),
-      endpoints: {
-        'universal_call': {
-          method: 'POST',
-          path: '/api/v1/execute',
-          required_params: [],
-          optional_params: [],
-          response_schema: {}
+    try {
+      const { data, error } = await this.supabase.functions.invoke('chat-ai', {
+        body: {
+          message: `Generate complete execution configuration for ${platformName} platform including: API endpoints, methods, parameters, authentication, error handling, and execution flow patterns. Focus on automation execution requirements.`,
+          messages: [],
+          requestType: 'execution_config_generation'
         }
+      });
+
+      if (error) {
+        console.error('❌ Failed to get AI execution config:', error);
+        return null;
       }
-    };
+
+      const aiConfig = data?.api_configurations?.[platformName.toLowerCase()] || 
+                      data?.api_configurations?.[0];
+
+      if (aiConfig) {
+        this.configCache.set(platformName.toLowerCase(), aiConfig);
+        console.log(`✅ Got AI execution config for ${platformName}`);
+        return aiConfig;
+      }
+
+      return null;
+    } catch (error) {
+      console.error(`💥 Error getting AI execution config for ${platformName}:`, error);
+      return null;
+    }
   }
 
-  private inferBaseUrl(platformName: string): string {
-    return `https://api.${platformName.toLowerCase()}.com`;
-  }
-
-  private inferAuthConfig(platformName: string): any {
-    return {
-      type: 'bearer',
-      location: 'header',
-      parameter_name: 'Authorization',
-      format: 'Bearer {access_token}'
-    };
-  }
-
+  // AI-powered API call execution
   async callPlatformAPI(
     platformName: string, 
     endpointName: string, 
     parameters: Record<string, any>, 
     credentials: Record<string, string>
   ): Promise<any> {
-    console.log(`🚀 EXECUTION: TRUE UNIVERSAL API CALL: ${platformName}.${endpointName}`);
+    console.log(`🚀 AI-POWERED EXECUTION: ${platformName}.${endpointName}`);
 
-    let config = this.platformConfigs.get(platformName.toLowerCase());
+    // Get AI-generated execution configuration
+    const aiConfig = await this.getAIExecutionConfig(platformName);
     
-    if (!config) {
-      console.log(`🔍 EXECUTION: Platform ${platformName} not configured, discovering...`);
-      config = await this.discoverPlatform(platformName);
+    if (!aiConfig) {
+      console.log(`⚠️ No AI config for ${platformName}, using intelligent fallback`);
+      return await this.intelligentFallbackExecution(platformName, endpointName, parameters, credentials);
     }
 
-    const endpoint = config.endpoints[endpointName] || config.endpoints['universal_call'];
-    const baseUrl = config.base_url;
+    const baseUrl = aiConfig.base_url || this.inferBaseUrl(platformName);
+    const endpoint = aiConfig.endpoints?.[endpointName] || this.createDefaultEndpoint(endpointName);
     
     // Build request URL
     let url = baseUrl + endpoint.path;
-
-    // Replace path parameters
     Object.entries(parameters).forEach(([key, value]) => {
       url = url.replace(`{${key}}`, encodeURIComponent(String(value)));
     });
 
-    // Build headers with authentication
-    const headers = await this.buildAuthHeaders(config.auth_config, credentials);
+    // Build headers with AI-generated authentication
+    const headers = await this.buildAIHeaders(aiConfig, credentials);
 
     // Build request options
     const requestOptions: RequestInit = {
@@ -149,49 +107,84 @@ class TrueUniversalExecutionIntegrator {
       }
     }
 
-    console.log(`📡 EXECUTION: Making ${endpoint.method} request to: ${url}`);
+    console.log(`📡 Making AI-powered ${endpoint.method} request to: ${url}`);
 
     try {
       const response = await fetch(url, requestOptions);
       
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`TRUE UNIVERSAL API call failed: ${response.status} ${response.statusText} - ${errorText}`);
+        throw new Error(`AI-powered API call failed: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const result = await response.json();
-      console.log(`✅ EXECUTION: TRUE UNIVERSAL API call successful for ${platformName}`);
+      console.log(`✅ AI-powered execution successful for ${platformName}.${endpointName}`);
       
       return result;
     } catch (error) {
-      console.error(`❌ EXECUTION: TRUE UNIVERSAL API call failed:`, error);
+      console.error(`❌ AI-powered execution failed:`, error);
       throw error;
     }
   }
 
-  private async buildAuthHeaders(authConfig: any, credentials: Record<string, string>): Promise<Record<string, string>> {
+  private async intelligentFallbackExecution(
+    platformName: string, 
+    endpointName: string, 
+    parameters: Record<string, any>, 
+    credentials: Record<string, string>
+  ): Promise<any> {
+    console.log(`🔧 Intelligent fallback execution for ${platformName}.${endpointName}`);
+    
+    const baseUrl = this.inferBaseUrl(platformName);
+    const url = `${baseUrl}/api/v1/${endpointName}`;
+    
+    const headers = this.buildFallbackHeaders(credentials);
+    
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(parameters)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Fallback execution failed: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`❌ Fallback execution failed:`, error);
+      throw error;
+    }
+  }
+
+  private async buildAIHeaders(aiConfig: any, credentials: Record<string, string>): Promise<Record<string, string>> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'User-Agent': 'YusrAI-True-Universal-Execution/3.0'
+      'User-Agent': 'YusrAI-AI-Execution/4.0'
     };
 
-    switch (authConfig.type) {
+    const authConfig = aiConfig.auth_config || aiConfig.authentication || {};
+    
+    switch (authConfig.type?.toLowerCase()) {
       case 'bearer':
         const token = credentials.access_token || credentials.token || credentials.api_key;
         if (token) {
-          headers[authConfig.parameter_name] = authConfig.format
-            .replace('{token}', token)
-            .replace('{access_token}', token)
-            .replace('{api_key}', token);
+          headers['Authorization'] = `Bearer ${token}`;
         }
         break;
         
       case 'api_key':
         const apiKey = credentials.api_key || credentials.key;
-        if (apiKey && authConfig.location === 'header') {
-          headers[authConfig.parameter_name] = authConfig.format
-            .replace('{api_key}', apiKey)
-            .replace('{token}', apiKey);
+        if (apiKey) {
+          headers['X-API-Key'] = apiKey;
+        }
+        break;
+        
+      case 'oauth2':
+        const accessToken = credentials.access_token;
+        if (accessToken) {
+          headers['Authorization'] = `Bearer ${accessToken}`;
         }
         break;
     }
@@ -199,51 +192,43 @@ class TrueUniversalExecutionIntegrator {
     return headers;
   }
 
-  // Helper methods
-  private detectAuthConfig(spec: any): any {
-    const securitySchemes = spec.components?.securitySchemes;
-    
-    if (securitySchemes) {
-      const firstScheme = Object.values(securitySchemes)[0] as any;
-      
-      if (firstScheme?.type === 'http' && firstScheme?.scheme === 'bearer') {
-        return {
-          type: 'bearer',
-          location: 'header',
-          parameter_name: 'Authorization',
-          format: 'Bearer {token}'
-        };
-      }
+  private buildFallbackHeaders(credentials: Record<string, string>): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'YusrAI-Fallback-Execution/1.0'
+    };
+
+    if (credentials.access_token) {
+      headers['Authorization'] = `Bearer ${credentials.access_token}`;
+    } else if (credentials.api_key) {
+      headers['Authorization'] = `Bearer ${credentials.api_key}`;
+      headers['X-API-Key'] = credentials.api_key;
     }
 
+    return headers;
+  }
+
+  private inferBaseUrl(platformName: string): string {
+    return `https://api.${platformName.toLowerCase()}.com`;
+  }
+
+  private createDefaultEndpoint(endpointName: string): any {
     return {
-      type: 'bearer',
-      location: 'header',
-      parameter_name: 'Authorization',
-      format: 'Bearer {token}'
+      method: 'POST',
+      path: `/api/v1/${endpointName}`,
+      required_params: [],
+      optional_params: []
     };
-  }
-
-  private generateEndpointName(path: string, method: string): string {
-    return `${method.toLowerCase()}_${path.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '')}`;
-  }
-
-  private extractRequiredParams(parameters: any[]): string[] {
-    return parameters.filter(p => p.required).map(p => p.name);
-  }
-
-  private extractOptionalParams(parameters: any[]): string[] {
-    return parameters.filter(p => !p.required).map(p => p.name);
   }
 }
 
-// CLEAN AUTOMATION EXECUTOR - NO HARDCODED PLATFORM LOGIC
-class CleanAutomationExecutor {
+// AI-POWERED AUTOMATION EXECUTOR
+class AIAutomationExecutor {
   private context: any;
   private blueprint: any;
   private automationCredentials: Record<string, Record<string, string>> = {};
   private supabaseClient: any;
-  private universalIntegrator: TrueUniversalExecutionIntegrator;
+  private aiExecutionIntegrator: AIExecutionIntegrator;
 
   constructor(blueprint: any, runId: string, userId: string, automationId: string, supabaseClient: any) {
     this.blueprint = blueprint;
@@ -257,13 +242,13 @@ class CleanAutomationExecutor {
       logs: []
     };
     
-    this.universalIntegrator = new TrueUniversalExecutionIntegrator();
-    console.log('🌍 CleanAutomationExecutor using TRUE UNIVERSAL PLATFORM INTEGRATOR');
+    this.aiExecutionIntegrator = new AIExecutionIntegrator(supabaseClient);
+    console.log('🤖 AI Automation Executor using AI-powered platform integration');
   }
 
   async execute(): Promise<{ success: boolean; result?: any; error?: string }> {
     try {
-      console.log('🚀 Starting CLEAN automation execution:', this.blueprint.description);
+      console.log('🚀 Starting AI-powered automation execution:', this.blueprint.description);
       
       await this.loadAutomationCredentials();
       
@@ -300,11 +285,11 @@ class CleanAutomationExecutor {
         }
       }
       
-      console.log('✅ CLEAN automation execution completed successfully');
+      console.log('✅ AI-powered automation execution completed successfully');
       return { success: true, result: this.context.variables };
       
     } catch (error: any) {
-      console.error('💥 Clean automation execution failed:', error);
+      console.error('💥 AI-powered automation execution failed:', error);
       return { success: false, error: error.message };
     }
   }
@@ -342,7 +327,7 @@ class CleanAutomationExecutor {
 
     switch (step.type) {
       case 'action':
-        await this.executeUniversalAction(step);
+        await this.executeAIUniversalAction(step);
         break;
       case 'condition':
         await this.executeCondition(step);
@@ -363,8 +348,8 @@ class CleanAutomationExecutor {
     this.logStep(step.id, 'completed', `Completed step: ${step.name}`);
   }
 
-  // 100% ROUTING THROUGH TRUE UNIVERSAL INTEGRATOR
-  private async executeUniversalAction(step: any): Promise<void> {
+  // 100% AI-POWERED EXECUTION
+  private async executeAIUniversalAction(step: any): Promise<void> {
     const { action } = step;
     if (!action) throw new Error('Action configuration missing');
 
@@ -372,32 +357,32 @@ class CleanAutomationExecutor {
     const method = action.method;
     const parameters = this.resolveVariables(action.parameters);
 
-    console.log(`🌍 TRUE UNIVERSAL EXECUTION: ${platformName}.${method}`, parameters);
+    console.log(`🤖 AI-POWERED EXECUTION: ${platformName}.${method}`, parameters);
 
     const platformCreds = this.automationCredentials[platformName];
     if (!platformCreds) {
       throw new Error(`No credentials found for platform: ${platformName}`);
     }
 
-    console.log(`🔐 Using credentials for ${platformName} with TRUE UNIVERSAL discovery`);
+    console.log(`🔐 Using credentials for ${platformName} with AI-powered execution`);
 
     try {
-      // 100% ROUTING THROUGH TRUE UNIVERSAL INTEGRATOR
-      const result = await this.universalIntegrator.callPlatformAPI(
+      // 100% ROUTING THROUGH AI-POWERED INTEGRATOR
+      const result = await this.aiExecutionIntegrator.callPlatformAPI(
         platformName,
         method,
         parameters,
         platformCreds
       );
 
-      console.log(`✅ TRUE UNIVERSAL API SUCCESS for ${platformName}.${method}:`, result);
+      console.log(`✅ AI-POWERED EXECUTION SUCCESS for ${platformName}.${method}:`, result);
 
       if (action.output_variable) {
         this.context.variables[action.output_variable] = result;
       }
 
     } catch (error: any) {
-      console.error(`❌ TRUE UNIVERSAL API FAILED for ${platformName}.${method}:`, error);
+      console.error(`❌ AI-POWERED EXECUTION FAILED for ${platformName}.${method}:`, error);
       throw error;
     }
   }
@@ -571,7 +556,9 @@ class CleanAutomationExecutor {
           current_step: this.context.stepIndex + 1,
           total_steps: this.blueprint.steps.length,
           steps: this.context.logs,
-          variables: this.context.variables
+          variables: this.context.variables,
+          ai_powered: true,
+          execution_type: 'ai_universal'
         }
       })
       .eq('id', this.context.runId);
@@ -590,7 +577,7 @@ serve(async (req) => {
   try {
     const { automation_id, trigger_data, user_id } = await req.json();
 
-    console.log('🚀 CLEAN AUTOMATION EXECUTION started:', { automation_id, user_id });
+    console.log('🚀 AI-POWERED AUTOMATION EXECUTION started:', { automation_id, user_id });
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -625,8 +612,8 @@ serve(async (req) => {
       throw new Error(`Failed to create run record: ${runError?.message}`);
     }
 
-    // Execute automation with CLEAN executor
-    const executor = new CleanAutomationExecutor(
+    // Execute automation with AI-POWERED executor
+    const executor = new AIAutomationExecutor(
       automation.automation_blueprint,
       run.id,
       user_id,
@@ -645,24 +632,26 @@ serve(async (req) => {
           ...run.details_log,
           completed_at: new Date().toISOString(),
           final_result: result,
-          execution_type: 'clean_universal'
+          ai_powered: true,
+          execution_type: 'ai_universal'
         }
       })
       .eq('id', run.id);
 
-    console.log('✅ CLEAN AUTOMATION EXECUTION completed:', result);
+    console.log('✅ AI-POWERED AUTOMATION EXECUTION completed:', result);
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: any) {
-    console.error('❌ CLEAN AUTOMATION EXECUTION failed:', error);
+    console.error('❌ AI-POWERED AUTOMATION EXECUTION failed:', error);
     return new Response(
       JSON.stringify({ 
         success: false, 
         error: error.message,
-        execution_type: 'clean_universal'
+        ai_powered: true,
+        execution_type: 'ai_universal'
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

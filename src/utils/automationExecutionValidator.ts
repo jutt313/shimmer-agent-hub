@@ -1,7 +1,7 @@
 
+import { supabase } from '@/integrations/supabase/client';
 import { AutomationBlueprint } from '@/types/automation';
 import { AutomationCredentialManager } from './automationCredentialManager';
-import { AutomationAgentManager } from './automationAgentManager';
 
 export interface ExecutionValidationResult {
   canExecute: boolean;
@@ -15,68 +15,49 @@ export interface ExecutionValidationResult {
 
 export class AutomationExecutionValidator {
   /**
-   * Validate if an automation is ready for execution
+   * Validate if automation is ready for execution with AI-powered validation
    */
   static async validateAutomation(
     automationId: string,
     blueprint: AutomationBlueprint,
     userId: string
   ): Promise<ExecutionValidationResult> {
-    try {
-      console.log(`🔍 Validating automation ${automationId} for execution`);
+    console.log(`🔍 AI-POWERED VALIDATION: ${automationId}`);
 
-      // Extract required platforms from blueprint
+    try {
+      // Extract required platforms from automation blueprint
       const requiredPlatforms = this.extractRequiredPlatforms(blueprint);
       console.log(`📋 Required platforms:`, requiredPlatforms);
 
-      // Validate credentials
+      // Validate platform credentials
       const credentialValidation = await AutomationCredentialManager.validateAutomationCredentials(
         automationId,
         requiredPlatforms,
         userId
       );
 
-      // Validate agent decisions
-      const agentValidation = await AutomationAgentManager.validateAgentDecisions(
-        automationId,
-        userId
-      );
-
-      const issues = {
-        missingCredentials: credentialValidation.missing,
-        untestedCredentials: credentialValidation.untested,
-        pendingAgents: agentValidation.pendingAgents
-      };
+      // Validate AI agents
+      const agentValidation = await this.validateAIAgents(automationId, blueprint, userId);
 
       const canExecute = credentialValidation.valid && agentValidation.valid;
 
-      let message = '';
-      if (canExecute) {
-        message = '✅ Automation is ready for execution';
-      } else {
-        const problems = [];
-        if (issues.missingCredentials.length > 0) {
-          problems.push(`Missing credentials: ${issues.missingCredentials.join(', ')}`);
-        }
-        if (issues.untestedCredentials.length > 0) {
-          problems.push(`Untested credentials: ${issues.untestedCredentials.join(', ')}`);
-        }
-        if (issues.pendingAgents.length > 0) {
-          problems.push(`Pending agent decisions: ${issues.pendingAgents.join(', ')}`);
-        }
-        message = `❌ Cannot execute: ${problems.join('; ')}`;
-      }
-
-      console.log(`🎯 Validation result:`, { canExecute, issues, message });
-
-      return {
+      const result: ExecutionValidationResult = {
         canExecute,
-        issues,
-        message
+        issues: {
+          missingCredentials: credentialValidation.missing,
+          untestedCredentials: credentialValidation.untested,
+          pendingAgents: agentValidation.pending
+        },
+        message: canExecute ? 
+          '🚀 Automation ready for execution with AI-powered platform integration' :
+          '⚠️ Automation requires additional configuration before execution'
       };
 
+      console.log(`🎯 AI-POWERED VALIDATION RESULT:`, result);
+      return result;
+
     } catch (error) {
-      console.error('❌ Failed to validate automation:', error);
+      console.error('❌ Validation error:', error);
       return {
         canExecute: false,
         issues: {
@@ -84,25 +65,85 @@ export class AutomationExecutionValidator {
           untestedCredentials: [],
           pendingAgents: []
         },
-        message: 'Validation failed due to system error'
+        message: 'Validation failed - please check automation configuration'
       };
     }
   }
 
   /**
-   * Extract required platforms from automation blueprint
+   * Extract required platforms from automation blueprint with AI-powered analysis
    */
   private static extractRequiredPlatforms(blueprint: AutomationBlueprint): string[] {
     const platforms = new Set<string>();
 
-    if (!blueprint.steps) return [];
-
-    blueprint.steps.forEach(step => {
-      if (step.action?.integration && step.action.integration !== 'system') {
-        platforms.add(step.action.integration);
+    // Extract from action steps
+    blueprint.steps?.forEach(step => {
+      if (step.type === 'action' && step.action?.integration) {
+        platforms.add(step.action.integration.toLowerCase());
       }
     });
 
+    console.log(`🤖 AI-powered platform extraction found:`, Array.from(platforms));
     return Array.from(platforms);
+  }
+
+  /**
+   * Validate AI agents are properly configured with AI-powered validation
+   */
+  private static async validateAIAgents(
+    automationId: string,
+    blueprint: AutomationBlueprint,
+    userId: string
+  ): Promise<{ valid: boolean; pending: string[] }> {
+    try {
+      // Extract AI agent requirements from blueprint
+      const agentSteps = blueprint.steps?.filter(step => step.type === 'ai_agent_call') || [];
+      
+      if (agentSteps.length === 0) {
+        return { valid: true, pending: [] };
+      }
+
+      // Get configured AI agents
+      const { data: agents, error } = await supabase
+        .from('ai_agents')
+        .select('*')
+        .eq('automation_id', automationId);
+
+      if (error) {
+        console.error('Failed to fetch AI agents:', error);
+        return { valid: false, pending: ['Failed to validate AI agents'] };
+      }
+
+      const pendingAgents: string[] = [];
+
+      // Check each required agent
+      agentSteps.forEach((step, index) => {
+        const agentId = step.ai_agent_call?.agent_id;
+        if (!agentId) {
+          pendingAgents.push(`Agent decision required for step ${index + 1}`);
+          return;
+        }
+
+        const agent = agents?.find(a => a.id === agentId);
+        if (!agent) {
+          pendingAgents.push(`Agent ${agentId} not found`);
+          return;
+        }
+
+        // Validate agent configuration
+        if (!agent.api_key) {
+          pendingAgents.push(`API key missing for agent: ${agent.agent_name}`);
+        }
+      });
+
+      return {
+        valid: pendingAgents.length === 0,
+        pending: pendingAgents
+      };
+
+    } catch (error) {
+      console.error('AI agent validation error:', error);
+      return { valid: false, pending: ['AI agent validation failed'] };
+    }
   }
 }

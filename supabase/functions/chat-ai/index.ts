@@ -28,7 +28,7 @@ serve(async (req) => {
   try {
     console.log('🔄 Processing chat request')
     
-    const { message, messages = [], automationId, automationContext } = await req.json()
+    const { message, messages = [], automationId, automationContext, requestType } = await req.json()
     
     if (!message) {
       throw new Error('Message is required')
@@ -36,6 +36,115 @@ serve(async (req) => {
 
     console.log('📚 Processing message:', message.substring(0, 100) + '...')
     console.log('🔧 Messages history length:', messages.length)
+    console.log('🎯 Request type:', requestType || 'normal_chat')
+
+    // PHASE 1: Handle API Configuration Generation specifically
+    if (requestType === 'api_config_generation') {
+      console.log('🔧 API Configuration Generation Mode Activated')
+      
+      const apiConfigPrompt = `You are an AI-powered API configuration generator. Generate complete, real API configurations for platform: ${message}
+
+CRITICAL REQUIREMENTS:
+- Generate REAL API endpoints and URLs (research actual platform APIs)
+- Provide complete authentication configurations
+- Include working test endpoints
+- Generate proper error handling patterns
+- Create detailed request/response examples
+
+Return ONLY this JSON structure:
+{
+  "api_configurations": [
+    {
+      "platform_name": "${message}",
+      "base_url": "REAL_API_BASE_URL",
+      "auth_config": {
+        "type": "bearer|api_key|oauth2|basic",
+        "location": "header|query|body",
+        "parameter_name": "Authorization|X-API-Key",
+        "format": "Bearer {token}|Key {api_key}",
+        "oauth2_config": {
+          "authorization_url": "REAL_OAUTH_URL",
+          "token_url": "REAL_TOKEN_URL",
+          "scopes": ["REAL_SCOPES"],
+          "grant_type": "authorization_code"
+        }
+      },
+      "test_endpoint": {
+        "method": "GET|POST",
+        "path": "/REAL_TEST_PATH",
+        "description": "Real test endpoint description",
+        "expected_response": {
+          "success": {"status": 200, "contains": ["REAL_FIELDS"]},
+          "failure": {"status": 401, "message": "REAL_ERROR_MESSAGE"}
+        },
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "YusrAI-Universal-Integrator/3.0"
+        },
+        "sample_request": {
+          "url": "COMPLETE_REQUEST_URL",
+          "method": "GET|POST",
+          "headers": {"Authorization": "REAL_AUTH_HEADER"}
+        },
+        "sample_response": {
+          "success": {"REAL_SUCCESS_DATA": "REAL_VALUES"},
+          "error": {"error": "REAL_ERROR_CODE", "message": "REAL_ERROR_MESSAGE"}
+        }
+      },
+      "common_endpoints": [
+        {
+          "name": "REAL_ENDPOINT_NAME",
+          "method": "GET|POST|PUT|DELETE",
+          "path": "/REAL_PATH",
+          "description": "REAL_DESCRIPTION"
+        }
+      ],
+      "error_patterns": [
+        {"status": 401, "pattern": "unauthorized|invalid.*token", "action": "refresh_credentials"},
+        {"status": 429, "pattern": "rate.*limit", "action": "retry_with_backoff"},
+        {"status": 403, "pattern": "forbidden", "action": "check_permissions"}
+      ],
+      "rate_limits": {
+        "requests_per_minute": 60,
+        "requests_per_hour": 1000,
+        "burst_limit": 10
+      }
+    }
+  ]
+}`
+
+      const apiConfigResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: "system", content: apiConfigPrompt },
+            { role: "user", content: `Generate complete API configuration for ${message}` }
+          ],
+          max_tokens: 2000,
+          temperature: 0.1,
+          response_format: { type: "json_object" }
+        }),
+      })
+
+      if (apiConfigResponse.ok) {
+        const apiConfigData = await apiConfigResponse.json()
+        const apiConfig = apiConfigData.choices[0]?.message?.content
+        
+        if (apiConfig) {
+          console.log('✅ API Configuration generated successfully')
+          return new Response(apiConfig, {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+      }
+      
+      console.warn('⚠️ API config generation failed, using fallback')
+    }
 
     // Get universal knowledge as separate memory
     console.log('🔍 Accessing universal knowledge store...')

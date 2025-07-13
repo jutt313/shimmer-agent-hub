@@ -147,7 +147,7 @@ export class ExpandedComprehensiveTestingSuite {
     }
   }
 
-  // TEST 2: UNIVERSAL PLATFORM INTEGRATION
+  // TEST 2: UNIVERSAL PLATFORM INTEGRATION - UPDATED FOR AI-POWERED INTEGRATOR
   async testUniversalPlatformIntegration(): Promise<void> {
     console.log('🌍 Testing Universal Platform Integration System...');
 
@@ -157,48 +157,50 @@ export class ExpandedComprehensiveTestingSuite {
       const startTime = Date.now();
       
       try {
-        console.log(`🧪 Testing platform discovery: ${platformName}`);
+        console.log(`🧪 Testing AI-powered platform discovery: ${platformName}`);
 
-        // Test platform discovery
-        const config = await universalIntegrator.discoverPlatform(platformName);
+        // Test AI-powered platform discovery using the new method
+        const config = await universalIntegrator.getAIGeneratedConfig(platformName);
         
         if (!config) {
-          throw new Error(`Failed to discover platform: ${platformName}`);
+          throw new Error(`Failed to get AI-generated config for platform: ${platformName}`);
         }
 
-        // Validate configuration structure
-        if (!config.name || !config.api_spec || !config.auth_config) {
-          throw new Error(`Invalid platform configuration for: ${platformName}`);
+        // Validate AI-generated configuration structure
+        if (!config.name || !config.base_url || !config.auth_config) {
+          throw new Error(`Invalid AI-generated platform configuration for: ${platformName}`);
         }
 
         const executionTime = Date.now() - startTime;
 
         this.addTestResult({
-          test_name: `Universal Platform Integration - ${platformName}`,
+          test_name: `AI-Powered Platform Integration - ${platformName}`,
           status: 'PASS',
           execution_time_ms: executionTime,
           coverage_area: 'integration',
           details: {
             platform: platformName,
-            base_url: config.api_spec.servers[0]?.url,
+            base_url: config.base_url,
             auth_type: config.auth_config.type,
-            endpoints_discovered: Object.keys(config.endpoints).length
+            endpoints_discovered: Object.keys(config.endpoints || {}).length,
+            ai_powered: true,
+            dynamic_config: true
           }
         });
 
-        console.log(`✅ Platform integration test for ${platformName} passed (${executionTime}ms)`);
+        console.log(`✅ AI-powered platform integration test for ${platformName} passed (${executionTime}ms)`);
 
       } catch (error: any) {
         this.addTestResult({
-          test_name: `Universal Platform Integration - ${platformName}`,
+          test_name: `AI-Powered Platform Integration - ${platformName}`,
           status: 'FAIL',
           execution_time_ms: Date.now() - startTime,
           error_message: error.message,
           coverage_area: 'integration',
-          details: { platform: platformName }
+          details: { platform: platformName, ai_powered: true }
         });
 
-        console.error(`❌ Platform integration test for ${platformName} failed:`, error.message);
+        console.error(`❌ AI-powered platform integration test for ${platformName} failed:`, error.message);
       }
     }
   }
@@ -242,7 +244,7 @@ export class ExpandedComprehensiveTestingSuite {
     }
   }
 
-  // 🎯 NEW: CROSS-PLATFORM INTEGRATION TESTS - ADDRESSING COVERAGE GAPS
+  // 🎯 NEW: CROSS-PLATFORM INTEGRATION TESTS - UPDATED FOR AI-POWERED INTEGRATOR
   async testCrossPlatformIntegrations(): Promise<void> {
     console.log('🌍 Testing Cross-Platform Integration Scenarios...');
 
@@ -270,12 +272,12 @@ export class ExpandedComprehensiveTestingSuite {
       try {
         console.log(`🧪 Testing complex scenario: ${scenario.name}`);
 
-        // Step 1: Verify all platforms can be discovered dynamically
+        // Step 1: Verify all platforms can be discovered dynamically using AI
         const platformConfigs = [];
         for (const platformName of scenario.platforms) {
-          const config = await universalIntegrator.discoverPlatform(platformName);
+          const config = await universalIntegrator.getAIGeneratedConfig(platformName);
           if (!config) {
-            throw new Error(`Failed to discover platform: ${platformName}`);
+            throw new Error(`Failed to get AI-generated config for platform: ${platformName}`);
           }
           platformConfigs.push(config);
         }
@@ -287,18 +289,18 @@ export class ExpandedComprehensiveTestingSuite {
           scenario_id: `test_${Math.random().toString(36).substr(2, 9)}`
         };
 
-        // Step 3: Simulate complex automation execution
+        // Step 3: Simulate complex automation execution with AI-powered configs
         const executionResults = [];
         for (let i = 0; i < scenario.platforms.length; i++) {
           const platform = scenario.platforms[i];
           const config = platformConfigs[i];
           
-          // Simulate API call with dynamic credentials
+          // Simulate API call with dynamic credentials using AI-powered integrator
           const mockCredentials = this.generateMockCredentials(platform);
           
           try {
-            // Test that the universal integrator can handle the platform
-            const mockResult = await this.simulateUniversalAPICall(
+            // Test that the AI-powered universal integrator can handle the platform
+            const mockResult = await this.simulateAIPoweredAPICall(
               platform, 
               'test_action', 
               testData, 
@@ -308,13 +310,15 @@ export class ExpandedComprehensiveTestingSuite {
             executionResults.push({
               platform,
               success: true,
-              result: mockResult
+              result: mockResult,
+              ai_powered: true
             });
           } catch (error: any) {
             executionResults.push({
               platform,
               success: false,
-              error: error.message
+              error: error.message,
+              ai_powered: true
             });
           }
         }
@@ -324,13 +328,13 @@ export class ExpandedComprehensiveTestingSuite {
         const successRate = (successfulPlatforms / scenario.platforms.length) * 100;
 
         if (successRate < 80) {
-          throw new Error(`Cross-platform integration success rate too low: ${successRate}%`);
+          throw new Error(`AI-powered cross-platform integration success rate too low: ${successRate}%`);
         }
 
         const executionTime = Date.now() - startTime;
 
         this.addTestResult({
-          test_name: `Cross-Platform Integration - ${scenario.name}`,
+          test_name: `AI-Powered Cross-Platform Integration - ${scenario.name}`,
           status: 'PASS',
           execution_time_ms: executionTime,
           coverage_area: 'integration',
@@ -339,31 +343,33 @@ export class ExpandedComprehensiveTestingSuite {
             success_rate: successRate,
             execution_results: executionResults,
             data_consistency_verified: true,
-            dynamic_discovery_successful: true
+            ai_dynamic_discovery_successful: true,
+            ai_powered: true
           }
         });
 
-        console.log(`✅ Cross-platform integration test passed: ${scenario.name} (${successRate}% success rate)`);
+        console.log(`✅ AI-powered cross-platform integration test passed: ${scenario.name} (${successRate}% success rate)`);
 
       } catch (error: any) {
         this.addTestResult({
-          test_name: `Cross-Platform Integration - ${scenario.name}`,
+          test_name: `AI-Powered Cross-Platform Integration - ${scenario.name}`,
           status: 'FAIL',
           execution_time_ms: Date.now() - startTime,
           error_message: error.message,
           coverage_area: 'integration',
           details: { 
             scenario: scenario,
-            failure_point: 'cross_platform_execution'
+            failure_point: 'ai_powered_cross_platform_execution',
+            ai_powered: true
           }
         });
 
-        console.error(`❌ Cross-platform integration test failed: ${scenario.name}`, error.message);
+        console.error(`❌ AI-powered cross-platform integration test failed: ${scenario.name}`, error.message);
       }
     }
   }
 
-  // 🎯 NEW: MULTI-AUTH TYPE SCENARIO TESTING
+  // 🎯 NEW: MULTI-AUTH TYPE SCENARIO TESTING - UPDATED FOR AI-POWERED INTEGRATOR
   async testMultiAuthTypeScenarios(): Promise<void> {
     console.log('🔐 Testing Multi-Authentication Type Scenarios...');
 
@@ -398,13 +404,13 @@ export class ExpandedComprehensiveTestingSuite {
       const startTime = Date.now();
       
       try {
-        console.log(`🧪 Testing auth scenario: ${scenario.name}`);
+        console.log(`🧪 Testing AI-powered auth scenario: ${scenario.name}`);
 
         const authResults = [];
         
         for (const platform of scenario.platforms) {
-          // Test dynamic platform discovery with specific auth type
-          const config = await universalIntegrator.discoverPlatform(platform);
+          // Test AI-powered dynamic platform discovery with specific auth type
+          const config = await universalIntegrator.getAIGeneratedConfig(platform);
           
           // Verify auth config matches expected type
           if (config.auth_config.type.toLowerCase() !== scenario.auth_type.toLowerCase()) {
@@ -414,9 +420,9 @@ export class ExpandedComprehensiveTestingSuite {
           // Generate appropriate mock credentials for auth type
           const mockCredentials = this.generateMockCredentialsForAuthType(scenario.auth_type);
           
-          // Test API call with specific auth type
+          // Test API call with specific auth type using AI-powered integrator
           try {
-            const result = await this.simulateAuthenticatedAPICall(
+            const result = await this.simulateAIPoweredAuthenticatedAPICall(
               platform,
               scenario.test_endpoint,
               mockCredentials,
@@ -427,14 +433,16 @@ export class ExpandedComprehensiveTestingSuite {
               platform,
               auth_type: scenario.auth_type,
               success: true,
-              auth_header_format: config.auth_config.format
+              auth_header_format: config.auth_config.format,
+              ai_powered: true
             });
           } catch (error: any) {
             authResults.push({
               platform,
               auth_type: scenario.auth_type,
               success: false,
-              error: error.message
+              error: error.message,
+              ai_powered: true
             });
           }
         }
@@ -442,13 +450,13 @@ export class ExpandedComprehensiveTestingSuite {
         const successRate = (authResults.filter(r => r.success).length / authResults.length) * 100;
 
         if (successRate < 90) {
-          throw new Error(`Auth type success rate too low: ${successRate}%`);
+          throw new Error(`AI-powered auth type success rate too low: ${successRate}%`);
         }
 
         const executionTime = Date.now() - startTime;
 
         this.addTestResult({
-          test_name: `Multi-Auth Scenarios - ${scenario.name}`,
+          test_name: `AI-Powered Multi-Auth Scenarios - ${scenario.name}`,
           status: 'PASS',
           execution_time_ms: executionTime,
           coverage_area: 'security',
@@ -457,23 +465,24 @@ export class ExpandedComprehensiveTestingSuite {
             platforms_tested: scenario.platforms,
             success_rate: successRate,
             auth_results: authResults,
-            dynamic_auth_discovery: true
+            ai_dynamic_auth_discovery: true,
+            ai_powered: true
           }
         });
 
-        console.log(`✅ Multi-auth test passed: ${scenario.name} (${successRate}% success rate)`);
+        console.log(`✅ AI-powered multi-auth test passed: ${scenario.name} (${successRate}% success rate)`);
 
       } catch (error: any) {
         this.addTestResult({
-          test_name: `Multi-Auth Scenarios - ${scenario.name}`,
+          test_name: `AI-Powered Multi-Auth Scenarios - ${scenario.name}`,
           status: 'FAIL',
           execution_time_ms: Date.now() - startTime,
           error_message: error.message,
           coverage_area: 'security',
-          details: { scenario }
+          details: { scenario, ai_powered: true }
         });
 
-        console.error(`❌ Multi-auth test failed: ${scenario.name}`, error.message);
+        console.error(`❌ AI-powered multi-auth test failed: ${scenario.name}`, error.message);
       }
     }
   }
@@ -1157,13 +1166,13 @@ export class ExpandedComprehensiveTestingSuite {
     }
   }
 
-  private async simulateUniversalAPICall(
+  private async simulateAIPoweredAPICall(
     platform: string, 
     method: string, 
     parameters: any, 
     credentials: Record<string, string>
   ): Promise<any> {
-    // Simulate the universal API call process
+    // Simulate the AI-powered universal API call process
     await new Promise(resolve => setTimeout(resolve, Math.random() * 100 + 50));
     
     return {
@@ -1171,11 +1180,13 @@ export class ExpandedComprehensiveTestingSuite {
       method,
       success: true,
       response_time_ms: Math.random() * 200 + 100,
-      data: { mock: true, parameters, timestamp: new Date().toISOString() }
+      data: { mock: true, parameters, timestamp: new Date().toISOString() },
+      ai_powered: true,
+      dynamic_config: true
     };
   }
 
-  private async simulateAuthenticatedAPICall(
+  private async simulateAIPoweredAuthenticatedAPICall(
     platform: string,
     endpoint: string,
     credentials: Record<string, string>,
@@ -1188,7 +1199,9 @@ export class ExpandedComprehensiveTestingSuite {
       endpoint,
       auth_type: authType,
       authenticated: true,
-      response: { status: 'success', data: 'mock-response' }
+      response: { status: 'success', data: 'mock-response' },
+      ai_powered: true,
+      dynamic_auth: true
     };
   }
 

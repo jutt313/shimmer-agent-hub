@@ -248,7 +248,7 @@ export class UniversalPlatformManager {
       });
     }
     
-    // DEFAULT OPERATION FOR ANY PLATFORM
+    // DEFAULT OPERATION FOR ANY PLATFORM - ensure it has description
     if (operations.length === 0) {
       operations.push({
         name: `${platformName} Operation`,
@@ -478,6 +478,7 @@ export class UniversalPlatformManager {
         name: 'Authentication Test',
         method: config.test_endpoint.method,
         path: config.test_endpoint.path,
+        description: 'Test authentication and permissions',
         sample_request: {
           url: config.base_url + config.test_endpoint.path,
           method: config.test_endpoint.method,

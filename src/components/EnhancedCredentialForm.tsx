@@ -7,12 +7,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { UniversalPlatformManager } from '@/utils/universalPlatformManager';
 import { AutomationCredentialManager } from '@/utils/automationCredentialManager';
 import { toast } from 'sonner';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 
 interface EnhancedCredentialFormProps {
   automationId: string;
@@ -42,7 +36,7 @@ const EnhancedCredentialForm = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const [canSave, setCanSave] = useState(false);
   
-  // ENHANCED PLAYGROUND MODE STATES
+  // PLAYGROUND MODE STATES - FIXED UI
   const [isPlaygroundMode, setIsPlaygroundMode] = useState(false);
   const [apiCallPreview, setApiCallPreview] = useState<any>(null);
   const [testResponseData, setTestResponseData] = useState<any>(null);
@@ -190,10 +184,10 @@ const EnhancedCredentialForm = ({
   }
 
   return (
-    <div className="w-full max-w-none mx-auto space-y-6">
+    <div className="w-full mx-auto space-y-6">
       {isPlaygroundMode ? (
-        /* PLAYGROUND MODE - FULL WIDTH SPLIT VIEW */
-        <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-2xl p-8 border border-slate-200 min-h-[600px]">
+        /* PLAYGROUND MODE - LIGHT BACKGROUND, ACTUALLY WIDE */
+        <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-lg" style={{ minWidth: '90vw', maxWidth: '95vw' }}>
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <h3 className="text-2xl font-bold text-gray-900">{platform.name} API Playground</h3>
@@ -205,31 +199,31 @@ const EnhancedCredentialForm = ({
             <Button
               variant="outline"
               onClick={handleTogglePlayground}
-              className="text-blue-600 hover:text-blue-800 hover:bg-blue-100 border-blue-300"
+              className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 border-blue-300"
             >
               ← Back to Form
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
-            {/* REQUEST PANEL */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* REQUEST PANEL - LIGHT THEME */}
             <div className="space-y-4">
               <h4 className="font-semibold text-gray-800 text-lg flex items-center gap-2">
                 <Play className="h-5 w-5 text-blue-600" />
                 API Request
               </h4>
-              <div className="bg-gray-900 rounded-lg border h-96 overflow-hidden">
-                <div className="p-3 border-b bg-gray-800 text-white font-mono text-sm">
+              <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden" style={{ minHeight: '400px' }}>
+                <div className="p-3 border-b bg-gray-100 text-gray-800 font-mono text-sm">
                   <div className="flex items-center gap-3">
-                    <span className="bg-green-600 px-2 py-1 rounded text-xs font-bold">
+                    <span className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">
                       {(testResponseData?.request || apiCallPreview?.request)?.method || 'GET'}
                     </span>
-                    <span className="text-green-400">
+                    <span className="text-blue-600 font-medium">
                       {(testResponseData?.request || apiCallPreview?.request)?.url}
                     </span>
                   </div>
                 </div>
-                <pre className="p-4 text-sm text-green-400 font-mono h-80 overflow-auto">
+                <pre className="p-4 text-sm text-gray-700 font-mono overflow-auto" style={{ height: '350px' }}>
 {JSON.stringify({
   headers: (testResponseData?.request || apiCallPreview?.request)?.headers || {},
   body: (testResponseData?.request || apiCallPreview?.request)?.body || null
@@ -238,16 +232,16 @@ const EnhancedCredentialForm = ({
               </div>
             </div>
 
-            {/* RESPONSE PANEL */}
+            {/* RESPONSE PANEL - LIGHT THEME */}
             <div className="space-y-4">
               <h4 className="font-semibold text-gray-800 text-lg flex items-center gap-2">
                 <CheckCircle className="h-5 w-5 text-green-600" />
                 API Response
               </h4>
-              <div className="bg-gray-900 rounded-lg border h-96 overflow-hidden">
-                <div className="p-3 border-b bg-gray-800 text-white font-mono text-sm">
+              <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden" style={{ minHeight: '400px' }}>
+                <div className="p-3 border-b bg-gray-100 text-gray-800 font-mono text-sm">
                   <div className="flex items-center gap-3">
-                    <span className={`px-2 py-1 rounded text-xs font-bold ${
+                    <span className={`px-2 py-1 rounded text-xs font-bold text-white ${
                       testResponseData?.response?.status >= 200 && testResponseData?.response?.status < 300 
                         ? 'bg-green-600' 
                         : 'bg-red-600'
@@ -255,13 +249,13 @@ const EnhancedCredentialForm = ({
                       Status: {testResponseData?.response?.status || apiCallPreview?.expected_response?.status || 'Waiting...'}
                     </span>
                     {testResponseData?.response?.request_time_ms && (
-                      <span className="text-blue-400">
+                      <span className="text-blue-600 font-medium">
                         {testResponseData.response.request_time_ms}ms
                       </span>
                     )}
                   </div>
                 </div>
-                <pre className="p-4 text-sm text-blue-400 font-mono h-80 overflow-auto">
+                <pre className="p-4 text-sm text-gray-700 font-mono overflow-auto" style={{ height: '350px' }}>
 {JSON.stringify(
   testResponseData?.response?.data || apiCallPreview?.expected_response || { message: "Click 'Test Credentials' to see live response" }, 
   null, 
@@ -312,8 +306,8 @@ const EnhancedCredentialForm = ({
           </div>
         </div>
       ) : (
-        /* NORMAL FORM MODE - MUCH WIDER */
-        <div className="bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 rounded-2xl p-10 border border-purple-200 w-full">
+        /* NORMAL FORM MODE - ACTUALLY WIDER */
+        <div className="bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 rounded-2xl p-12 border border-purple-200 shadow-lg" style={{ minWidth: '85vw', maxWidth: '90vw' }}>
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
               <h3 className="text-3xl font-bold text-gray-900">{platform.name} Credentials</h3>
@@ -326,7 +320,7 @@ const EnhancedCredentialForm = ({
               variant="outline"
               size="lg"
               onClick={handleTogglePlayground}
-              className="text-purple-600 hover:text-purple-800 hover:bg-purple-100 border-purple-300 px-6 py-3"
+              className="text-purple-600 hover:text-purple-800 hover:bg-purple-100 border-purple-300 px-8 py-4 text-lg"
               disabled={!hasAllCredentials}
             >
               <Code className="h-6 w-6 mr-3" />
@@ -334,7 +328,7 @@ const EnhancedCredentialForm = ({
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8 mb-10">
             {platform.credentials.map((cred) => (
               <div key={cred.field} className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -354,11 +348,11 @@ const EnhancedCredentialForm = ({
 
                 <div className="relative">
                   <Input
-                    type="text"
+                    type={showPasswords[cred.field] ? "text" : "password"}
                     placeholder={cred.placeholder}
                     value={credentials[cred.field] || ''}
                     onChange={(e) => handleCredentialChange(cred.field, e.target.value)}
-                    className="rounded-xl border-purple-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-200 pr-14 py-6 text-lg font-mono"
+                    className="rounded-xl border-purple-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-200 pr-14 py-6 text-lg font-mono bg-white"
                   />
                   <Button
                     type="button"
@@ -375,7 +369,7 @@ const EnhancedCredentialForm = ({
                   </Button>
                 </div>
 
-                <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg border-l-4 border-purple-300">{cred.why_needed}</p>
+                <p className="text-sm text-gray-600 bg-white/50 p-3 rounded-lg border-l-4 border-purple-300">{cred.why_needed}</p>
               </div>
             ))}
           </div>
@@ -394,7 +388,7 @@ const EnhancedCredentialForm = ({
                 )}
                 <span className="font-semibold text-xl">{testResult.message}</span>
                 {testResult.status_code && (
-                  <span className="bg-gray-200 text-gray-800 px-3 py-2 rounded-full text-sm font-mono">
+                  <span className="bg-white/50 text-gray-800 px-3 py-2 rounded-full text-sm font-mono">
                     Status: {testResult.status_code}
                   </span>
                 )}
@@ -406,7 +400,7 @@ const EnhancedCredentialForm = ({
                     variant="outline"
                     size="lg"
                     onClick={handleTogglePlayground}
-                    className="text-lg px-6 py-3"
+                    className="text-lg px-6 py-3 bg-white hover:bg-gray-50"
                   >
                     <Play className="h-5 w-5 mr-2" />
                     View Full API Response in Playground

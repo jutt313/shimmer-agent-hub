@@ -24,6 +24,7 @@ import PlatformCredentialManager from "@/components/PlatformCredentialManager";
 import ToolWorkflowDiagram from "@/components/ToolWorkflowDiagram";
 import { supabase } from "@/integrations/supabase/client";
 import { Json } from "@/integrations/supabase/types";
+import UniversalPlatformSeeder from "@/components/UniversalPlatformSeeder";
 
 interface KnowledgeEntry {
   id: string;
@@ -255,7 +256,7 @@ const KnowledgeAdmin = () => {
                 Universal Knowledge Admin
               </h1>
               <p className="text-gray-600">
-                Manage your AI's comprehensive platform knowledge database
+                Manage your AI's comprehensive platform knowledge database - Now supporting 500+ platforms
               </p>
             </div>
           </div>
@@ -280,10 +281,14 @@ const KnowledgeAdmin = () => {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200/50">
+          <TabsList className="grid w-full grid-cols-6 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200/50">
             <TabsTrigger value="dashboard" className="rounded-xl">
               <Database className="h-4 w-4 mr-2" />
               Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="universal-seeder" className="rounded-xl">
+              <Plus className="h-4 w-4 mr-2" />
+              Universal Seeder
             </TabsTrigger>
             <TabsTrigger value="chat" className="rounded-xl">
               <Brain className="h-4 w-4 mr-2" />
@@ -375,6 +380,24 @@ const KnowledgeAdmin = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* NEW: Universal Platform Seeder Tab */}
+          <TabsContent value="universal-seeder" className="mt-6">
+            <div className="space-y-6">
+              <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-6 rounded-2xl border border-purple-200">
+                <h2 className="text-xl font-bold text-purple-900 mb-2">Universal Platform Seeder</h2>
+                <p className="text-purple-700 mb-4">
+                  Seed your Universal Knowledge Store with 500+ platform configurations for AI-powered universal integration. 
+                  This includes CRM, Communication, E-commerce, Marketing, Social Media, Cloud Services, and Development Tools.
+                </p>
+                <div className="flex items-center gap-2 text-sm text-purple-600">
+                  <CheckCircle className="h-4 w-4" />
+                  <span>Works with your existing chat-AI system without modifications</span>
+                </div>
+              </div>
+              <UniversalPlatformSeeder />
+            </div>
           </TabsContent>
 
           {/* AI Assistant Tab */}

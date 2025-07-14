@@ -28,7 +28,7 @@ serve(async (req) => {
   try {
     console.log('🔄 Processing chat request')
     
-    const { message, messages = [], automationId, automationContext, requestType } = await req.json()
+    const { message, messages = [], automationId, automationContext, requestType, platformName } = await req.json()
     
     if (!message) {
       throw new Error('Message is required')
@@ -38,80 +38,66 @@ serve(async (req) => {
     console.log('🔧 Messages history length:', messages.length)
     console.log('🎯 Request type:', requestType || 'normal_chat')
 
-    // PHASE 1: Handle API Configuration Generation specifically
-    if (requestType === 'api_config_generation') {
-      console.log('🔧 API Configuration Generation Mode Activated')
+    // ENHANCED PHASE 1: Handle Platform Configuration Generation with Automation Context
+    if (requestType === 'platform_config' || requestType === 'api_config_generation') {
+      console.log('🔧 Enhanced Platform Configuration Generation Mode Activated')
+      console.log('🎯 Platform:', platformName || message)
+      console.log('🤖 Automation Context:', automationContext ? 'Available' : 'Not available')
       
-      const apiConfigPrompt = `You are an AI-powered API configuration generator. Generate complete, real API configurations for platform: ${message}
+      const targetPlatform = platformName || message;
+      
+      const enhancedConfigPrompt = `You are an advanced AI configuration generator. Generate REAL, working API configuration for platform: ${targetPlatform}
 
-CRITICAL REQUIREMENTS:
-- Generate REAL API endpoints and URLs (research actual platform APIs)
-- Provide complete authentication configurations
-- Include working test endpoints
-- Generate proper error handling patterns
-- Create detailed request/response examples
+AUTOMATION CONTEXT AWARENESS:
+${automationContext ? `
+Current Automation: ${automationContext.title || 'Untitled Automation'}
+Automation Description: ${automationContext.description || 'No description'}
+Automation Steps: ${automationContext.steps ? JSON.stringify(automationContext.steps) : 'No steps defined'}
+Platform Role in Automation: Generate API config that enables this specific automation workflow.
+` : 'No automation context available - generate general platform configuration.'}
+
+CRITICAL REQUIREMENTS FOR ${targetPlatform.toUpperCase()}:
+- Generate ACTUAL working API endpoints (research real ${targetPlatform} API documentation)
+- Use REAL authentication methods specific to ${targetPlatform}
+- Include WORKING test endpoints that actually exist
+- Generate REAL request/response examples based on actual ${targetPlatform} API
+- Consider automation context for relevant API operations
 
 Return ONLY this JSON structure:
 {
-  "api_configurations": [
-    {
-      "platform_name": "${message}",
-      "base_url": "REAL_API_BASE_URL",
-      "auth_config": {
-        "type": "bearer|api_key|oauth2|basic",
-        "location": "header|query|body",
-        "parameter_name": "Authorization|X-API-Key",
-        "format": "Bearer {token}|Key {api_key}",
-        "oauth2_config": {
-          "authorization_url": "REAL_OAUTH_URL",
-          "token_url": "REAL_TOKEN_URL",
-          "scopes": ["REAL_SCOPES"],
-          "grant_type": "authorization_code"
-        }
-      },
-      "test_endpoint": {
-        "method": "GET|POST",
-        "path": "/REAL_TEST_PATH",
-        "description": "Real test endpoint description",
-        "expected_response": {
-          "success": {"status": 200, "contains": ["REAL_FIELDS"]},
-          "failure": {"status": 401, "message": "REAL_ERROR_MESSAGE"}
-        },
-        "headers": {
-          "Content-Type": "application/json",
-          "User-Agent": "YusrAI-Universal-Integrator/3.0"
-        },
-        "sample_request": {
-          "url": "COMPLETE_REQUEST_URL",
-          "method": "GET|POST",
-          "headers": {"Authorization": "REAL_AUTH_HEADER"}
-        },
-        "sample_response": {
-          "success": {"REAL_SUCCESS_DATA": "REAL_VALUES"},
-          "error": {"error": "REAL_ERROR_CODE", "message": "REAL_ERROR_MESSAGE"}
-        }
-      },
-      "common_endpoints": [
-        {
-          "name": "REAL_ENDPOINT_NAME",
-          "method": "GET|POST|PUT|DELETE",
-          "path": "/REAL_PATH",
-          "description": "REAL_DESCRIPTION"
-        }
-      ],
-      "error_patterns": [
-        {"status": 401, "pattern": "unauthorized|invalid.*token", "action": "refresh_credentials"},
-        {"status": 429, "pattern": "rate.*limit", "action": "retry_with_backoff"},
-        {"status": 403, "pattern": "forbidden", "action": "check_permissions"}
-      ],
-      "rate_limits": {
-        "requests_per_minute": 60,
-        "requests_per_hour": 1000,
-        "burst_limit": 10
-      }
-    }
-  ]
-}`
+  "platform_name": "${targetPlatform}",
+  "base_url": "REAL_${targetPlatform.toUpperCase()}_API_BASE_URL",
+  "test_endpoint": {
+    "method": "GET",
+    "path": "/REAL_TEST_ENDPOINT_PATH",
+    "description": "Real working test endpoint for ${targetPlatform}"
+  },
+  "auth_config": {
+    "type": "bearer",
+    "header_format": "Bearer {token}",
+    "field_names": ["api_key", "access_token", "personal_access_token", "token"]
+  },
+  "sample_request": {
+    "url": "COMPLETE_REAL_URL_FOR_${targetPlatform.toUpperCase()}",
+    "method": "GET|POST",
+    "headers": {"Authorization": "Bearer {token}"},
+    "body": {}
+  },
+  "sample_response": {
+    "status": 200,
+    "data": "REAL_${targetPlatform.toUpperCase()}_RESPONSE_STRUCTURE"
+  }
+}
+
+SPECIFIC PLATFORM CONFIGURATIONS (USE REAL ENDPOINTS):
+- OpenAI: base_url "https://api.openai.com", test "/v1/models", auth "Bearer {api_key}"
+- Typeform: base_url "https://api.typeform.com", test "/me", auth "Bearer {personal_access_token}"  
+- Google Sheets: base_url "https://sheets.googleapis.com", test "/v4/spreadsheets", auth "Bearer {access_token}"
+- Slack: base_url "https://slack.com/api", test "/auth.test", auth "Bearer {token}"
+- HubSpot: base_url "https://api.hubapi.com", test "/crm/v3/owners", auth "Bearer {access_token}"
+- Airtable: base_url "https://api.airtable.com", test "/v0/meta/bases", auth "Bearer {api_key}"
+
+Generate WORKING configuration for ${targetPlatform} that enables real API testing.`
 
       const apiConfigResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -122,8 +108,8 @@ Return ONLY this JSON structure:
         body: JSON.stringify({
           model: 'gpt-4o-mini',
           messages: [
-            { role: "system", content: apiConfigPrompt },
-            { role: "user", content: `Generate complete API configuration for ${message}` }
+            { role: "system", content: enhancedConfigPrompt },
+            { role: "user", content: `Generate REAL working API configuration for ${targetPlatform} with automation context awareness.` }
           ],
           max_tokens: 2000,
           temperature: 0.1,
@@ -136,14 +122,15 @@ Return ONLY this JSON structure:
         const apiConfig = apiConfigData.choices[0]?.message?.content
         
         if (apiConfig) {
-          console.log('✅ API Configuration generated successfully')
+          console.log('✅ Enhanced API Configuration generated successfully for', targetPlatform)
+          console.log('📋 Config preview:', apiConfig.substring(0, 200) + '...')
           return new Response(apiConfig, {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           })
         }
       }
       
-      console.warn('⚠️ API config generation failed, using fallback')
+      console.warn('⚠️ Enhanced API config generation failed, using fallback')
     }
 
     // Get universal knowledge as separate memory

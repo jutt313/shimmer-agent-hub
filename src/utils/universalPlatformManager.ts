@@ -136,23 +136,39 @@ Return ONLY the JSON configuration.`,
         };
       }
 
-      // Build request
+      // ENHANCED REQUEST BUILDING WITH PROPER CREDENTIAL INSERTION
       const testUrl = config.base_url + config.test_endpoint.path;
+      
+      // Build authorization header with ACTUAL credential value
+      let authorizationHeader = config.auth_config.header_format;
+      authorizationHeader = authorizationHeader
+        .replace('{token}', credentialValue)
+        .replace('{api_key}', credentialValue)
+        .replace('{personal_access_token}', credentialValue)
+        .replace('{access_token}', credentialValue)
+        .replace('{bearer_token}', credentialValue)
+        .replace('{auth_token}', credentialValue);
+      
       const headers = {
         'Content-Type': 'application/json',
         'User-Agent': 'YusrAI-Universal-Tester/3.0',
-        'Authorization': config.auth_config.header_format.replace('{token}', credentialValue)
-          .replace('{api_key}', credentialValue)
-          .replace('{personal_access_token}', credentialValue)
-          .replace('{access_token}', credentialValue)
+        'Authorization': authorizationHeader
       };
+
+      console.log(`🔑 Authorization header: ${authorizationHeader.replace(credentialValue, '***HIDDEN***')}`);
 
       const requestDetails = {
         url: testUrl,
         method: config.test_endpoint.method,
-        headers: { ...headers, Authorization: headers.Authorization.replace(credentialValue, '***HIDDEN***') },
+        headers: { 
+          ...headers, 
+          Authorization: headers.Authorization.replace(credentialValue, '***HIDDEN***')
+        },
+        body: config.test_endpoint.method === 'POST' ? {} : null,
         platform: platformName,
-        ai_generated: true
+        ai_generated: true,
+        credential_found: true,
+        field_detected: Object.keys(credentials).find(key => credentials[key] === credentialValue)
       };
 
       console.log(`📡 Making universal API call to: ${testUrl}`);
@@ -209,15 +225,57 @@ Return ONLY the JSON configuration.`,
   }
 
   /**
-   * Find credential value from multiple possible field names
+   * ENHANCED CREDENTIAL DETECTION - Find ANY credential field dynamically
    */
   private static findCredentialValue(credentials: Record<string, string>, fieldNames: string[]): string | null {
-    for (const fieldName of fieldNames) {
-      const value = credentials[fieldName] || credentials[fieldName.toLowerCase()] || credentials[fieldName.replace('_', '')];
+    console.log('🔍 Finding credential value from fields:', fieldNames);
+    console.log('📋 Available credentials:', Object.keys(credentials));
+    
+    // ENHANCED FIELD MATCHING - Check multiple variations
+    const allPossibleNames = [
+      ...fieldNames,
+      'api_key', 'API Key', 'apikey', 'apiKey', 'key',
+      'access_token', 'Access Token', 'accesstoken', 'accessToken', 'token',
+      'personal_access_token', 'Personal Access Token', 'personalAccessToken',
+      'bearer_token', 'Bearer Token', 'bearerToken',
+      'auth_token', 'Auth Token', 'authToken',
+      'client_secret', 'Client Secret', 'clientSecret', 'secret',
+      'password', 'Password', 'pwd'
+    ];
+    
+    for (const fieldName of allPossibleNames) {
+      // Check exact match
+      if (credentials[fieldName] && credentials[fieldName].trim()) {
+        console.log(`✅ Found credential in field: ${fieldName}`);
+        return credentials[fieldName].trim();
+      }
+      
+      // Check case variations
+      const variations = [
+        fieldName.toLowerCase(),
+        fieldName.toUpperCase(),
+        fieldName.replace(/[_\s]/g, ''),
+        fieldName.replace(/[_\s]/g, '').toLowerCase(),
+        fieldName.replace(/[_\s]/g, '').toUpperCase()
+      ];
+      
+      for (const variation of variations) {
+        if (credentials[variation] && credentials[variation].trim()) {
+          console.log(`✅ Found credential in variation: ${variation} (original: ${fieldName})`);
+          return credentials[variation].trim();
+        }
+      }
+    }
+    
+    // FALLBACK: Get any non-empty credential value
+    for (const [key, value] of Object.entries(credentials)) {
       if (value && value.trim()) {
+        console.log(`⚠️ Using fallback credential from field: ${key}`);
         return value.trim();
       }
     }
+    
+    console.log('❌ No credential value found');
     return null;
   }
 

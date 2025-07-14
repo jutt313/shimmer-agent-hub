@@ -126,4 +126,75 @@ export class AutomationCredentialManager {
       return null;
     }
   }
+
+  /**
+   * Get all credentials for automation - MISSING METHOD FIXED
+   */
+  static async getAllCredentials(
+    automationId: string,
+    userId: string
+  ): Promise<AutomationCredential[]> {
+    try {
+      const { data, error } = await supabase
+        .from('automation_platform_credentials')
+        .select('*')
+        .eq('automation_id', automationId)
+        .eq('user_id', userId)
+        .eq('is_active', true);
+
+      if (error) {
+        console.error('Failed to get all credentials:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Failed to get all credentials:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Validate automation credentials - MISSING METHOD FIXED
+   */
+  static async validateAutomationCredentials(
+    automationId: string,
+    requiredPlatforms: string[],
+    userId: string
+  ): Promise<{
+    valid: boolean;
+    missing: string[];
+    untested: string[];
+  }> {
+    try {
+      const credentials = await this.getAllCredentials(automationId, userId);
+      const missing: string[] = [];
+      const untested: string[] = [];
+
+      for (const platform of requiredPlatforms) {
+        const platformCred = credentials.find(
+          c => c.platform_name.toLowerCase() === platform.toLowerCase()
+        );
+
+        if (!platformCred) {
+          missing.push(platform);
+        } else if (!platformCred.is_tested || platformCred.test_status !== 'success') {
+          untested.push(platform);
+        }
+      }
+
+      return {
+        valid: missing.length === 0 && untested.length === 0,
+        missing,
+        untested
+      };
+    } catch (error) {
+      console.error('Failed to validate automation credentials:', error);
+      return {
+        valid: false,
+        missing: requiredPlatforms,
+        untested: []
+      };
+    }
+  }
 }

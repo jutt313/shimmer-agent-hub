@@ -13,10 +13,10 @@ export interface AutomationCredential {
   test_message?: string;
 }
 
-// ENHANCED CREDENTIAL MANAGER - PHASE 1-5 IMPLEMENTATION
+// REAL CREDENTIAL MANAGER - INTEGRATED WITH REAL TESTING SYSTEM
 export class AutomationCredentialManager {
   /**
-   * PHASE 5: Enhanced credential testing with full transparency
+   * REAL CREDENTIAL TESTING - Using actual API calls via chat-ai configurations
    */
   static async testCredentials(
     userId: string,
@@ -25,72 +25,58 @@ export class AutomationCredentialManager {
     credentials: Record<string, string>
   ): Promise<{ success: boolean; message: string; details?: any }> {
     try {
-      console.log(`🌟 ENHANCED TESTING: ${platformName} with all 5 phases implemented`);
+      console.log(`🌟 REAL TESTING: ${platformName} with chat-ai integration`);
       
-      // PHASE 5: Call enhanced test-credential function with full transparency
+      // Call the REAL test-credential function
       const { data, error } = await supabase.functions.invoke('test-credential', {
         body: {
           platform_name: platformName,
           credentials: credentials,
           user_id: userId,
-          automation_id: automationId,
-          enhanced_mode: true,
-          phase_implementation: {
-            phase_1: 'standardized_communication',
-            phase_2: 'universal_knowledge_integration',
-            phase_3: 'enhanced_authentication',
-            phase_4: 'advanced_error_diagnosis',
-            phase_5: 'real_time_transparency'
-          }
+          automation_id: automationId
         }
       });
 
       if (error) {
-        console.error('❌ Enhanced credential test error:', error);
+        console.error('❌ Real credential test error:', error);
         return {
           success: false,
           message: `Failed to test ${platformName} credentials: ${error.message}`,
           details: { 
             error: error.message,
-            enhanced_system: true,
-            phase_status: 'ERROR'
+            real_testing: true
           }
         };
       }
 
-      console.log(`✅ ENHANCED TEST RESULT for ${platformName}:`, data);
+      console.log(`✅ REAL TEST RESULT for ${platformName}:`, data);
       
-      // PHASE 4: Enhanced response with detailed analysis
       return {
         success: data.success,
         message: data.message,
         details: {
           ...data.details,
-          enhanced_testing: true,
-          phase_implementation_status: data.details?.phase_markers || 'ALL_PHASES_ACTIVE',
-          performance_metrics: data.performance_metrics,
-          real_time_transparency: true
+          real_api_testing: true,
+          chat_ai_powered: true
         }
       };
 
     } catch (error: any) {
-      console.error(`💥 Enhanced testing system error for ${platformName}:`, error);
+      console.error(`💥 Real testing system error for ${platformName}:`, error);
       
       return {
         success: false,
-        message: `Enhanced testing system error for ${platformName}: ${error.message}`,
+        message: `Real testing system error for ${platformName}: ${error.message}`,
         details: { 
           error: error.message,
-          enhanced_system: true,
-          system_status: 'ERROR',
-          phase_implementation: 'FAILED'
+          real_testing: true
         }
       };
     }
   }
 
   /**
-   * Save credentials for a specific automation (ONLY after successful test)
+   * Save credentials for a specific automation (ONLY after successful REAL test)
    */
   static async saveCredentials(
     automationId: string,
@@ -105,7 +91,7 @@ export class AutomationCredentialManager {
           automation_id: automationId,
           user_id: userId,
           platform_name: platformName.toLowerCase(),
-          credential_type: 'oauth2',
+          credential_type: 'api_key',
           credentials: JSON.stringify(credentials),
           is_active: true,
           is_tested: true,
@@ -116,7 +102,7 @@ export class AutomationCredentialManager {
 
       if (error) throw error;
 
-      console.log(`✅ Saved enhanced-tested credentials for ${platformName} in automation ${automationId}`);
+      console.log(`✅ Saved REAL-tested credentials for ${platformName} in automation ${automationId}`);
       return { success: true };
     } catch (error: any) {
       console.error(`❌ Failed to save credentials for ${platformName}:`, error);
@@ -125,7 +111,7 @@ export class AutomationCredentialManager {
   }
 
   /**
-   * Get credentials for a specific automation and platform
+   * Get credentials for execution
    */
   static async getCredentials(
     automationId: string,

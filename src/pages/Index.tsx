@@ -58,7 +58,7 @@ const Index = () => {
     setIsLoading(true);
 
     try {
-      console.log('🚀 Sending message via ChatAIConnectionService:', currentMessage);
+      console.log('🚀 Sending message via Enhanced ChatAIConnectionService:', currentMessage);
       
       const result = await executeChatRequest(async () => {
         const response = await chatAIConnectionService.processConnectionRequest({
@@ -69,7 +69,7 @@ const Index = () => {
             isBot: msg.isBot,
             message_content: msg.text
           })),
-          context: 'general_chat',
+          context: 'automation_creation',
           automationContext: currentAgentConfig ? {
             agentConfig: currentAgentConfig.config || {},
             llmProvider: currentAgentConfig.llmProvider || 'OpenAI',
@@ -77,79 +77,55 @@ const Index = () => {
           } : undefined
         });
 
-        console.log('✅ Received response from ChatAIConnectionService:', response);
+        console.log('✅ Received enhanced response from ChatAIConnectionService:', response);
         return response;
       }, {
-        userAction: 'Sending chat message',
+        userAction: 'Creating automation request',
         additionalContext: `Message: "${currentMessage}"`
       });
 
-      console.log('🔍 Processing result:', result);
+      console.log('🔍 Processing enhanced result:', result);
       
-      // Enhanced response processing with comprehensive null prevention
-      let responseText = "I'm here to help you build comprehensive automations with specific platform integrations.";
+      // Enhanced response processing
+      let responseText = "I'm ready to help you create comprehensive automations with the right platforms and credentials.";
       let structuredData = null;
+      let errorHelpAvailable = false;
       
       if (result && typeof result === 'object') {
-        console.log('📊 Result analysis:', {
+        console.log('📊 Enhanced result analysis:', {
           hasResponse: !!result.response,
           responseType: typeof result.response,
           responseLength: result.response?.length || 0,
           hasStructuredData: !!result.structuredData,
+          errorHelpAvailable: !!result.error_help_available,
           responsePreview: result.response?.substring(0, 50)
         });
         
-        // Primary: Use response text if available and valid
+        // Use response text if available and valid
         if (result.response && 
             typeof result.response === 'string' && 
             result.response.trim() !== '' && 
-            result.response.trim() !== 'null' && 
-            result.response.toLowerCase() !== 'null' &&
-            !result.response.includes('undefined')) {
+            result.response.trim() !== 'null') {
           responseText = result.response;
-          console.log('✅ Using response text from service');
+          console.log('✅ Using enhanced response text from service');
         }
         
-        // Store structured data
+        // Store structured data and error help status
         if (result.structuredData && typeof result.structuredData === 'object') {
           structuredData = result.structuredData;
-          console.log('✅ Structured data available');
-          
-          // Fallback: If response is null/empty but we have structured data summary
-          if ((!result.response || 
-               result.response.trim() === '' || 
-               result.response.trim() === 'null' || 
-               result.response.toLowerCase() === 'null') && 
-              structuredData.summary && 
-              typeof structuredData.summary === 'string' &&
-              structuredData.summary.trim() !== '') {
-            responseText = structuredData.summary;
-            console.log('✅ Using summary from structured data as fallback');
-          }
-          
-          // Additional fallback: Use clarification questions if available
-          else if ((!result.response || 
-                    result.response.trim() === '' || 
-                    result.response.trim() === 'null') && 
-                   structuredData.clarification_questions && 
-                   Array.isArray(structuredData.clarification_questions) && 
-                   structuredData.clarification_questions.length > 0) {
-            responseText = "I need some clarification to provide the best solution:\n\n" + 
-              structuredData.clarification_questions.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n');
-            console.log('✅ Using clarification questions as fallback');
-          }
+          console.log('✅ Enhanced structured data available');
         }
+
+        errorHelpAvailable = result.error_help_available || false;
       }
       
-      // Final comprehensive safety check
+      // Final validation
       if (!responseText || 
           responseText.trim() === '' || 
           responseText.toLowerCase().includes('null') || 
-          responseText === 'null' ||
-          responseText === 'undefined' ||
-          responseText.toLowerCase() === 'undefined') {
-        console.warn('⚠️ Final safety check triggered - using emergency fallback response');
-        responseText = "I'm ready to help you create a comprehensive automation. Please specify the exact platforms you'd like to integrate (like Gmail, Slack, HubSpot, Salesforce, etc.) and I'll provide complete setup instructions.";
+          responseText === 'null') {
+        console.warn('⚠️ Enhanced safety check triggered - using comprehensive fallback response');
+        responseText = "I'm ready to help you create comprehensive automations. Please specify the platforms you'd like to integrate (like Gmail, Slack, HubSpot, etc.) and I'll provide complete setup instructions.";
       }
       
       const botResponse = {
@@ -157,26 +133,29 @@ const Index = () => {
         text: responseText,
         isBot: true,
         timestamp: new Date(),
-        structuredData: structuredData
+        structuredData: structuredData,
+        error_help_available: errorHelpAvailable
       };
       
-      console.log('📤 Adding bot response:', {
+      console.log('📤 Adding enhanced bot response:', {
         textLength: botResponse.text.length,
         textPreview: botResponse.text.substring(0, 100),
-        hasStructuredData: !!botResponse.structuredData
+        hasStructuredData: !!botResponse.structuredData,
+        errorHelpAvailable: botResponse.error_help_available
       });
       
       setMessages(prev => [...prev, botResponse]);
 
     } catch (error: any) {
-      console.error('❌ Error in chat request:', error);
-      handleError(error, 'Chat message sending');
+      console.error('❌ Error in enhanced chat request:', error);
+      handleError(error, 'Enhanced chat message sending');
       
       const errorResponse = {
         id: Date.now() + 1,
         text: "I encountered a technical issue, but I'm ready to help you create your automation. Please rephrase your request with specific platform names (like Gmail, Slack, HubSpot, etc.) and I'll provide a complete solution.",
         isBot: true,
-        timestamp: new Date()
+        timestamp: new Date(),
+        error_help_available: true
       };
       setMessages(prev => [...prev, errorResponse]);
       
@@ -275,6 +254,15 @@ const Index = () => {
           <ChatCard 
             messages={messages} 
             isLoading={isLoading}
+            onSendMessage={(helpMessage) => {
+              setMessage(helpMessage);
+              // Automatically send the help message
+              setTimeout(() => {
+                if (!isLoading) {
+                  handleSendMessage();
+                }
+              }, 100);
+            }}
           />
         </div>
         

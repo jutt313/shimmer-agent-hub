@@ -1,3 +1,4 @@
+
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Plus, X, Play, User } from 'lucide-react';
@@ -8,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { agentStateManager } from '@/utils/agentStateManager';
+import ErrorHelpButton from './ErrorHelpButton';
 
 interface Message {
   id: number;
@@ -15,6 +17,7 @@ interface Message {
   isBot: boolean;
   timestamp: Date;
   structuredData?: StructuredResponse;
+  error_help_available?: boolean;
 }
 
 interface ChatCardProps {
@@ -56,7 +59,7 @@ const ChatCard = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // Optimize messages for performance with safe array handling
+  // Optimize messages for performance
   const optimizeMessages = (msgs: Message[]) => {
     try {
       if (!Array.isArray(msgs)) {
@@ -72,39 +75,14 @@ const ChatCard = ({
 
   const optimizedMessages = optimizeMessages(messages);
 
-  // ENHANCED safe text formatting with bulletproof error recovery
+  // Enhanced safe text formatting
   const safeFormatMessageText = (inputText: string | undefined | null): React.ReactNode[] => {
     try {
       if (!inputText || typeof inputText !== 'string') {
         return [<span key="fallback-input-error">Message content unavailable.</span>];
       }
 
-      // Check if the text looks like broken JSON and try to clean it
-      if (inputText.includes('{') && inputText.includes('}')) {
-        try {
-          // Try to parse as structured response first
-          const structured = parseStructuredResponse(inputText);
-          if (structured) {
-            // If we can parse it as structured data, don't show raw JSON
-            return [<span key="structured-content">Processing automation details...</span>];
-          }
-        } catch (e) {
-          // If it's broken JSON, try to extract readable parts
-          const cleanText = inputText
-            .replace(/\{[\s\S]*?\}/g, '') // Remove JSON blocks
-            .replace(/```json[\s\S]*?```/g, '') // Remove JSON code blocks
-            .replace(/^[\s\n]*/, '') // Remove leading whitespace
-            .replace(/[\s\n]*$/, '') // Remove trailing whitespace
-            .trim();
-          
-          if (cleanText && cleanText.length > 0) {
-            inputText = cleanText;
-          } else {
-            return [<span key="processing-message">Processing your automation request...</span>];
-          }
-        }
-      }
-
+      // Clean and format text
       const cleanHtmlString = cleanDisplayText(inputText);
       
       if (typeof cleanHtmlString !== 'string') {
@@ -144,9 +122,19 @@ const ChatCard = ({
     }
   };
 
+  // Handle error help requests
+  const handleErrorHelp = (errorMessage?: string) => {
+    const helpMessage = errorMessage ? 
+      `I encountered this error: "${errorMessage}". Can you help me resolve it and continue with my automation?` :
+      "I need help with an error I encountered. Can you assist me?";
+    
+    if (onSendMessage) {
+      onSendMessage(helpMessage);
+    }
+  };
+
   // Check if all platforms are configured and agents handled
   const checkReadyForExecution = () => {
-    // Get platforms from latest bot message
     const latestBotMessage = messages.filter(msg => msg.isBot).pop();
     if (!latestBotMessage?.structuredData?.platforms) return false;
 
@@ -156,16 +144,15 @@ const ChatCard = ({
       platformCredentialStatus[platform.name] === 'tested'
     );
 
-    // Check if all agents are handled (added or dismissed)
     const agents = latestBotMessage.structuredData.agents || [];
     const allAgentsHandled = agents.every(agent => 
-      dismissedAgents.has(agent.name) // Agent was dismissed
+      dismissedAgents.has(agent.name)
     );
 
     return allPlatformsConfigured && allAgentsHandled && platforms.length > 0;
   };
 
-  // Enhanced automation execution with agent state
+  // Enhanced automation execution
   const handleExecuteAutomation = async () => {
     if (!user?.id) {
       toast({
@@ -187,9 +174,8 @@ const ChatCard = ({
     }
 
     try {
-      console.log('🚀 Executing automation with agent state');
+      console.log('🚀 Executing automation with enhanced capabilities');
       
-      // Include agent decisions in execution data
       const agentDecisions = agentStateManager.getAllDecisions();
       
       const { data, error } = await supabase.functions.invoke('execute-automation', {
@@ -231,7 +217,7 @@ const ChatCard = ({
     }
   };
 
-  const renderStructuredContent = (structuredData: StructuredResponse) => {
+  const renderStructuredContent = (structuredData: StructuredResponse, showErrorHelp: boolean = false) => {
     const content = [];
 
     try {
@@ -240,11 +226,17 @@ const ChatCard = ({
         content.push(
           <div key="summary" className="mb-4">
             <p className="text-gray-800 leading-relaxed">{structuredData.summary}</p>
+            {showErrorHelp && (
+              <ErrorHelpButton 
+                errorMessage={structuredData.summary}
+                onHelpRequest={() => handleErrorHelp(structuredData.summary)}
+              />
+            )}
           </div>
         );
       }
 
-      // Steps - Safe array rendering without numbering
+      // Steps - Safe array rendering
       if (Array.isArray(structuredData.steps) && structuredData.steps.length > 0) {
         content.push(
           <div key="steps" className="mb-4">
@@ -261,93 +253,88 @@ const ChatCard = ({
         );
       }
 
-      // Enhanced Platforms rendering with smaller buttons (6 per row) and color coding
+      // Enhanced Platforms rendering with color coding
       if (Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
-        try {
-          const validPlatforms = structuredData.platforms.filter(platform => 
-            platform && typeof platform === 'object' && platform.name && typeof platform.name === 'string'
-          );
-          
-          if (validPlatforms.length > 0) {
-            content.push(
-              <div key="platforms" className="mb-4">
-                <p className="font-medium text-gray-800 mb-3">Required Platform Credentials:</p>
-                <div className="grid grid-cols-6 gap-2 mb-4">
-                  {validPlatforms.map((platform, index) => {
-                    const platformName = platform.name || 'Unknown Platform';
-                    const status = platformCredentialStatus[platformName] || 'unsaved';
-                    
-                    const getButtonColor = () => {
-                      switch (status) {
-                        case 'saved':
-                        case 'tested':
-                          return 'bg-green-100 hover:bg-green-200 text-green-800 border-green-300';
-                        case 'unsaved':
-                        default:
-                          return 'bg-red-100 hover:bg-red-200 text-red-800 border-red-300';
-                      }
-                    };
-                    
-                    return (
-                      <Button
-                        key={`platform-${index}`}
-                        size="sm"
-                        variant="outline"
-                        className={`text-xs h-8 px-2 rounded-lg ${getButtonColor()} transition-colors`}
-                      >
-                        {platformName}
-                      </Button>
-                    );
-                  })}
-                </div>
-                
-                {/* Platform details */}
-                <div className="text-gray-700 space-y-2">
-                  {validPlatforms.map((platform, index) => {
-                    const platformName = platform.name || 'Unknown Platform';
-                    
-                    return (
-                      <div key={`platform-detail-${index}`} className="bg-blue-50/30 p-3 rounded-lg border border-blue-200/50">
-                        <p className="font-medium text-gray-800 mb-2">{platformName}</p>
-                        {Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
-                          <div className="text-sm text-gray-600 space-y-1">
-                            {platform.credentials.map((cred, credIndex) => {
-                              if (cred && typeof cred === 'object' && cred.field) {
-                                const fieldName = String(cred.field).replace(/_/g, ' ').toUpperCase();
-                                return (
-                                  <div key={`cred-${credIndex}`} className="flex items-center justify-between">
-                                    <span>• {fieldName}: {cred.why_needed || 'Required for integration'}</span>
-                                    {cred.link && (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => window.open(cred.link, '_blank')}
-                                        className="ml-2 h-6 px-2 py-1 text-xs"
-                                      >
-                                        Get
-                                      </Button>
-                                    )}
-                                  </div>
-                                );
-                              }
-                              return null;
-                            }).filter(Boolean)}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+        const validPlatforms = structuredData.platforms.filter(platform => 
+          platform && typeof platform === 'object' && platform.name && typeof platform.name === 'string'
+        );
+        
+        if (validPlatforms.length > 0) {
+          content.push(
+            <div key="platforms" className="mb-4">
+              <p className="font-medium text-gray-800 mb-3">Required Platform Credentials:</p>
+              <div className="grid grid-cols-6 gap-2 mb-4">
+                {validPlatforms.map((platform, index) => {
+                  const platformName = platform.name || 'Unknown Platform';
+                  const status = platformCredentialStatus[platformName] || 'unsaved';
+                  
+                  const getButtonColor = () => {
+                    switch (status) {
+                      case 'saved':
+                      case 'tested':
+                        return 'bg-green-100 hover:bg-green-200 text-green-800 border-green-300';
+                      case 'unsaved':
+                      default:
+                        return 'bg-red-100 hover:bg-red-200 text-red-800 border-red-300';
+                    }
+                  };
+                  
+                  return (
+                    <Button
+                      key={`platform-${index}`}
+                      size="sm"
+                      variant="outline"
+                      className={`text-xs h-8 px-2 rounded-lg ${getButtonColor()} transition-colors`}
+                    >
+                      {platformName}
+                    </Button>
+                  );
+                })}
               </div>
-            );
-          }
-        } catch (platformsError) {
-          console.error('Error rendering platforms section:', platformsError);
-          handleError(platformsError, 'Platforms section rendering');
+              
+              {/* Platform details */}
+              <div className="text-gray-700 space-y-2">
+                {validPlatforms.map((platform, index) => {
+                  const platformName = platform.name || 'Unknown Platform';
+                  
+                  return (
+                    <div key={`platform-detail-${index}`} className="bg-blue-50/30 p-3 rounded-lg border border-blue-200/50">
+                      <p className="font-medium text-gray-800 mb-2">{platformName}</p>
+                      {Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
+                        <div className="text-sm text-gray-600 space-y-1">
+                          {platform.credentials.map((cred, credIndex) => {
+                            if (cred && typeof cred === 'object' && cred.field) {
+                              const fieldName = String(cred.field).replace(/_/g, ' ').toUpperCase();
+                              return (
+                                <div key={`cred-${credIndex}`} className="flex items-center justify-between">
+                                  <span>• {fieldName}: {cred.why_needed || 'Required for integration'}</span>
+                                  {cred.link && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => window.open(cred.link, '_blank')}
+                                      className="ml-2 h-6 px-2 py-1 text-xs"
+                                    >
+                                      Get
+                                    </Button>
+                                  )}
+                                </div>
+                              );
+                            }
+                            return null;
+                          }).filter(Boolean)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
         }
       }
 
-      // Clarification Questions - Safe rendering without numbering
+      // Clarification Questions
       if (Array.isArray(structuredData.clarification_questions) && structuredData.clarification_questions.length > 0) {
         content.push(
           <div key="clarification" className="mb-4">
@@ -364,7 +351,7 @@ const ChatCard = ({
         );
       }
 
-      // Enhanced AI Agents rendering with state management
+      // Enhanced AI Agents rendering
       if (Array.isArray(structuredData.agents) && structuredData.agents.length > 0) {
         content.push(
           <div key="agents" className="mb-4">
@@ -377,7 +364,6 @@ const ChatCard = ({
 
                 const agentStatus = agentStateManager.getAgentStatus(agent.name);
                 
-                // Don't show agents that have been handled
                 if (agentStatus !== 'pending') {
                   return null;
                 }
@@ -415,24 +401,21 @@ const ChatCard = ({
         );
       }
 
-      // Show agent decision summary if any decisions made
-      const agentSummary = agentStateManager.getStatusSummary();
-      if (agentSummary) {
-        content.push(
-          <div key="agent-summary" className="mb-4">
-            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-sm text-blue-800 font-medium">Agent Status:</p>
-              <p className="text-xs text-blue-600 mt-1">{agentSummary}</p>
-            </div>
-          </div>
-        );
-      }
-
       return content;
     } catch (error: any) {
       console.error('Critical error in renderStructuredContent:', error);
       handleError(error, 'Structured content rendering');
-      return [<div key="error" className="text-blue-600 p-4 bg-blue-50 rounded-lg">I'm processing your automation request. Please wait...</div>];
+      return [
+        <div key="error" className="text-blue-600 p-4 bg-blue-50 rounded-lg">
+          I'm processing your automation request. Please wait...
+          {showErrorHelp && (
+            <ErrorHelpButton 
+              errorMessage="Content rendering error"
+              onHelpRequest={() => handleErrorHelp("I encountered an error while displaying the automation details.")}
+            />
+          )}
+        </div>
+      ];
     }
   };
 
@@ -450,7 +433,7 @@ const ChatCard = ({
           {optimizedMessages.map(message => {
             let structuredData = message.structuredData;
             
-            // ENHANCED: Try to parse structured data from bot messages
+            // Try to parse structured data from bot messages
             if (message.isBot && !structuredData) {
               try {
                 structuredData = parseStructuredResponse(message.text);
@@ -466,12 +449,7 @@ const ChatCard = ({
                   message.isBot 
                     ? 'bg-white border border-blue-100/50 text-gray-800 shadow-lg backdrop-blur-sm' 
                     : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
-                  } transition-all duration-300 overflow-hidden`} 
-                  style={message.isBot ? {
-                    boxShadow: '0 0 25px rgba(59, 130, 246, 0.1)'
-                  } : {
-                    boxShadow: '0 0 25px rgba(92, 142, 246, 0.25)'
-                  }}
+                  } transition-all duration-300 overflow-hidden`}
                 >
                   {message.isBot && (
                     <div className="flex items-center gap-2 mb-2">
@@ -484,22 +462,27 @@ const ChatCard = ({
                     </div>
                   )}
                   
-                  {message.isBot ? (
-                    <div className="flex items-start gap-2">
-                      <User className="w-4 h-4 mt-1 flex-shrink-0 text-white" />
+                  {!message.isBot && (
+                    <div className="flex items-start gap-2 mb-2">
+                      <User className="w-4 h-4 mt-1 flex-shrink-0" />
                       <span className="text-sm">You</span>
                     </div>
-                  ) : null}
+                  )}
 
                   {/* Render structured content for bot messages if available */}
                   {message.isBot && structuredData ? (
                     <div className="leading-relaxed">
-                      {renderStructuredContent(structuredData)}
+                      {renderStructuredContent(structuredData, message.error_help_available)}
                     </div>
                   ) : (
-                    /* Show formatted text for user messages or if no structured data */
                     <div className="leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
-                      {safeFormatMessageText(message.text)} 
+                      {safeFormatMessageText(message.text)}
+                      {message.isBot && message.error_help_available && (
+                        <ErrorHelpButton 
+                          errorMessage={message.text}
+                          onHelpRequest={() => handleErrorHelp(message.text)}
+                        />
+                      )}
                     </div>
                   )}
                   
@@ -514,7 +497,7 @@ const ChatCard = ({
             );
           })}
           
-          {/* Loading indicator with your logo */}
+          {/* Enhanced loading indicator */}
           {isLoading && (
             <div className="flex justify-start">
               <div className="max-w-4xl px-6 py-4 rounded-2xl bg-white border border-blue-100/50 text-gray-800 shadow-lg backdrop-blur-sm">

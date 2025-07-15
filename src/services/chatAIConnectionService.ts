@@ -16,6 +16,7 @@ export interface ChatAIConnectionResponse {
   requiresAuth?: boolean;
   authMessage?: string;
   structuredData?: any;
+  error_help_available?: boolean;
 }
 
 export class ChatAIConnectionService {
@@ -29,129 +30,156 @@ export class ChatAIConnectionService {
   }
 
   async processConnectionRequest(request: ChatAIConnectionRequest): Promise<ChatAIConnectionResponse> {
+    const startTime = Date.now();
+    
     try {
-      console.log('🚀 ChatAIConnectionService: Processing request', {
+      console.log('🚀 ChatAIConnectionService: Processing automation request', {
         hasMessage: !!request.message,
         messageLength: request.message?.length || 0,
         userId: request.userId,
         automationId: request.automationId,
-        hasMessages: !!request.messages,
+        hasAutomationContext: !!request.automationContext,
         messagesCount: request.messages?.length || 0
       });
 
-      // Ensure we have the required payload structure
       const payload = {
         message: request.message,
         messages: request.messages || [],
         automationId: request.automationId,
         automationContext: request.automationContext,
-        context: request.context || 'general',
+        context: request.context || 'automation_creation',
         userId: request.userId
       };
 
-      console.log('📋 Calling chat-ai with payload:', {
-        hasMessage: !!payload.message,
-        messageLength: payload.message?.length || 0,
-        messagesCount: payload.messages?.length || 0,
-        hasAutomationContext: !!payload.automationContext,
-        context: payload.context,
-        userId: payload.userId
-      });
+      console.log('🤖 Calling enhanced chat-ai function...');
 
       const { data, error } = await supabase.functions.invoke('chat-ai', {
         body: payload
       });
+
+      const responseTime = Date.now() - startTime;
+      console.log(`⚡ Chat-AI response received in ${responseTime}ms`);
 
       if (error) {
         console.error('❌ Supabase function error:', error);
         throw error;
       }
 
-      console.log('✅ Chat AI response received:', {
+      console.log('✅ Chat AI response analysis:', {
         hasData: !!data,
         dataType: typeof data,
         hasSummary: !!data?.summary,
         stepsCount: data?.steps?.length || 0,
         platformsCount: data?.platforms?.length || 0,
-        rawDataPreview: JSON.stringify(data).substring(0, 200)
+        agentsCount: data?.agents?.length || 0,
+        hasBlueprint: !!data?.automation_blueprint,
+        hasApiConfigs: !!data?.api_configurations,
+        clarificationCount: data?.clarification_questions?.length || 0,
+        responseTime: `${responseTime}ms`
       });
 
-      // Enhanced response processing with comprehensive null prevention
-      let responseText = "I'm here to help you build comprehensive automations with the right platforms.";
+      // Enhanced response processing with graceful handling
+      let responseText = "I'm ready to help you create a comprehensive automation with the right platforms and credentials.";
       let structuredData = null;
+      let errorHelpAvailable = false;
       
       if (data && typeof data === 'object') {
-        // Store the entire structured data
+        // Store the complete structured data
         structuredData = data;
+        errorHelpAvailable = data.error_help_available || false;
         
-        // Handle clarification-only responses
+        // Priority 1: Handle clarification-only responses
         if (data.clarification_questions && Array.isArray(data.clarification_questions) && data.clarification_questions.length > 0) {
           responseText = "I need some clarification to provide the best solution:\n\n" + 
             data.clarification_questions.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n');
         }
-        // Handle full responses with summary - prioritize summary
-        else if (data.summary && typeof data.summary === 'string' && data.summary.trim() !== '' && data.summary.trim() !== 'null') {
+        // Priority 2: Use summary if available and valid
+        else if (data.summary && typeof data.summary === 'string' && data.summary.trim() !== '') {
           responseText = data.summary;
         }
-        // Handle case where data exists but no summary - create from steps
+        // Priority 3: Generate from structured data
         else if (data.steps && Array.isArray(data.steps) && data.steps.length > 0) {
-          responseText = "I've created a comprehensive automation plan with " + data.steps.length + " detailed steps to achieve your goal.";
+          const platformCount = data.platforms?.length || 0;
+          const agentCount = data.agents?.length || 0;
+          responseText = `I've created a comprehensive automation plan with ${data.steps.length} steps` +
+            (platformCount > 0 ? `, ${platformCount} platform integrations` : '') +
+            (agentCount > 0 ? `, and ${agentCount} AI agents` : '') + 
+            ' to achieve your automation goals.';
         }
-        // Handle case where we have platforms but no summary
+        // Priority 4: Handle platforms-only response
         else if (data.platforms && Array.isArray(data.platforms) && data.platforms.length > 0) {
           const platformNames = data.platforms.map(p => p.name).join(', ');
-          responseText = `I've identified the platforms you'll need: ${platformNames}. Let me set up the complete automation workflow.`;
+          responseText = `I've identified the platforms you'll need: ${platformNames}. I'm setting up the complete automation workflow with all necessary credentials and configurations.`;
         }
-        // Final fallback if data exists but is incomplete
-        else {
-          responseText = "I'm analyzing your automation requirements and will provide a complete solution with all necessary platforms and credentials.";
-        }
-      } else if (typeof data === 'string' && data.trim() !== '' && data.trim() !== 'null') {
-        responseText = data;
       }
 
-      // Final comprehensive validation - ensure response is never null/empty
-      if (!responseText || 
-          responseText.trim() === '' || 
-          responseText.toLowerCase().includes('null') || 
-          responseText === 'null' ||
-          responseText === 'undefined') {
-        console.warn('⚠️ Detected null/empty response, using comprehensive fallback');
-        responseText = "I'm ready to help you create a comprehensive automation. Please let me know which specific platforms you'd like to integrate, and I'll provide complete setup instructions with all necessary credentials.";
+      // Final validation - ensure response is never empty
+      if (!responseText || responseText.trim() === '') {
+        console.warn('⚠️ Empty response detected, using fallback');
+        responseText = "I'm ready to help you create your automation. Please specify the platforms you'd like to integrate (like Gmail, Slack, HubSpot, etc.) and I'll provide complete setup instructions.";
       }
 
       console.log('📤 Final response processing:', {
         responseTextLength: responseText.length,
         responsePreview: responseText.substring(0, 100),
         hasStructuredData: !!structuredData,
-        structuredDataKeys: structuredData ? Object.keys(structuredData) : []
+        errorHelpAvailable,
+        totalProcessingTime: `${Date.now() - startTime}ms`
       });
 
       return {
         response: responseText,
         requiresAuth: false,
-        structuredData: structuredData
+        structuredData: structuredData,
+        error_help_available: errorHelpAvailable
       };
 
     } catch (error) {
-      console.error('❌ ChatAIConnectionService: Error processing request:', error);
+      const responseTime = Date.now() - startTime;
+      console.error(`❌ ChatAIConnectionService: Error after ${responseTime}ms:`, error);
       
-      // Enhanced error response
+      // Graceful error response with chat help
       return {
         response: "I encountered a technical issue, but I'm ready to help you create your automation. Please rephrase your request with specific platform names (like Gmail, Slack, HubSpot, etc.) and I'll provide a complete solution.",
         requiresAuth: false,
+        error_help_available: true,
         structuredData: {
           summary: "Technical issue resolved - ready to build your automation",
           steps: [
-            "Step 1: Specify the exact platforms you want to integrate",
-            "Step 2: I'll provide complete credential requirements for each platform",
-            "Step 3: Build the automation workflow with proper error handling",
-            "Step 4: Test and deploy your automation"
+            "Specify the exact platforms you want to integrate",
+            "Describe the automation workflow you want to create", 
+            "I'll provide complete credential requirements for each platform",
+            "Build and test your automation with full support"
           ],
+          platforms: [],
+          api_configurations: [],
+          agents: [{
+            name: "TechnicalSupportAgent",
+            role: "Technical issue resolution and automation guidance specialist",
+            goal: "Help recover from technical issues and provide complete automation solutions",
+            rules: "Always provide helpful responses, ensure user can continue with automation creation",
+            memory: "Technical issue encountered - ready to provide full automation assistance",
+            why_needed: "Essential for maintaining reliable automation creation experience"
+          }],
           clarification_questions: [
             "Which specific platforms would you like to integrate? (e.g., Gmail, Slack, HubSpot, Salesforce)",
             "What specific outcome are you trying to achieve?"
-          ]
+          ],
+          automation_blueprint: {
+            version: "2.0.0",
+            description: "Error recovery - ready for automation creation",
+            trigger: { type: "manual" },
+            variables: { error_recovery: "active" },
+            steps: [],
+            error_handling: { retry_attempts: 3, fallback_actions: "user_guidance" }
+          },
+          conversation_updates: {
+            error_recovery: "Active - ready for automation assistance",
+            platform_support: "All platforms available",
+            automation_integration: "Ready for complete automation creation"
+          },
+          is_update: false,
+          recheck_status: "error_recovered_ready_for_request"
         }
       };
     }

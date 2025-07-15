@@ -1,16 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle,
-  DialogDescription 
-} from '@/components/ui/dialog';
 import { Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useParams } from 'react-router-dom';
-import AutomationPlatformCredentialForm from './AutomationPlatformCredentialForm';
+import ModernCredentialForm from './ModernCredentialForm';
 import { AutomationCredentialManager } from '@/utils/automationCredentialManager';
 
 interface Platform {
@@ -83,6 +76,7 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
   const handleCredentialSaved = () => {
     checkCredentialStatus();
     onCredentialChange?.();
+    setSelectedPlatform(null);
   };
 
   const getButtonStyle = (platform: Platform) => {
@@ -133,24 +127,15 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
         </p>
       </div>
 
-      <Dialog open={!!selectedPlatform} onOpenChange={() => setSelectedPlatform(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Configure {selectedPlatform?.name} Credentials</DialogTitle>
-            <DialogDescription>
-              Test your credentials first, then save them securely for this automation.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedPlatform && automationId && (
-            <AutomationPlatformCredentialForm
-              automationId={automationId}
-              platform={selectedPlatform}
-              onCredentialSaved={handleCredentialSaved}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      {selectedPlatform && automationId && (
+        <ModernCredentialForm
+          automationId={automationId}
+          platform={selectedPlatform}
+          onCredentialSaved={handleCredentialSaved}
+          onClose={() => setSelectedPlatform(null)}
+          isOpen={!!selectedPlatform}
+        />
+      )}
     </>
   );
 };

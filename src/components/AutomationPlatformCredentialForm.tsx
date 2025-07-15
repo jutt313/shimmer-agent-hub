@@ -1,6 +1,6 @@
 
 import React from 'react';
-import ModernCredentialForm from './ModernCredentialForm';
+import SimpleCredentialForm from './SimpleCredentialForm';
 
 interface PlatformCredentialFormProps {
   automationId: string;
@@ -17,7 +17,7 @@ interface PlatformCredentialFormProps {
 }
 
 const AutomationPlatformCredentialForm = (props: PlatformCredentialFormProps) => {
-  return <ModernCredentialForm {...props} isOpen={true} />;
+  return <SimpleCredentialForm {...props} />;
 };
 
 export default AutomationPlatformCredentialForm;

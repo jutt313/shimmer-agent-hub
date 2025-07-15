@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface UniversalPlatformConfig {
@@ -248,13 +249,17 @@ Return ONLY valid JSON with complete platform configuration including real autom
         sample_request: {
           model: 'gpt-4o-mini',
           messages: [
-            { role: 'system', content: automationContext ? 
-              `You are an AI assistant processing data for automation: ${automationContext.title || 'Unnamed Automation'}` : 
-              'You are a helpful AI assistant'
+            { 
+              role: 'system', 
+              content: automationContext ? 
+                `You are an AI assistant processing data for automation: ${automationContext.title || 'Unnamed Automation'}` : 
+                'You are a helpful AI assistant'
             },
-            { role: 'user', content: automationContext ? 
-              'Process this automation data: {automation_data}' : 
-              'Hello, how can you help?'
+            { 
+              role: 'user', 
+              content: automationContext ? 
+                'Process this automation data: {automation_data}' : 
+                'Hello, how can you help?'
             }
           ],
           max_tokens: 1000
@@ -279,7 +284,7 @@ Return ONLY valid JSON with complete platform configuration including real autom
             { property: 'Name', title: { is_not_empty: true } }
         },
         sample_response: {
-          results: [{ id: 'page_id', properties: { Name: { title: [{ text: { content: 'Sample Entry' } }] } }]
+          results: [{ id: 'page_id', properties: { Name: { title: [{ text: { content: 'Sample Entry' } }] } } }]
         },
         automation_context_required: true
       });
@@ -406,14 +411,12 @@ Return ONLY valid JSON with complete platform configuration including real autom
         path: '/action',
         description: `Perform an action using ${platformName}`,
         sample_request: {
-          url: `https://api.${lowerName.replace(/\s+/g, '')}.com/action`,
-          method: 'POST',
-          headers: { 'Authorization': 'Bearer {access_token}' },
-          body: { action: 'automation_action', data: automationContext || {} }
+          action: 'automation_action',
+          data: automationContext || {}
         },
         sample_response: {
-          success: { result: 'success', data: 'operation_completed' },
-          error: { error: 'operation_failed', message: 'Action could not be completed' }
+          result: 'success',
+          data: 'operation_completed'
         },
         automation_context_required: !!automationContext
       });

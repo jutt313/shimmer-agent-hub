@@ -125,12 +125,12 @@ const EnhancedCredentialForm = ({
       setTestResult({
         success: result.success,
         message: result.message,
-        status_code: result.status_code
+        status_code: result.response_details?.status || 200
       });
 
       setTestResponseData({
-        request: result.request_details,
-        response: result.response_details
+        request: result.response_details?.request || null,
+        response: result.response_details?.response || null
       });
       
       if (result.success) {

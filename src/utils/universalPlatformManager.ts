@@ -143,7 +143,9 @@ Return ONLY valid JSON with complete platform configuration including real autom
       }
 
       const knowledge = data[0];
-      const apiConfig = knowledge.details?.api_config || {};
+      const details = knowledge.details as any;
+      const apiConfig = details?.api_config || {};
+      const credentialFields = knowledge.credential_fields as any[];
       
       return {
         platform_name: knowledge.platform_name || platformName,
@@ -154,7 +156,7 @@ Return ONLY valid JSON with complete platform configuration including real autom
           location: 'header',
           parameter_name: 'Authorization',
           format: apiConfig.auth_config?.format || 'Bearer {token}',
-          field_names: knowledge.credential_fields?.map((c: any) => c.field) || ['api_key', 'access_token'],
+          field_names: credentialFields?.map((c: any) => c.field) || ['api_key', 'access_token'],
           oauth2_config: apiConfig.oauth2_config
         },
         automation_operations: this.generateAutomationOperations(platformName, automationContext, apiConfig),

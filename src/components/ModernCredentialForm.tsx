@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { AutomationCredentialManager } from '@/utils/automationCredentialManager';
 import { UniversalPlatformManager } from '@/utils/universalPlatformManager';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ModernCredentialFormProps {
   automationId: string;

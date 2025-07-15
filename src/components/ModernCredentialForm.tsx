@@ -4,9 +4,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Info, ExternalLink, TestTube, Save, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Info, ExternalLink, TestTube, Save, Eye, EyeOff, Loader2, Sparkles } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { AutomationCredentialManager } from '@/utils/automationCredentialManager';
+import { UniversalPlatformManager } from '@/utils/universalPlatformManager';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface ModernCredentialFormProps {
@@ -39,15 +40,22 @@ const ModernCredentialForm = ({
   const [isTesting, setIsTesting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
-  const [apiPayload, setApiPayload] = useState<any>(null);
+  const [automationContextPayload, setAutomationContextPayload] = useState<any>(null);
   const [apiResponse, setApiResponse] = useState<any>(null);
+  const [automationContext, setAutomationContext] = useState<any>(null);
 
   useEffect(() => {
     if (user && automationId && platform.name) {
       loadExistingCredentials();
-      generateSamplePayload();
+      loadAutomationContext();
     }
   }, [user, automationId, platform.name]);
+
+  useEffect(() => {
+    if (automationContext) {
+      generateAutomationContextPayload();
+    }
+  }, [credentials, automationContext]);
 
   const loadExistingCredentials = async () => {
     if (!user) return;
@@ -67,17 +75,53 @@ const ModernCredentialForm = ({
     }
   };
 
-  const generateSamplePayload = () => {
-    const samplePayload = {
-      method: "GET",
-      url: `https://api.${platform.name.toLowerCase()}.com/v1/auth/verify`,
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer [YOUR_API_KEY]",
-        "User-Agent": "YusrAI-Platform-Test/1.0"
+  const loadAutomationContext = async () => {
+    try {
+      // Get automation context from Supabase
+      const { data: automationData } = await supabase
+        .from('automations')
+        .select('*')
+        .eq('id', automationId)
+        .single();
+
+      if (automationData) {
+        setAutomationContext(automationData);
       }
-    };
-    setApiPayload(samplePayload);
+    } catch (error) {
+      console.error('Failed to load automation context:', error);
+    }
+  };
+
+  const generateAutomationContextPayload = async () => {
+    try {
+      const sampleCall = await UniversalPlatformManager.generateSampleCall(
+        platform.name,
+        credentials,
+        automationContext
+      );
+      setAutomationContextPayload(sampleCall);
+    } catch (error) {
+      console.error('Failed to generate automation context payload:', error);
+      // Fallback to basic payload
+      const fallbackPayload = {
+        task_description: `${platform.name} operation for automation: ${automationContext?.title || 'Unnamed Automation'}`,
+        automation_context: 'Automation-aware testing',
+        request: {
+          method: "GET",
+          url: `https://api.${platform.name.toLowerCase()}.com/test`,
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer [YOUR_API_KEY]",
+            "User-Agent": "YusrAI-Automation-Context-Test/1.0"
+          }
+        },
+        expected_response: {
+          success: true,
+          message: "Authentication successful for automation context"
+        }
+      };
+      setAutomationContextPayload(fallbackPayload);
+    }
   };
 
   const handleCredentialChange = (field: string, value: string) => {
@@ -85,15 +129,6 @@ const ModernCredentialForm = ({
       ...prev,
       [field]: value
     }));
-    
-    // Update payload with real credential
-    if (apiPayload && value) {
-      const updatedPayload = { ...apiPayload };
-      if (updatedPayload.headers && updatedPayload.headers.Authorization) {
-        updatedPayload.headers.Authorization = `Bearer ${value}`;
-      }
-      setApiPayload(updatedPayload);
-    }
   };
 
   const togglePasswordVisibility = (field: string) => {
@@ -114,51 +149,23 @@ const ModernCredentialForm = ({
     setApiResponse(null);
     
     try {
-      const result = await AutomationCredentialManager.testCredentials(
-        user.id,
-        automationId,
+      const result = await UniversalPlatformManager.testCredentials(
         platform.name,
-        credentials
+        credentials,
+        automationContext
       );
 
       setTestResult(result);
-      
-      // Mock API response for demonstration
-      const mockResponse = {
-        status: result.success ? 200 : 401,
-        statusText: result.success ? "OK" : "Unauthorized",
-        data: result.success ? {
-          authenticated: true,
-          user_id: "12345",
-          permissions: ["read", "write"],
-          rate_limit: {
-            remaining: 4999,
-            limit: 5000,
-            reset_time: "2024-01-15T12:00:00Z"
-          }
-        } : {
-          error: "Invalid API key",
-          code: "UNAUTHORIZED",
-          message: result.message
-        },
-        headers: {
-          "content-type": "application/json",
-          "x-ratelimit-remaining": "4999",
-          "x-ratelimit-limit": "5000"
-        },
-        request_time_ms: 145
-      };
-      
-      setApiResponse(mockResponse);
+      setApiResponse(result.response_details);
       
       if (result.success) {
         toast({
-          title: "Credentials Verified",
-          description: `${platform.name} credentials are working correctly!`,
+          title: "Automation Context Test Successful",
+          description: `${platform.name} credentials work with your automation workflow!`,
         });
       } else {
         toast({
-          title: "Test Failed",
+          title: "Automation Context Test Failed",
           description: result.message,
           variant: "destructive",
         });
@@ -188,8 +195,8 @@ const ModernCredentialForm = ({
 
       if (result.success) {
         toast({
-          title: "Credentials Saved",
-          description: `${platform.name} credentials saved successfully!`,
+          title: "Automation Credentials Saved",
+          description: `${platform.name} credentials saved for this automation!`,
         });
         onCredentialSaved?.();
         onClose?.();
@@ -223,19 +230,24 @@ const ModernCredentialForm = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-7xl max-h-[90vh] bg-white/95 backdrop-blur-md border-0 shadow-2xl rounded-3xl overflow-hidden">
         <DialogHeader className="pb-6">
-          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-green-600 bg-clip-text text-transparent">
-            Configure {platform.name} Credentials
+          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-green-600 bg-clip-text text-transparent flex items-center gap-2">
+            <Sparkles className="w-6 h-6 text-purple-600" />
+            Configure {platform.name} for Automation
           </DialogTitle>
-          <p className="text-gray-600 mt-2">
-            Test your credentials first, then save them securely for this automation.
-          </p>
+          <div className="text-gray-600 mt-2 space-y-1">
+            <p className="font-medium">Automation: {automationContext?.title || 'Loading...'}</p>
+            <p className="text-sm">{automationContext?.description || 'Test your credentials with real automation workflow operations.'}</p>
+          </div>
         </DialogHeader>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-[600px]">
           {/* Left Side - Credential Form */}
           <div className="space-y-6">
             <div className="bg-gradient-to-br from-purple-50 via-blue-50 to-green-50 rounded-2xl p-6 border border-purple-200/50">
-              <h3 className="text-xl font-semibold text-gray-900 mb-6">Platform Credentials</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                <TestTube className="w-5 h-5 text-purple-600" />
+                Automation-Specific Credentials
+              </h3>
               
               <div className="space-y-5">
                 {platform.credentials.map((cred, index) => {
@@ -253,7 +265,12 @@ const ModernCredentialForm = ({
                           <div className="group relative">
                             <Info className="h-4 w-4 text-gray-400 cursor-help" />
                             <div className="absolute left-0 top-6 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
-                              {cred.why_needed}
+                              <strong>For this automation:</strong> {cred.why_needed}
+                              {automationContext && (
+                                <div className="mt-2 pt-2 border-t border-gray-700">
+                                  <strong>Workflow:</strong> {automationContext.title}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -310,12 +327,12 @@ const ModernCredentialForm = ({
                   {isTesting ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Testing...
+                      Testing with Automation...
                     </>
                   ) : (
                     <>
                       <TestTube className="w-4 h-4 mr-2" />
-                      Test Credentials
+                      Test with Automation
                     </>
                   )}
                 </Button>
@@ -333,7 +350,7 @@ const ModernCredentialForm = ({
                   ) : (
                     <>
                       <Save className="w-4 h-4 mr-2" />
-                      Save Credentials
+                      Save for Automation
                     </>
                   )}
                 </Button>
@@ -341,21 +358,39 @@ const ModernCredentialForm = ({
             </div>
           </div>
 
-          {/* Right Side - API Playground */}
+          {/* Right Side - Automation Context API Playground */}
           <div className="space-y-4">
+            {/* Automation Context Info */}
+            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-200/50">
+              <h4 className="text-sm font-semibold text-indigo-900 mb-2 flex items-center gap-2">
+                <Sparkles className="w-4 h-4" />
+                Automation Context
+              </h4>
+              <div className="text-xs text-indigo-700 space-y-1">
+                <p><strong>Workflow:</strong> {automationContext?.title || 'Loading...'}</p>
+                <p><strong>Purpose:</strong> {automationContextPayload?.task_description || 'Testing credentials...'}</p>
+              </div>
+            </div>
+
             {/* Request Payload */}
             <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl p-6 border border-green-200/50">
-              <h4 className="text-lg font-semibold text-gray-900 mb-4">API Request</h4>
+              <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <TestTube className="w-5 h-5 text-green-600" />
+                Automation API Request
+              </h4>
               <div className="bg-gray-900 rounded-xl p-4 overflow-auto" style={{ height: '200px' }}>
                 <pre className="text-green-400 text-sm font-mono">
-                  {JSON.stringify(apiPayload, null, 2)}
+                  {automationContextPayload ? JSON.stringify(automationContextPayload.request, null, 2) : 'Loading automation context...'}
                 </pre>
               </div>
             </div>
 
             {/* API Response */}
             <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-200/50">
-              <h4 className="text-lg font-semibold text-gray-900 mb-4">API Response</h4>
+              <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-blue-600" />
+                Automation API Response
+              </h4>
               <div className="bg-gray-900 rounded-xl p-4 overflow-auto" style={{ height: '280px' }}>
                 {apiResponse ? (
                   <pre className="text-blue-400 text-sm font-mono">
@@ -363,9 +398,12 @@ const ModernCredentialForm = ({
                   </pre>
                 ) : (
                   <div className="flex items-center justify-center h-full text-gray-500">
-                    <p className="text-center">
-                      Click "Test Credentials" to see the API response
-                    </p>
+                    <div className="text-center space-y-2">
+                      <TestTube className="w-8 h-8 mx-auto opacity-50" />
+                      <p className="text-sm">
+                        Click "Test with Automation" to see how your credentials work with the actual automation workflow
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -373,11 +411,19 @@ const ModernCredentialForm = ({
           </div>
         </div>
 
-        {/* Footer */}
+        {/* Enhanced Footer */}
         <div className="pt-4 border-t border-gray-200/50">
-          <p className="text-xs text-center text-gray-500">
-            Credentials are encrypted and stored securely • AI-powered platform support
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-gray-500">
+              🔒 Credentials are encrypted and stored securely • 🤖 AI-powered automation context testing
+            </p>
+            {testResult?.success && (
+              <div className="flex items-center gap-2 text-xs text-green-600">
+                <TestTube className="w-4 h-4" />
+                <span>Ready for automation execution</span>
+              </div>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

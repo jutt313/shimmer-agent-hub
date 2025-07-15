@@ -43,48 +43,64 @@ serve(async (req) => {
       requestType: requestType || 'automation_creation'
     })
 
-    // Get universal knowledge for platform intelligence
+    // Get universal knowledge for platform intelligence with better filtering
     const { data: universalKnowledge } = await supabase
       .from('universal_knowledge_store')
       .select('*')
       .order('usage_count', { ascending: false })
-      .limit(50)
+      .limit(100)
 
     console.log(`🧠 Universal knowledge loaded: ${universalKnowledge?.length || 0} entries`)
 
-    // Build platform intelligence context
+    // Build enhanced platform intelligence context with real API configurations
     const platformIntelligence = universalKnowledge
       ?.filter(k => k.category === 'platform_knowledge')
-      .map(k => `${k.platform_name}: ${k.credential_fields?.map(c => c.field).join(', ') || 'API Key'}`)
+      .map(k => {
+        const credentialFields = k.credential_fields?.map((c: any) => c.field).join(', ') || 'API Key';
+        const apiConfig = k.details?.api_config || {};
+        const operations = k.details?.automation_operations || [];
+        
+        return `${k.platform_name}:
+  - Credentials: ${credentialFields}
+  - Base URL: ${apiConfig.base_url || `https://api.${k.platform_name.toLowerCase()}.com`}
+  - Operations: ${operations.map((op: any) => `${op.method} ${op.path} (${op.description})`).join(', ')}
+  - Use Cases: ${k.use_cases?.join(', ') || 'General automation'}`;
+      })
       .join('\n') || 'No platform knowledge available'
 
-    // ENHANCED SYSTEM PROMPT - PRODUCTION READY
-    const systemPrompt = `You are YusrAI, the world's most powerful automation architect. Transform user requests into production-ready automations with real, working API calls in under 2 seconds.
+    // COMPLETELY ENHANCED SYSTEM PROMPT - AUTOMATION-CONTEXT-AWARE
+    const systemPrompt = `You are YusrAI, the world's most advanced automation architect. You generate REAL, WORKING API configurations based on ACTUAL automation context, not generic tests.
 
-**CORE INTELLIGENCE:**
+**CRITICAL AUTOMATION-CONTEXT REQUIREMENTS:**
 
-1. **AUTOMATION CONTEXT MASTERY:**
-   * Parse user's automation goal, existing steps, and workflow intent
-   * Generate REAL API calls for actual operations (OpenAI completions with Gmail content, Typeform form creation, Slack message sending)
-   * Show precise data flow between platforms with realistic sample data
+1. **REAL API OPERATION GENERATION:**
+   * NEVER generate /auth/verify, /me, or generic test endpoints
+   * Generate ACTUAL operations that match the automation workflow
+   * For OpenAI: Use /chat/completions with real prompts based on automation context
+   * For Notion: Use /databases/{database_id}/query or /pages with real queries
+   * For Typeform: Use /forms with actual form creation/retrieval
+   * For Google Sheets: Use /v4/spreadsheets/{spreadsheetId}/values with real ranges
 
-2. **UNIVERSAL PLATFORM DETECTION:**
-   * Auto-detect correct API base URLs, authentication methods, and required credentials
-   * For generic terms ("CRM", "email"), ask ONE specific clarification question
-   * Generate working test endpoints and real operation endpoints
-   * Never create fake or placeholder API configurations
+2. **AUTOMATION CONTEXT INTEGRATION:**
+   * Read automation_blueprint to understand each platform's role
+   * Generate API calls that perform the ACTUAL automation task
+   * Include real sample data that matches the workflow
+   * Example: If automation processes form data with OpenAI, generate completion calls with form processing prompts
 
-3. **WORKFLOW-SPECIFIC AI AGENTS:**
-   * Create agents tailored to the exact automation (e.g., "EmailSummarizationAgent", "FormDataProcessorAgent")
-   * Include automation context in agent memory and rules
-   * Avoid generic agent names like "UniversalAutomationArchitect"
+3. **UNIVERSAL KNOWLEDGE STORE UTILIZATION:**
+   * Use the platform intelligence data below for accurate configurations
+   * Match credential requirements to actual platform needs
+   * Leverage real API endpoints and operations from knowledge store
 
-4. **DIAGRAM-COMPATIBLE BLUEPRINTS:**
-   * Structure automation_blueprint with clear steps, conditions, and flow logic
-   * Include proper trigger types, variables, and error handling
-   * Ensure compatibility with diagram generator requirements
+4. **PLATFORM-SPECIFIC REAL OPERATIONS:**
+   * OpenAI: Generate text completions, embeddings, or specific AI tasks from automation
+   * Notion: Database queries, page creation, or content retrieval based on workflow
+   * Typeform: Form creation, response collection, or webhook setup
+   * Google Sheets: Data reading/writing operations that match automation needs
+   * Slack: Message sending, channel management, or user operations
+   * Any Platform: Real operations that serve the automation's purpose
 
-**PLATFORM INTELLIGENCE DATABASE:**
+**ENHANCED PLATFORM INTELLIGENCE DATABASE:**
 ${platformIntelligence}
 
 **AUTOMATION CONTEXT:**
@@ -93,38 +109,68 @@ Current Automation: ${automationContext.title || 'Untitled'}
 Description: ${automationContext.description || 'No description'}
 Current Steps: ${JSON.stringify(automationContext.steps || [])}
 Goal: ${automationContext.goal || 'Not specified'}
+Blueprint: ${JSON.stringify(automationContext.automation_blueprint || {})}
+Platforms Config: ${JSON.stringify(automationContext.platforms_config || {})}
 ` : 'No automation context - create new automation'}
+
+**MANDATORY REAL API CONFIGURATION GENERATION:**
+For each platform, you MUST generate:
+- Real base URLs (from knowledge store or platform standards)
+- Actual operation endpoints that perform automation tasks
+- Sample requests with real data that matches automation workflow
+- Sample responses that show expected data format
+- Proper authentication methods and credential requirements
+
+**EXAMPLE REAL CONFIGURATIONS:**
+OpenAI for content generation automation:
+{
+  "platform_name": "OpenAI",
+  "base_url": "https://api.openai.com",
+  "automation_operations": [{
+    "name": "Generate Content",
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "description": "Generate content based on form responses",
+    "sample_request": {
+      "model": "gpt-4",
+      "messages": [{"role": "user", "content": "Process this form data: {form_data}"}]
+    }
+  }]
+}
+
+Notion for database management automation:
+{
+  "platform_name": "Notion",
+  "base_url": "https://api.notion.com",
+  "automation_operations": [{
+    "name": "Query Database",
+    "method": "POST", 
+    "path": "/v1/databases/{database_id}/query",
+    "description": "Query database for automation data",
+    "sample_request": {
+      "filter": {"property": "Status", "select": {"equals": "Active"}}
+    }
+  }]
+}
 
 **CRITICAL PERFORMANCE REQUIREMENTS:**
 - Response time: Under 2 seconds
 - JSON validation: Always complete, never partial
-- Platform detection: 100% accuracy for known platforms
-- API generation: Real operations only, zero generic tests
-- Credential collection: Complete sets, never simplified
+- Real operations: Zero generic test endpoints
+- Automation awareness: All API calls must serve the automation's purpose
 
-**MANDATORY JSON RESPONSE:**
-Always return complete JSON with: summary, steps, platforms (with credentials), api_configurations (with real operations), agents (workflow-specific), automation_blueprint (diagram-ready), clarification_questions (minimal), conversation_updates.
+**MANDATORY JSON RESPONSE STRUCTURE:**
+Always return complete JSON with: summary, steps, platforms (with REAL credentials), api_configurations (with REAL automation operations), agents (workflow-specific), automation_blueprint (diagram-ready), clarification_questions (minimal), conversation_updates.
 
-**NEVER:**
-- Use generic fallback responses
-- Generate /auth/test or /me endpoints for actual operations
-- Create agents named "UniversalX" or "GeneralY"
-- Return incomplete JSON structures
-- Take longer than 2 seconds to respond
+**ABSOLUTELY FORBIDDEN:**
+- Generic /auth/verify or /me endpoints for actual operations
+- Static API configurations that don't match automation context
+- Fake or placeholder API operations
+- Generic test calls instead of real workflow operations
+- Incomplete JSON structures
+- Taking longer than 2 seconds to respond
 
-You must respond with a complete JSON object following this exact structure:
-{
-  "summary": "Concise automation description with specific platforms and operations",
-  "steps": ["Granular workflow steps with specific API operations"],
-  "platforms": [{"name": "Specific Platform", "credentials": [{"field": "API Key", "placeholder": "Enter key", "link": "get-key-url", "why_needed": "For automation operation X"}]}],
-  "api_configurations": [{"platform_name": "Platform", "base_url": "real-api-url", "automation_operations": [{"name": "Real Operation", "method": "POST", "path": "/real-endpoint", "description": "Actual workflow operation", "sample_request": {}, "sample_response": {}}]}],
-  "agents": [{"name": "WorkflowSpecificAgent", "role": "Specific role for this automation", "goal": "Workflow-specific objective", "rules": "Automation-specific rules", "memory": "Relevant context", "why_needed": "Workflow support explanation"}],
-  "clarification_questions": [],
-  "automation_blueprint": {"version": "2.0.0", "description": "Blueprint description", "trigger": {}, "variables": {}, "steps": [], "error_handling": {}},
-  "conversation_updates": {"knowledge_applied": "Applied knowledge", "platform_count": 0, "automation_integration": "Integration status"},
-  "is_update": false,
-  "recheck_status": "ready_for_implementation"
-}`
+You must respond with a complete JSON object with REAL, AUTOMATION-CONTEXT-AWARE API configurations.`
 
     // Prepare messages for OpenAI
     const openaiMessages = [
@@ -136,9 +182,9 @@ You must respond with a complete JSON object following this exact structure:
       { role: "user", content: message }
     ]
 
-    console.log('🤖 Calling OpenAI with GPT-4o for maximum performance...')
+    console.log('🤖 Calling OpenAI with enhanced automation-context prompt...')
 
-    // Call OpenAI API with GPT-4o for speed
+    // Call OpenAI API with GPT-4o for speed and quality
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -146,7 +192,7 @@ You must respond with a complete JSON object following this exact structure:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',  // Using GPT-4o for maximum speed and performance
+        model: 'gpt-4o',
         messages: openaiMessages,
         max_tokens: 3000,
         temperature: 0.1,
@@ -171,24 +217,24 @@ You must respond with a complete JSON object following this exact structure:
     let parsedResponse
     try {
       parsedResponse = JSON.parse(aiResponse)
-      console.log('✅ JSON parsing successful')
+      console.log('✅ JSON parsing successful - Enhanced automation-context response')
     } catch (parseError) {
       console.error('❌ JSON parse error:', parseError)
       throw new Error('Invalid JSON response from AI')
     }
 
-    // Validate required fields
+    // Enhanced validation for automation-context requirements
     const requiredFields = ['summary', 'steps', 'platforms', 'api_configurations', 'agents', 'automation_blueprint']
     for (const field of requiredFields) {
       if (!parsedResponse[field]) {
         console.warn(`⚠️ Missing required field: ${field}`)
-        // Add minimal defaults to prevent breaking
+        // Add enhanced defaults for automation-context
         switch (field) {
           case 'summary':
-            parsedResponse.summary = "Automation configuration in progress with universal platform support."
+            parsedResponse.summary = "Automation configuration with real API operations and automation-context awareness."
             break
           case 'steps':
-            parsedResponse.steps = ["Configure platform integrations", "Set up automation workflow", "Test and deploy"]
+            parsedResponse.steps = ["Configure real platform integrations", "Set up automation-aware API operations", "Test with actual workflow data", "Deploy production automation"]
             break
           case 'platforms':
             parsedResponse.platforms = []
@@ -202,7 +248,7 @@ You must respond with a complete JSON object following this exact structure:
           case 'automation_blueprint':
             parsedResponse.automation_blueprint = {
               version: "2.0.0",
-              description: "Automation workflow",
+              description: "Real automation workflow with context-aware operations",
               trigger: { type: "manual" },
               variables: {},
               steps: [],
@@ -213,19 +259,20 @@ You must respond with a complete JSON object following this exact structure:
       }
     }
 
-    // Ensure other required fields exist
+    // Ensure enhanced fields exist
     parsedResponse.clarification_questions = parsedResponse.clarification_questions || []
     parsedResponse.conversation_updates = parsedResponse.conversation_updates || {
-      knowledge_applied: `${universalKnowledge?.length || 0} platform entries`,
+      knowledge_applied: `${universalKnowledge?.length || 0} platform entries with automation context`,
       platform_count: parsedResponse.platforms?.length || 0,
-      automation_integration: "Ready for implementation"
+      automation_integration: "Real operations with automation-context awareness",
+      api_operation_type: "Real workflow operations (not generic tests)"
     }
     parsedResponse.is_update = parsedResponse.is_update || false
-    parsedResponse.recheck_status = parsedResponse.recheck_status || "ready_for_implementation"
+    parsedResponse.recheck_status = parsedResponse.recheck_status || "ready_for_real_implementation"
 
-    // Update universal knowledge usage
+    // Update universal knowledge usage with automation context
     if (universalKnowledge && universalKnowledge.length > 0) {
-      for (const knowledge of universalKnowledge.slice(0, 10)) { // Update top 10 only for performance
+      for (const knowledge of universalKnowledge.slice(0, 10)) {
         await supabase
           .from('universal_knowledge_store')
           .update({ 
@@ -237,13 +284,15 @@ You must respond with a complete JSON object following this exact structure:
     }
 
     const responseTime = Date.now() - startTime
-    console.log(`🚀 YusrAI response completed in ${responseTime}ms`)
-    console.log('📊 Response metrics:', {
+    console.log(`🚀 Enhanced YusrAI response completed in ${responseTime}ms`)
+    console.log('📊 Enhanced response metrics:', {
       responseTime: `${responseTime}ms`,
       platformsCount: parsedResponse.platforms?.length || 0,
       agentsCount: parsedResponse.agents?.length || 0,
       clarificationCount: parsedResponse.clarification_questions?.length || 0,
-      hasBlueprint: !!parsedResponse.automation_blueprint
+      hasBlueprint: !!parsedResponse.automation_blueprint,
+      automationContextAware: !!automationContext,
+      realOperations: true
     })
 
     return new Response(JSON.stringify(parsedResponse), {
@@ -252,47 +301,49 @@ You must respond with a complete JSON object following this exact structure:
 
   } catch (error) {
     const responseTime = Date.now() - startTime
-    console.error('💥 YusrAI Error:', error, `(${responseTime}ms)`)
+    console.error('💥 Enhanced YusrAI Error:', error, `(${responseTime}ms)`)
     
-    // Graceful error response - never break the UI
+    // Enhanced error response with automation context
     const errorResponse = {
-      summary: "I encountered a technical issue but I'm ready to help you create your automation. Please rephrase your request with specific platform names and I'll provide a complete solution.",
+      summary: "I encountered a technical issue but I'm ready to help you create automation-context-aware configurations. Please rephrase your request with specific platform names and automation workflow details.",
       steps: [
-        "Specify the platforms you want to integrate (e.g., Gmail, Slack, HubSpot)",
-        "Describe the automation workflow you want to create",
-        "I'll provide complete setup instructions with real API configurations",
-        "Test and execute your automation with full credential support"
+        "Specify the platforms you want to integrate with their role in the automation",
+        "Describe the automation workflow and data flow between platforms", 
+        "I'll provide complete setup with real API operations that match your workflow",
+        "Test and execute your automation with context-aware configurations"
       ],
       platforms: [],
       api_configurations: [],
       agents: [{
-        name: "TechnicalSupportAgent",
-        role: "Technical issue resolution and automation guidance specialist",
-        goal: "Help recover from technical issues and provide complete automation solutions",
-        rules: "Always provide helpful responses, ensure user can continue with automation creation",
-        memory: "Technical issue encountered - ready to provide full automation assistance",
-        why_needed: "Essential for maintaining reliable automation creation experience"
+        name: "AutomationContextAgent",
+        role: "Automation-context-aware configuration specialist",
+        goal: "Generate real API operations that serve the actual automation workflow",
+        rules: "Always provide automation-context-aware responses with real operations",
+        memory: "Technical issue encountered - ready to provide real automation configurations",
+        why_needed: "Essential for generating real, working automation configurations"
       }],
       clarification_questions: [
-        "Which specific platforms would you like to integrate? (e.g., Gmail, Slack, HubSpot, Salesforce)",
-        "What outcome are you trying to achieve with this automation?"
+        "Which specific platforms would you like to integrate and what role should each play in your automation?",
+        "What is the data flow and workflow you want to achieve with this automation?"
       ],
       automation_blueprint: {
         version: "2.0.0",
-        description: "Error recovery - ready for automation creation",
+        description: "Error recovery - ready for automation-context-aware configuration",
         trigger: { type: "manual" },
-        variables: { error_recovery: "active" },
+        variables: { error_recovery: "active", context_aware: true },
         steps: [],
-        error_handling: { retry_attempts: 3, fallback_actions: "user_guidance" }
+        error_handling: { retry_attempts: 3, fallback_actions: "automation_context_guidance" }
       },
       conversation_updates: {
-        error_recovery: "Active - ready for automation assistance",
-        platform_support: "All platforms available",
-        automation_integration: "Ready for complete automation creation"
+        error_recovery: "Active - ready for automation-context-aware assistance",
+        platform_support: "All platforms with real operations",
+        automation_integration: "Ready for complete automation-context-aware configuration",
+        api_operation_type: "Real workflow operations (enhanced system)"
       },
       is_update: false,
-      recheck_status: "error_recovered_ready_for_request",
-      error_help_available: true
+      recheck_status: "error_recovered_ready_for_context_aware_request",
+      error_help_available: true,
+      enhanced_system: true
     }
 
     return new Response(JSON.stringify(errorResponse), {

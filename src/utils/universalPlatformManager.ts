@@ -7,6 +7,7 @@ export interface UniversalPlatformConfig {
     method: string;
     path: string;
     description: string;
+    requires_automation_data?: boolean;
   };
   auth_config: {
     type: string;
@@ -27,6 +28,7 @@ export interface UniversalPlatformConfig {
     description: string;
     sample_request: any;
     sample_response: any;
+    automation_context_required: boolean;
   }>;
   error_patterns: Array<{
     status: number;
@@ -44,25 +46,47 @@ export class UniversalPlatformManager {
   private static configCache = new Map<string, UniversalPlatformConfig>();
 
   /**
-   * UNIVERSAL PLATFORM CONFIGURATION - NO HARDCODING
-   * Uses AI-powered dynamic configuration generation for ANY platform
+   * ENHANCED AUTOMATION-CONTEXT-AWARE PLATFORM CONFIGURATION
+   * Uses Universal Knowledge Store + AI-powered dynamic configuration generation
    */
   static async getPlatformConfig(platformName: string, automationContext?: any): Promise<UniversalPlatformConfig> {
-    console.log(`🤖 Getting universal config for ${platformName} via AI with automation context`);
+    console.log(`🤖 Getting automation-context-aware config for ${platformName}`);
     
-    // Check cache first
-    const cacheKey = `${platformName.toLowerCase()}_${automationContext?.id || 'general'}`;
+    // Enhanced cache key includes automation context
+    const contextHash = automationContext ? JSON.stringify(automationContext).slice(0, 50) : 'general';
+    const cacheKey = `${platformName.toLowerCase()}_${contextHash}`;
     const cached = this.configCache.get(cacheKey);
     if (cached) {
-      console.log(`✅ Using cached config for ${platformName}`);
+      console.log(`✅ Using cached automation-context config for ${platformName}`);
       return cached;
     }
 
     try {
+      // First, try to get configuration from Universal Knowledge Store
+      const knowledgeConfig = await this.getKnowledgeStoreConfig(platformName, automationContext);
+      if (knowledgeConfig) {
+        console.log(`📚 Using Universal Knowledge Store config for ${platformName}`);
+        this.configCache.set(cacheKey, knowledgeConfig);
+        return knowledgeConfig;
+      }
+
+      // Fallback to AI-generated config with automation context
       const { data, error } = await supabase.functions.invoke('chat-ai', {
         body: {
-          message: `Generate complete API configuration for ${platformName} platform with automation context awareness.`,
-          requestType: 'platform_config',
+          message: `Generate complete automation-context-aware API configuration for ${platformName} platform.
+
+**AUTOMATION CONTEXT:**
+${automationContext ? JSON.stringify(automationContext, null, 2) : 'General platform integration'}
+
+**REQUIREMENTS:**
+- Generate REAL API operations that serve the automation workflow
+- Include proper authentication configuration
+- Provide sample requests/responses with automation data
+- No generic test endpoints - only real operations
+
+**RESPONSE FORMAT:**
+Return ONLY valid JSON with complete platform configuration including real automation operations.`,
+          requestType: 'automation_context_platform_config',
           platformName: platformName,
           automationContext: automationContext,
           messages: []
@@ -85,169 +109,296 @@ export class UniversalPlatformManager {
         config = data;
       }
 
-      // Validate and enhance configuration
-      if (!config.base_url || !config.test_endpoint) {
-        console.warn(`⚠️ Invalid AI config for ${platformName}, using intelligent fallback`);
-        config = this.generateIntelligentFallback(platformName, automationContext);
-      }
-
-      // Cache the configuration
-      this.configCache.set(cacheKey, config);
-      console.log(`✅ Universal AI config generated and cached for ${platformName}`);
-      return config;
+      // Enhanced validation and transformation
+      const enhancedConfig = this.enhanceConfigWithAutomationContext(config, platformName, automationContext);
+      
+      // Cache the enhanced configuration
+      this.configCache.set(cacheKey, enhancedConfig);
+      console.log(`✅ Automation-context-aware AI config generated and cached for ${platformName}`);
+      return enhancedConfig;
 
     } catch (error) {
-      console.error(`Failed to get AI config for ${platformName}:`, error);
-      console.log(`🔄 Using intelligent fallback for ${platformName}`);
-      return this.generateIntelligentFallback(platformName, automationContext);
+      console.error(`Failed to get automation-context config for ${platformName}:`, error);
+      console.log(`🔄 Using enhanced intelligent fallback for ${platformName}`);
+      return this.generateAutomationContextFallback(platformName, automationContext);
     }
   }
 
   /**
-   * INTELLIGENT FALLBACK CONFIGURATION GENERATOR
-   * Generates realistic configurations using platform analysis rules
+   * GET CONFIGURATION FROM UNIVERSAL KNOWLEDGE STORE
    */
-  private static generateIntelligentFallback(platformName: string, automationContext?: any): UniversalPlatformConfig {
-    console.log(`🔧 Generating intelligent fallback for ${platformName}`);
-    
-    const cleanName = platformName.toLowerCase().replace(/\s+/g, '');
-    
-    // UNIVERSAL BASE URL DETECTION RULES
-    const baseUrlPatterns = [
-      `https://api.${cleanName}.com`,
-      `https://${cleanName}-api.com`,
-      `https://api-${cleanName}.com`,
-      `https://${cleanName}.api.com`
-    ];
-    
-    // AUTHENTICATION PATTERN DETECTION
-    const authPatterns = {
-      modern: { type: 'bearer', format: 'Bearer {token}', param: 'Authorization' },
-      legacy: { type: 'api_key', format: '{api_key}', param: 'X-API-Key' },
-      custom: { type: 'bearer', format: 'Bearer {access_token}', param: 'Authorization' }
-    };
-    
-    // CREDENTIAL FIELD INTELLIGENCE
-    const credentialFields = [
-      'api_key', 'access_token', 'token', 'personal_access_token',
-      'client_id', 'client_secret', 'bearer_token', 'auth_token'
-    ];
-    
-    // TEST ENDPOINT DISCOVERY
-    const testEndpoints = ['/me', '/user', '/auth/test', '/ping', '/status', '/account', '/profile'];
-    
-    // AUTOMATION OPERATION DETECTION
-    const operationPatterns = this.detectOperationPatterns(platformName, automationContext);
-    
-    const selectedAuth = authPatterns.modern; // Default to modern pattern
-    
-    return {
-      platform_name: platformName,
-      base_url: baseUrlPatterns[0], // Use most common pattern
-      test_endpoint: {
-        method: 'GET',
-        path: testEndpoints[0], // Most common: /me
-        description: `Test ${platformName} authentication and permissions`
-      },
-      auth_config: {
-        type: selectedAuth.type,
-        location: 'header',
-        parameter_name: selectedAuth.param,
-        format: selectedAuth.format,
-        field_names: credentialFields,
-        oauth2_config: {
-          authorization_url: `${baseUrlPatterns[0]}/oauth/authorize`,
-          token_url: `${baseUrlPatterns[0]}/oauth/token`,
-          scopes: ['read', 'write', 'admin']
-        }
-      },
-      automation_operations: operationPatterns,
-      error_patterns: [
-        { status: 401, pattern: 'unauthorized|invalid.*token', action: 'refresh_credentials' },
-        { status: 429, pattern: 'rate.*limit', action: 'retry_with_backoff' },
-        { status: 403, pattern: 'forbidden|insufficient.*permissions', action: 'check_scopes' },
-        { status: 400, pattern: 'bad.*request|invalid.*input', action: 'validate_input' },
-        { status: 500, pattern: 'server.*error|internal.*error', action: 'retry_later' }
-      ],
-      rate_limits: {
-        requests_per_minute: 60,
-        requests_per_hour: 1000,
-        burst_limit: 10
+  private static async getKnowledgeStoreConfig(platformName: string, automationContext?: any): Promise<UniversalPlatformConfig | null> {
+    try {
+      const { data, error } = await supabase
+        .from('universal_knowledge_store')
+        .select('*')
+        .eq('category', 'platform_knowledge')
+        .or(`platform_name.ilike.%${platformName}%,title.ilike.%${platformName}%`)
+        .order('usage_count', { ascending: false })
+        .limit(1);
+
+      if (error || !data || data.length === 0) {
+        return null;
       }
+
+      const knowledge = data[0];
+      const apiConfig = knowledge.details?.api_config || {};
+      
+      return {
+        platform_name: knowledge.platform_name || platformName,
+        base_url: apiConfig.base_url || `https://api.${platformName.toLowerCase().replace(/\s+/g, '')}.com`,
+        test_endpoint: this.generateAutomationAwareTestEndpoint(platformName, automationContext, apiConfig),
+        auth_config: {
+          type: apiConfig.auth_config?.type || 'bearer',
+          location: 'header',
+          parameter_name: 'Authorization',
+          format: apiConfig.auth_config?.format || 'Bearer {token}',
+          field_names: knowledge.credential_fields?.map((c: any) => c.field) || ['api_key', 'access_token'],
+          oauth2_config: apiConfig.oauth2_config
+        },
+        automation_operations: this.generateAutomationOperations(platformName, automationContext, apiConfig),
+        error_patterns: this.getStandardErrorPatterns(),
+        rate_limits: {
+          requests_per_minute: 60,
+          requests_per_hour: 1000,
+          burst_limit: 10
+        }
+      };
+    } catch (error) {
+      console.error('Error getting knowledge store config:', error);
+      return null;
+    }
+  }
+
+  /**
+   * GENERATE AUTOMATION-AWARE TEST ENDPOINT
+   */
+  private static generateAutomationAwareTestEndpoint(platformName: string, automationContext?: any, apiConfig?: any): any {
+    const lowerName = platformName.toLowerCase();
+    
+    // Real automation-context-aware endpoints
+    if (lowerName.includes('openai')) {
+      return {
+        method: 'POST',
+        path: '/v1/chat/completions',
+        description: `Test OpenAI with real completion request${automationContext ? ' based on automation workflow' : ''}`,
+        requires_automation_data: true
+      };
+    }
+    
+    if (lowerName.includes('notion')) {
+      return {
+        method: 'GET',
+        path: '/v1/users/me',
+        description: `Test Notion authentication and get user info${automationContext ? ' for automation setup' : ''}`,
+        requires_automation_data: false
+      };
+    }
+    
+    if (lowerName.includes('typeform')) {
+      return {
+        method: 'GET', 
+        path: '/me',
+        description: `Test Typeform authentication${automationContext ? ' for form automation' : ''}`,
+        requires_automation_data: false
+      };
+    }
+    
+    if (lowerName.includes('google') && lowerName.includes('sheet')) {
+      return {
+        method: 'GET',
+        path: '/v4/spreadsheets',
+        description: `Test Google Sheets access${automationContext ? ' for spreadsheet automation' : ''}`,
+        requires_automation_data: false
+      };
+    }
+    
+    if (lowerName.includes('slack')) {
+      return {
+        method: 'GET',
+        path: '/api/auth.test',
+        description: `Test Slack authentication${automationContext ? ' for messaging automation' : ''}`,
+        requires_automation_data: false
+      };
+    }
+
+    // Enhanced fallback based on automation context
+    return {
+      method: 'GET',
+      path: apiConfig?.test_endpoint?.path || '/me',
+      description: `Test ${platformName} authentication${automationContext ? ' for automation workflow' : ''}`,
+      requires_automation_data: false
     };
   }
 
   /**
-   * AUTOMATION OPERATION PATTERN DETECTION
-   * Generates realistic operations based on platform type and automation context
+   * GENERATE REAL AUTOMATION OPERATIONS
    */
-  private static detectOperationPatterns(platformName: string, automationContext?: any): Array<any> {
+  private static generateAutomationOperations(platformName: string, automationContext?: any, apiConfig?: any): Array<any> {
     const lowerName = platformName.toLowerCase();
     const operations = [];
     
-    // UNIVERSAL OPERATION DETECTION RULES
-    if (lowerName.includes('form') || lowerName.includes('survey')) {
+    // OpenAI - Real completion operations
+    if (lowerName.includes('openai')) {
+      operations.push({
+        name: 'Generate AI Response',
+        method: 'POST',
+        path: '/v1/chat/completions',
+        description: `Generate AI response${automationContext ? ' based on automation workflow data' : ''}`,
+        sample_request: {
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: automationContext ? 
+              `You are an AI assistant processing data for automation: ${automationContext.title || 'Unnamed Automation'}` : 
+              'You are a helpful AI assistant'
+            },
+            { role: 'user', content: automationContext ? 
+              'Process this automation data: {automation_data}' : 
+              'Hello, how can you help?'
+            }
+          ],
+          max_tokens: 1000
+        },
+        sample_response: {
+          choices: [{ message: { content: 'AI response based on automation context' } }]
+        },
+        automation_context_required: true
+      });
+    }
+    
+    // Notion - Real database operations
+    if (lowerName.includes('notion')) {
+      operations.push({
+        name: 'Query Database',
+        method: 'POST',
+        path: '/v1/databases/{database_id}/query',
+        description: `Query Notion database${automationContext ? ' for automation data processing' : ''}`,
+        sample_request: {
+          filter: automationContext ? 
+            { property: 'Status', select: { equals: 'Active' } } : 
+            { property: 'Name', title: { is_not_empty: true } }
+        },
+        sample_response: {
+          results: [{ id: 'page_id', properties: { Name: { title: [{ text: { content: 'Sample Entry' } }] } }]
+        },
+        automation_context_required: true
+      });
+      
+      operations.push({
+        name: 'Create Page',
+        method: 'POST',
+        path: '/v1/pages',
+        description: `Create new Notion page${automationContext ? ' with automation data' : ''}`,
+        sample_request: {
+          parent: { database_id: '{database_id}' },
+          properties: {
+            Name: { title: [{ text: { content: automationContext?.title || 'New Page' } }] }
+          }
+        },
+        sample_response: {
+          id: 'new_page_id',
+          properties: { Name: { title: [{ text: { content: 'Created Page' } }] } }
+        },
+        automation_context_required: true
+      });
+    }
+    
+    // Typeform - Real form operations
+    if (lowerName.includes('typeform')) {
       operations.push({
         name: 'Create Form',
         method: 'POST',
         path: '/forms',
-        description: 'Create a new form for data collection',
+        description: `Create new Typeform${automationContext ? ' for automation data collection' : ''}`,
         sample_request: {
-          url: `https://api.${lowerName}.com/forms`,
-          method: 'POST',
-          headers: { 'Authorization': 'Bearer {access_token}' },
-          body: { title: 'Automation Form', fields: [] }
+          title: automationContext?.title ? `${automationContext.title} - Data Collection` : 'New Form',
+          fields: [
+            { title: 'What is your name?', type: 'short_text', required: true },
+            { title: 'Your email address?', type: 'email', required: true }
+          ]
         },
         sample_response: {
-          success: { id: 'form_123', title: 'Automation Form', url: 'https://form.url' },
-          error: { error: 'creation_failed', message: 'Form creation failed' }
-        }
+          id: 'form_id',
+          title: 'Created Form',
+          self: { href: 'https://api.typeform.com/forms/form_id' }
+        },
+        automation_context_required: true
+      });
+      
+      operations.push({
+        name: 'Get Form Responses',
+        method: 'GET',
+        path: '/forms/{form_id}/responses',
+        description: `Get form responses${automationContext ? ' for automation processing' : ''}`,
+        sample_request: {},
+        sample_response: {
+          items: [
+            { submitted_at: '2024-01-01T00:00:00Z', answers: [{ text: 'John Doe' }, { email: 'john@example.com' }] }
+          ]
+        },
+        automation_context_required: false
       });
     }
     
-    if (lowerName.includes('slack') || lowerName.includes('chat') || lowerName.includes('message')) {
+    // Google Sheets - Real spreadsheet operations
+    if (lowerName.includes('google') && lowerName.includes('sheet')) {
+      operations.push({
+        name: 'Read Spreadsheet Data',
+        method: 'GET',
+        path: '/v4/spreadsheets/{spreadsheetId}/values/{range}',
+        description: `Read data from Google Sheets${automationContext ? ' for automation processing' : ''}`,
+        sample_request: {},
+        sample_response: {
+          values: [
+            ['Name', 'Email', 'Status'],
+            ['John Doe', 'john@example.com', 'Active']
+          ]
+        },
+        automation_context_required: false
+      });
+      
+      operations.push({
+        name: 'Write Spreadsheet Data',
+        method: 'PUT',
+        path: '/v4/spreadsheets/{spreadsheetId}/values/{range}',
+        description: `Write data to Google Sheets${automationContext ? ' from automation results' : ''}`,
+        sample_request: {
+          values: [
+            ['Updated Name', 'updated@example.com', 'Processed']
+          ]
+        },
+        sample_response: {
+          updatedRows: 1,
+          updatedColumns: 3,
+          updatedCells: 3
+        },
+        automation_context_required: true
+      });
+    }
+    
+    // Slack - Real messaging operations
+    if (lowerName.includes('slack')) {
       operations.push({
         name: 'Send Message',
         method: 'POST',
-        path: '/chat.postMessage',
-        description: 'Send a message to a channel or user',
+        path: '/api/chat.postMessage',
+        description: `Send Slack message${automationContext ? ' with automation results' : ''}`,
         sample_request: {
-          url: `https://api.${lowerName}.com/chat.postMessage`,
-          method: 'POST',
-          headers: { 'Authorization': 'Bearer {token}' },
-          body: { channel: '#general', text: 'Automation message' }
+          channel: '#general',
+          text: automationContext ? 
+            `Automation "${automationContext.title}" completed successfully!` : 
+            'Hello from automation!'
         },
         sample_response: {
-          success: { ok: true, channel: 'C123456', ts: '1234567890.123' },
-          error: { ok: false, error: 'channel_not_found' }
-        }
-      });
-    }
-    
-    if (lowerName.includes('email') || lowerName.includes('mail')) {
-      operations.push({
-        name: 'Send Email',
-        method: 'POST',
-        path: '/mail/send',
-        description: 'Send an email message',
-        sample_request: {
-          url: `https://api.${lowerName}.com/mail/send`,
-          method: 'POST',
-          headers: { 'Authorization': 'Bearer {api_key}' },
-          body: { 
-            to: 'recipient@example.com',
-            subject: 'Automation Email',
-            html: '<p>This is an automated email</p>'
-          }
+          ok: true,
+          channel: 'C1234567890',
+          ts: '1234567890.123'
         },
-        sample_response: {
-          success: { message: 'Queued. Thank you.', message_id: 'msg_123' },
-          error: { errors: [{ message: 'Invalid email address' }] }
-        }
+        automation_context_required: true
       });
     }
-    
-    // DEFAULT OPERATION FOR ANY PLATFORM - ensure it has description
+
+    // Default operation if no specific platform matched
     if (operations.length === 0) {
       operations.push({
         name: `${platformName} Operation`,
@@ -263,7 +414,8 @@ export class UniversalPlatformManager {
         sample_response: {
           success: { result: 'success', data: 'operation_completed' },
           error: { error: 'operation_failed', message: 'Action could not be completed' }
-        }
+        },
+        automation_context_required: !!automationContext
       });
     }
     
@@ -271,7 +423,65 @@ export class UniversalPlatformManager {
   }
 
   /**
-   * UNIVERSAL CREDENTIAL TESTING - NO HARDCODING
+   * ENHANCE CONFIG WITH AUTOMATION CONTEXT
+   */
+  private static enhanceConfigWithAutomationContext(config: any, platformName: string, automationContext?: any): UniversalPlatformConfig {
+    return {
+      platform_name: config.platform_name || platformName,
+      base_url: config.base_url || `https://api.${platformName.toLowerCase().replace(/\s+/g, '')}.com`,
+      test_endpoint: config.test_endpoint || this.generateAutomationAwareTestEndpoint(platformName, automationContext),
+      auth_config: {
+        type: config.auth_config?.type || 'bearer',
+        location: 'header',
+        parameter_name: 'Authorization',
+        format: config.auth_config?.format || 'Bearer {token}',
+        field_names: config.auth_config?.field_names || ['api_key', 'access_token'],
+        oauth2_config: config.auth_config?.oauth2_config
+      },
+      automation_operations: config.automation_operations || this.generateAutomationOperations(platformName, automationContext),
+      error_patterns: config.error_patterns || this.getStandardErrorPatterns(),
+      rate_limits: config.rate_limits || {
+        requests_per_minute: 60,
+        requests_per_hour: 1000,
+        burst_limit: 10
+      }
+    };
+  }
+
+  /**
+   * GENERATE AUTOMATION-CONTEXT FALLBACK
+   */
+  private static generateAutomationContextFallback(platformName: string, automationContext?: any): UniversalPlatformConfig {
+    console.log(`🔧 Generating automation-context fallback for ${platformName}`);
+    
+    return {
+      platform_name: platformName,
+      base_url: `https://api.${platformName.toLowerCase().replace(/\s+/g, '')}.com`,
+      test_endpoint: this.generateAutomationAwareTestEndpoint(platformName, automationContext),
+      auth_config: {
+        type: 'bearer',
+        location: 'header',
+        parameter_name: 'Authorization',
+        format: 'Bearer {token}',
+        field_names: ['api_key', 'access_token', 'token'],
+        oauth2_config: {
+          authorization_url: `https://api.${platformName.toLowerCase().replace(/\s+/g, '')}.com/oauth/authorize`,
+          token_url: `https://api.${platformName.toLowerCase().replace(/\s+/g, '')}.com/oauth/token`,
+          scopes: ['read', 'write']
+        }
+      },
+      automation_operations: this.generateAutomationOperations(platformName, automationContext),
+      error_patterns: this.getStandardErrorPatterns(),
+      rate_limits: {
+        requests_per_minute: 60,
+        requests_per_hour: 1000,
+        burst_limit: 10
+      }
+    };
+  }
+
+  /**
+   * ENHANCED AUTOMATION-CONTEXT-AWARE CREDENTIAL TESTING
    */
   static async testCredentials(
     platformName: string,
@@ -284,13 +494,13 @@ export class UniversalPlatformManager {
     response_details: any;
     status_code: number;
   }> {
-    console.log(`🧪 Universal testing for ${platformName} with automation context`);
+    console.log(`🧪 Automation-context-aware testing for ${platformName}`);
 
     try {
-      // Get AI-generated platform config with automation context
+      // Get automation-context-aware platform config
       const config = await this.getPlatformConfig(platformName, automationContext);
       
-      // ENHANCED CREDENTIAL DETECTION - NO HARDCODING
+      // Enhanced credential detection
       const credentialValue = this.findCredentialValueIntelligently(credentials, config.auth_config.field_names);
       if (!credentialValue) {
         return {
@@ -299,17 +509,18 @@ export class UniversalPlatformManager {
           request_details: {
             error: 'credential_not_found',
             expected_fields: config.auth_config.field_names,
-            provided_fields: Object.keys(credentials)
+            provided_fields: Object.keys(credentials),
+            automation_context: !!automationContext
           },
           response_details: { error: 'No valid credentials provided' },
           status_code: 0
         };
       }
 
-      // UNIVERSAL REQUEST BUILDING
+      // Build real API request
       const testUrl = config.base_url + config.test_endpoint.path;
       
-      // Build authorization using detected format
+      // Enhanced authorization building
       let authValue = config.auth_config.format;
       const placeholders = ['{token}', '{api_key}', '{personal_access_token}', '{access_token}', '{bearer_token}', '{auth_token}'];
       placeholders.forEach(placeholder => {
@@ -318,14 +529,18 @@ export class UniversalPlatformManager {
       
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'User-Agent': 'YusrAI-Universal-Tester/3.0'
+        'User-Agent': 'YusrAI-Automation-Context-Tester/1.0'
       };
       
       if (config.auth_config.location === 'header') {
         headers[config.auth_config.parameter_name] = authValue;
       }
 
-      console.log(`🔑 Authorization: ${authValue.replace(credentialValue, '***HIDDEN***')}`);
+      // Generate automation-context-aware request body
+      let requestBody = null;
+      if (config.test_endpoint.method === 'POST' && config.test_endpoint.requires_automation_data) {
+        requestBody = this.generateAutomationContextRequestBody(platformName, automationContext, config);
+      }
 
       const requestDetails = {
         url: testUrl,
@@ -334,14 +549,13 @@ export class UniversalPlatformManager {
           ...headers, 
           [config.auth_config.parameter_name]: headers[config.auth_config.parameter_name]?.replace(credentialValue, '***HIDDEN***')
         },
-        body: config.test_endpoint.method === 'POST' ? {} : null,
+        body: requestBody,
         platform: platformName,
-        universal_detection: true,
-        credential_found: true,
+        automation_context_aware: true,
         automation_context: !!automationContext
       };
 
-      console.log(`📡 Making universal API call to: ${testUrl}`);
+      console.log(`📡 Making automation-context-aware API call to: ${testUrl}`);
 
       // Make API call with timeout
       const startTime = Date.now();
@@ -349,7 +563,7 @@ export class UniversalPlatformManager {
         method: config.test_endpoint.method,
         headers,
         signal: AbortSignal.timeout(15000),
-        ...(config.test_endpoint.method === 'POST' && { body: JSON.stringify({}) })
+        ...(requestBody && { body: JSON.stringify(requestBody) })
       });
       const requestTime = Date.now() - startTime;
 
@@ -367,13 +581,14 @@ export class UniversalPlatformManager {
         request_time_ms: requestTime,
         headers: Object.fromEntries(response.headers.entries()),
         platform: platformName,
-        universal_detection: true
+        automation_context_aware: true,
+        automation_context: !!automationContext
       };
 
       const success = response.ok;
       const message = success 
-        ? `✅ ${platformName} credentials verified successfully with universal detection!`
-        : `❌ ${platformName} test failed: ${response.status} ${response.statusText}`;
+        ? `✅ ${platformName} credentials verified successfully with automation-context testing!`
+        : `❌ ${platformName} automation-context test failed: ${response.status} ${response.statusText}`;
 
       return {
         success,
@@ -384,21 +599,53 @@ export class UniversalPlatformManager {
       };
 
     } catch (error: any) {
-      console.error(`Universal testing failed for ${platformName}:`, error);
+      console.error(`Automation-context testing failed for ${platformName}:`, error);
       
       return {
         success: false,
-        message: `Universal test failed: ${error.message}`,
+        message: `Automation-context test failed: ${error.message}`,
         request_details: { 
           error: error.message, 
           platform: platformName,
-          universal_detection: true,
+          automation_context_aware: true,
           automation_context: !!automationContext
         },
         response_details: { error: error.message },
         status_code: 0
       };
     }
+  }
+
+  /**
+   * GENERATE AUTOMATION CONTEXT REQUEST BODY
+   */
+  private static generateAutomationContextRequestBody(platformName: string, automationContext?: any, config?: any): any {
+    const lowerName = platformName.toLowerCase();
+    
+    // OpenAI - Real completion request with automation context
+    if (lowerName.includes('openai')) {
+      return {
+        model: 'gpt-4o-mini',
+        messages: [
+          { 
+            role: 'system', 
+            content: automationContext ? 
+              `You are an AI assistant for automation: ${automationContext.title || 'Automation'}. ${automationContext.description || ''}` :
+              'You are a helpful AI assistant for automation tasks.'
+          },
+          { 
+            role: 'user', 
+            content: automationContext ? 
+              `Test automation workflow processing. Automation goal: ${automationContext.goal || 'Process data efficiently'}` :
+              'Hello! Please confirm you can process automation requests.'
+          }
+        ],
+        max_tokens: 100
+      };
+    }
+    
+    // Default empty body for other platforms
+    return {};
   }
 
   /**
@@ -464,6 +711,16 @@ export class UniversalPlatformManager {
     return null;
   }
 
+  private static getStandardErrorPatterns(): Array<any> {
+    return [
+      { status: 401, pattern: 'unauthorized|invalid.*token', action: 'refresh_credentials' },
+      { status: 429, pattern: 'rate.*limit', action: 'retry_with_backoff' },
+      { status: 403, pattern: 'forbidden|insufficient.*permissions', action: 'check_scopes' },
+      { status: 400, pattern: 'bad.*request|invalid.*input', action: 'validate_input' },
+      { status: 500, pattern: 'server.*error|internal.*error', action: 'retry_later' }
+    ];
+  }
+
   /**
    * AUTOMATION-AWARE SAMPLE CALL GENERATION
    */
@@ -477,17 +734,19 @@ export class UniversalPlatformManager {
         name: 'Authentication Test',
         method: config.test_endpoint.method,
         path: config.test_endpoint.path,
-        description: 'Test authentication and permissions',
+        description: config.test_endpoint.description,
         sample_request: {
           url: config.base_url + config.test_endpoint.path,
           method: config.test_endpoint.method,
           headers: {},
-          body: null
+          body: config.test_endpoint.requires_automation_data ? 
+            this.generateAutomationContextRequestBody(platformName, automationContext, config) : null
         },
         sample_response: {
           success: { authenticated: true, user: 'test_user' },
           error: { error: 'authentication_failed' }
-        }
+        },
+        automation_context_required: config.test_endpoint.requires_automation_data || false
       };
       
       // Build authorization
@@ -499,7 +758,8 @@ export class UniversalPlatformManager {
       
       return {
         task_description: `${operation.description} for ${platformName}`,
-        automation_context: automationContext ? 'Automation-aware operation' : 'General platform operation',
+        automation_context: automationContext ? 'Automation-context-aware operation' : 'General platform operation',
+        automation_workflow: automationContext?.title || 'Standard workflow',
         request: {
           ...operation.sample_request,
           headers: {
@@ -509,13 +769,14 @@ export class UniversalPlatformManager {
         },
         expected_response: operation.sample_response,
         platform: platformName,
-        universal_support: true,
+        automation_context_aware: true,
         intelligent_detection: true
       };
     } catch (error) {
       console.error(`Sample call generation failed for ${platformName}:`, error);
       return {
         task_description: `${platformName} API operation`,
+        automation_context: automationContext ? 'Automation-context-aware fallback' : 'General operation',
         request: {
           url: `https://api.${platformName.toLowerCase().replace(/\s+/g, '')}.com/v1/action`,
           method: 'POST',
@@ -525,7 +786,7 @@ export class UniversalPlatformManager {
         expected_response: { status: 200, data: 'success' },
         platform: platformName,
         fallback: true,
-        universal_support: true
+        automation_context_aware: true
       };
     }
   }
@@ -535,6 +796,6 @@ export class UniversalPlatformManager {
    */
   static clearCache(): void {
     this.configCache.clear();
-    console.log('🗑️ Universal platform config cache cleared');
+    console.log('🗑️ Automation-context-aware platform config cache cleared');
   }
 }

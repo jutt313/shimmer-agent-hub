@@ -15,7 +15,7 @@ export interface AutomationCredential {
 
 export class AutomationCredentialManager {
   /**
-   * ENHANCED: Universal credential testing with REAL credential injection
+   * ENHANCED: Universal credential testing via Supabase Edge Function
    */
   static async testCredentials(
     userId: string,
@@ -25,13 +25,13 @@ export class AutomationCredentialManager {
     automationContext?: any
   ): Promise<{ success: boolean; message: string; details?: any }> {
     try {
-      console.log(`🧪 UNIVERSAL TESTING for ${platformName} with REAL credentials`);
+      console.log(`🧪 EDGE FUNCTION TESTING for ${platformName} with REAL credentials via server-side`);
       
-      // Use Enhanced Universal Platform Manager for REAL testing
+      // Use Enhanced Universal Platform Manager via Edge Function
       const result = await UniversalPlatformManager.testCredentials(
         platformName, 
         credentials,
-        automationContext
+        automationContext || { id: automationId, title: `Automation ${automationId}` }
       );
       
       return {
@@ -42,21 +42,23 @@ export class AutomationCredentialManager {
           platform: platformName,
           universal_testing: true,
           real_credential_injection: true,
-          automation_id: automationId
+          automation_id: automationId,
+          server_side_testing: true
         }
       };
 
     } catch (error: any) {
-      console.error(`💥 Universal testing failed for ${platformName}:`, error);
+      console.error(`💥 Server-side testing failed for ${platformName}:`, error);
       
       return {
         success: false,
-        message: `Universal testing failed for ${platformName}: ${error.message}`,
+        message: `Server-side testing failed for ${platformName}: ${error.message}`,
         details: { 
           error: error.message,
           platform: platformName,
           system_error: true,
-          universal_testing: true
+          universal_testing: true,
+          server_side_testing: true
         }
       };
     }
@@ -84,7 +86,7 @@ export class AutomationCredentialManager {
           is_active: true,
           is_tested: true,
           test_status: 'success',
-          test_message: `Universal testing successful for ${platformName} with REAL credential injection`,
+          test_message: `Universal server-side testing successful for ${platformName} with REAL credential injection`,
           credential_type: 'universal_multi_field'
         })
         .select()

@@ -703,38 +703,59 @@ serve(async (req) => {
   }
 
   try {
-    const { platform_name, credentials, automation_id } = await req.json();
-    
-    console.log(`🌟 AUTOMATION-CONTEXT TESTING: ${platform_name} for automation ${automation_id || 'N/A'}`);
-    console.log(`🎯 REAL WORKFLOW API TESTING WITH AUTOMATION CONTEXT`);
-    
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const { platformName, credentials, automationId } = await req.json();
+
+    if (!platformName || !credentials) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'Platform name and credentials are required' 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Initialize the automation context credential tester
+    const tester = new AutomationContextCredentialTester(supabase);
+
+    // Test platform credentials with automation context
+    const result = await tester.testPlatformCredentialsWithAutomationContext(
+      platformName,
+      credentials,
+      automationId
     );
 
-    const tester = new AutomationContextCredentialTester(supabase);
-    const result = await tester.testPlatformCredentialsWithAutomationContext(platform_name, credentials, automation_id);
-    
-    console.log(`📊 FINAL AUTOMATION-CONTEXT RESULT for ${platform_name}:`, result.success ? '✅ SUCCESS' : '❌ FAILED');
-
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify(result),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
 
   } catch (error: any) {
-    console.error('❌ AUTOMATION-CONTEXT SYSTEM ERROR:', error);
+    console.error('Error in test-credential function:', error);
+    
     return new Response(
       JSON.stringify({ 
         success: false, 
-        message: `Automation-context system error: ${error.message}`,
-        details: { 
-          error: error.message,
-          system_error: true,
-          automation_context_aware: true
+        message: `Server error: ${error.message}`,
+        details: {
+          error_type: 'server_error',
+          timestamp: new Date().toISOString()
         }
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });

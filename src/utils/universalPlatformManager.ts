@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface PlatformCredential {
@@ -31,71 +32,7 @@ export interface PlatformConfiguration {
 
 export class UniversalPlatformManager {
   /**
-   * FIXED: Enhanced credential substitution - NO MORE PLACEHOLDER ISSUES
-   */
-  private static performCredentialSubstitution(
-    template: string,
-    credentials: Record<string, string>
-  ): string {
-    let result = template;
-    
-    // Handle all possible credential field patterns
-    const patterns = [
-      'token', 'api_key', 'access_token', 'bearer_token',
-      'integration_token', 'database_id', 'sheet_id', 
-      'spreadsheet_id', 'bot_token', 'channel_id',
-      'workspace_id', 'service_account_json', 'client_id',
-      'client_secret', 'refresh_token', 'username', 'password'
-    ];
-    
-    patterns.forEach(pattern => {
-      const regex = new RegExp(`\\{${pattern}\\}`, 'g');
-      const credentialValue = credentials[pattern] || credentials.api_key || credentials.access_token || '';
-      if (credentialValue) {
-        result = result.replace(regex, credentialValue);
-      }
-    });
-    
-    // Fallback: replace any remaining {field} with first available credential
-    const remainingPlaceholders = result.match(/\{([^}]+)\}/g);
-    if (remainingPlaceholders) {
-      const firstCredential = Object.values(credentials)[0] || '';
-      remainingPlaceholders.forEach(placeholder => {
-        const fieldName = placeholder.replace(/[{}]/g, '');
-        if (credentials[fieldName]) {
-          result = result.replace(placeholder, credentials[fieldName]);
-        } else if (firstCredential) {
-          result = result.replace(placeholder, firstCredential);
-        }
-      });
-    }
-    
-    return result;
-  }
-
-  /**
-   * FIXED: Enhanced authentication header building with REAL credential injection
-   */
-  private static formatAuthHeader(
-    authConfig: any,
-    credentials: Record<string, string>
-  ): string {
-    const format = authConfig.format || 'Bearer {token}';
-    
-    // Use enhanced credential substitution
-    const authHeader = this.performCredentialSubstitution(format, credentials);
-    
-    console.log('🔧 Enhanced Auth Header:', { 
-      original: format, 
-      final: authHeader,
-      credentials: Object.keys(credentials) 
-    });
-    
-    return authHeader;
-  }
-
-  /**
-   * ENHANCED: Test credentials with REAL substitution and multi-field support
+   * ENHANCED: Test credentials using Supabase Edge Function (fixes CORS)
    */
   static async testCredentials(
     platformName: string, 
@@ -103,148 +40,49 @@ export class UniversalPlatformManager {
     automationContext?: any
   ): Promise<{ success: boolean; message: string; response_details?: any }> {
     try {
-      console.log(`🧪 UNIVERSAL TESTING: ${platformName} with credentials:`, Object.keys(credentials));
+      console.log(`🧪 EDGE FUNCTION TESTING: ${platformName} with real credentials via server-side`);
       
-      const config = await this.getPlatformConfiguration(platformName, automationContext);
-      const operation = config.automation_operations[0];
-      
-      if (!operation) {
+      // Use Supabase Edge Function to avoid CORS issues
+      const { data, error } = await supabase.functions.invoke('test-credential', {
+        body: {
+          platformName,
+          credentials,
+          automationId: automationContext?.id
+        }
+      });
+
+      if (error) {
+        console.error('❌ Edge function error:', error);
         return {
           success: false,
-          message: `No automation operations configured for ${platformName}`
+          message: `Failed to test ${platformName} credentials: ${error.message}`,
+          response_details: {
+            error: error.message,
+            suggestion: "Server-side credential testing failed"
+          }
         };
       }
 
-      // Build authentication header with REAL credential injection
-      const authHeader = this.formatAuthHeader(config.authentication, credentials);
+      console.log(`✅ Edge function response for ${platformName}:`, data);
       
-      // Build test URL with credential substitution
-      let testUrl = `${config.base_url}${operation.path}`;
-      testUrl = this.performCredentialSubstitution(testUrl, credentials);
-      
-      // Build headers with real credentials
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'User-Agent': 'YusrAI-Universal-Tester/3.0'
+      return {
+        success: data.success,
+        message: data.message,
+        response_details: data.details || {}
       };
-      
-      // Add authentication header
-      if (authHeader && !authHeader.includes('{')) {
-        headers['Authorization'] = authHeader;
-      }
-      
-      // Add any additional credential headers for complex platforms
-      if (credentials.database_id) {
-        headers['Notion-Version'] = '2022-06-28';
-      }
-      
-      if (credentials.bot_token && platformName.toLowerCase() === 'slack') {
-        headers['Authorization'] = `Bearer ${credentials.bot_token}`;
-      }
-      
-      console.log('📡 REAL API REQUEST:', { 
-        url: testUrl, 
-        headers: this.sanitizeHeadersForLog(headers),
-        method: operation.method 
-      });
-
-      // Make REAL API call with actual credentials
-      const response = await fetch(testUrl, {
-        method: operation.method === 'POST' ? 'POST' : 'GET',
-        headers,
-        body: operation.method === 'POST' ? JSON.stringify(
-          this.buildRequestBody(operation.sample_request, credentials, automationContext)
-        ) : undefined
-      });
-
-      const responseData = await response.json().catch(() => ({}));
-      
-      if (response.ok || response.status === 200 || response.status === 201) {
-        return {
-          success: true,
-          message: `✅ ${platformName} credentials verified successfully! Universal testing confirmed connectivity.`,
-          response_details: {
-            status: response.status,
-            data: responseData,
-            request: {
-              url: testUrl,
-              method: operation.method,
-              headers: this.sanitizeHeadersForLog(headers)
-            },
-            universal_testing: true,
-            credential_injection: 'successful',
-            platform_ready: true
-          }
-        };
-      } else {
-        return {
-          success: false,
-          message: `❌ ${platformName} credentials test failed: ${response.status} ${response.statusText}`,
-          response_details: {
-            status: response.status,
-            error: responseData,
-            request: {
-              url: testUrl,
-              method: operation.method,
-              headers: this.sanitizeHeadersForLog(headers)
-            },
-            suggestion: "Please verify your credentials are correct and active"
-          }
-        };
-      }
 
     } catch (error: any) {
-      console.error(`💥 Universal testing error for ${platformName}:`, error);
+      console.error(`💥 Credential testing error for ${platformName}:`, error);
       
       return {
         success: false,
-        message: `Connection test failed for ${platformName}: ${error.message}`,
+        message: `Credential testing failed for ${platformName}: ${error.message}`,
         response_details: {
           error: error.message,
-          suggestion: "Please verify your credentials and network connection"
+          suggestion: "Please check your credentials and try again"
         }
       };
     }
-  }
-
-  /**
-   * NEW: Build request body with credential substitution
-   */
-  private static buildRequestBody(
-    sampleRequest: any,
-    credentials: Record<string, string>,
-    automationContext?: any
-  ): any {
-    if (!sampleRequest) {
-      return {
-        test: true,
-        automation_context: automationContext?.title || 'Universal Testing',
-        universal_platform_manager: true
-      };
-    }
-    
-    const requestBody = JSON.parse(JSON.stringify(sampleRequest));
-    const requestString = JSON.stringify(requestBody);
-    const substitutedString = this.performCredentialSubstitution(requestString, credentials);
-    
-    return JSON.parse(substitutedString);
-  }
-
-  /**
-   * NEW: Sanitize headers for logging (hide sensitive data)
-   */
-  private static sanitizeHeadersForLog(headers: Record<string, string>): Record<string, string> {
-    const sanitized: Record<string, string> = {};
-    
-    Object.entries(headers).forEach(([key, value]) => {
-      if (key.toLowerCase() === 'authorization') {
-        sanitized[key] = value.length > 20 ? value.substring(0, 20) + '...' : value;
-      } else {
-        sanitized[key] = value;
-      }
-    });
-    
-    return sanitized;
   }
 
   /**
@@ -273,7 +111,7 @@ export class UniversalPlatformManager {
       const authHeader = this.formatAuthHeader(config.authentication, credentials);
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
-        "User-Agent": "YusrAI-Universal-API-Tester/3.0"
+        "User-Agent": "YusrAI-Universal-API-Tester/4.0"
       };
       
       if (authHeader && !authHeader.includes('{')) {
@@ -281,7 +119,7 @@ export class UniversalPlatformManager {
       }
       
       // Add platform-specific headers
-      if (platformName.toLowerCase() === 'notion' && credentials.database_id) {
+      if (platformName.toLowerCase() === 'notion' && credentials.integration_token) {
         headers['Notion-Version'] = '2022-06-28';
       }
       
@@ -319,7 +157,7 @@ export class UniversalPlatformManager {
           headers: {
             "Content-Type": "application/json",
             "Authorization": this.performCredentialSubstitution("Bearer {api_key}", credentials),
-            "User-Agent": "YusrAI-Universal-Tester/3.0"
+            "User-Agent": "YusrAI-Universal-Tester/4.0"
           }
         },
         expected_response: {
@@ -328,6 +166,99 @@ export class UniversalPlatformManager {
         }
       };
     }
+  }
+
+  /**
+   * FIXED: Enhanced credential substitution - REAL credential injection
+   */
+  private static performCredentialSubstitution(
+    template: string,
+    credentials: Record<string, string>
+  ): string {
+    let result = template;
+    
+    // Handle all possible credential field patterns with exact matching
+    Object.entries(credentials).forEach(([fieldName, fieldValue]) => {
+      if (fieldValue && fieldValue.trim()) {
+        // Create regex for exact field name matching
+        const regex = new RegExp(`\\{${fieldName}\\}`, 'g');
+        result = result.replace(regex, fieldValue);
+        
+        // Also handle common variations
+        const variations = [
+          fieldName.toLowerCase(),
+          fieldName.toUpperCase(),
+          fieldName.replace(/_/g, '-'),
+          fieldName.replace(/-/g, '_')
+        ];
+        
+        variations.forEach(variation => {
+          const variationRegex = new RegExp(`\\{${variation}\\}`, 'g');
+          result = result.replace(variationRegex, fieldValue);
+        });
+      }
+    });
+    
+    // Handle common token patterns
+    const commonPatterns = [
+      { pattern: /\{token\}/g, getValue: () => credentials.access_token || credentials.token || credentials.api_key || credentials.integration_token },
+      { pattern: /\{api_key\}/g, getValue: () => credentials.api_key || credentials.key },
+      { pattern: /\{access_token\}/g, getValue: () => credentials.access_token || credentials.token },
+      { pattern: /\{bearer_token\}/g, getValue: () => credentials.bearer_token || credentials.access_token || credentials.token }
+    ];
+    
+    commonPatterns.forEach(({ pattern, getValue }) => {
+      const value = getValue();
+      if (value) {
+        result = result.replace(pattern, value);
+      }
+    });
+    
+    return result;
+  }
+
+  /**
+   * FIXED: Enhanced authentication header building with REAL credential injection
+   */
+  private static formatAuthHeader(
+    authConfig: any,
+    credentials: Record<string, string>
+  ): string {
+    const format = authConfig.format || 'Bearer {token}';
+    
+    // Use enhanced credential substitution
+    const authHeader = this.performCredentialSubstitution(format, credentials);
+    
+    console.log('🔧 Enhanced Auth Header:', { 
+      original: format, 
+      final: authHeader,
+      credentials: Object.keys(credentials) 
+    });
+    
+    return authHeader;
+  }
+
+  /**
+   * NEW: Build request body with credential substitution
+   */
+  private static buildRequestBody(
+    sampleRequest: any,
+    credentials: Record<string, string>,
+    automationContext?: any
+  ): any {
+    if (!sampleRequest) {
+      return {
+        test: true,
+        automation_context: automationContext?.title || 'Universal Testing',
+        universal_platform_manager: true
+      };
+    }
+    
+    const requestBody = JSON.parse(JSON.stringify(sampleRequest));
+    const requestString = JSON.stringify(requestBody);
+    const substitutedString = this.performCredentialSubstitution(requestString, credentials);
+    
+    return JSON.parse(substitutedString);
   }
 
   static async getPlatformConfiguration(

@@ -36,7 +36,6 @@ const EnhancedCredentialForm = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const [canSave, setCanSave] = useState(false);
   
-  // PLAYGROUND MODE STATES - FIXED UI
   const [isPlaygroundMode, setIsPlaygroundMode] = useState(false);
   const [apiCallPreview, setApiCallPreview] = useState<any>(null);
   const [testResponseData, setTestResponseData] = useState<any>(null);
@@ -98,7 +97,7 @@ const EnhancedCredentialForm = ({
 
     if (!isPlaygroundMode) {
       try {
-        console.log('🔍 Generating API preview for playground...');
+        console.log('🔍 Generating REAL API preview for playground...');
         const preview = await UniversalPlatformManager.generateSampleCall(platform.name, credentials);
         setApiCallPreview(preview);
         setIsPlaygroundMode(true);
@@ -118,7 +117,7 @@ const EnhancedCredentialForm = ({
     setTestResponseData(null);
     
     try {
-      console.log(`🧪 Testing ${platform.name} credentials with Universal Platform Manager`);
+      console.log(`🧪 UNIVERSAL TESTING ${platform.name} with REAL credentials`);
       
       const result = await UniversalPlatformManager.testCredentials(platform.name, credentials);
 
@@ -130,12 +129,12 @@ const EnhancedCredentialForm = ({
 
       setTestResponseData({
         request: result.response_details?.request || null,
-        response: result.response_details?.response || null
+        response: result.response_details?.data || result.response_details?.error || null
       });
       
       if (result.success) {
         setCanSave(true);
-        toast.success(`✅ ${platform.name} credentials verified!`);
+        toast.success(`✅ ${platform.name} credentials verified with REAL API test!`);
       } else {
         setCanSave(false);
         toast.error(`❌ Test failed: ${result.message}`);
@@ -186,13 +185,12 @@ const EnhancedCredentialForm = ({
   return (
     <div className="w-full mx-auto space-y-6">
       {isPlaygroundMode ? (
-        /* PLAYGROUND MODE - LIGHT BACKGROUND, ACTUALLY WIDE */
-        <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-lg" style={{ minWidth: '90vw', maxWidth: '95vw' }}>
-          <div className="flex items-center justify-between mb-6">
+        <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-lg" style={{ minWidth: '90vw', maxWidth: '95vw', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div className="flex items-center justify-between mb-6 flex-shrink-0">
             <div className="flex items-center gap-3">
               <h3 className="text-2xl font-bold text-gray-900">{platform.name} API Playground</h3>
               <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                ⚡ Live Testing Mode
+                ⚡ REAL Credential Testing
               </div>
             </div>
             
@@ -205,69 +203,63 @@ const EnhancedCredentialForm = ({
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* REQUEST PANEL - LIGHT THEME */}
-            <div className="space-y-4">
-              <h4 className="font-semibold text-gray-800 text-lg flex items-center gap-2">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 flex-1 min-h-0">
+            <div className="space-y-4 flex flex-col min-h-0">
+              <h4 className="font-semibold text-gray-800 text-lg flex items-center gap-2 flex-shrink-0">
                 <Play className="h-5 w-5 text-blue-600" />
-                API Request
+                API Request (REAL Credentials)
               </h4>
-              <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden" style={{ minHeight: '400px' }}>
-                <div className="p-3 border-b bg-gray-100 text-gray-800 font-mono text-sm">
+              <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden flex-1 min-h-0">
+                <div className="p-3 border-b bg-gray-100 text-gray-800 font-mono text-sm flex-shrink-0">
                   <div className="flex items-center gap-3">
                     <span className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">
                       {(testResponseData?.request || apiCallPreview?.request)?.method || 'GET'}
                     </span>
-                    <span className="text-blue-600 font-medium">
+                    <span className="text-blue-600 font-medium truncate">
                       {(testResponseData?.request || apiCallPreview?.request)?.url}
                     </span>
                   </div>
                 </div>
-                <pre className="p-4 text-sm text-gray-700 font-mono overflow-auto" style={{ height: '350px' }}>
+                <div className="flex-1 overflow-auto">
+                  <pre className="p-4 text-sm text-gray-700 font-mono whitespace-pre-wrap">
 {JSON.stringify({
   headers: (testResponseData?.request || apiCallPreview?.request)?.headers || {},
   body: (testResponseData?.request || apiCallPreview?.request)?.body || null
 }, null, 2)}
-                </pre>
+                  </pre>
+                </div>
               </div>
             </div>
 
-            {/* RESPONSE PANEL - LIGHT THEME */}
-            <div className="space-y-4">
-              <h4 className="font-semibold text-gray-800 text-lg flex items-center gap-2">
+            <div className="space-y-4 flex flex-col min-h-0">
+              <h4 className="font-semibold text-gray-800 text-lg flex items-center gap-2 flex-shrink-0">
                 <CheckCircle className="h-5 w-5 text-green-600" />
-                API Response
+                API Response (REAL Data)
               </h4>
-              <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden" style={{ minHeight: '400px' }}>
-                <div className="p-3 border-b bg-gray-100 text-gray-800 font-mono text-sm">
+              <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden flex-1 min-h-0">
+                <div className="p-3 border-b bg-gray-100 text-gray-800 font-mono text-sm flex-shrink-0">
                   <div className="flex items-center gap-3">
                     <span className={`px-2 py-1 rounded text-xs font-bold text-white ${
-                      testResponseData?.response?.status >= 200 && testResponseData?.response?.status < 300 
-                        ? 'bg-green-600' 
-                        : 'bg-red-600'
+                      testResult?.success ? 'bg-green-600' : 'bg-red-600'
                     }`}>
-                      Status: {testResponseData?.response?.status || apiCallPreview?.expected_response?.status || 'Waiting...'}
+                      Status: {testResult?.status_code || 'Waiting...'}
                     </span>
-                    {testResponseData?.response?.request_time_ms && (
-                      <span className="text-blue-600 font-medium">
-                        {testResponseData.response.request_time_ms}ms
-                      </span>
-                    )}
                   </div>
                 </div>
-                <pre className="p-4 text-sm text-gray-700 font-mono overflow-auto" style={{ height: '350px' }}>
+                <div className="flex-1 overflow-auto">
+                  <pre className="p-4 text-sm text-gray-700 font-mono whitespace-pre-wrap">
 {JSON.stringify(
-  testResponseData?.response?.data || apiCallPreview?.expected_response || { message: "Click 'Test Credentials' to see live response" }, 
+  testResponseData?.response || apiCallPreview?.expected_response || { message: "Click 'Test REAL Credentials' to see live response" }, 
   null, 
   2
 )}
-                </pre>
+                  </pre>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* PLAYGROUND ACTIONS */}
-          <div className="flex gap-4 mt-8">
+          <div className="flex gap-4 mt-8 flex-shrink-0">
             <Button
               onClick={handleTest}
               disabled={!hasAllCredentials || isTesting}
@@ -276,12 +268,12 @@ const EnhancedCredentialForm = ({
               {isTesting ? (
                 <>
                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Testing Live API...
+                  Testing REAL API...
                 </>
               ) : (
                 <>
                   <TestTube className="w-5 h-5 mr-2" />
-                  Test Live API
+                  Test REAL Credentials
                 </>
               )}
             </Button>
@@ -306,13 +298,12 @@ const EnhancedCredentialForm = ({
           </div>
         </div>
       ) : (
-        /* NORMAL FORM MODE - ACTUALLY WIDER */
-        <div className="bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 rounded-2xl p-12 border border-purple-200 shadow-lg" style={{ minWidth: '85vw', maxWidth: '90vw' }}>
-          <div className="flex items-center justify-between mb-8">
+        <div className="bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 rounded-2xl p-8 border border-purple-200 shadow-lg" style={{ minWidth: '85vw', maxWidth: '90vw', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div className="flex items-center justify-between mb-6 flex-shrink-0">
             <div className="flex items-center gap-4">
               <h3 className="text-3xl font-bold text-gray-900">{platform.name} Credentials</h3>
               <div className="bg-green-100 text-green-800 px-4 py-2 rounded-full text-sm font-medium">
-                🌐 Universal Support
+                🌐 Universal Multi-Field Support
               </div>
             </div>
             
@@ -328,65 +319,69 @@ const EnhancedCredentialForm = ({
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8 mb-10">
-            {platform.credentials.map((cred) => (
-              <div key={cred.field} className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <label className="text-lg font-semibold text-gray-800">{cred.field}</label>
-                  {cred.link && (
-                    <a
-                      href={cred.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center text-sm text-purple-600 hover:text-purple-800 font-medium"
-                    >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Get Key
-                    </a>
-                  )}
-                </div>
-
-                <div className="relative">
-                  <Input
-                    type={showPasswords[cred.field] ? "text" : "password"}
-                    placeholder={cred.placeholder}
-                    value={credentials[cred.field] || ''}
-                    onChange={(e) => handleCredentialChange(cred.field, e.target.value)}
-                    className="rounded-xl border-purple-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-200 pr-14 py-6 text-lg font-mono bg-white"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 h-10 w-10 p-0 hover:bg-purple-100"
-                    onClick={() => togglePasswordVisibility(cred.field)}
-                  >
-                    {showPasswords[cred.field] ? (
-                      <EyeOff className="h-5 w-5 text-gray-400" />
-                    ) : (
-                      <Eye className="h-5 w-5 text-gray-400" />
+          {/* SCROLLABLE CREDENTIAL FIELDS */}
+          <div className="flex-1 overflow-auto mb-6" style={{ maxHeight: '50vh' }}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              {platform.credentials.map((cred) => (
+                <div key={cred.field} className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-lg font-semibold text-gray-800">{cred.field}</label>
+                    {cred.link && (
+                      <a
+                        href={cred.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center text-sm text-purple-600 hover:text-purple-800 font-medium"
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Get Key
+                      </a>
                     )}
-                  </Button>
-                </div>
+                  </div>
 
-                <p className="text-sm text-gray-600 bg-white/50 p-3 rounded-lg border-l-4 border-purple-300">{cred.why_needed}</p>
-              </div>
-            ))}
+                  <div className="relative">
+                    <Input
+                      type={showPasswords[cred.field] ? "text" : "password"}
+                      placeholder={cred.placeholder}
+                      value={credentials[cred.field] || ''}
+                      onChange={(e) => handleCredentialChange(cred.field, e.target.value)}
+                      className="rounded-xl border-purple-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-200 pr-14 py-6 text-lg font-mono bg-white"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 h-10 w-10 p-0 hover:bg-purple-100"
+                      onClick={() => togglePasswordVisibility(cred.field)}
+                    >
+                      {showPasswords[cred.field] ? (
+                        <EyeOff className="h-5 w-5 text-gray-400" />
+                      ) : (
+                        <Eye className="h-5 w-5 text-gray-400" />
+                      )}
+                    </Button>
+                  </div>
+
+                  <p className="text-sm text-gray-600 bg-white/50 p-3 rounded-lg border-l-4 border-purple-300">{cred.why_needed}</p>
+                </div>
+              ))}
+            </div>
           </div>
 
+          {/* TEST RESULT */}
           {testResult && (
-            <div className={`mb-8 p-8 rounded-xl border-2 ${
+            <div className={`mb-6 p-6 rounded-xl border-2 flex-shrink-0 ${
               testResult.success 
                 ? 'bg-green-50 border-green-300 text-green-800' 
                 : 'bg-red-50 border-red-300 text-red-800'
             }`}>
-              <div className="flex items-center gap-4 mb-6">
+              <div className="flex items-center gap-4 mb-4">
                 {testResult.success ? (
-                  <CheckCircle className="h-8 w-8" />
+                  <CheckCircle className="h-6 w-6" />
                 ) : (
-                  <XCircle className="h-8 w-8" />
+                  <XCircle className="h-6 w-6" />
                 )}
-                <span className="font-semibold text-xl">{testResult.message}</span>
+                <span className="font-semibold text-lg">{testResult.message}</span>
                 {testResult.status_code && (
                   <span className="bg-white/50 text-gray-800 px-3 py-2 rounded-full text-sm font-mono">
                     Status: {testResult.status_code}
@@ -395,22 +390,22 @@ const EnhancedCredentialForm = ({
               </div>
 
               {testResponseData && (
-                <div className="mt-6">
+                <div className="mt-4">
                   <Button
                     variant="outline"
-                    size="lg"
                     onClick={handleTogglePlayground}
                     className="text-lg px-6 py-3 bg-white hover:bg-gray-50"
                   >
                     <Play className="h-5 w-5 mr-2" />
-                    View Full API Response in Playground
+                    View Full REAL API Response in Playground
                   </Button>
                 </div>
               )}
             </div>
           )}
 
-          <div className="flex gap-6 mt-10">
+          {/* ACTION BUTTONS */}
+          <div className="flex gap-6 flex-shrink-0">
             <Button
               onClick={handleTest}
               disabled={!hasAllCredentials || isTesting}
@@ -419,12 +414,12 @@ const EnhancedCredentialForm = ({
               {isTesting ? (
                 <>
                   <Loader2 className="w-6 h-6 mr-3 animate-spin" />
-                  Testing with Universal AI...
+                  Testing REAL Credentials...
                 </>
               ) : (
                 <>
                   <TestTube className="w-6 h-6 mr-3" />
-                  Test Credentials
+                  Test REAL Credentials
                 </>
               )}
             </Button>
@@ -448,8 +443,8 @@ const EnhancedCredentialForm = ({
             </Button>
           </div>
 
-          <p className="text-sm text-center text-gray-500 mt-8">
-            🔒 Credentials are encrypted and stored securely • 🤖 Universal AI-powered platform support
+          <p className="text-sm text-center text-gray-500 mt-6 flex-shrink-0">
+            🔒 Credentials encrypted & secure • 🤖 Universal AI-powered platform support • ⚡ REAL API testing
           </p>
         </div>
       )}

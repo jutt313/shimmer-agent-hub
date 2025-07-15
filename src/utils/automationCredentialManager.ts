@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { UniversalPlatformManager } from './universalPlatformManager';
 
@@ -14,10 +13,9 @@ export interface AutomationCredential {
   test_message?: string;
 }
 
-// ENHANCED AUTOMATION CREDENTIAL MANAGER with COMPLETE INTEGRATION
 export class AutomationCredentialManager {
   /**
-   * ENHANCED: Universal credential testing with automation context
+   * ENHANCED: Universal credential testing with REAL credential injection
    */
   static async testCredentials(
     userId: string,
@@ -27,9 +25,9 @@ export class AutomationCredentialManager {
     automationContext?: any
   ): Promise<{ success: boolean; message: string; details?: any }> {
     try {
-      console.log(`🧪 ENHANCED testing for ${platformName} with automation context`);
+      console.log(`🧪 UNIVERSAL TESTING for ${platformName} with REAL credentials`);
       
-      // Use Enhanced Universal Platform Manager for testing
+      // Use Enhanced Universal Platform Manager for REAL testing
       const result = await UniversalPlatformManager.testCredentials(
         platformName, 
         credentials,
@@ -42,30 +40,30 @@ export class AutomationCredentialManager {
         details: {
           ...result.response_details,
           platform: platformName,
-          automation_context_aware: true,
-          enhanced_system: true,
+          universal_testing: true,
+          real_credential_injection: true,
           automation_id: automationId
         }
       };
 
     } catch (error: any) {
-      console.error(`💥 Enhanced testing failed for ${platformName}:`, error);
+      console.error(`💥 Universal testing failed for ${platformName}:`, error);
       
       return {
         success: false,
-        message: `Enhanced testing failed for ${platformName}: ${error.message}`,
+        message: `Universal testing failed for ${platformName}: ${error.message}`,
         details: { 
           error: error.message,
           platform: platformName,
           system_error: true,
-          enhanced_system: true
+          universal_testing: true
         }
       };
     }
   }
 
   /**
-   * ENHANCED: Save credentials with automation context
+   * ENHANCED: Save credentials with universal support
    */
   static async saveCredentials(
     automationId: string,
@@ -74,7 +72,7 @@ export class AutomationCredentialManager {
     userId: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log(`💾 Saving ENHANCED credentials for ${platformName} in automation ${automationId}`);
+      console.log(`💾 Saving UNIVERSAL credentials for ${platformName} in automation ${automationId}`);
 
       const { data, error } = await supabase
         .from('automation_platform_credentials')
@@ -86,8 +84,8 @@ export class AutomationCredentialManager {
           is_active: true,
           is_tested: true,
           test_status: 'success',
-          test_message: `Enhanced testing successful for ${platformName} with automation context`,
-          credential_type: 'enhanced_automation_managed'
+          test_message: `Universal testing successful for ${platformName} with REAL credential injection`,
+          credential_type: 'universal_multi_field'
         })
         .select()
         .single();
@@ -96,11 +94,11 @@ export class AutomationCredentialManager {
         throw error;
       }
 
-      console.log(`✅ Enhanced credentials saved for ${platformName}`);
+      console.log(`✅ Universal credentials saved for ${platformName}`);
       return { success: true };
 
     } catch (error: any) {
-      console.error(`❌ Failed to save enhanced credentials:`, error);
+      console.error(`❌ Failed to save universal credentials:`, error);
       return { success: false, error: error.message };
     }
   }

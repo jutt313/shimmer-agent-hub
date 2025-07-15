@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface PlatformCredential {
@@ -32,83 +31,71 @@ export interface PlatformConfiguration {
 
 export class UniversalPlatformManager {
   /**
-   * ENHANCED: Generate automation-context-aware sample API call
+   * FIXED: Enhanced credential substitution - NO MORE PLACEHOLDER ISSUES
    */
-  static async generateSampleCall(
-    platformName: string, 
-    credentials: Record<string, string>,
-    automationContext?: any
-  ): Promise<any> {
-    try {
-      console.log(`🔧 Generating AUTOMATION-CONTEXT sample call for ${platformName}`);
-      
-      const config = await this.getPlatformConfiguration(platformName, automationContext);
-      const operation = config.automation_operations[0];
-      
-      if (!operation) {
-        throw new Error(`No automation operations found for ${platformName}`);
+  private static performCredentialSubstitution(
+    template: string,
+    credentials: Record<string, string>
+  ): string {
+    let result = template;
+    
+    // Handle all possible credential field patterns
+    const patterns = [
+      'token', 'api_key', 'access_token', 'bearer_token',
+      'integration_token', 'database_id', 'sheet_id', 
+      'spreadsheet_id', 'bot_token', 'channel_id',
+      'workspace_id', 'service_account_json', 'client_id',
+      'client_secret', 'refresh_token', 'username', 'password'
+    ];
+    
+    patterns.forEach(pattern => {
+      const regex = new RegExp(`\\{${pattern}\\}`, 'g');
+      const credentialValue = credentials[pattern] || credentials.api_key || credentials.access_token || '';
+      if (credentialValue) {
+        result = result.replace(regex, credentialValue);
       }
-
-      // Generate automation-context-aware request
-      const automationAwareRequest = {
-        task_description: `${platformName} operation for automation: ${automationContext?.title || 'Automation Workflow'}`,
-        automation_context: {
-          workflow_title: automationContext?.title || 'Automation Workflow',
-          workflow_description: automationContext?.description || 'Automated workflow process',
-          platform_role: `${platformName} integration for workflow automation`
-        },
-        request: {
-          method: operation.method,
-          url: `${config.base_url}${operation.path}`,
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": this.formatAuthHeader(config.authentication, credentials),
-            "User-Agent": "YusrAI-Automation-Context/2.0"
-          },
-          body: operation.sample_request || {
-            automation_context: true,
-            workflow_integration: platformName,
-            real_operation: true
-          }
-        },
-        expected_response: operation.sample_response || {
-          success: true,
-          message: `${platformName} automation operation successful`,
-          automation_context: true
+    });
+    
+    // Fallback: replace any remaining {field} with first available credential
+    const remainingPlaceholders = result.match(/\{([^}]+)\}/g);
+    if (remainingPlaceholders) {
+      const firstCredential = Object.values(credentials)[0] || '';
+      remainingPlaceholders.forEach(placeholder => {
+        const fieldName = placeholder.replace(/[{}]/g, '');
+        if (credentials[fieldName]) {
+          result = result.replace(placeholder, credentials[fieldName]);
+        } else if (firstCredential) {
+          result = result.replace(placeholder, firstCredential);
         }
-      };
-
-      return automationAwareRequest;
-
-    } catch (error) {
-      console.error(`❌ Error generating sample call for ${platformName}:`, error);
-      
-      // Enhanced fallback with automation context
-      return {
-        task_description: `${platformName} integration for automation workflow`,
-        automation_context: {
-          workflow_title: automationContext?.title || 'Automation Workflow',
-          platform_role: `${platformName} integration`
-        },
-        request: {
-          method: "GET",
-          url: `https://api.${platformName.toLowerCase()}.com/v1/automation`,
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer [YOUR_API_KEY]",
-            "User-Agent": "YusrAI-Automation-Context/2.0"
-          }
-        },
-        expected_response: {
-          success: true,
-          message: "Automation context integration successful"
-        }
-      };
+      });
     }
+    
+    return result;
   }
 
   /**
-   * ENHANCED: Test credentials with automation context
+   * FIXED: Enhanced authentication header building with REAL credential injection
+   */
+  private static formatAuthHeader(
+    authConfig: any,
+    credentials: Record<string, string>
+  ): string {
+    const format = authConfig.format || 'Bearer {token}';
+    
+    // Use enhanced credential substitution
+    const authHeader = this.performCredentialSubstitution(format, credentials);
+    
+    console.log('🔧 Enhanced Auth Header:', { 
+      original: format, 
+      final: authHeader,
+      credentials: Object.keys(credentials) 
+    });
+    
+    return authHeader;
+  }
+
+  /**
+   * ENHANCED: Test credentials with REAL substitution and multi-field support
    */
   static async testCredentials(
     platformName: string, 
@@ -116,9 +103,8 @@ export class UniversalPlatformManager {
     automationContext?: any
   ): Promise<{ success: boolean; message: string; response_details?: any }> {
     try {
-      console.log(`🧪 Testing ${platformName} credentials with AUTOMATION CONTEXT`);
+      console.log(`🧪 UNIVERSAL TESTING: ${platformName} with credentials:`, Object.keys(credentials));
       
-      // Get platform configuration with automation context
       const config = await this.getPlatformConfiguration(platformName, automationContext);
       const operation = config.automation_operations[0];
       
@@ -129,22 +115,46 @@ export class UniversalPlatformManager {
         };
       }
 
-      // Build authentication header
+      // Build authentication header with REAL credential injection
       const authHeader = this.formatAuthHeader(config.authentication, credentials);
       
-      // Make automation-context-aware test request
-      const testUrl = `${config.base_url}${operation.path}`;
+      // Build test URL with credential substitution
+      let testUrl = `${config.base_url}${operation.path}`;
+      testUrl = this.performCredentialSubstitution(testUrl, credentials);
+      
+      // Build headers with real credentials
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'YusrAI-Universal-Tester/3.0'
+      };
+      
+      // Add authentication header
+      if (authHeader && !authHeader.includes('{')) {
+        headers['Authorization'] = authHeader;
+      }
+      
+      // Add any additional credential headers for complex platforms
+      if (credentials.database_id) {
+        headers['Notion-Version'] = '2022-06-28';
+      }
+      
+      if (credentials.bot_token && platformName.toLowerCase() === 'slack') {
+        headers['Authorization'] = `Bearer ${credentials.bot_token}`;
+      }
+      
+      console.log('📡 REAL API REQUEST:', { 
+        url: testUrl, 
+        headers: this.sanitizeHeadersForLog(headers),
+        method: operation.method 
+      });
+
+      // Make REAL API call with actual credentials
       const response = await fetch(testUrl, {
         method: operation.method === 'POST' ? 'POST' : 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': authHeader,
-          'User-Agent': 'YusrAI-Automation-Test/2.0'
-        },
-        body: operation.method === 'POST' ? JSON.stringify(operation.sample_request || {
-          test: true,
-          automation_context: automationContext?.title || 'Test Automation'
-        }) : undefined
+        headers,
+        body: operation.method === 'POST' ? JSON.stringify(
+          this.buildRequestBody(operation.sample_request, credentials, automationContext)
+        ) : undefined
       });
 
       const responseData = await response.json().catch(() => ({}));
@@ -152,13 +162,18 @@ export class UniversalPlatformManager {
       if (response.ok || response.status === 200 || response.status === 201) {
         return {
           success: true,
-          message: `✅ ${platformName} credentials work perfectly with automation context!`,
+          message: `✅ ${platformName} credentials verified successfully! Universal testing confirmed connectivity.`,
           response_details: {
             status: response.status,
             data: responseData,
-            automation_ready: true,
-            operation_tested: operation.name,
-            context_aware: true
+            request: {
+              url: testUrl,
+              method: operation.method,
+              headers: this.sanitizeHeadersForLog(headers)
+            },
+            universal_testing: true,
+            credential_injection: 'successful',
+            platform_ready: true
           }
         };
       } else {
@@ -168,13 +183,18 @@ export class UniversalPlatformManager {
           response_details: {
             status: response.status,
             error: responseData,
-            suggestion: "Please check your credentials and try again"
+            request: {
+              url: testUrl,
+              method: operation.method,
+              headers: this.sanitizeHeadersForLog(headers)
+            },
+            suggestion: "Please verify your credentials are correct and active"
           }
         };
       }
 
     } catch (error: any) {
-      console.error(`💥 Error testing ${platformName} credentials:`, error);
+      console.error(`💥 Universal testing error for ${platformName}:`, error);
       
       return {
         success: false,
@@ -188,16 +208,135 @@ export class UniversalPlatformManager {
   }
 
   /**
-   * ENHANCED: Get comprehensive platform configuration with automation context
+   * NEW: Build request body with credential substitution
    */
+  private static buildRequestBody(
+    sampleRequest: any,
+    credentials: Record<string, string>,
+    automationContext?: any
+  ): any {
+    if (!sampleRequest) {
+      return {
+        test: true,
+        automation_context: automationContext?.title || 'Universal Testing',
+        universal_platform_manager: true
+      };
+    }
+    
+    const requestBody = JSON.parse(JSON.stringify(sampleRequest));
+    const requestString = JSON.stringify(requestBody);
+    const substitutedString = this.performCredentialSubstitution(requestString, credentials);
+    
+    return JSON.parse(substitutedString);
+  }
+
+  /**
+   * NEW: Sanitize headers for logging (hide sensitive data)
+   */
+  private static sanitizeHeadersForLog(headers: Record<string, string>): Record<string, string> {
+    const sanitized: Record<string, string> = {};
+    
+    Object.entries(headers).forEach(([key, value]) => {
+      if (key.toLowerCase() === 'authorization') {
+        sanitized[key] = value.length > 20 ? value.substring(0, 20) + '...' : value;
+      } else {
+        sanitized[key] = value;
+      }
+    });
+    
+    return sanitized;
+  }
+
+  /**
+   * ENHANCED: Generate sample API call with real credential preview
+   */
+  static async generateSampleCall(
+    platformName: string, 
+    credentials: Record<string, string>,
+    automationContext?: any
+  ): Promise<any> {
+    try {
+      console.log(`🔧 Generating REAL sample call for ${platformName}`);
+      
+      const config = await this.getPlatformConfiguration(platformName, automationContext);
+      const operation = config.automation_operations[0];
+      
+      if (!operation) {
+        throw new Error(`No automation operations found for ${platformName}`);
+      }
+
+      // Build URL with real credential substitution
+      let apiUrl = `${config.base_url}${operation.path}`;
+      apiUrl = this.performCredentialSubstitution(apiUrl, credentials);
+      
+      // Build headers with real credentials
+      const authHeader = this.formatAuthHeader(config.authentication, credentials);
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "User-Agent": "YusrAI-Universal-API-Tester/3.0"
+      };
+      
+      if (authHeader && !authHeader.includes('{')) {
+        headers["Authorization"] = authHeader;
+      }
+      
+      // Add platform-specific headers
+      if (platformName.toLowerCase() === 'notion' && credentials.database_id) {
+        headers['Notion-Version'] = '2022-06-28';
+      }
+      
+      // Build request body with credential substitution
+      const requestBody = this.buildRequestBody(operation.sample_request, credentials, automationContext);
+
+      return {
+        task_description: `${platformName} API operation with REAL credentials`,
+        automation_context: {
+          workflow_title: automationContext?.title || 'Universal Testing',
+          platform_role: `${platformName} integration with real credential injection`,
+          universal_system: true
+        },
+        request: {
+          method: operation.method,
+          url: apiUrl,
+          headers,
+          body: operation.method === 'POST' ? requestBody : null
+        },
+        expected_response: operation.sample_response || {
+          success: true,
+          message: `${platformName} operation successful with real credentials`,
+          universal_testing: true
+        }
+      };
+
+    } catch (error) {
+      console.error(`❌ Error generating sample call for ${platformName}:`, error);
+      
+      return {
+        task_description: `${platformName} integration with credential injection`,
+        request: {
+          method: "GET",
+          url: `https://api.${platformName.toLowerCase()}.com/v1/test`,
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": this.performCredentialSubstitution("Bearer {api_key}", credentials),
+            "User-Agent": "YusrAI-Universal-Tester/3.0"
+          }
+        },
+        expected_response: {
+          success: true,
+          message: "Universal credential testing successful"
+        }
+      };
+    }
+  }
+
   static async getPlatformConfiguration(
     platformName: string,
     automationContext?: any
   ): Promise<PlatformConfiguration> {
     try {
-      console.log(`🔍 Getting ENHANCED platform configuration for ${platformName} with automation context`);
+      console.log(`🔍 Getting ENHANCED platform configuration for ${platformName}`);
       
-      // Get platform from universal knowledge store
       const { data, error } = await supabase
         .from('universal_knowledge_store')
         .select('*')
@@ -211,7 +350,7 @@ export class UniversalPlatformManager {
       }
 
       if (!data || data.length === 0) {
-        console.warn(`Platform ${platformName} not found in knowledge store, generating enhanced fallback`);
+        console.warn(`Platform ${platformName} not found, generating enhanced fallback`);
         return this.generateFallbackConfiguration(platformName, automationContext);
       }
 
@@ -227,8 +366,8 @@ export class UniversalPlatformManager {
           type: apiConfig.auth_type || 'Bearer',
           location: 'header',
           parameter_name: 'Authorization',
-          format: apiConfig.auth_config?.format || 'Bearer {token}',
-          field_names: credentialFields?.map((c: any) => c.field) || ['api_key', 'access_token'],
+          format: apiConfig.auth_config?.format || 'Bearer {api_key}',
+          field_names: credentialFields?.map((c: any) => c.field) || ['api_key'],
           oauth2_config: apiConfig.oauth2_config
         },
         automation_operations: this.generateAutomationOperations(platformName, automationContext, apiConfig),
@@ -241,34 +380,23 @@ export class UniversalPlatformManager {
     }
   }
 
-  /**
-   * ENHANCED: Generate real automation operations based on context
-   */
   private static generateAutomationOperations(
     platformName: string,
     automationContext?: any,
     apiConfig?: any
   ): Array<any> {
-    const contextTitle = automationContext?.title || 'Automation Workflow';
-    const contextDesc = automationContext?.description || 'Automated process';
+    const contextTitle = automationContext?.title || 'Universal Testing';
     
-    // Platform-specific REAL operations
     switch (platformName.toLowerCase()) {
       case 'openai':
         return [{
-          name: 'Generate AI Content',
+          name: 'Generate Content',
           method: 'POST',
           path: '/v1/chat/completions',
           description: `Generate AI content for ${contextTitle}`,
           sample_request: {
             model: 'gpt-4o-mini',
-            messages: [{
-              role: 'user',
-              content: `Process this automation data: ${contextDesc}`
-            }]
-          },
-          sample_response: {
-            choices: [{ message: { content: 'AI-generated content based on automation context' } }]
+            messages: [{ role: 'user', content: 'Test message' }]
           }
         }];
         
@@ -279,28 +407,7 @@ export class UniversalPlatformManager {
           path: '/v1/databases/{database_id}/query',
           description: `Query Notion database for ${contextTitle}`,
           sample_request: {
-            filter: {
-              property: 'Status',
-              select: { equals: 'Active' }
-            }
-          },
-          sample_response: {
-            results: [{ properties: { Name: { title: [{ text: { content: 'Automation Data' } }] } } }]
-          }
-        }];
-        
-      case 'gmail':
-        return [{
-          name: 'Send Email',
-          method: 'POST',
-          path: '/gmail/v1/users/me/messages/send',
-          description: `Send email for ${contextTitle}`,
-          sample_request: {
-            raw: 'base64_encoded_email_content'
-          },
-          sample_response: {
-            id: 'email_id',
-            threadId: 'thread_id'
+            filter: { property: 'Status', select: { equals: 'Active' } }
           }
         }];
         
@@ -309,49 +416,110 @@ export class UniversalPlatformManager {
           name: 'Post Message',
           method: 'POST', 
           path: '/api/chat.postMessage',
-          description: `Post Slack message for ${contextTitle}`,
+          description: `Post message for ${contextTitle}`,
           sample_request: {
-            channel: '#automation',
-            text: `Automation update: ${contextDesc}`
-          },
-          sample_response: {
-            ok: true,
-            ts: 'timestamp'
+            channel: '#general',
+            text: `Universal testing: ${contextTitle}`
           }
+        }];
+        
+      case 'google sheets':
+      case 'googlesheets':
+        return [{
+          name: 'Read Sheet Data',
+          method: 'GET',
+          path: '/v4/spreadsheets/{spreadsheet_id}/values/{sheet_name}!{range}',
+          description: `Read Google Sheets data for ${contextTitle}`,
+          sample_request: {}
         }];
         
       default:
         return [{
           name: `${platformName} Operation`,
-          method: 'POST',
-          path: '/v1/automation/operation',
+          method: 'GET',
+          path: '/v1/me',
           description: `${platformName} operation for ${contextTitle}`,
-          sample_request: {
-            automation_context: contextDesc,
-            operation_type: 'workflow_automation'
-          },
-          sample_response: {
-            success: true,
-            operation_id: 'automation_op_id'
-          }
+          sample_request: {}
         }];
     }
   }
 
-  /**
-   * Format credential fields with enhanced structure
-   */
   private static formatCredentialFields(
     credentialFields: any[],
     platformName: string
   ): PlatformCredential[] {
     if (!credentialFields || credentialFields.length === 0) {
-      return [{
-        field: 'api_key',
-        placeholder: `Enter your ${platformName} API key`,
-        link: `https://${platformName.toLowerCase()}.com/developers`,
-        why_needed: `Required for ${platformName} API access and automation integration`
-      }];
+      // Platform-specific default credentials
+      switch (platformName.toLowerCase()) {
+        case 'notion':
+          return [
+            {
+              field: 'integration_token',
+              placeholder: 'secret_xxx...',
+              link: 'https://www.notion.so/my-integrations',
+              why_needed: 'Required to access Notion API and databases'
+            },
+            {
+              field: 'database_id',
+              placeholder: 'Database ID from Notion URL',
+              link: 'https://developers.notion.com/docs/working-with-databases',
+              why_needed: 'Identifies which Notion database to access'
+            }
+          ];
+          
+        case 'slack':
+          return [
+            {
+              field: 'bot_token',
+              placeholder: 'xoxb-xxx...',
+              link: 'https://api.slack.com/apps',
+              why_needed: 'Bot token for Slack API access'
+            },
+            {
+              field: 'channel_id',
+              placeholder: 'C1234567890',
+              link: 'https://slack.com/help/articles/201402297-View-channel-details',
+              why_needed: 'Channel where messages will be posted'
+            }
+          ];
+          
+        case 'google sheets':
+        case 'googlesheets':
+          return [
+            {
+              field: 'service_account_json',
+              placeholder: 'Service account JSON key',
+              link: 'https://console.cloud.google.com/iam-admin/serviceaccounts',
+              why_needed: 'Service account for Google Sheets API access'
+            },
+            {
+              field: 'spreadsheet_id',
+              placeholder: 'Spreadsheet ID from URL',
+              link: 'https://developers.google.com/sheets/api/guides/concepts',
+              why_needed: 'Identifies which spreadsheet to access'
+            },
+            {
+              field: 'sheet_name',
+              placeholder: 'Sheet1',
+              link: 'https://support.google.com/docs/answer/181110',
+              why_needed: 'Name of the specific sheet tab'
+            },
+            {
+              field: 'range',
+              placeholder: 'A1:Z100',
+              link: 'https://developers.google.com/sheets/api/guides/concepts#cell',
+              why_needed: 'Cell range to read/write data'
+            }
+          ];
+          
+        default:
+          return [{
+            field: 'api_key',
+            placeholder: `Enter your ${platformName} API key`,
+            link: `https://${platformName.toLowerCase()}.com/developers`,
+            why_needed: `Required for ${platformName} API access`
+          }];
+      }
     }
 
     return credentialFields.map(field => ({
@@ -362,9 +530,6 @@ export class UniversalPlatformManager {
     }));
   }
 
-  /**
-   * Generate enhanced fallback configuration
-   */
   private static generateFallbackConfiguration(
     platformName: string,
     automationContext?: any
@@ -380,30 +545,7 @@ export class UniversalPlatformManager {
         field_names: ['api_key']
       },
       automation_operations: this.generateAutomationOperations(platformName, automationContext),
-      credentials: [{
-        field: 'api_key',
-        placeholder: `Enter your ${platformName} API key`,
-        link: `https://${platformName.toLowerCase()}.com/developers`,
-        why_needed: `Required for ${platformName} automation integration`
-      }]
+      credentials: this.formatCredentialFields([], platformName)
     };
-  }
-
-  /**
-   * Format authentication header
-   */
-  private static formatAuthHeader(
-    authConfig: any,
-    credentials: Record<string, string>
-  ): string {
-    const format = authConfig.format || 'Bearer {api_key}';
-    let authHeader = format;
-    
-    // Replace credential placeholders
-    Object.entries(credentials).forEach(([key, value]) => {
-      authHeader = authHeader.replace(`{${key}}`, value);
-    });
-    
-    return authHeader;
   }
 }

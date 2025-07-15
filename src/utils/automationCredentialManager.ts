@@ -14,51 +14,58 @@ export interface AutomationCredential {
   test_message?: string;
 }
 
-// UNIVERSAL AUTOMATION CREDENTIAL MANAGER - NO HARDCODING
+// ENHANCED AUTOMATION CREDENTIAL MANAGER with COMPLETE INTEGRATION
 export class AutomationCredentialManager {
   /**
-   * Universal credential testing using AI-powered platform detection
+   * ENHANCED: Universal credential testing with automation context
    */
   static async testCredentials(
     userId: string,
     automationId: string,
     platformName: string,
-    credentials: Record<string, string>
+    credentials: Record<string, string>,
+    automationContext?: any
   ): Promise<{ success: boolean; message: string; details?: any }> {
     try {
-      console.log(`🧪 Universal testing for ${platformName} via AI`);
+      console.log(`🧪 ENHANCED testing for ${platformName} with automation context`);
       
-      // Use Universal Platform Manager for testing
-      const result = await UniversalPlatformManager.testCredentials(platformName, credentials);
+      // Use Enhanced Universal Platform Manager for testing
+      const result = await UniversalPlatformManager.testCredentials(
+        platformName, 
+        credentials,
+        automationContext
+      );
       
       return {
         success: result.success,
         message: result.message,
         details: {
-          ...result,
+          ...result.response_details,
           platform: platformName,
-          universal_ai_powered: true,
-          no_hardcoding: true
+          automation_context_aware: true,
+          enhanced_system: true,
+          automation_id: automationId
         }
       };
 
     } catch (error: any) {
-      console.error(`💥 Universal testing failed for ${platformName}:`, error);
+      console.error(`💥 Enhanced testing failed for ${platformName}:`, error);
       
       return {
         success: false,
-        message: `Universal AI testing failed for ${platformName}: ${error.message}`,
+        message: `Enhanced testing failed for ${platformName}: ${error.message}`,
         details: { 
           error: error.message,
           platform: platformName,
-          system_error: true
+          system_error: true,
+          enhanced_system: true
         }
       };
     }
   }
 
   /**
-   * Save credentials after successful testing
+   * ENHANCED: Save credentials with automation context
    */
   static async saveCredentials(
     automationId: string,
@@ -67,7 +74,7 @@ export class AutomationCredentialManager {
     userId: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log(`💾 Saving universal credentials for ${platformName}`);
+      console.log(`💾 Saving ENHANCED credentials for ${platformName} in automation ${automationId}`);
 
       const { data, error } = await supabase
         .from('automation_platform_credentials')
@@ -79,8 +86,8 @@ export class AutomationCredentialManager {
           is_active: true,
           is_tested: true,
           test_status: 'success',
-          test_message: `Universal AI testing successful for ${platformName}`,
-          credential_type: 'universal_ai_managed'
+          test_message: `Enhanced testing successful for ${platformName} with automation context`,
+          credential_type: 'enhanced_automation_managed'
         })
         .select()
         .single();
@@ -89,17 +96,17 @@ export class AutomationCredentialManager {
         throw error;
       }
 
-      console.log(`✅ Universal credentials saved for ${platformName}`);
+      console.log(`✅ Enhanced credentials saved for ${platformName}`);
       return { success: true };
 
     } catch (error: any) {
-      console.error(`❌ Failed to save universal credentials:`, error);
+      console.error(`❌ Failed to save enhanced credentials:`, error);
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * Get existing credentials
+   * Get existing credentials for platform
    */
   static async getCredentials(
     automationId: string,
@@ -128,7 +135,7 @@ export class AutomationCredentialManager {
   }
 
   /**
-   * Get all credentials for automation - MISSING METHOD FIXED
+   * ENHANCED: Get all credentials for automation
    */
   static async getAllCredentials(
     automationId: string,
@@ -155,7 +162,7 @@ export class AutomationCredentialManager {
   }
 
   /**
-   * Validate automation credentials - MISSING METHOD FIXED
+   * ENHANCED: Validate automation credentials with complete checking
    */
   static async validateAutomationCredentials(
     automationId: string,
@@ -165,11 +172,13 @@ export class AutomationCredentialManager {
     valid: boolean;
     missing: string[];
     untested: string[];
+    status: Record<string, 'saved' | 'tested' | 'unsaved'>;
   }> {
     try {
       const credentials = await this.getAllCredentials(automationId, userId);
       const missing: string[] = [];
       const untested: string[] = [];
+      const status: Record<string, 'saved' | 'tested' | 'unsaved'> = {};
 
       for (const platform of requiredPlatforms) {
         const platformCred = credentials.find(
@@ -178,22 +187,34 @@ export class AutomationCredentialManager {
 
         if (!platformCred) {
           missing.push(platform);
+          status[platform] = 'unsaved';
         } else if (!platformCred.is_tested || platformCred.test_status !== 'success') {
           untested.push(platform);
+          status[platform] = 'saved';
+        } else {
+          status[platform] = 'tested';
         }
       }
 
       return {
         valid: missing.length === 0 && untested.length === 0,
         missing,
-        untested
+        untested,
+        status
       };
     } catch (error) {
       console.error('Failed to validate automation credentials:', error);
+      
+      const status: Record<string, 'saved' | 'tested' | 'unsaved'> = {};
+      requiredPlatforms.forEach(platform => {
+        status[platform] = 'unsaved';
+      });
+      
       return {
         valid: false,
         missing: requiredPlatforms,
-        untested: []
+        untested: [],
+        status
       };
     }
   }

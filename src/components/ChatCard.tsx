@@ -30,6 +30,7 @@ interface ChatCardProps {
   onSendMessage?: (message: string) => void;
   onExecuteAutomation?: () => void;
   platformCredentialStatus?: { [key: string]: 'saved' | 'tested' | 'unsaved' };
+  onPlatformCredentialChange?: () => void;
 }
 
 const ChatCard = ({
@@ -41,7 +42,8 @@ const ChatCard = ({
   isLoading = false,
   onSendMessage,
   onExecuteAutomation,
-  platformCredentialStatus = {}
+  platformCredentialStatus = {},
+  onPlatformCredentialChange
 }: ChatCardProps) => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -130,6 +132,16 @@ const ChatCard = ({
     
     if (onSendMessage) {
       onSendMessage(helpMessage);
+    }
+  };
+
+  // ENHANCED: Handle platform credential button click
+  const handlePlatformCredentialClick = (platformName: string, platforms: any[]) => {
+    const platform = platforms.find(p => p.name === platformName);
+    if (platform && onPlatformCredentialChange) {
+      console.log(`🔧 Opening credential form for ${platformName}`);
+      // Trigger the platform credential form opening
+      onPlatformCredentialChange();
     }
   };
 
@@ -253,7 +265,7 @@ const ChatCard = ({
         );
       }
 
-      // Enhanced Platforms rendering with color coding
+      // ENHANCED Platforms rendering with WORKING credential buttons
       if (Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
         const validPlatforms = structuredData.platforms.filter(platform => 
           platform && typeof platform === 'object' && platform.name && typeof platform.name === 'string'
@@ -275,7 +287,7 @@ const ChatCard = ({
                         return 'bg-green-100 hover:bg-green-200 text-green-800 border-green-300';
                       case 'unsaved':
                       default:
-                        return 'bg-red-100 hover:bg-red-200 text-red-800 border-red-300';
+                        return 'bg-red-100 hover:bg-red-200 text-red-800 border-red-300 cursor-pointer';
                     }
                   };
                   
@@ -284,6 +296,7 @@ const ChatCard = ({
                       key={`platform-${index}`}
                       size="sm"
                       variant="outline"
+                      onClick={() => handlePlatformCredentialClick(platformName, validPlatforms)}
                       className={`text-xs h-8 px-2 rounded-lg ${getButtonColor()} transition-colors`}
                     >
                       {platformName}
@@ -292,7 +305,7 @@ const ChatCard = ({
                 })}
               </div>
               
-              {/* Platform details */}
+              {/* Enhanced Platform details with credential information */}
               <div className="text-gray-700 space-y-2">
                 {validPlatforms.map((platform, index) => {
                   const platformName = platform.name || 'Unknown Platform';
@@ -396,6 +409,27 @@ const ChatCard = ({
                   </div>
                 );
               }).filter(Boolean)}
+            </div>
+          </div>
+        );
+      }
+
+      // ENHANCED: Show execution button when ready
+      if (checkReadyForExecution()) {
+        content.push(
+          <div key="execution" className="mt-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-green-800">🎉 Automation Ready!</p>
+                <p className="text-sm text-green-600">All platforms configured and agents handled</p>
+              </div>
+              <Button
+                onClick={onExecuteAutomation || handleExecuteAutomation}
+                className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white"
+              >
+                <Play className="w-4 h-4 mr-2" />
+                Execute Automation
+              </Button>
             </div>
           </div>
         );
@@ -507,7 +541,7 @@ const ChatCard = ({
                     alt="YusrAI" 
                     className="w-5 h-5 object-contain animate-pulse"
                   />
-                  <span className="font-medium">YusrAI is creating your automation...</span>
+                  <span className="font-medium">YusrAI is creating your complete automation...</span>
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
                     <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>

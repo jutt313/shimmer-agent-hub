@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -17,7 +18,184 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
     )
 
-    const { message, isTrainingMode = false, userId = null } = await req.json()
+    const { message, isTrainingMode = false, userId = null, generateTestConfig = false, platformName = null } = await req.json()
+
+    // NEW: Handle Test Configuration Generation Mode
+    if (generateTestConfig && platformName) {
+      console.log(`🔧 Generating test configuration for platform: ${platformName}`)
+      
+      const testConfigSystemPrompt = `You are a Platform Test Configuration Generator. Your ONLY job is to generate REAL, working test configurations for platform integrations.
+
+CRITICAL REQUIREMENTS:
+1. Generate REAL API endpoints, not fake ones
+2. Use EXACT field names that platforms require
+3. Provide working authentication methods
+4. Include proper success/error detection patterns
+
+PLATFORM KNOWLEDGE BASE:
+
+**OpenAI**:
+- Base URL: https://api.openai.com/v1
+- Test Endpoint: /models (GET)
+- Auth: Bearer token in Authorization header
+- Required Fields: ["api_key"]
+- Success Indicators: status 200, data.data array exists
+- Error Patterns: 401 = invalid key, 429 = rate limit
+
+**Google Sheets**:
+- Base URL: https://sheets.googleapis.com/v4
+- Test Endpoint: /spreadsheets/{spreadsheet_id} (GET)
+- Auth: Bearer token (OAuth2) or API key
+- Required Fields: ["api_key", "spreadsheet_id"]
+- Success Indicators: status 200, properties.title exists
+- Error Patterns: 403 = no access, 404 = not found
+
+**Slack**:
+- Base URL: https://slack.com/api
+- Test Endpoint: /auth.test (POST)
+- Auth: Bearer token in Authorization header
+- Required Fields: ["bot_token"]
+- Success Indicators: status 200, ok: true
+- Error Patterns: invalid_auth = bad token
+
+**Notion**:
+- Base URL: https://api.notion.com/v1
+- Test Endpoint: /users/me (GET)
+- Auth: Bearer token + Notion-Version header
+- Required Fields: ["integration_token"]
+- Success Indicators: status 200, object: "user"
+- Error Patterns: 401 = unauthorized, 400 = bad request
+
+**Typeform**:
+- Base URL: https://api.typeform.com
+- Test Endpoint: /me (GET)
+- Auth: Bearer token in Authorization header
+- Required Fields: ["personal_access_token"]
+- Success Indicators: status 200, email field exists
+- Error Patterns: 401 = invalid token
+
+**Trello**:
+- Base URL: https://api.trello.com/1
+- Test Endpoint: /members/me (GET)
+- Auth: key and token as query params
+- Required Fields: ["api_key", "token"]
+- Success Indicators: status 200, id field exists
+- Error Patterns: 401 = invalid credentials
+
+**Gmail**:
+- Base URL: https://gmail.googleapis.com/gmail/v1
+- Test Endpoint: /users/me/profile (GET)
+- Auth: Bearer token in Authorization header
+- Required Fields: ["access_token"]
+- Success Indicators: status 200, emailAddress exists
+- Error Patterns: 401 = invalid token, 403 = insufficient scope
+
+**GitHub**:
+- Base URL: https://api.github.com
+- Test Endpoint: /user (GET)
+- Auth: Bearer token in Authorization header
+- Required Fields: ["personal_access_token"]
+- Success Indicators: status 200, login field exists
+- Error Patterns: 401 = bad credentials
+
+RESPONSE FORMAT - Return ONLY this JSON structure:
+{
+  "platform_name": "exact platform name",
+  "base_url": "real API base URL",
+  "test_endpoint": {
+    "method": "GET|POST",
+    "path": "exact endpoint path",
+    "query_params": {},
+    "headers": {
+      "required_headers": "format"
+    }
+  },
+  "authentication": {
+    "type": "bearer|api_key|oauth",
+    "location": "header|query|body",
+    "parameter_name": "exact param name",
+    "format": "Bearer {token}|{field_name}"
+  },
+  "required_fields": ["exact_field_names"],
+  "field_mappings": {
+    "platform_field": "user_input_field"
+  },
+  "success_indicators": {
+    "status_codes": [200],
+    "response_patterns": ["field.exists", "property.value"]
+  },
+  "error_patterns": {
+    "401": "Invalid credentials",
+    "403": "Insufficient permissions",
+    "404": "Resource not found"
+  },
+  "ai_generated": true,
+  "config_version": "2.0"
+}
+
+Generate test configuration for: ${platformName}`
+
+      const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4',
+          messages: [
+            { role: 'system', content: testConfigSystemPrompt },
+            { role: 'user', content: `Generate test configuration for ${platformName}` }
+          ],
+          max_tokens: 1500,
+          temperature: 0.1,
+        }),
+      })
+
+      const openAIData = await openAIResponse.json()
+      let testConfig
+
+      try {
+        // Extract JSON from response
+        const responseText = openAIData.choices[0]?.message?.content || '{}'
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+        testConfig = JSON.parse(jsonMatch ? jsonMatch[0] : responseText)
+        
+        console.log(`✅ Generated test config for ${platformName}:`, testConfig)
+      } catch (parseError) {
+        console.error('❌ Failed to parse test config JSON:', parseError)
+        // Fallback config
+        testConfig = {
+          platform_name: platformName,
+          base_url: `https://api.${platformName.toLowerCase().replace(/\s+/g, '')}.com`,
+          test_endpoint: {
+            method: "GET",
+            path: "/me",
+            headers: {}
+          },
+          authentication: {
+            type: "bearer",
+            location: "header",
+            parameter_name: "Authorization",
+            format: "Bearer {api_key}"
+          },
+          required_fields: ["api_key"],
+          field_mappings: { "api_key": "api_key" },
+          success_indicators: { status_codes: [200], response_patterns: ["id"] },
+          error_patterns: { "401": "Invalid credentials" },
+          ai_generated: true,
+          config_version: "2.0"
+        }
+      }
+
+      return new Response(JSON.stringify({ 
+        testConfig,
+        generated: true,
+        platform: platformName 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
     // Get dynamic instructions from database
     const { data: instructions, error: instructionsError } = await supabaseClient
@@ -63,7 +241,7 @@ serve(async (req) => {
       memoryContext += `Successful Solutions: ${JSON.stringify(userMemory.successful_solutions)}\n`
     }
 
-    // Original system prompt (kept unchanged)
+    // Enhanced base system prompt with test configuration capabilities
     const baseSystemPrompt = `You are a powerful AI automation assistant that helps users create comprehensive automation workflows. Your primary goal is to understand user requirements and generate complete automation configurations that can be immediately implemented.
 
 CORE RESPONSIBILITIES:
@@ -83,9 +261,26 @@ CORE RESPONSIBILITIES:
    - Field validation and formatting rules
    - Rate limiting and retry logic
 
+4. **NEW: Test Configuration Generator**: When users mention testing credentials or platform connections, generate real test configurations that include:
+   - Real API endpoints for credential testing
+   - Exact field names required by platforms
+   - Proper authentication methods and headers
+   - Success/failure detection patterns
+   - Platform-specific error messages
+
 KEY CAPABILITIES:
 
 **Platform Knowledge**: You understand the specific requirements, APIs, authentication methods, and best practices for hundreds of platforms. Always provide platform-specific guidance that accounts for real-world API limitations and requirements.
+
+**Real API Endpoint Knowledge**: You know the exact testing endpoints for platforms:
+- OpenAI: https://api.openai.com/v1/models (GET with Bearer token)
+- Google Sheets: https://sheets.googleapis.com/v4/spreadsheets/{id} (GET)
+- Slack: https://slack.com/api/auth.test (POST with Bearer token)
+- Notion: https://api.notion.com/v1/users/me (GET with Bearer + Notion-Version)
+- Typeform: https://api.typeform.com/me (GET with Bearer token)
+- Trello: https://api.trello.com/1/members/me (GET with key/token)
+- Gmail: https://gmail.googleapis.com/gmail/v1/users/me/profile (GET)
+- GitHub: https://api.github.com/user (GET with Bearer token)
 
 **Authentication Expertise**: You know the exact authentication methods for each platform:
 - OAuth 2.0 flows and token management
@@ -93,6 +288,16 @@ KEY CAPABILITIES:
 - Service account authentication
 - Personal access tokens and their scopes
 - Webhook authentication and signature verification
+
+**Field Name Mapping**: You provide exact field names that platforms expect:
+- OpenAI: "api_key" 
+- Google Sheets: "api_key", "spreadsheet_id"
+- Slack: "bot_token" or "user_token"
+- Notion: "integration_token", "database_id"
+- Typeform: "personal_access_token"
+- Trello: "api_key", "token"
+- Gmail: "access_token"
+- GitHub: "personal_access_token"
 
 **Data Transformation**: You can design complex data mappings between platforms, including:
 - JSON path expressions for data extraction
@@ -122,6 +327,14 @@ When creating automations, structure your response as a complete blueprint that 
 5. **Field Mappings**: Data transformation and mapping rules
 6. **Error Handling**: Fallback mechanisms and error recovery procedures
 7. **Testing Recommendations**: How to test and validate the automation
+
+CREDENTIAL TESTING INTEGRATION:
+When users mention testing platform credentials, always include:
+- Real API endpoints for testing
+- Exact field names the platform requires
+- Proper authentication headers and methods
+- Expected success/error response patterns
+- Integration with the test-credential function
 
 PLATFORM-SPECIFIC GUIDELINES:
 

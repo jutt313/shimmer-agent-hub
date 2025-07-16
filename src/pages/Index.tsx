@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useMemo } from "react";
 import { Send, Bot } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -11,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useErrorRecovery } from "@/hooks/useErrorRecovery";
 import { useAsyncOperation } from "@/hooks/useAsyncOperation";
 import { chatAIConnectionService } from "@/services/chatAIConnectionService";
+import { parseStructuredResponse } from "@/utils/jsonParser";
 
 const Index = () => {
   const [message, setMessage] = useState("");
@@ -58,7 +60,7 @@ const Index = () => {
     setIsLoading(true);
 
     try {
-      console.log('🚀 Sending message via Enhanced ChatAIConnectionService:', currentMessage);
+      console.log('🚀 Sending message to YusrAI:', currentMessage);
       
       const result = await executeChatRequest(async () => {
         const response = await chatAIConnectionService.processConnectionRequest({
@@ -77,43 +79,37 @@ const Index = () => {
           } : undefined
         });
 
-        console.log('✅ Received enhanced response from ChatAIConnectionService:', response);
+        console.log('✅ Received response from YusrAI:', response);
         return response;
       }, {
         userAction: 'Creating automation request',
         additionalContext: `Message: "${currentMessage}"`
       });
 
-      console.log('🔍 Processing enhanced result:', result);
+      console.log('🔍 Processing result:', result);
       
-      // Enhanced response processing
+      // Process the response
       let responseText = "I'm ready to help you create comprehensive automations with the right platforms and credentials.";
       let structuredData = null;
       let errorHelpAvailable = false;
       
       if (result && typeof result === 'object') {
-        console.log('📊 Enhanced result analysis:', {
-          hasResponse: !!result.response,
-          responseType: typeof result.response,
-          responseLength: result.response?.length || 0,
-          hasStructuredData: !!result.structuredData,
-          errorHelpAvailable: !!result.error_help_available,
-          responsePreview: result.response?.substring(0, 50)
-        });
-        
-        // Use response text if available and valid
         if (result.response && 
             typeof result.response === 'string' && 
             result.response.trim() !== '' && 
             result.response.trim() !== 'null') {
           responseText = result.response;
-          console.log('✅ Using enhanced response text from service');
+          console.log('✅ Using response text from service');
         }
         
-        // Store structured data and error help status
+        // Get structured data from result or parse from response
         if (result.structuredData && typeof result.structuredData === 'object') {
           structuredData = result.structuredData;
-          console.log('✅ Enhanced structured data available');
+          console.log('✅ Structured data available from service');
+        } else if (result.response) {
+          // Try to parse structured data from response text
+          structuredData = parseStructuredResponse(result.response);
+          console.log('✅ Parsed structured data from response text');
         }
 
         errorHelpAvailable = result.error_help_available || false;
@@ -124,7 +120,7 @@ const Index = () => {
           responseText.trim() === '' || 
           responseText.toLowerCase().includes('null') || 
           responseText === 'null') {
-        console.warn('⚠️ Enhanced safety check triggered - using comprehensive fallback response');
+        console.warn('⚠️ Safety check triggered - using fallback response');
         responseText = "I'm ready to help you create comprehensive automations. Please specify the platforms you'd like to integrate (like Gmail, Slack, HubSpot, etc.) and I'll provide complete setup instructions.";
       }
       
@@ -137,7 +133,7 @@ const Index = () => {
         error_help_available: errorHelpAvailable
       };
       
-      console.log('📤 Adding enhanced bot response:', {
+      console.log('📤 Adding bot response:', {
         textLength: botResponse.text.length,
         textPreview: botResponse.text.substring(0, 100),
         hasStructuredData: !!botResponse.structuredData,
@@ -147,8 +143,8 @@ const Index = () => {
       setMessages(prev => [...prev, botResponse]);
 
     } catch (error: any) {
-      console.error('❌ Error in enhanced chat request:', error);
-      handleError(error, 'Enhanced chat message sending');
+      console.error('❌ Error in chat request:', error);
+      handleError(error, 'Chat message sending');
       
       const errorResponse = {
         id: Date.now() + 1,

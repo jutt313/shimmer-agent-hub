@@ -1,3 +1,4 @@
+
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Plus, X, Play, User, Code } from 'lucide-react';
@@ -52,46 +53,20 @@ const ChatCard = ({
   const { user } = useAuth();
   const [showCodeModal, setShowCodeModal] = useState(false);
 
-  // Initialize agent state manager
-  useEffect(() => {
-    agentStateManager.setAutomationId(automationId);
-  }, [automationId]);
-
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // Optimize messages for performance
-  const optimizeMessages = (msgs: Message[]) => {
-    try {
-      if (!Array.isArray(msgs)) {
-        console.warn('Messages is not an array, using empty array');
-        return [];
-      }
-      return msgs.slice(-50);
-    } catch (error) {
-      console.error('Error optimizing messages:', error);
-      return [];
-    }
-  };
+  const optimizedMessages = messages.slice(-50);
 
-  const optimizedMessages = optimizeMessages(messages);
-
-  // Enhanced safe text formatting
   const safeFormatMessageText = (inputText: string | undefined | null): React.ReactNode[] => {
     try {
       if (!inputText || typeof inputText !== 'string') {
         return [<span key="fallback-input-error">Message content unavailable.</span>];
       }
 
-      // Clean and format text
       const cleanHtmlString = cleanDisplayText(inputText);
-      
-      if (typeof cleanHtmlString !== 'string') {
-        return [<span key="processing-error">Processing automation details...</span>];
-      }
-
       const processedText = cleanHtmlString.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
       const lines = processedText.split('\n');
       
@@ -108,7 +83,6 @@ const ChatCard = ({
     }
   };
 
-  // Enhanced agent handling
   const handleAgentAdd = (agent: any) => {
     console.log(`🤖 User adding agent: ${agent.name}`);
     agentStateManager.addAgent(agent.name, agent);
@@ -125,7 +99,6 @@ const ChatCard = ({
     }
   };
 
-  // Handle error help requests
   const handleErrorHelp = (errorMessage?: string) => {
     const helpMessage = errorMessage ? 
       `I encountered this error: "${errorMessage}". Can you help me resolve it and continue with my automation?` :
@@ -136,17 +109,14 @@ const ChatCard = ({
     }
   };
 
-  // ENHANCED: Handle platform credential button click
   const handlePlatformCredentialClick = (platformName: string, platforms: any[]) => {
     const platform = platforms.find(p => p.name === platformName);
     if (platform && onPlatformCredentialChange) {
-      console.log(`🔧 Opening credential form for ${platformName} (Fresh AI system)`);
-      // Trigger the platform credential form opening
+      console.log(`🔧 Opening credential form for ${platformName}`);
       onPlatformCredentialChange();
     }
   };
 
-  // Check if all platforms are configured and agents handled
   const checkReadyForExecution = () => {
     const latestBotMessage = messages.filter(msg => msg.isBot).pop();
     if (!latestBotMessage?.structuredData?.platforms) return false;
@@ -165,7 +135,6 @@ const ChatCard = ({
     return allPlatformsConfigured && allAgentsHandled && platforms.length > 0;
   };
 
-  // Enhanced automation execution
   const handleExecuteAutomation = async () => {
     if (!user?.id) {
       toast({
@@ -187,15 +156,12 @@ const ChatCard = ({
     }
 
     try {
-      console.log('🚀 Executing automation with enhanced capabilities');
-      
-      const agentDecisions = agentStateManager.getAllDecisions();
+      console.log('🚀 Executing automation');
       
       const { data, error } = await supabase.functions.invoke('execute-automation', {
         body: {
           automation_id: automationId,
           automation_data: latestBotMessage.structuredData,
-          agent_decisions: agentDecisions,
           trigger_data: {
             executed_at: new Date().toISOString(),
             trigger_type: 'manual',
@@ -205,23 +171,16 @@ const ChatCard = ({
       });
 
       if (error) {
-        console.error('❌ Automation execution error:', error);
-        toast({
-          title: "Execution Failed",
-          description: error.message || "Failed to execute automation",
-          variant: "destructive",
-        });
-        return;
+        throw error;
       }
 
-      console.log('✅ Automation executed successfully:', data);
       toast({
         title: "🎉 Automation Executed!",
         description: `Automation completed successfully. Run ID: ${data.run_id}`,
       });
 
     } catch (error: any) {
-      console.error('💥 Critical execution error:', error);
+      console.error('💥 Execution error:', error);
       toast({
         title: "Execution Error",
         description: "An unexpected error occurred during execution",
@@ -230,12 +189,11 @@ const ChatCard = ({
     }
   };
 
-  // Get the complete automation JSON for the code viewer
   const getCompleteAutomationJSON = () => {
     const latestBotMessage = messages.filter(msg => msg.isBot).pop();
     if (!latestBotMessage?.structuredData) return null;
 
-    const automationData = {
+    return {
       automation_id: automationId,
       created_at: new Date().toISOString(),
       platforms: latestBotMessage.structuredData.platforms || [],
@@ -244,19 +202,16 @@ const ChatCard = ({
       agents: latestBotMessage.structuredData.agents || [],
       steps: latestBotMessage.structuredData.steps || [],
       summary: latestBotMessage.structuredData.summary || "",
-      conversation_updates: latestBotMessage.structuredData.conversation_updates || {},
       ready_for_execution: checkReadyForExecution(),
       credential_status: platformCredentialStatus
     };
-
-    return automationData;
   };
 
   const renderStructuredContent = (structuredData: StructuredResponse, showErrorHelp: boolean = false) => {
     const content = [];
 
     try {
-      // Summary - Safe rendering
+      // Summary
       if (structuredData.summary && typeof structuredData.summary === 'string') {
         content.push(
           <div key="summary" className="mb-4">
@@ -271,7 +226,7 @@ const ChatCard = ({
         );
       }
 
-      // Steps - Safe array rendering
+      // Steps
       if (Array.isArray(structuredData.steps) && structuredData.steps.length > 0) {
         content.push(
           <div key="steps" className="mb-4">
@@ -288,7 +243,7 @@ const ChatCard = ({
         );
       }
 
-      // FIXED: Platforms rendering with FRESH AI credential buttons
+      // Platforms with credentials
       if (Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
         const validPlatforms = structuredData.platforms.filter(platform => 
           platform && typeof platform === 'object' && platform.name && typeof platform.name === 'string'
@@ -297,7 +252,7 @@ const ChatCard = ({
         if (validPlatforms.length > 0) {
           content.push(
             <div key="platforms" className="mb-4">
-              <p className="font-medium text-gray-800 mb-3">Fresh AI Platform Credentials (Universal Store Disabled):</p>
+              <p className="font-medium text-gray-800 mb-3">Platform Credentials Required:</p>
               <div className="grid grid-cols-6 gap-2 mb-4">
                 {validPlatforms.map((platform, index) => {
                   const platformName = platform.name || 'Unknown Platform';
@@ -329,14 +284,13 @@ const ChatCard = ({
                 })}
               </div>
               
-              {/* Fresh AI Platform details with credential information */}
               <div className="text-gray-700 space-y-2">
                 {validPlatforms.map((platform, index) => {
                   const platformName = platform.name || 'Unknown Platform';
                   
                   return (
                     <div key={`platform-detail-${index}`} className="bg-blue-50/30 p-3 rounded-lg border border-blue-200/50">
-                      <p className="font-medium text-gray-800 mb-2">{platformName} (Fresh AI Generated)</p>
+                      <p className="font-medium text-gray-800 mb-2">{platformName}</p>
                       {Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
                         <div className="text-sm text-gray-600 space-y-1">
                           {platform.credentials.map((cred, credIndex) => {
@@ -344,7 +298,7 @@ const ChatCard = ({
                               const fieldName = String(cred.field).replace(/_/g, ' ').toUpperCase();
                               return (
                                 <div key={`cred-${credIndex}`} className="flex items-center justify-between">
-                                  <span>• {fieldName}: {cred.why_needed || 'Required for fresh AI integration'}</span>
+                                  <span>• {fieldName}: {cred.why_needed || 'Required for integration'}</span>
                                   {cred.link && (
                                     <Button
                                       size="sm"
@@ -371,24 +325,7 @@ const ChatCard = ({
         }
       }
 
-      // Clarification Questions
-      if (Array.isArray(structuredData.clarification_questions) && structuredData.clarification_questions.length > 0) {
-        content.push(
-          <div key="clarification" className="mb-4">
-            <p className="font-medium text-gray-800 mb-2">I need some clarification:</p>
-            <ul className="list-disc list-inside space-y-1 text-gray-700 ml-4">
-              {structuredData.clarification_questions.map((question, index) => {
-                if (typeof question === 'string') {
-                  return <li key={index} className="leading-relaxed">{question}</li>;
-                }
-                return null;
-              }).filter(Boolean)}
-            </ul>
-          </div>
-        );
-      }
-
-      // Enhanced AI Agents rendering
+      // Agents
       if (Array.isArray(structuredData.agents) && structuredData.agents.length > 0) {
         content.push(
           <div key="agents" className="mb-4">
@@ -438,14 +375,14 @@ const ChatCard = ({
         );
       }
 
-      // ENHANCED: Show execution button when ready
+      // Execution button when ready
       if (checkReadyForExecution()) {
         content.push(
           <div key="execution" className="mt-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200">
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium text-green-800">🎉 Automation Ready!</p>
-                <p className="text-sm text-green-600">All platforms configured and agents handled</p>
+                <p className="text-sm text-green-600">All platforms configured</p>
               </div>
               <Button
                 onClick={onExecuteAutomation || handleExecuteAutomation}
@@ -465,11 +402,11 @@ const ChatCard = ({
       handleError(error, 'Structured content rendering');
       return [
         <div key="error" className="text-blue-600 p-4 bg-blue-50 rounded-lg">
-          I'm processing your fresh AI automation request. Please wait...
+          I'm processing your automation request. Please wait...
           {showErrorHelp && (
             <ErrorHelpButton 
               errorMessage="Content rendering error"
-              onHelpRequest={() => handleErrorHelp("I encountered an error while displaying the fresh AI automation details.")}
+              onHelpRequest={() => handleErrorHelp("I encountered an error while displaying the automation details.")}
             />
           )}
         </div>
@@ -486,7 +423,7 @@ const ChatCard = ({
     >
       <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/20 to-purple-100/20 pointer-events-none"></div>
       
-      {/* FIXED: Top-right View Code button (connects to Fresh AI system) */}
+      {/* View Code button */}
       {getCompleteAutomationJSON() && (
         <Dialog open={showCodeModal} onOpenChange={setShowCodeModal}>
           <DialogTrigger asChild>
@@ -502,7 +439,7 @@ const ChatCard = ({
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle className="text-lg font-semibold text-blue-600">
-                Complete Fresh AI Automation JSON - Ready for Execution
+                Complete Automation JSON - Ready for Execution
               </DialogTitle>
             </DialogHeader>
             <ScrollArea className="h-[60vh] w-full">
@@ -585,7 +522,7 @@ const ChatCard = ({
             );
           })}
           
-          {/* Fresh AI loading indicator */}
+          {/* Loading indicator */}
           {isLoading && (
             <div className="flex justify-start">
               <div className="max-w-4xl px-6 py-4 rounded-2xl bg-white border border-blue-100/50 text-gray-800 shadow-lg backdrop-blur-sm">
@@ -595,7 +532,7 @@ const ChatCard = ({
                     alt="YusrAI" 
                     className="w-5 h-5 object-contain animate-pulse"
                   />
-                  <span className="font-medium">YusrAI is creating your fresh AI automation...</span>
+                  <span className="font-medium">YusrAI is creating your automation...</span>
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
                     <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -606,7 +543,6 @@ const ChatCard = ({
             </div>
           )}
           
-          {/* Invisible div for auto-scroll */}
           <div ref={messagesEndRef} />
         </div>
       </ScrollArea>

@@ -7,10 +7,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// AUTOMATION-CONTEXT-AWARE UNIVERSAL CREDENTIAL TESTER
-class AutomationContextCredentialTester {
+// FRESH AI CONFIG CREDENTIAL TESTER
+class FreshAICredentialTester {
   private supabase: any;
-  private configCache = new Map<string, any>();
 
   constructor(supabase: any) {
     this.supabase = supabase;
@@ -37,224 +36,6 @@ class AutomationContextCredentialTester {
       console.error('Exception getting automation context:', error);
       return null;
     }
-  }
-
-  /**
-   * Get real platform configuration from Universal Knowledge Store + Chat-AI
-   */
-  async getRealAutomationContextConfig(platformName: string, automationContext: any): Promise<any> {
-    console.log(`🔧 Getting REAL automation-context config for ${platformName}`);
-    
-    const cacheKey = `${platformName}_${automationContext?.id || 'default'}`;
-    if (this.configCache.has(cacheKey)) {
-      console.log(`📦 Using cached automation-context config for ${platformName}`);
-      return this.configCache.get(cacheKey);
-    }
-
-    try {
-      // First try Universal Knowledge Store
-      const { data: knowledgeData, error: knowledgeError } = await this.supabase
-        .from('universal_knowledge_store')
-        .select('*')
-        .eq('category', 'platform_knowledge')
-        .or(`platform_name.ilike.%${platformName}%,title.ilike.%${platformName}%`)
-        .order('usage_count', { ascending: false })
-        .limit(1);
-
-      if (!knowledgeError && knowledgeData && knowledgeData.length > 0) {
-        const knowledge = knowledgeData[0];
-        const config = this.buildConfigFromKnowledge(knowledge, platformName, automationContext);
-        this.configCache.set(cacheKey, config);
-        return config;
-      }
-
-      // Fallback to Chat-AI with automation context
-      const { data, error } = await this.supabase.functions.invoke('chat-ai', {
-        body: {
-          message: `Generate REAL automation-context-aware API configuration for ${platformName}.
-
-**AUTOMATION CONTEXT:**
-${JSON.stringify(automationContext, null, 2)}
-
-**CRITICAL REQUIREMENTS:**
-- Generate REAL API operations that serve this specific automation workflow
-- NO generic /auth/verify or /me endpoints for operations
-- Use actual operations like /chat/completions for OpenAI, /databases/{id}/query for Notion
-- Include proper authentication configuration
-- Return ONLY valid JSON configuration
-
-**EXAMPLE REAL OPERATIONS:**
-- OpenAI: POST /v1/chat/completions with automation-specific prompts
-- Notion: POST /v1/databases/{id}/query with workflow filters
-- Typeform: POST /forms with automation form creation
-- Google Sheets: GET /v4/spreadsheets/{id}/values with real ranges
-
-Return ONLY the JSON configuration, no explanations.`,
-          messages: [],
-          requestType: 'automation_context_platform_config',
-          automationContext: automationContext
-        }
-      });
-
-      if (error) {
-        console.error('❌ Chat-AI error:', error);
-        return this.createAutomationContextFallback(platformName, automationContext);
-      }
-
-      let realConfig;
-      try {
-        if (typeof data === 'string') {
-          const jsonMatch = data.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            realConfig = JSON.parse(jsonMatch[0]);
-          } else {
-            throw new Error('No JSON found in chat-ai response');
-          }
-        } else if (data && typeof data === 'object') {
-          realConfig = data;
-        } else {
-          throw new Error('Invalid chat-ai response');
-        }
-
-        if (!realConfig.base_url) {
-          throw new Error('Missing required config fields');
-        }
-
-        console.log(`✅ Real automation-context config obtained for ${platformName}`);
-        this.configCache.set(cacheKey, realConfig);
-        return realConfig;
-
-      } catch (parseError) {
-        console.error('❌ Config parsing failed:', parseError);
-        return this.createAutomationContextFallback(platformName, automationContext);
-      }
-
-    } catch (error) {
-      console.error('💥 Complete config generation failed:', error);
-      return this.createAutomationContextFallback(platformName, automationContext);
-    }
-  }
-
-  /**
-   * Build configuration from Universal Knowledge Store
-   */
-  buildConfigFromKnowledge(knowledge: any, platformName: string, automationContext: any): any {
-    const apiConfig = knowledge.details?.api_config || {};
-    const operations = knowledge.details?.automation_operations || [];
-    
-    return {
-      platform_name: knowledge.platform_name || platformName,
-      base_url: apiConfig.base_url || `https://api.${platformName.toLowerCase().replace(/\s+/g, '')}.com`,
-      test_endpoint: this.getAutomationContextTestEndpoint(platformName, automationContext),
-      auth_config: {
-        type: apiConfig.auth_config?.type || 'bearer',
-        location: 'header',
-        parameter_name: 'Authorization',
-        format: apiConfig.auth_config?.format || 'Bearer {token}'
-      },
-      automation_operations: operations.length > 0 ? operations : this.generateDefaultOperations(platformName, automationContext)
-    };
-  }
-
-  /**
-   * Get automation-context-aware test endpoint
-   */
-  getAutomationContextTestEndpoint(platformName: string, automationContext: any): any {
-    const lowerName = platformName.toLowerCase();
-    
-    // Real automation-context endpoints based on platform and workflow
-    if (lowerName.includes('openai')) {
-      return {
-        method: 'POST',
-        path: '/v1/chat/completions',
-        description: `Test OpenAI with real completion for automation: ${automationContext?.title || 'Workflow'}`,
-        body: {
-          model: 'gpt-4o-mini',
-          messages: [
-            { 
-              role: 'system', 
-              content: `You are processing data for automation: ${automationContext?.title || 'Data Processing'}. ${automationContext?.description || ''}`
-            },
-            { 
-              role: 'user', 
-              content: `Test automation workflow. Goal: ${automationContext?.goal || 'Process data efficiently'}`
-            }
-          ],
-          max_tokens: 100
-        }
-      };
-    }
-    
-    if (lowerName.includes('notion')) {
-      return {
-        method: 'GET',
-        path: '/v1/users/me',
-        description: `Test Notion authentication for automation: ${automationContext?.title || 'Database Workflow'}`
-      };
-    }
-    
-    if (lowerName.includes('typeform')) {
-      return {
-        method: 'GET',
-        path: '/me', 
-        description: `Test Typeform for automation: ${automationContext?.title || 'Form Workflow'}`
-      };
-    }
-    
-    if (lowerName.includes('google') && lowerName.includes('sheet')) {
-      return {
-        method: 'GET',
-        path: '/v4/spreadsheets',
-        description: `Test Google Sheets for automation: ${automationContext?.title || 'Spreadsheet Workflow'}`
-      };
-    }
-    
-    if (lowerName.includes('slack')) {
-      return {
-        method: 'GET',
-        path: '/api/auth.test',
-        description: `Test Slack for automation: ${automationContext?.title || 'Messaging Workflow'}`
-      };
-    }
-
-    // Enhanced fallback
-    return {
-      method: 'GET',
-      path: '/me',
-      description: `Test ${platformName} for automation: ${automationContext?.title || 'Workflow'}`
-    };
-  }
-
-  /**
-   * Generate default operations for platform
-   */
-  generateDefaultOperations(platformName: string, automationContext: any): any[] {
-    const lowerName = platformName.toLowerCase();
-    
-    if (lowerName.includes('openai')) {
-      return [{
-        name: 'Generate Content',
-        method: 'POST',
-        path: '/v1/chat/completions',
-        description: `Generate content for automation: ${automationContext?.title || 'Content Generation'}`
-      }];
-    }
-    
-    if (lowerName.includes('notion')) {
-      return [{
-        name: 'Query Database',
-        method: 'POST',
-        path: '/v1/databases/{database_id}/query',
-        description: `Query database for automation: ${automationContext?.title || 'Data Management'}`
-      }];
-    }
-    
-    return [{
-      name: `${platformName} Operation`,
-      method: 'POST',
-      path: '/action',
-      description: `Perform ${platformName} operation for automation: ${automationContext?.title || 'Workflow'}`
-    }];
   }
 
   /**
@@ -292,88 +73,81 @@ Return ONLY the JSON configuration, no explanations.`,
   }
 
   /**
-   * Build real authentication headers with automation context
+   * Build authentication headers with fresh AI config
    */
-  buildAutomationContextAuthHeaders(config: any, credentials: Record<string, string>, platformName: string): {headers: Record<string, string>, url: string, body?: any} {
-    console.log(`🔑 Building automation-context auth headers for ${platformName}`);
+  buildFreshAIAuthHeaders(aiConfig: any, credentials: Record<string, string>, platformName: string): {headers: Record<string, string>, url: string, body?: any} {
+    console.log(`🔑 Building fresh AI auth headers for ${platformName}`);
     
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'User-Agent': 'YusrAI-Automation-Context-Tester/1.0',
+      'User-Agent': 'YusrAI-FreshAI-Tester/1.0',
       'Accept': 'application/json'
     };
 
-    let testUrl = config.base_url + config.test_endpoint.path;
-    let requestBody = config.test_endpoint.body || null;
+    let testUrl = aiConfig.base_url + aiConfig.test_endpoint.path;
+    let requestBody = aiConfig.test_endpoint.body || null;
     
-    // Platform-specific authentication
-    const platform = platformName.toLowerCase();
+    // Use AI config authentication settings
+    const authConfig = aiConfig.authentication || {};
+    const testEndpoint = aiConfig.test_endpoint || {};
     
-    switch (platform) {
-      case 'openai':
-        const openaiKey = credentials.api_key || credentials.key;
-        if (openaiKey) {
-          headers['Authorization'] = `Bearer ${openaiKey}`;
-        }
-        break;
+    // Apply headers from AI config
+    if (testEndpoint.headers) {
+      Object.keys(testEndpoint.headers).forEach(headerKey => {
+        let headerValue = testEndpoint.headers[headerKey];
         
-      case 'typeform':
-        const typeformToken = credentials.personal_access_token || credentials.token;
-        if (typeformToken) {
-          headers['Authorization'] = `Bearer ${typeformToken}`;
-        }
-        break;
+        // Replace credential placeholders with real values
+        Object.keys(credentials).forEach(credKey => {
+          if (credentials[credKey]) {
+            headerValue = headerValue.replace(`{${credKey}}`, credentials[credKey]);
+          }
+        });
         
-      case 'notion':
-        const notionToken = credentials.access_token || credentials.token;
-        if (notionToken) {
-          headers['Authorization'] = `Bearer ${notionToken}`;
-          headers['Notion-Version'] = '2022-06-28';
+        headers[headerKey] = headerValue;
+      });
+    }
+    
+    // Fallback authentication if not in test endpoint headers
+    if (!headers['Authorization'] && authConfig.type) {
+      const firstCredValue = Object.values(credentials)[0];
+      if (firstCredValue) {
+        switch (authConfig.type.toLowerCase()) {
+          case 'bearer':
+            headers['Authorization'] = `Bearer ${firstCredValue}`;
+            break;
+          case 'basic':
+            headers['Authorization'] = `Basic ${btoa(firstCredValue)}`;
+            break;
+          case 'api_key':
+            if (authConfig.location === 'header') {
+              headers[authConfig.parameter_name || 'X-API-Key'] = firstCredValue;
+            } else if (authConfig.location === 'query') {
+              testUrl += `?${authConfig.parameter_name || 'api_key'}=${firstCredValue}`;
+            }
+            break;
+          default:
+            headers['Authorization'] = `Bearer ${firstCredValue}`;
         }
-        break;
-        
-      case 'google_sheets':
-      case 'google sheets':
-        const googleToken = credentials.access_token;
-        const googleApiKey = credentials.api_key;
-        if (googleToken) {
-          headers['Authorization'] = `Bearer ${googleToken}`;
-        } else if (googleApiKey) {
-          testUrl += `?key=${googleApiKey}`;
-        }
-        break;
-        
-      case 'slack':
-        const slackToken = credentials.bot_token || credentials.token;
-        if (slackToken) {
-          headers['Authorization'] = `Bearer ${slackToken}`;
-        }
-        break;
-        
-      default:
-        const token = credentials.access_token || credentials.api_key || credentials.token || credentials.key;
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
+      }
     }
 
     return { headers, url: testUrl, body: requestBody };
   }
 
   /**
-   * Perform real automation-context API test
+   * Perform real API test with fresh AI config
    */
-  async performAutomationContextAPITest(config: any, credentials: Record<string, string>, platformName: string, automationContext: any): Promise<any> {
-    console.log(`📡 Making REAL automation-context API call to ${platformName}`);
+  async performFreshAIAPITest(aiConfig: any, credentials: Record<string, string>, platformName: string, automationContext: any): Promise<any> {
+    console.log(`📡 Making REAL API call to ${platformName} with fresh AI config`);
     
     try {
-      const { headers, url, body } = this.buildAutomationContextAuthHeaders(config, credentials, platformName);
+      const { headers, url, body } = this.buildFreshAIAuthHeaders(aiConfig, credentials, platformName);
       
-      console.log(`🔗 Testing automation-context endpoint: ${config.test_endpoint.method} ${url}`);
+      console.log(`🔗 Testing fresh AI endpoint: ${aiConfig.test_endpoint.method} ${url}`);
       
       const startTime = Date.now();
       const response = await fetch(url, {
-        method: config.test_endpoint.method,
+        method: aiConfig.test_endpoint.method || 'GET',
         headers,
         signal: AbortSignal.timeout(15000),
         ...(body && { body: JSON.stringify(body) })
@@ -388,21 +162,21 @@ Return ONLY the JSON configuration, no explanations.`,
         responseData = responseText.substring(0, 200);
       }
 
-      console.log(`📊 Real automation-context API Response: Status ${response.status}, Time ${requestTime}ms`);
+      console.log(`📊 Fresh AI API Response: Status ${response.status}, Time ${requestTime}ms`);
 
       return {
-        success: this.analyzeAutomationContextResponse(response, responseData, platformName, automationContext),
+        success: this.analyzeFreshAIResponse(response, responseData, aiConfig, platformName, automationContext),
         status_code: response.status,
         response_data: responseData,
         request_time_ms: requestTime,
         endpoint_tested: url,
-        method_used: config.test_endpoint.method,
+        method_used: aiConfig.test_endpoint.method || 'GET',
         automation_context: automationContext?.title || 'Default',
-        automation_aware: true
+        fresh_ai_config: true
       };
 
     } catch (error: any) {
-      console.error(`💥 Real automation-context API call failed for ${platformName}:`, error);
+      console.error(`💥 Fresh AI API call failed for ${platformName}:`, error);
       
       return {
         success: false,
@@ -411,82 +185,53 @@ Return ONLY the JSON configuration, no explanations.`,
         endpoint_tested: 'connection_failed',
         error_type: 'network_error',
         automation_context: automationContext?.title || 'Default',
-        automation_aware: true
+        fresh_ai_config: true
       };
     }
   }
 
   /**
-   * Analyze API response with automation context
+   * Analyze API response with fresh AI config
    */
-  analyzeAutomationContextResponse(response: Response, responseData: any, platformName: string, automationContext: any): boolean {
-    console.log(`🔍 Analyzing automation-context API response for ${platformName}`);
+  analyzeFreshAIResponse(response: Response, responseData: any, aiConfig: any, platformName: string, automationContext: any): boolean {
+    console.log(`🔍 Analyzing fresh AI API response for ${platformName}`);
     
     const status = response.status;
     
     if (status >= 200 && status < 300) {
-      const platform = platformName.toLowerCase();
+      const testEndpoint = aiConfig.test_endpoint || {};
+      const successIndicators = testEndpoint.expected_success_indicators || ['success', 'data', 'user'];
+      const errorIndicators = testEndpoint.expected_error_indicators || ['error', 'invalid', 'unauthorized'];
       
-      // Platform-specific success validation with automation context
-      switch (platform) {
-        case 'openai':
-          if (responseData?.choices && Array.isArray(responseData.choices)) {
-            console.log(`✅ OpenAI automation-context success - AI response generated for: ${automationContext?.title || 'Workflow'}`);
-            return true;
-          }
-          break;
-          
-        case 'typeform':
-          if (responseData?.alias || responseData?.account_id || responseData?.language) {
-            console.log(`✅ Typeform automation-context success - Ready for: ${automationContext?.title || 'Form Workflow'}`);
-            return true;
-          }
-          break;
-          
-        case 'notion':
-          if (responseData?.name || responseData?.id || responseData?.type === 'user') {
-            console.log(`✅ Notion automation-context success - Ready for: ${automationContext?.title || 'Database Workflow'}`);
-            return true;
-          }
-          break;
-          
-        case 'google_sheets':
-        case 'google sheets':
-          console.log(`✅ Google Sheets automation-context success - Ready for: ${automationContext?.title || 'Spreadsheet Workflow'}`);
-          return true;
-          
-        case 'slack':
-          if (responseData?.ok === true) {
-            console.log(`✅ Slack automation-context success - Ready for: ${automationContext?.title || 'Messaging Workflow'}`);
-            return true;
-          }
-          break;
-          
-        default:
-          if (typeof responseData === 'object' && responseData !== null) {
-            const hasError = responseData.error || responseData.errors || 
-                           (responseData.message && responseData.message.toLowerCase().includes('error'));
-            if (!hasError) {
-              console.log(`✅ ${platformName} automation-context success - Ready for: ${automationContext?.title || 'Workflow'}`);
-              return true;
-            }
-          }
-          console.log(`✅ ${platformName} automation-context success - Status 2xx for: ${automationContext?.title || 'Workflow'}`);
-          return true;
+      const responseString = JSON.stringify(responseData).toLowerCase();
+      
+      // Check for success indicators
+      const hasSuccessIndicators = successIndicators.some((indicator: string) =>
+        responseString.includes(indicator.toLowerCase())
+      );
+      
+      // Check for error indicators
+      const hasErrorIndicators = errorIndicators.some((indicator: string) =>
+        responseString.includes(indicator.toLowerCase())
+      );
+      
+      if (hasSuccessIndicators || !hasErrorIndicators) {
+        console.log(`✅ ${platformName} fresh AI success - Ready for: ${automationContext?.title || 'Workflow'}`);
+        return true;
       }
       
-      console.log(`⚠️ ${platformName} returned 2xx but unexpected format for automation: ${automationContext?.title || 'Workflow'}`);
-      return true;
+      console.log(`⚠️ ${platformName} returned 2xx but with error indicators for automation: ${automationContext?.title || 'Workflow'}`);
+      return false;
     }
     
-    console.log(`❌ ${platformName} automation-context failure - Status ${status} for: ${automationContext?.title || 'Workflow'}`);
+    console.log(`❌ ${platformName} fresh AI failure - Status ${status} for: ${automationContext?.title || 'Workflow'}`);
     return false;
   }
 
   /**
    * Generate intelligent error messages with automation context
    */
-  generateAutomationContextErrorMessage(platformName: string, testResult: any, automationContext: any): string {
+  generateFreshAIErrorMessage(platformName: string, testResult: any, automationContext: any): string {
     const platform = platformName.toLowerCase();
     const status = testResult.status_code;
     const workflowName = automationContext?.title || 'your automation workflow';
@@ -508,12 +253,6 @@ Return ONLY the JSON configuration, no explanations.`,
         if (status === 403) return `Notion access denied for ${workflowName}. Check your integration permissions and workspace access.`;
         return `Notion API error (${status}) for ${workflowName}. Please verify your integration token and permissions.`;
         
-      case 'google_sheets':
-      case 'google sheets':
-        if (status === 401) return `Google Sheets authentication failed for ${workflowName}. Please verify your access token or API key.`;
-        if (status === 403) return `Google Sheets access denied for ${workflowName}. Check your OAuth2 scopes and permissions.`;
-        return `Google Sheets API error (${status}) for ${workflowName}. Please verify your credentials.`;
-        
       default:
         if (status === 401) return `${platformName} authentication failed for ${workflowName}. Please verify your credentials.`;
         if (status === 403) return `${platformName} access denied for ${workflowName}. Check your account permissions.`;
@@ -524,15 +263,16 @@ Return ONLY the JSON configuration, no explanations.`,
   }
 
   /**
-   * Main automation-context testing function
+   * Main fresh AI testing function
    */
-  async testPlatformCredentialsWithAutomationContext(
+  async testPlatformCredentialsWithFreshAI(
     platformName: string,
     credentials: Record<string, string>,
-    automationId?: string
+    automationId?: string,
+    aiGeneratedConfig?: any
   ): Promise<any> {
     const startTime = Date.now();
-    console.log(`🚀 Starting AUTOMATION-CONTEXT test for ${platformName}`);
+    console.log(`🚀 Starting FRESH AI test for ${platformName}`);
 
     try {
       // Get automation context
@@ -557,21 +297,26 @@ Return ONLY the JSON configuration, no explanations.`,
 
       console.log(`✅ Credential format validation passed for ${platformName} with automation context`);
 
-      // Step 2: Get real automation-context platform configuration
-      const config = await this.getRealAutomationContextConfig(platformName, automationContext);
-      console.log(`📋 Real automation-context configuration loaded for ${platformName}`);
+      // Step 2: Use AI-generated config or create fallback
+      let config = aiGeneratedConfig;
+      if (!config) {
+        console.log(`⚠️ No AI config provided, creating fallback for ${platformName}`);
+        config = this.createFreshAIFallback(platformName, automationContext);
+      }
 
-      // Step 3: Perform real automation-context API test
-      const testResult = await this.performAutomationContextAPITest(config, credentials, platformName, automationContext);
+      console.log(`📋 Fresh AI configuration loaded for ${platformName}`);
+
+      // Step 3: Perform real fresh AI API test
+      const testResult = await this.performFreshAIAPITest(config, credentials, platformName, automationContext);
       const totalTime = Date.now() - startTime;
 
-      console.log(`🏁 Automation-context testing completed for ${platformName} in ${totalTime}ms - ${testResult.success ? 'SUCCESS' : 'FAILED'}`);
+      console.log(`🏁 Fresh AI testing completed for ${platformName} in ${totalTime}ms - ${testResult.success ? 'SUCCESS' : 'FAILED'}`);
 
       return {
         success: testResult.success,
         message: testResult.success 
-          ? `✅ ${platformName} credentials verified successfully for automation: ${automationContext?.title || 'Workflow'}! Ready for execution.`
-          : this.generateAutomationContextErrorMessage(platformName, testResult, automationContext),
+          ? `✅ ${platformName} credentials verified successfully with fresh AI for automation: ${automationContext?.title || 'Workflow'}! Ready for execution.`
+          : this.generateFreshAIErrorMessage(platformName, testResult, automationContext),
         details: {
           // Real test results
           endpoint_tested: testResult.endpoint_tested,
@@ -582,16 +327,16 @@ Return ONLY the JSON configuration, no explanations.`,
           
           // Automation context information
           automation_title: automationContext?.title || 'No automation context',
-          automation_description: automationContext?.description || 'Standard testing',
+          automation_description: automationContext?.description || 'Fresh AI testing',
           platform: platformName,
-          config_source: 'automation_context_aware',
+          config_source: 'fresh_ai_generated',
           base_url: config.base_url,
           
           // Response preview (sanitized)
           api_response_preview: this.sanitizeResponse(testResult.response_data),
           
           // Testing markers
-          automation_context_test: true,
+          fresh_ai_test: true,
           format_validated: true,
           automation_aware: true,
           real_workflow_test: true
@@ -600,27 +345,27 @@ Return ONLY the JSON configuration, no explanations.`,
 
     } catch (error: any) {
       const totalTime = Date.now() - startTime;
-      console.error(`💥 Automation-context testing failed for ${platformName}:`, error);
+      console.error(`💥 Fresh AI testing failed for ${platformName}:`, error);
       
       return {
         success: false,
-        message: `Automation-context testing system error for ${platformName}: ${error.message}`,
+        message: `Fresh AI testing system error for ${platformName}: ${error.message}`,
         details: {
           error_details: error.message,
           total_time_ms: totalTime,
           platform: platformName,
           system_error: true,
-          automation_context_aware: true
+          fresh_ai_aware: true
         }
       };
     }
   }
 
   /**
-   * Create automation context fallback
+   * Create fresh AI fallback config
    */
-  private createAutomationContextFallback(platformName: string, automationContext: any): any {
-    console.log(`⚠️ Creating automation-context fallback for ${platformName}`);
+  private createFreshAIFallback(platformName: string, automationContext: any): any {
+    console.log(`⚠️ Creating fresh AI fallback for ${platformName}`);
     
     const platform = platformName.toLowerCase();
     const realConfigs = {
@@ -630,17 +375,19 @@ Return ONLY the JSON configuration, no explanations.`,
         test_endpoint: { 
           method: 'POST', 
           path: '/v1/chat/completions',
-          description: `Test OpenAI for automation: ${automationContext?.title || 'Workflow'}`,
+          headers: { 'Authorization': 'Bearer {api_key}', 'Content-Type': 'application/json' },
           body: {
             model: 'gpt-4o-mini',
             messages: [
-              { role: 'system', content: `Automation context: ${automationContext?.title || 'Processing'}` },
-              { role: 'user', content: 'Test automation workflow processing' }
+              { role: 'system', content: `Fresh AI automation test: ${automationContext?.title || 'Processing'}` },
+              { role: 'user', content: 'Test fresh AI automation workflow processing' }
             ],
             max_tokens: 50
-          }
+          },
+          expected_success_indicators: ['choices', 'message', 'content'],
+          expected_error_indicators: ['error', 'invalid', 'unauthorized']
         },
-        auth_config: { type: 'bearer', location: 'header', parameter_name: 'Authorization' }
+        authentication: { type: 'Bearer', location: 'header', parameter_name: 'Authorization' }
       },
       'typeform': {
         platform_name: 'Typeform', 
@@ -648,9 +395,11 @@ Return ONLY the JSON configuration, no explanations.`,
         test_endpoint: { 
           method: 'GET', 
           path: '/me',
-          description: `Test Typeform for automation: ${automationContext?.title || 'Form Workflow'}`
+          headers: { 'Authorization': 'Bearer {personal_access_token}' },
+          expected_success_indicators: ['alias', 'account_id', 'language'],
+          expected_error_indicators: ['error', 'invalid', 'unauthorized']
         },
-        auth_config: { type: 'bearer', location: 'header', parameter_name: 'Authorization' }
+        authentication: { type: 'Bearer', location: 'header', parameter_name: 'Authorization' }
       },
       'notion': {
         platform_name: 'Notion',
@@ -658,9 +407,11 @@ Return ONLY the JSON configuration, no explanations.`,
         test_endpoint: { 
           method: 'GET', 
           path: '/v1/users/me',
-          description: `Test Notion for automation: ${automationContext?.title || 'Database Workflow'}`
+          headers: { 'Authorization': 'Bearer {access_token}', 'Notion-Version': '2022-06-28' },
+          expected_success_indicators: ['name', 'id', 'type'],
+          expected_error_indicators: ['error', 'invalid', 'unauthorized']
         },
-        auth_config: { type: 'bearer', location: 'header', parameter_name: 'Authorization' }
+        authentication: { type: 'Bearer', location: 'header', parameter_name: 'Authorization' }
       }
     };
 
@@ -670,9 +421,11 @@ Return ONLY the JSON configuration, no explanations.`,
       test_endpoint: { 
         method: 'GET', 
         path: '/me',
-        description: `Test ${platformName} for automation: ${automationContext?.title || 'Workflow'}`
+        headers: { 'Authorization': 'Bearer {api_key}' },
+        expected_success_indicators: ['success', 'data', 'user'],
+        expected_error_indicators: ['error', 'invalid', 'unauthorized']
       },
-      auth_config: { type: 'bearer', location: 'header', parameter_name: 'Authorization' }
+      authentication: { type: 'Bearer', location: 'header', parameter_name: 'Authorization' }
     };
   }
 
@@ -703,7 +456,7 @@ serve(async (req) => {
   }
 
   try {
-    const { platformName, credentials, automationId } = await req.json();
+    const { platformName, credentials, automationId, aiGeneratedConfig } = await req.json();
 
     if (!platformName || !credentials) {
       return new Response(
@@ -723,14 +476,15 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Initialize the automation context credential tester
-    const tester = new AutomationContextCredentialTester(supabase);
+    // Initialize the fresh AI credential tester
+    const tester = new FreshAICredentialTester(supabase);
 
-    // Test platform credentials with automation context
-    const result = await tester.testPlatformCredentialsWithAutomationContext(
+    // Test platform credentials with fresh AI config
+    const result = await tester.testPlatformCredentialsWithFreshAI(
       platformName,
       credentials,
-      automationId
+      automationId,
+      aiGeneratedConfig
     );
 
     return new Response(
@@ -741,14 +495,14 @@ serve(async (req) => {
     );
 
   } catch (error: any) {
-    console.error('Error in test-credential function:', error);
+    console.error('Error in fresh AI test-credential function:', error);
     
     return new Response(
       JSON.stringify({ 
         success: false, 
-        message: `Server error: ${error.message}`,
+        message: `Fresh AI server error: ${error.message}`,
         details: {
-          error_type: 'server_error',
+          error_type: 'fresh_ai_server_error',
           timestamp: new Date().toISOString()
         }
       }),

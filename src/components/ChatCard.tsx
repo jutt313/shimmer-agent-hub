@@ -1,4 +1,3 @@
-
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Plus, X, Play, User, Code } from 'lucide-react';
@@ -141,7 +140,7 @@ const ChatCard = ({
   const handlePlatformCredentialClick = (platformName: string, platforms: any[]) => {
     const platform = platforms.find(p => p.name === platformName);
     if (platform && onPlatformCredentialChange) {
-      console.log(`🔧 Opening credential form for ${platformName}`);
+      console.log(`🔧 Opening credential form for ${platformName} (Fresh AI system)`);
       // Trigger the platform credential form opening
       onPlatformCredentialChange();
     }
@@ -289,7 +288,7 @@ const ChatCard = ({
         );
       }
 
-      // ENHANCED Platforms rendering with WORKING credential buttons
+      // FIXED: Platforms rendering with FRESH AI credential buttons
       if (Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
         const validPlatforms = structuredData.platforms.filter(platform => 
           platform && typeof platform === 'object' && platform.name && typeof platform.name === 'string'
@@ -298,7 +297,7 @@ const ChatCard = ({
         if (validPlatforms.length > 0) {
           content.push(
             <div key="platforms" className="mb-4">
-              <p className="font-medium text-gray-800 mb-3">Required Platform Credentials:</p>
+              <p className="font-medium text-gray-800 mb-3">Fresh AI Platform Credentials (Universal Store Disabled):</p>
               <div className="grid grid-cols-6 gap-2 mb-4">
                 {validPlatforms.map((platform, index) => {
                   const platformName = platform.name || 'Unknown Platform';
@@ -330,14 +329,14 @@ const ChatCard = ({
                 })}
               </div>
               
-              {/* Enhanced Platform details with credential information */}
+              {/* Fresh AI Platform details with credential information */}
               <div className="text-gray-700 space-y-2">
                 {validPlatforms.map((platform, index) => {
                   const platformName = platform.name || 'Unknown Platform';
                   
                   return (
                     <div key={`platform-detail-${index}`} className="bg-blue-50/30 p-3 rounded-lg border border-blue-200/50">
-                      <p className="font-medium text-gray-800 mb-2">{platformName}</p>
+                      <p className="font-medium text-gray-800 mb-2">{platformName} (Fresh AI Generated)</p>
                       {Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
                         <div className="text-sm text-gray-600 space-y-1">
                           {platform.credentials.map((cred, credIndex) => {
@@ -345,7 +344,7 @@ const ChatCard = ({
                               const fieldName = String(cred.field).replace(/_/g, ' ').toUpperCase();
                               return (
                                 <div key={`cred-${credIndex}`} className="flex items-center justify-between">
-                                  <span>• {fieldName}: {cred.why_needed || 'Required for integration'}</span>
+                                  <span>• {fieldName}: {cred.why_needed || 'Required for fresh AI integration'}</span>
                                   {cred.link && (
                                     <Button
                                       size="sm"
@@ -466,11 +465,11 @@ const ChatCard = ({
       handleError(error, 'Structured content rendering');
       return [
         <div key="error" className="text-blue-600 p-4 bg-blue-50 rounded-lg">
-          I'm processing your automation request. Please wait...
+          I'm processing your fresh AI automation request. Please wait...
           {showErrorHelp && (
             <ErrorHelpButton 
               errorMessage="Content rendering error"
-              onHelpRequest={() => handleErrorHelp("I encountered an error while displaying the automation details.")}
+              onHelpRequest={() => handleErrorHelp("I encountered an error while displaying the fresh AI automation details.")}
             />
           )}
         </div>
@@ -487,7 +486,7 @@ const ChatCard = ({
     >
       <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/20 to-purple-100/20 pointer-events-none"></div>
       
-      {/* Top-right View Code button */}
+      {/* FIXED: Top-right View Code button (connects to Fresh AI system) */}
       {getCompleteAutomationJSON() && (
         <Dialog open={showCodeModal} onOpenChange={setShowCodeModal}>
           <DialogTrigger asChild>
@@ -503,7 +502,7 @@ const ChatCard = ({
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle className="text-lg font-semibold text-blue-600">
-                Complete Automation JSON - Ready for Execution
+                Complete Fresh AI Automation JSON - Ready for Execution
               </DialogTitle>
             </DialogHeader>
             <ScrollArea className="h-[60vh] w-full">
@@ -547,7 +546,7 @@ const ChatCard = ({
                         alt="YusrAI" 
                         className="w-5 h-5 object-contain"
                       />
-                      <span className="text-sm font-medium text-blue-600">YusrAI</span>
+                      <span className="text-sm font-medium text-blue-600">YusrAI (Fresh AI)</span>
                     </div>
                   )}
                   
@@ -586,7 +585,7 @@ const ChatCard = ({
             );
           })}
           
-          {/* Enhanced loading indicator */}
+          {/* Fresh AI loading indicator */}
           {isLoading && (
             <div className="flex justify-start">
               <div className="max-w-4xl px-6 py-4 rounded-2xl bg-white border border-blue-100/50 text-gray-800 shadow-lg backdrop-blur-sm">
@@ -596,7 +595,7 @@ const ChatCard = ({
                     alt="YusrAI" 
                     className="w-5 h-5 object-contain animate-pulse"
                   />
-                  <span className="font-medium">YusrAI is creating your complete automation...</span>
+                  <span className="font-medium">YusrAI is creating your fresh AI automation...</span>
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
                     <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>

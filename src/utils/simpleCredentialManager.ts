@@ -10,12 +10,12 @@ export interface SimpleCredential {
 }
 
 /**
- * Simplified credential manager that focuses on basic storage and validation
- * without complex API testing
+ * Simplified credential manager that connects to main Chat-AI function
+ * and uses test-credential function for testing
  */
 export class SimpleCredentialManager {
   /**
-   * Save credentials and test with Chat-AI (no universal store)
+   * Save credentials and test with main Chat-AI + test-credential functions
    */
   static async saveCredentials(
     automationId: string,
@@ -47,9 +47,9 @@ export class SimpleCredentialManager {
           credentials: JSON.stringify(credentials),
           is_active: true,
           is_tested: false,
-          credential_type: 'chat_ai_tested',
+          credential_type: 'fresh_ai_tested',
           test_status: 'testing',
-          test_message: 'Testing credentials with fresh Chat-AI config...'
+          test_message: 'Testing credentials with fresh AI configurations...'
         }, {
           onConflict: 'automation_id,platform_name,user_id'
         });
@@ -66,15 +66,82 @@ export class SimpleCredentialManager {
         .eq('id', automationId)
         .single();
 
-      // Step 3: Test credentials with Chat-AI generated config
-      console.log(`🧪 Testing ${platformName} credentials with Chat-AI...`);
+      // Step 3: Get fresh AI configuration from main Chat-AI function
+      console.log(`🧪 Getting fresh AI config for ${platformName} credentials...`);
       
       try {
-        const { data: testResult, error: testError } = await supabase.functions.invoke('chat-ai-credential-test', {
+        const { data: aiConfigResult, error: aiError } = await supabase.functions.invoke('chat-ai', {
+          body: {
+            message: `Generate fresh API configuration for ${platformName} platform credential testing.
+
+**AUTOMATION CONTEXT:**
+${JSON.stringify(automationData, null, 2)}
+
+**CRITICAL REQUIREMENTS:**
+- Generate REAL API operations that serve this specific automation workflow
+- NO generic /auth/verify or /me endpoints for operations
+- Use actual operations and real field names from current API documentation
+- Include proper test endpoint configuration for credential validation
+- Return ONLY the api_configurations array with test_endpoint included
+
+**REQUIRED FORMAT:**
+{
+  "api_configurations": [
+    {
+      "platform_name": "${platformName}",
+      "base_url": "https://api.platform.com",
+      "authentication": {
+        "type": "Bearer",
+        "location": "header",
+        "parameter_name": "Authorization",
+        "format": "Bearer {field_name}"
+      },
+      "test_endpoint": {
+        "method": "GET",
+        "path": "/v1/real/test/endpoint",
+        "headers": {
+          "Authorization": "Bearer {field_name}",
+          "Content-Type": "application/json"
+        },
+        "expected_success_indicators": ["success", "data", "user"],
+        "expected_error_indicators": ["error", "invalid", "unauthorized"]
+      }
+    }
+  ]
+}
+
+Return ONLY this JSON configuration, no explanations.`,
+            messages: [],
+            requestType: 'fresh_ai_platform_config',
+            automationContext: automationData,
+            platformName: platformName
+          }
+        });
+
+        if (aiError) {
+          console.warn('AI config generation failed:', aiError);
+          throw new Error(`AI config failed: ${aiError.message}`);
+        }
+
+        // Step 4: Extract test configuration from AI response
+        let testConfig = null;
+        if (aiConfigResult && aiConfigResult.api_configurations && aiConfigResult.api_configurations.length > 0) {
+          testConfig = aiConfigResult.api_configurations[0];
+        }
+
+        if (!testConfig || !testConfig.test_endpoint) {
+          throw new Error('AI did not provide valid test configuration');
+        }
+
+        // Step 5: Test credentials using test-credential function with AI config
+        console.log(`🔧 Testing ${platformName} credentials with fresh AI config...`);
+        
+        const { data: testResult, error: testError } = await supabase.functions.invoke('test-credential', {
           body: {
             platformName,
-            automationContext: automationData,
-            credentials
+            credentials,
+            automationId,
+            aiGeneratedConfig: testConfig // Pass AI config to test function
           }
         });
 
@@ -87,7 +154,7 @@ export class SimpleCredentialManager {
             .update({
               is_tested: false,
               test_status: 'failed',
-              test_message: `Test failed: ${testError.message}`
+              test_message: `Fresh AI test failed: ${testError.message}`
             })
             .eq('automation_id', automationId)
             .eq('platform_name', platformName)
@@ -95,7 +162,7 @@ export class SimpleCredentialManager {
 
           return { 
             success: true, // Credentials saved, but test failed
-            error: `Credentials saved but test failed: ${testError.message}`,
+            error: `Credentials saved but fresh AI test failed: ${testError.message}`,
             testResult: { success: false, message: testError.message }
           };
         }
@@ -118,7 +185,7 @@ export class SimpleCredentialManager {
         };
 
       } catch (testError: any) {
-        console.warn('Could not test credentials with Chat-AI:', testError);
+        console.warn('Could not test credentials with fresh AI system:', testError);
         
         // Update with test error
         await supabase
@@ -126,7 +193,7 @@ export class SimpleCredentialManager {
           .update({
             is_tested: false,
             test_status: 'error',
-            test_message: 'Could not test credentials - will be tested during execution'
+            test_message: 'Could not test credentials with fresh AI - will be tested during execution'
           })
           .eq('automation_id', automationId)
           .eq('platform_name', platformName)
@@ -134,7 +201,7 @@ export class SimpleCredentialManager {
 
         return { 
           success: true,
-          error: 'Credentials saved but could not be tested automatically'
+          error: 'Credentials saved but could not be tested with fresh AI automatically'
         };
       }
       

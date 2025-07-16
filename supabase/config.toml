@@ -1,11 +1,57 @@
 
 project_id = "zorwtyijosgdcckljmqd"
 
-[functions.chat-ai-credential-test]
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[functions.chat-ai]
+verify_jwt = false
+
+[functions.test-credential]
+verify_jwt = false
+
+[functions.execute-automation]
+verify_jwt = false
+
+[functions.diagram-generator]
+verify_jwt = false
+
+[functions.error-analyzer]
+verify_jwt = false
+
+[functions.knowledge-ai-chat]
+verify_jwt = false
+
+[functions.create-notification]
+verify_jwt = false
+
+[functions.oauth-token]
+verify_jwt = false
+
+[functions.oauth2-exchange]
+verify_jwt = false
+
+[functions.realtime-events]
+verify_jwt = false
+
+[functions.realtime-webhook]
+verify_jwt = false
+
+[functions.seed-knowledge-store]
 verify_jwt = false
 
 [functions.test-webhook]
 verify_jwt = false
 
-[functions.webhook-trigger]
+[functions.update-webhook-url-generator]
+verify_jwt = false
+
+[functions.yusrai-api]
+verify_jwt = false
+
+[functions.create-subscription]
 verify_jwt = false

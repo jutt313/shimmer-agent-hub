@@ -28,7 +28,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🚀 YusrAI: Processing COMPLETE AUTOMATION REQUEST with ENHANCED SYSTEM...')
+    console.log('🚀 YusrAI: Processing COMPLETE AUTOMATION REQUEST with FRESH AI GENERATION...')
     
     const { message, messages = [], automationId, automationContext, requestType, platformName, userId } = await req.json()
     
@@ -36,7 +36,7 @@ serve(async (req) => {
       throw new Error('Message is required')
     }
 
-    console.log('📋 ENHANCED Request details:', {
+    console.log('📋 Request details:', {
       messageLength: message.length,
       historyCount: messages.length,
       hasAutomationContext: !!automationContext,
@@ -45,26 +45,13 @@ serve(async (req) => {
       userId: userId || 'anonymous'
     })
 
-    // FRESH AI-GENERATED PLATFORM INTELLIGENCE (No Universal Store Dependency)
-    console.log(`🧠 ENHANCED: Using fresh AI-generated platform intelligence (Universal Store disabled)`)
+    // FRESH AI-GENERATED PLATFORM INTELLIGENCE (Universal Store DISABLED)
+    console.log(`🧠 FRESH AI GENERATION: Universal Store DISABLED - Using 100% fresh AI configs`)
 
-    // Generate fresh platform intelligence based on automation context
-    const platformIntelligence = `FRESH AI-GENERATED PLATFORM INTELLIGENCE:
-- Every platform configuration will be generated fresh by AI
-- No stale configs or cached endpoints
-- Real-time API documentation and requirements
-- Context-aware credential field names and formats
-- Current authentication methods and endpoints
-- Automation-specific operation recommendations
-
-AUTOMATION CONTEXT: ${JSON.stringify(automationContext, null, 2)}
-
-This ensures every test and execution uses the most current platform information.`
-
-    // COMPLETELY ENHANCED AUTOMATION-CONTEXT-AWARE SYSTEM PROMPT (500+ LINES)
+    // COMPLETELY ENHANCED AUTOMATION-CONTEXT-AWARE SYSTEM PROMPT
     const enhancedSystemPrompt = `You are YusrAI, the world's most advanced automation architect with COMPLETE AUTOMATION-CONTEXT AWARENESS. You generate REAL, WORKING API configurations with COMPLETE platform credential structures for immediate implementation.
 
-**🎯 CRITICAL MISSION: COMPLETE AUTOMATION CREATION**
+**🎯 CRITICAL MISSION: COMPLETE AUTOMATION CREATION WITH FRESH CONFIGS**
 Generate COMPLETE automation configurations with:
 1. FULL platform arrays with COMPLETE credential structures
 2. REAL API operations that match the ACTUAL automation workflow
@@ -73,20 +60,21 @@ Generate COMPLETE automation configurations with:
 5. DETAILED step-by-step implementation guides
 
 **🔧 MANDATORY PLATFORM CREDENTIAL STRUCTURE:**
-For EVERY platform, you MUST generate this EXACT structure:
+For EVERY platform, you MUST generate this EXACT structure with REAL, CURRENT field names:
 {
   "name": "PlatformName",
   "credentials": [
     {
-      "field": "api_key",
-      "placeholder": "Enter your API key",
-      "link": "https://platform.com/api/keys",
-      "why_needed": "Required for API authentication and access to platform features"
+      "field": "actual_field_name_from_api_docs",
+      "placeholder": "Enter your actual credential name",
+      "link": "https://real-platform-docs.com/api/keys",
+      "why_needed": "Required for specific API operations in this automation"
     }
   ]
 }
 
-**🚀 REAL API OPERATION GENERATION RULES:**
+**🚀 REAL API OPERATION GENERATION RULES (NO UNIVERSAL STORE):**
+Generate FRESH, REAL operations based on CURRENT API documentation:
 - OpenAI: Use /v1/chat/completions with REAL prompts based on automation context
 - Notion: Use /v1/databases/{id}/query or /v1/pages with ACTUAL database operations
 - Gmail: Use /gmail/v1/messages/send or /gmail/v1/messages with REAL email operations
@@ -95,9 +83,6 @@ For EVERY platform, you MUST generate this EXACT structure:
 - Typeform: Use /forms/{id}/responses with ACTUAL form operations
 - HubSpot: Use /crm/v3/objects/contacts with REAL CRM operations
 - ANY PLATFORM: Generate REAL operations that serve the automation's PURPOSE
-
-**🧠 ENHANCED PLATFORM INTELLIGENCE DATABASE:**
-${platformIntelligence}
 
 **📋 AUTOMATION CONTEXT INTEGRATION:**
 ${automationContext ? `
@@ -123,9 +108,9 @@ You MUST respond with this COMPLETE JSON structure:
       "name": "PlatformName",
       "credentials": [
         {
-          "field": "credential_name",
-          "placeholder": "Enter your credential",
-          "link": "https://platform.com/api",
+          "field": "real_credential_field_name",
+          "placeholder": "Enter your real credential",
+          "link": "https://platform.com/api/keys",
           "why_needed": "Detailed explanation for this automation"
         }
       ]
@@ -139,7 +124,7 @@ You MUST respond with this COMPLETE JSON structure:
         "type": "Bearer",
         "location": "header",
         "parameter_name": "Authorization",
-        "format": "Bearer {api_key}"
+        "format": "Bearer {credential_field_name}"
       },
       "automation_operations": [
         {
@@ -150,7 +135,18 @@ You MUST respond with this COMPLETE JSON structure:
           "sample_request": { "real": "request_data" },
           "sample_response": { "real": "response_data" }
         }
-      ]
+      ],
+      "test_endpoint": {
+        "method": "POST",
+        "path": "/v1/test/endpoint",
+        "headers": {
+          "Authorization": "Bearer {credential_field_name}",
+          "Content-Type": "application/json"
+        },
+        "body": { "test": "data" },
+        "expected_success_indicators": ["success", "data", "result"],
+        "expected_error_indicators": ["error", "invalid", "unauthorized"]
+      }
     }
   ],
   "agents": [
@@ -184,11 +180,14 @@ You MUST respond with this COMPLETE JSON structure:
     "platform_count": 2,
     "automation_readiness": "complete",
     "credential_status": "ready_for_configuration",
-    "blueprint_status": "ready_for_diagram"
+    "blueprint_status": "ready_for_diagram",
+    "fresh_ai_generation": true,
+    "universal_store_disabled": true
   }
 }
 
 **🚫 ABSOLUTELY FORBIDDEN:**
+- Using any cached or universal store configurations
 - Generic /auth/verify or /me endpoints for actual operations
 - Incomplete platform credential structures
 - Missing automation_blueprint fields
@@ -197,21 +196,16 @@ You MUST respond with this COMPLETE JSON structure:
 - Partial response structures
 - Test endpoints instead of real workflow operations
 
-**⚡ PERFORMANCE REQUIREMENTS:**
-- Response time: Under 2 seconds
-- Complete JSON structure: Always
-- Real operations: 100% automation-context-aware
-- Platform credentials: Complete with all required fields
-- Blueprint: Ready for immediate diagram generation
+**⚡ FRESH AI GENERATION REQUIREMENTS:**
+- Generate ALL platform configs fresh from current knowledge
+- Use REAL, documented API endpoints and field names
+- Provide working test endpoints for credential validation
+- Include proper authentication formats for each platform
+- Ensure all configurations are production-ready
+- Response time: Under 3 seconds
+- Complete JSON structure: Always required
 
-**🎯 SUCCESS CRITERIA:**
-- Platform credential buttons appear immediately
-- Diagram generation works perfectly
-- All API configurations are production-ready
-- Complete automation workflow is implementable
-- User can execute automation without additional configuration
-
-Generate the COMPLETE automation with REAL, WORKING configurations NOW.`
+Generate the COMPLETE automation with FRESH, AI-GENERATED configurations NOW.`
 
     // Prepare enhanced messages for OpenAI
     const enhancedMessages = [
@@ -223,7 +217,7 @@ Generate the COMPLETE automation with REAL, WORKING configurations NOW.`
       { role: "user", content: message }
     ]
 
-    console.log('🤖 Calling OpenAI with ENHANCED AUTOMATION-CONTEXT PROMPT...')
+    console.log('🤖 Calling OpenAI with FRESH AI GENERATION SYSTEM...')
 
     // Call OpenAI API with enhanced configuration
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -254,11 +248,11 @@ Generate the COMPLETE automation with REAL, WORKING configurations NOW.`
       throw new Error('No response from OpenAI')
     }
 
-    // Parse and validate ENHANCED JSON response
+    // Parse and validate FRESH JSON response
     let parsedResponse
     try {
       parsedResponse = JSON.parse(aiResponse)
-      console.log('✅ ENHANCED JSON parsing successful')
+      console.log('✅ FRESH AI JSON parsing successful')
     } catch (parseError) {
       console.error('❌ JSON parse error:', parseError)
       throw new Error('Invalid JSON response from AI')
@@ -268,14 +262,14 @@ Generate the COMPLETE automation with REAL, WORKING configurations NOW.`
     const requiredFields = ['summary', 'steps', 'platforms', 'api_configurations', 'agents', 'automation_blueprint']
     for (const field of requiredFields) {
       if (!parsedResponse[field]) {
-        console.warn(`⚠️ Missing required field: ${field} - Adding enhanced default`)
+        console.warn(`⚠️ Missing required field: ${field} - Adding fresh AI default`)
         
         switch (field) {
           case 'summary':
-            parsedResponse.summary = "Complete automation configuration with platform integrations and real API operations."
+            parsedResponse.summary = "Complete automation configuration with fresh AI-generated platform integrations and real API operations."
             break
           case 'steps':
-            parsedResponse.steps = ["Configure platform credentials", "Set up API connections", "Test automation workflow", "Deploy production automation"]
+            parsedResponse.steps = ["Configure platform credentials", "Set up AI-generated API connections", "Test automation workflow", "Deploy production automation"]
             break
           case 'platforms':
             parsedResponse.platforms = []
@@ -285,18 +279,18 @@ Generate the COMPLETE automation with REAL, WORKING configurations NOW.`
             break
           case 'agents':
             parsedResponse.agents = [{
-              name: "AutomationAgent",
-              role: "Automation workflow specialist",
-              goal: "Optimize automation performance and reliability",
-              rules: "Follow automation best practices and error handling",
-              memory: "Track workflow performance and user preferences",
-              why_needed: "Essential for monitoring and optimizing automation workflows"
+              name: "FreshAIAgent",
+              role: "Fresh AI-generated automation specialist",
+              goal: "Optimize automation performance with real-time AI configurations",
+              rules: "Use only fresh AI-generated configurations, no cached data",
+              memory: "Track fresh configuration performance and user preferences",
+              why_needed: "Essential for maintaining fresh, AI-generated automation workflows"
             }]
             break
           case 'automation_blueprint':
             parsedResponse.automation_blueprint = {
               version: "2.0.0",
-              description: "Complete automation workflow with platform integrations",
+              description: "Complete automation workflow with fresh AI-generated platform integrations",
               trigger: { type: "manual", config: {} },
               variables: {},
               steps: [],
@@ -307,49 +301,50 @@ Generate the COMPLETE automation with REAL, WORKING configurations NOW.`
       }
     }
 
-    // ENHANCE PLATFORM CREDENTIALS with REAL STRUCTURES
+    // ENHANCE PLATFORM CREDENTIALS with FRESH AI STRUCTURES
     if (Array.isArray(parsedResponse.platforms)) {
       parsedResponse.platforms = parsedResponse.platforms.map((platform: any) => {
         if (!platform.credentials || !Array.isArray(platform.credentials)) {
-          // Find platform in universal knowledge
-          const knowledgePlatform = universalKnowledge?.find(k => 
-            k.platform_name?.toLowerCase() === platform.name?.toLowerCase()
-          );
-          
-          if (knowledgePlatform && knowledgePlatform.credential_fields) {
-            platform.credentials = knowledgePlatform.credential_fields.map((c: any) => ({
-              field: c.field || 'api_key',
-              placeholder: c.placeholder || `Enter your ${c.field || 'API key'}`,
-              link: c.link || `https://${platform.name?.toLowerCase()}.com/developers`,
-              why_needed: c.why_needed || `Required for ${platform.name} integration in this automation`
-            }));
-          } else {
-            // Fallback enhanced credential structure
-            platform.credentials = [{
-              field: 'api_key',
-              placeholder: `Enter your ${platform.name} API key`,
-              link: `https://${platform.name?.toLowerCase()}.com/api`,
-              why_needed: `Required for ${platform.name} API access in this automation workflow`
-            }];
-          }
+          // Generate fresh AI credential structure
+          platform.credentials = [{
+            field: 'api_key',
+            placeholder: `Enter your ${platform.name} API key`,
+            link: `https://${platform.name?.toLowerCase()}.com/api`,
+            why_needed: `Required for ${platform.name} integration in this fresh AI-generated automation`
+          }];
         }
         return platform;
       });
     }
 
-    // ENHANCE API CONFIGURATIONS with REAL OPERATIONS
+    // ENHANCE API CONFIGURATIONS with FRESH AI OPERATIONS
     if (Array.isArray(parsedResponse.api_configurations)) {
       parsedResponse.api_configurations = parsedResponse.api_configurations.map((config: any) => {
         if (!config.automation_operations || !Array.isArray(config.automation_operations)) {
           config.automation_operations = [{
-            name: `${config.platform_name} Operation`,
+            name: `${config.platform_name} Fresh AI Operation`,
             method: "POST",
             path: "/v1/api/operation",
-            description: `Real ${config.platform_name} operation for automation workflow`,
-            sample_request: { automation_context: "real_operation" },
-            sample_response: { success: true, data: "real_response" }
+            description: `Fresh AI-generated ${config.platform_name} operation for automation workflow`,
+            sample_request: { automation_context: "fresh_ai_operation" },
+            sample_response: { success: true, data: "fresh_ai_response" }
           }];
         }
+        
+        // Add test endpoint if missing
+        if (!config.test_endpoint) {
+          config.test_endpoint = {
+            method: "GET",
+            path: "/v1/test",
+            headers: {
+              "Authorization": "Bearer {api_key}",
+              "Content-Type": "application/json"
+            },
+            expected_success_indicators: ["success", "data", "user"],
+            expected_error_indicators: ["error", "invalid", "unauthorized"]
+          };
+        }
+        
         return config;
       });
     }
@@ -361,8 +356,8 @@ Generate the COMPLETE automation with REAL, WORKING configurations NOW.`
           .from('automations')
           .upsert({
             id: automationId,
-            title: parsedResponse.summary?.substring(0, 100) || 'YusrAI Automation',
-            description: parsedResponse.summary || 'Generated by YusrAI',
+            title: parsedResponse.summary?.substring(0, 100) || 'YusrAI Fresh Automation',
+            description: parsedResponse.summary || 'Generated by YusrAI with fresh AI configurations',
             automation_blueprint: parsedResponse.automation_blueprint,
             platforms_config: parsedResponse.platforms,
             api_configurations: parsedResponse.api_configurations,
@@ -370,53 +365,40 @@ Generate the COMPLETE automation with REAL, WORKING configurations NOW.`
             updated_at: new Date().toISOString()
           });
         
-        console.log('💾 Automation context saved successfully');
+        console.log('💾 Fresh AI automation context saved successfully');
       } catch (saveError) {
         console.warn('⚠️ Could not save automation context:', saveError);
       }
     }
 
-    // ENHANCED FINAL VALIDATION
+    // FRESH AI FINAL VALIDATION
     parsedResponse.clarification_questions = parsedResponse.clarification_questions || []
     parsedResponse.conversation_updates = {
       ...parsedResponse.conversation_updates,
-      knowledge_applied: `${universalKnowledge?.length || 0} platform entries`,
+      fresh_ai_generation: true,
+      universal_store_disabled: true,
       platform_count: parsedResponse.platforms?.length || 0,
-      automation_integration: "Complete with real API operations",
-      credential_structure: "Complete with all required fields",
+      automation_integration: "Complete with fresh AI-generated real API operations",
+      credential_structure: "Complete with fresh AI field names and requirements",
       blueprint_status: "Ready for diagram generation",
-      api_operation_type: "Real workflow operations (no generic tests)",
-      enhanced_system: true,
-      automation_context_aware: true
+      api_operation_type: "Fresh AI real workflow operations (no cached configs)",
+      system_status: "Fresh AI generation active, universal store disabled"
     }
     parsedResponse.is_update = parsedResponse.is_update || false
-    parsedResponse.recheck_status = "complete_automation_ready_for_implementation"
-
-    // UPDATE UNIVERSAL KNOWLEDGE USAGE
-    if (universalKnowledge && universalKnowledge.length > 0) {
-      for (const knowledge of universalKnowledge.slice(0, 20)) {
-        await supabase
-          .from('universal_knowledge_store')
-          .update({ 
-            usage_count: (knowledge.usage_count || 0) + 1,
-            last_used: new Date().toISOString()
-          })
-          .eq('id', knowledge.id)
-      }
-    }
+    parsedResponse.recheck_status = "fresh_ai_complete_automation_ready_for_implementation"
 
     const responseTime = Date.now() - startTime
-    console.log(`🚀 ENHANCED YusrAI COMPLETE AUTOMATION response completed in ${responseTime}ms`)
-    console.log('📊 ENHANCED response metrics:', {
+    console.log(`🚀 FRESH AI YusrAI COMPLETE AUTOMATION response completed in ${responseTime}ms`)
+    console.log('📊 Fresh AI response metrics:', {
       responseTime: `${responseTime}ms`,
       platformsCount: parsedResponse.platforms?.length || 0,
       apiConfigsCount: parsedResponse.api_configurations?.length || 0,
       agentsCount: parsedResponse.agents?.length || 0,
       blueprintReady: !!parsedResponse.automation_blueprint,
       credentialStructuresComplete: true,
-      automationContextAware: true,
-      realOperations: true,
-      enhancedSystem: true
+      freshAIGeneration: true,
+      universalStoreDisabled: true,
+      realOperations: true
     })
 
     return new Response(JSON.stringify(parsedResponse), {
@@ -425,16 +407,16 @@ Generate the COMPLETE automation with REAL, WORKING configurations NOW.`
 
   } catch (error: any) {
     const responseTime = Date.now() - startTime
-    console.error('💥 ENHANCED YusrAI Error:', error, `(${responseTime}ms)`)
+    console.error('💥 FRESH AI YusrAI Error:', error, `(${responseTime}ms)`)
     
-    // ENHANCED ERROR RESPONSE with COMPLETE STRUCTURES
-    const enhancedErrorResponse = {
-      summary: "I encountered a technical issue but I'm ready to help you create a complete automation with platform credentials and diagram generation. Please rephrase your request with specific platform names and I'll provide a comprehensive solution.",
+    // FRESH AI ERROR RESPONSE with COMPLETE STRUCTURES
+    const freshAIErrorResponse = {
+      summary: "I encountered a technical issue but I'm ready to help you create a complete automation with fresh AI-generated platform credentials and diagram generation. Please rephrase your request with specific platform names and I'll provide a comprehensive solution using fresh AI configurations.",
       steps: [
         "Specify the platforms you want to integrate (Gmail, Slack, Notion, etc.)",
         "Describe your automation workflow and what you want to achieve", 
-        "I'll provide complete platform credential structures and API configurations",
-        "All credential buttons and diagram generation will work perfectly"
+        "I'll provide complete fresh AI platform credential structures and API configurations",
+        "All credential buttons and diagram generation will work perfectly with fresh AI data"
       ],
       platforms: [{
         name: "ExamplePlatform",
@@ -442,7 +424,7 @@ Generate the COMPLETE automation with REAL, WORKING configurations NOW.`
           field: "api_key",
           placeholder: "Enter your API key",
           link: "https://platform.com/api/keys",
-          why_needed: "Required for platform integration in your automation"
+          why_needed: "Required for platform integration in your fresh AI automation"
         }]
       }],
       api_configurations: [{
@@ -455,21 +437,28 @@ Generate the COMPLETE automation with REAL, WORKING configurations NOW.`
           format: "Bearer {api_key}"
         },
         automation_operations: [{
-          name: "Platform Operation",
+          name: "Fresh AI Platform Operation",
           method: "POST",
           path: "/v1/operation",
-          description: "Real platform operation for automation",
-          sample_request: { automation: "real_request" },
-          sample_response: { success: true, data: "real_response" }
-        }]
+          description: "Fresh AI-generated platform operation for automation",
+          sample_request: { automation: "fresh_ai_request" },
+          sample_response: { success: true, data: "fresh_ai_response" }
+        }],
+        test_endpoint: {
+          method: "GET",
+          path: "/v1/test",
+          headers: { "Authorization": "Bearer {api_key}" },
+          expected_success_indicators: ["success", "data"],
+          expected_error_indicators: ["error", "invalid"]
+        }
       }],
       agents: [{
-        name: "EnhancedAutomationAgent",
-        role: "Complete automation specialist with error recovery",
-        goal: "Generate complete automations with working credential buttons and diagrams",
-        rules: "Always provide complete platform structures and real API operations",
-        memory: "Technical issue encountered - ready to provide complete automation",
-        why_needed: "Essential for creating complete, working automations with all components"
+        name: "FreshAIRecoveryAgent",
+        role: "Complete fresh AI automation specialist with error recovery",
+        goal: "Generate complete automations with working fresh AI credential buttons and diagrams",
+        rules: "Always provide complete fresh AI platform structures and real API operations",
+        memory: "Technical issue encountered - ready to provide complete fresh AI automation",
+        why_needed: "Essential for creating complete, working automations with all fresh AI components"
       }],
       clarification_questions: [
         "Which specific platforms would you like to integrate (Gmail, Slack, Notion, HubSpot, etc.)?",
@@ -478,39 +467,40 @@ Generate the COMPLETE automation with REAL, WORKING configurations NOW.`
       ],
       automation_blueprint: {
         version: "2.0.0",
-        description: "Error recovery - ready for complete automation creation",
+        description: "Error recovery - ready for complete fresh AI automation creation",
         trigger: { type: "manual", config: {} },
-        variables: { error_recovery: "active", enhanced_system: true },
+        variables: { error_recovery: "active", fresh_ai_system: true },
         steps: [{
           id: "step_1",
-          name: "Platform Integration Setup",
+          name: "Fresh AI Platform Integration Setup",
           platform: "UserSpecified",
           operation: "setup_credentials",
-          config: { enhanced_system: true }
+          config: { fresh_ai_system: true }
         }],
         error_handling: { 
           retry_attempts: 3, 
-          fallback_actions: ["complete_automation_guidance", "enhanced_error_recovery"] 
+          fallback_actions: ["complete_automation_guidance", "fresh_ai_error_recovery"] 
         }
       },
       conversation_updates: {
-        error_recovery: "Active - ready for complete automation creation",
-        platform_support: "All platforms with complete credential structures",
-        automation_integration: "Complete with enhanced system capabilities",
+        error_recovery: "Active - ready for complete fresh AI automation creation",
+        platform_support: "All platforms with complete fresh AI credential structures",
+        automation_integration: "Complete with fresh AI system capabilities",
         credential_structure: "Complete with all required fields for buttons",
         blueprint_status: "Ready for immediate diagram generation",
-        api_operation_type: "Real workflow operations (enhanced system)",
-        enhanced_system: true,
-        automation_context_aware: true
+        api_operation_type: "Fresh AI real workflow operations",
+        fresh_ai_generation: true,
+        universal_store_disabled: true,
+        system_status: "Fresh AI error recovered, ready for complete automation"
       },
       is_update: false,
-      recheck_status: "enhanced_error_recovered_ready_for_complete_automation",
+      recheck_status: "fresh_ai_error_recovered_ready_for_complete_automation",
       error_help_available: true,
-      enhanced_system: true,
+      fresh_ai_system: true,
       complete_automation_ready: true
     }
 
-    return new Response(JSON.stringify(enhancedErrorResponse), {
+    return new Response(JSON.stringify(freshAIErrorResponse), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })

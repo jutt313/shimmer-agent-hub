@@ -716,6 +716,105 @@ export type Database = {
           },
         ]
       }
+      chat_ai_feedback: {
+        Row: {
+          automation_context: Json | null
+          created_at: string
+          desired_output: string | null
+          feedback_type: string
+          id: string
+          original_output: string
+          solution_applied: string | null
+          user_id: string
+        }
+        Insert: {
+          automation_context?: Json | null
+          created_at?: string
+          desired_output?: string | null
+          feedback_type: string
+          id?: string
+          original_output: string
+          solution_applied?: string | null
+          user_id: string
+        }
+        Update: {
+          automation_context?: Json | null
+          created_at?: string
+          desired_output?: string | null
+          feedback_type?: string
+          id?: string
+          original_output?: string
+          solution_applied?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      chat_ai_instructions: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string
+          id: string
+          instruction_type: string
+          is_active: boolean
+          priority: number
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by: string
+          id?: string
+          instruction_type: string
+          is_active?: boolean
+          priority?: number
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          instruction_type?: string
+          is_active?: boolean
+          priority?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      chat_ai_memory: {
+        Row: {
+          conversation_context: Json
+          created_at: string
+          id: string
+          learned_patterns: Json
+          memory_type: string
+          successful_solutions: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_context?: Json
+          created_at?: string
+          id?: string
+          learned_patterns?: Json
+          memory_type?: string
+          successful_solutions?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_context?: Json
+          created_at?: string
+          id?: string
+          learned_patterns?: Json
+          memory_type?: string
+          successful_solutions?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       credential_test_results: {
         Row: {
           created_at: string

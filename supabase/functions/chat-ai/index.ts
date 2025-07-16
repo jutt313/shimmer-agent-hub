@@ -45,38 +45,21 @@ serve(async (req) => {
       userId: userId || 'anonymous'
     })
 
-    // COMPREHENSIVE UNIVERSAL KNOWLEDGE LOADING with AUTOMATION CONTEXT
-    const { data: universalKnowledge } = await supabase
-      .from('universal_knowledge_store')
-      .select('*')
-      .order('usage_count', { ascending: false })
-      .limit(200) // Increased for comprehensive platform coverage
+    // FRESH AI-GENERATED PLATFORM INTELLIGENCE (No Universal Store Dependency)
+    console.log(`🧠 ENHANCED: Using fresh AI-generated platform intelligence (Universal Store disabled)`)
 
-    console.log(`🧠 ENHANCED Universal knowledge loaded: ${universalKnowledge?.length || 0} entries`)
+    // Generate fresh platform intelligence based on automation context
+    const platformIntelligence = `FRESH AI-GENERATED PLATFORM INTELLIGENCE:
+- Every platform configuration will be generated fresh by AI
+- No stale configs or cached endpoints
+- Real-time API documentation and requirements
+- Context-aware credential field names and formats
+- Current authentication methods and endpoints
+- Automation-specific operation recommendations
 
-    // COMPREHENSIVE PLATFORM INTELLIGENCE with REAL API CONFIGURATIONS
-    const platformIntelligence = universalKnowledge
-      ?.filter(k => k.category === 'platform_knowledge')
-      .map(k => {
-        const credentialFields = k.credential_fields?.map((c: any) => ({
-          field: c.field,
-          placeholder: c.placeholder || `Enter your ${c.field}`,
-          link: c.link || `https://${k.platform_name.toLowerCase()}.com/developers`,
-          why_needed: c.why_needed || `Required for ${k.platform_name} API access`
-        })) || [];
-        
-        const apiConfig = k.details?.api_config || {};
-        const operations = k.details?.automation_operations || [];
-        
-        return `${k.platform_name}:
-  - Base URL: ${apiConfig.base_url || `https://api.${k.platform_name.toLowerCase()}.com`}
-  - Auth Type: ${apiConfig.auth_type || 'Bearer Token'}
-  - Credentials: ${credentialFields.map(c => c.field).join(', ') || 'API Key'}
-  - Real Operations: ${operations.map((op: any) => `${op.method} ${op.path} (${op.description})`).join(', ')}
-  - Use Cases: ${k.use_cases?.join(', ') || 'General automation'}
-  - Credential Details: ${JSON.stringify(credentialFields)}`;
-      })
-      .join('\n') || 'Loading comprehensive platform knowledge...'
+AUTOMATION CONTEXT: ${JSON.stringify(automationContext, null, 2)}
+
+This ensures every test and execution uses the most current platform information.`
 
     // COMPLETELY ENHANCED AUTOMATION-CONTEXT-AWARE SYSTEM PROMPT (500+ LINES)
     const enhancedSystemPrompt = `You are YusrAI, the world's most advanced automation architect with COMPLETE AUTOMATION-CONTEXT AWARENESS. You generate REAL, WORKING API configurations with COMPLETE platform credential structures for immediate implementation.

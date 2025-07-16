@@ -29,7 +29,7 @@ const SimplePlatformButtons = ({
 }: SimplePlatformButtonsProps) => {
   const { user } = useAuth();
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
-  const [credentialStatus, setCredentialStatus] = useState<Record<string, 'saved' | 'missing'>>({});
+  const [credentialStatus, setCredentialStatus] = useState<Record<string, 'saved' | 'tested' | 'missing'>>({});
 
   useEffect(() => {
     if (user && automationId && platforms.length > 0) {
@@ -63,8 +63,10 @@ const SimplePlatformButtons = ({
     const status = credentialStatus[platform.name];
     
     switch (status) {
-      case 'saved':
+      case 'tested':
         return 'border-green-300 bg-green-50 hover:bg-green-100 text-green-800';
+      case 'saved':
+        return 'border-yellow-300 bg-yellow-50 hover:bg-yellow-100 text-yellow-800';
       case 'missing':
         return 'border-orange-300 bg-orange-50 hover:bg-orange-100 text-orange-800';
       default:
@@ -76,8 +78,10 @@ const SimplePlatformButtons = ({
     const status = credentialStatus[platform.name];
     
     switch (status) {
-      case 'saved':
+      case 'tested':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'saved':
+        return <CheckCircle className="h-4 w-4 text-yellow-600" />;
       case 'missing':
         return <AlertCircle className="h-4 w-4 text-orange-600" />;
       default:
@@ -89,8 +93,10 @@ const SimplePlatformButtons = ({
     const status = credentialStatus[platform.name];
     
     switch (status) {
+      case 'tested':
+        return 'Tested ✓';
       case 'saved':
-        return 'Configured';
+        return 'Saved (Testing...)';
       case 'missing':
         return 'Setup Required';
       default:

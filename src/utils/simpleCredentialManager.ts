@@ -15,14 +15,14 @@ export interface SimpleCredential {
  */
 export class SimpleCredentialManager {
   /**
-   * Save credentials with basic validation
+   * Save credentials and test with Chat-AI (no universal store)
    */
   static async saveCredentials(
     automationId: string,
     platformName: string,
     credentials: Record<string, string>,
     userId: string
-  ): Promise<{ success: boolean; error?: string }> {
+  ): Promise<{ success: boolean; error?: string; testResult?: any }> {
     try {
       // Basic validation
       if (!automationId || !platformName || !userId) {
@@ -37,6 +37,7 @@ export class SimpleCredentialManager {
         return { success: false, error: 'At least one credential is required' };
       }
 
+      // Step 1: Save credentials to database first
       const { data, error } = await supabase
         .from('automation_platform_credentials')
         .upsert({
@@ -46,9 +47,9 @@ export class SimpleCredentialManager {
           credentials: JSON.stringify(credentials),
           is_active: true,
           is_tested: false,
-          credential_type: 'simple',
-          test_status: 'not_tested',
-          test_message: 'Credentials will be tested when automation runs'
+          credential_type: 'chat_ai_tested',
+          test_status: 'testing',
+          test_message: 'Testing credentials with fresh Chat-AI config...'
         }, {
           onConflict: 'automation_id,platform_name,user_id'
         });
@@ -58,7 +59,85 @@ export class SimpleCredentialManager {
         return { success: false, error: error.message };
       }
 
-      return { success: true };
+      // Step 2: Get automation context for testing
+      const { data: automationData } = await supabase
+        .from('automations')
+        .select('*')
+        .eq('id', automationId)
+        .single();
+
+      // Step 3: Test credentials with Chat-AI generated config
+      console.log(`🧪 Testing ${platformName} credentials with Chat-AI...`);
+      
+      try {
+        const { data: testResult, error: testError } = await supabase.functions.invoke('chat-ai-credential-test', {
+          body: {
+            platformName,
+            automationContext: automationData,
+            credentials
+          }
+        });
+
+        if (testError) {
+          console.warn('Credential test failed:', testError);
+          
+          // Update with test failure
+          await supabase
+            .from('automation_platform_credentials')
+            .update({
+              is_tested: false,
+              test_status: 'failed',
+              test_message: `Test failed: ${testError.message}`
+            })
+            .eq('automation_id', automationId)
+            .eq('platform_name', platformName)
+            .eq('user_id', userId);
+
+          return { 
+            success: true, // Credentials saved, but test failed
+            error: `Credentials saved but test failed: ${testError.message}`,
+            testResult: { success: false, message: testError.message }
+          };
+        }
+
+        // Update with test results
+        await supabase
+          .from('automation_platform_credentials')
+          .update({
+            is_tested: testResult.success,
+            test_status: testResult.success ? 'passed' : 'failed',
+            test_message: testResult.message
+          })
+          .eq('automation_id', automationId)
+          .eq('platform_name', platformName)
+          .eq('user_id', userId);
+
+        return { 
+          success: true, 
+          testResult 
+        };
+
+      } catch (testError: any) {
+        console.warn('Could not test credentials with Chat-AI:', testError);
+        
+        // Update with test error
+        await supabase
+          .from('automation_platform_credentials')
+          .update({
+            is_tested: false,
+            test_status: 'error',
+            test_message: 'Could not test credentials - will be tested during execution'
+          })
+          .eq('automation_id', automationId)
+          .eq('platform_name', platformName)
+          .eq('user_id', userId);
+
+        return { 
+          success: true,
+          error: 'Credentials saved but could not be tested automatically'
+        };
+      }
+      
     } catch (error: any) {
       console.error('Unexpected error saving credentials:', error);
       return { success: false, error: error.message };
@@ -122,21 +201,45 @@ export class SimpleCredentialManager {
   }
 
   /**
-   * Check which platforms have saved credentials
+   * Check which platforms have saved credentials with Chat-AI test status
    */
   static async getCredentialStatus(
     automationId: string,
     requiredPlatforms: string[],
     userId: string
-  ): Promise<Record<string, 'saved' | 'missing'>> {
+  ): Promise<Record<string, 'saved' | 'tested' | 'missing'>> {
     try {
-      const credentials = await this.getAllCredentials(automationId, userId);
-      const savedPlatforms = new Set(credentials.map(c => c.platform_name.toLowerCase()));
+      const { data: credentials, error } = await supabase
+        .from('automation_platform_credentials')
+        .select('platform_name, is_tested, test_status')
+        .eq('automation_id', automationId)
+        .eq('user_id', userId)
+        .eq('is_active', true);
+
+      if (error) {
+        console.error('Error getting credential status:', error);
+        return {};
+      }
+
+      const credentialMap = new Map();
+      credentials?.forEach(cred => {
+        credentialMap.set(cred.platform_name.toLowerCase(), {
+          is_tested: cred.is_tested,
+          test_status: cred.test_status
+        });
+      });
       
-      const status: Record<string, 'saved' | 'missing'> = {};
+      const status: Record<string, 'saved' | 'tested' | 'missing'> = {};
       
       requiredPlatforms.forEach(platform => {
-        status[platform] = savedPlatforms.has(platform.toLowerCase()) ? 'saved' : 'missing';
+        const credInfo = credentialMap.get(platform.toLowerCase());
+        if (!credInfo) {
+          status[platform] = 'missing';
+        } else if (credInfo.is_tested && credInfo.test_status === 'passed') {
+          status[platform] = 'tested';
+        } else {
+          status[platform] = 'saved';
+        }
       });
 
       return status;

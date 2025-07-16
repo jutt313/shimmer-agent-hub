@@ -1,6 +1,9 @@
 
 project_id = "zorwtyijosgdcckljmqd"
 
+[functions.chat-ai-credential-test]
+verify_jwt = false
+
 [functions.test-webhook]
 verify_jwt = false
 

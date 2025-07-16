@@ -1,15 +1,16 @@
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Plus, X, Play, User } from 'lucide-react';
+import { Plus, X, Play, User, Code } from 'lucide-react';
 import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useErrorRecovery } from "@/hooks/useErrorRecovery";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { agentStateManager } from '@/utils/agentStateManager';
 import ErrorHelpButton from './ErrorHelpButton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface Message {
   id: number;
@@ -29,7 +30,7 @@ interface ChatCardProps {
   isLoading?: boolean;
   onSendMessage?: (message: string) => void;
   onExecuteAutomation?: () => void;
-  platformCredentialStatus?: { [key: string]: 'saved' | 'tested' | 'unsaved' };
+  platformCredentialStatus?: { [key: string]: 'saved' | 'tested' | 'missing' };
   onPlatformCredentialChange?: () => void;
 }
 
@@ -50,6 +51,7 @@ const ChatCard = ({
   const { handleError } = useErrorRecovery();
   const { toast } = useToast();
   const { user } = useAuth();
+  const [showCodeModal, setShowCodeModal] = useState(false);
 
   // Initialize agent state manager
   useEffect(() => {
@@ -229,6 +231,28 @@ const ChatCard = ({
     }
   };
 
+  // Get the complete automation JSON for the code viewer
+  const getCompleteAutomationJSON = () => {
+    const latestBotMessage = messages.filter(msg => msg.isBot).pop();
+    if (!latestBotMessage?.structuredData) return null;
+
+    const automationData = {
+      automation_id: automationId,
+      created_at: new Date().toISOString(),
+      platforms: latestBotMessage.structuredData.platforms || [],
+      api_configurations: latestBotMessage.structuredData.api_configurations || [],
+      automation_blueprint: latestBotMessage.structuredData.automation_blueprint || {},
+      agents: latestBotMessage.structuredData.agents || [],
+      steps: latestBotMessage.structuredData.steps || [],
+      summary: latestBotMessage.structuredData.summary || "",
+      conversation_updates: latestBotMessage.structuredData.conversation_updates || {},
+      ready_for_execution: checkReadyForExecution(),
+      credential_status: platformCredentialStatus
+    };
+
+    return automationData;
+  };
+
   const renderStructuredContent = (structuredData: StructuredResponse, showErrorHelp: boolean = false) => {
     const content = [];
 
@@ -282,10 +306,11 @@ const ChatCard = ({
                   
                   const getButtonColor = () => {
                     switch (status) {
-                      case 'saved':
                       case 'tested':
                         return 'bg-green-100 hover:bg-green-200 text-green-800 border-green-300';
-                      case 'unsaved':
+                      case 'saved':
+                        return 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border-yellow-300';
+                      case 'missing':
                       default:
                         return 'bg-red-100 hover:bg-red-200 text-red-800 border-red-300 cursor-pointer';
                     }
@@ -461,6 +486,36 @@ const ChatCard = ({
       }}
     >
       <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/20 to-purple-100/20 pointer-events-none"></div>
+      
+      {/* Top-right View Code button */}
+      {getCompleteAutomationJSON() && (
+        <Dialog open={showCodeModal} onOpenChange={setShowCodeModal}>
+          <DialogTrigger asChild>
+            <Button
+              size="sm"
+              variant="outline"
+              className="absolute top-4 right-4 z-20 bg-white/90 backdrop-blur-sm border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 shadow-lg"
+            >
+              <Code className="w-4 h-4 mr-1" />
+              View Code
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-semibold text-blue-600">
+                Complete Automation JSON - Ready for Execution
+              </DialogTitle>
+            </DialogHeader>
+            <ScrollArea className="h-[60vh] w-full">
+              <pre className="bg-gray-900 text-green-400 p-4 rounded-lg text-xs overflow-x-auto">
+                <code>
+                  {JSON.stringify(getCompleteAutomationJSON(), null, 2)}
+                </code>
+              </pre>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+      )}
       
       <ScrollArea className="flex-1 relative z-10 p-6 max-h-[calc(100vh-200px)]" ref={scrollAreaRef}>
         <div className="space-y-6 pb-4">

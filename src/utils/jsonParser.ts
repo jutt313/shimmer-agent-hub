@@ -23,6 +23,7 @@ export interface StructuredResponse {
   }>;
   clarification_questions?: string[];
   automation_blueprint?: any;
+  api_configurations?: any;
   platforms_to_remove?: string[];
   conversation_updates?: any;
 }

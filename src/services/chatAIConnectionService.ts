@@ -24,31 +24,62 @@ export interface ChatAIResponse {
 class ChatAIConnectionService {
   async processConnectionRequest(request: ChatAIRequest): Promise<ChatAIResponse> {
     try {
-      console.log('🚀 Processing chat AI request:', request.message);
+      console.log('🚀 Processing YusrAI chat request:', request.message);
       
       const { data, error } = await supabase.functions.invoke('chat-ai', {
         body: {
           message: request.message,
           userId: request.userId,
           messages: request.messages || [],
-          context: request.context || 'automation_creation',
+          context: request.context || 'yusrai_automation_creation',
           automationContext: request.automationContext,
           isTrainingMode: false
         }
       });
 
       if (error) {
-        console.error('❌ Chat AI error:', error);
-        throw new Error(`Chat AI service error: ${error.message}`);
+        console.error('❌ YusrAI Chat AI error:', error);
+        throw new Error(`YusrAI Chat AI service error: ${error.message}`);
       }
 
-      console.log('✅ Chat AI response received:', data);
+      console.log('✅ YusrAI Chat AI response received:', data);
 
       // Ensure we have a proper response
       if (!data || !data.response) {
-        console.warn('⚠️ Empty response from Chat AI, using fallback');
+        console.warn('⚠️ Empty response from YusrAI Chat AI, using fallback');
         return {
-          response: "I'm ready to help you create comprehensive automations. Please specify the platforms you'd like to integrate and I'll provide complete setup instructions.",
+          response: JSON.stringify({
+            summary: "I'm YusrAI, ready to help you create comprehensive automations with platform integrations and AI agents.",
+            steps: [
+              "Tell me what automation you'd like to create",
+              "I'll provide a complete blueprint with platforms, credentials, and AI agents",
+              "Configure your platform credentials using the provided guidance",
+              "Test your integrations with real API calls",
+              "Execute your automation with full monitoring and error handling"
+            ],
+            platforms: [],
+            clarification_questions: [
+              "What specific automation would you like me to create for you?",
+              "Which platforms should be involved in your workflow?"
+            ],
+            agents: [],
+            test_payloads: {},
+            execution_blueprint: {
+              trigger: { type: "manual", configuration: {} },
+              workflow: [],
+              error_handling: {
+                retry_attempts: 3,
+                fallback_actions: ["log_error"],
+                notification_rules: [],
+                critical_failure_actions: ["pause_automation"]
+              },
+              performance_optimization: {
+                rate_limit_handling: "exponential_backoff",
+                concurrency_limit: 5,
+                timeout_seconds_per_step: 60
+              }
+            }
+          }),
           error_help_available: true
         };
       }
@@ -60,10 +91,17 @@ class ChatAIConnectionService {
         const jsonMatch = data.response.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           structuredData = JSON.parse(jsonMatch[0]);
-          console.log('📊 Parsed structured data:', structuredData);
+          console.log('📊 Parsed YusrAI structured data:', structuredData);
         }
       } catch (parseError) {
-        console.log('ℹ️ No structured data found in response');
+        console.log('ℹ️ No structured data found in YusrAI response, response might be pure JSON');
+        // Try parsing the entire response as JSON
+        try {
+          structuredData = JSON.parse(data.response);
+          console.log('📊 Parsed entire YusrAI response as JSON:', structuredData);
+        } catch (fullParseError) {
+          console.log('ℹ️ Response is not valid JSON, treating as text');
+        }
       }
 
       return {
@@ -75,7 +113,7 @@ class ChatAIConnectionService {
       };
 
     } catch (error: any) {
-      console.error('💥 Chat AI service error:', error);
+      console.error('💥 YusrAI Chat AI service error:', error);
       throw error;
     }
   }

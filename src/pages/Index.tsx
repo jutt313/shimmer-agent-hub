@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useMemo } from "react";
 import { Send, Bot } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -12,7 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useErrorRecovery } from "@/hooks/useErrorRecovery";
 import { useAsyncOperation } from "@/hooks/useAsyncOperation";
 import { chatAIConnectionService } from "@/services/chatAIConnectionService";
-import { parseStructuredResponse } from "@/utils/jsonParser";
+import { parseYusrAIStructuredResponse } from "@/utils/jsonParser";
 
 const Index = () => {
   const [message, setMessage] = useState("");
@@ -71,7 +70,7 @@ const Index = () => {
             isBot: msg.isBot,
             message_content: msg.text
           })),
-          context: 'automation_creation',
+          context: 'yusrai_automation_creation',
           automationContext: currentAgentConfig ? {
             agentConfig: currentAgentConfig.config || {},
             llmProvider: currentAgentConfig.llmProvider || 'OpenAI',
@@ -82,14 +81,14 @@ const Index = () => {
         console.log('✅ Received response from YusrAI:', response);
         return response;
       }, {
-        userAction: 'Creating automation request',
+        userAction: 'Creating YusrAI automation request',
         additionalContext: `Message: "${currentMessage}"`
       });
 
-      console.log('🔍 Processing result:', result);
+      console.log('🔍 Processing YusrAI result:', result);
       
       // Process the response
-      let responseText = "I'm ready to help you create comprehensive automations with the right platforms and credentials.";
+      let responseText = "I'm YusrAI, ready to help you create comprehensive automations with the right platforms and credentials.";
       let structuredData = null;
       let errorHelpAvailable = false;
       
@@ -99,17 +98,17 @@ const Index = () => {
             result.response.trim() !== '' && 
             result.response.trim() !== 'null') {
           responseText = result.response;
-          console.log('✅ Using response text from service');
+          console.log('✅ Using response text from YusrAI service');
         }
         
         // Get structured data from result or parse from response
         if (result.structuredData && typeof result.structuredData === 'object') {
           structuredData = result.structuredData;
-          console.log('✅ Structured data available from service');
+          console.log('✅ YusrAI structured data available from service');
         } else if (result.response) {
           // Try to parse structured data from response text
-          structuredData = parseStructuredResponse(result.response);
-          console.log('✅ Parsed structured data from response text');
+          structuredData = parseYusrAIStructuredResponse(result.response);
+          console.log('✅ Parsed YusrAI structured data from response text');
         }
 
         errorHelpAvailable = result.error_help_available || false;
@@ -121,7 +120,41 @@ const Index = () => {
           responseText.toLowerCase().includes('null') || 
           responseText === 'null') {
         console.warn('⚠️ Safety check triggered - using fallback response');
-        responseText = "I'm ready to help you create comprehensive automations. Please specify the platforms you'd like to integrate (like Gmail, Slack, HubSpot, etc.) and I'll provide complete setup instructions.";
+        responseText = JSON.stringify({
+          summary: "I'm YusrAI, ready to help you create comprehensive automations. Please specify the platforms you'd like to integrate and I'll provide complete setup instructions with real credentials and testing.",
+          steps: [
+            "Tell me what automation you want to create",
+            "I'll analyze your requirements and provide a complete blueprint",
+            "Configure platform credentials with my detailed guidance",
+            "Test integrations with real API calls",
+            "Execute your automation with monitoring and error handling"
+          ],
+          platforms: [],
+          clarification_questions: [
+            "What specific automation workflow would you like me to create?",
+            "Which platforms should be integrated (e.g., Gmail, Slack, Salesforce, OpenAI)?"
+          ],
+          agents: [],
+          test_payloads: {},
+          execution_blueprint: {
+            trigger: { type: "manual", configuration: {} },
+            workflow: [],
+            error_handling: {
+              retry_attempts: 3,
+              fallback_actions: ["log_error"],
+              notification_rules: [],
+              critical_failure_actions: ["pause_automation"]
+            },
+            performance_optimization: {
+              rate_limit_handling: "exponential_backoff",
+              concurrency_limit: 5,
+              timeout_seconds_per_step: 60
+            }
+          }
+        });
+        
+        // Parse the fallback as structured data
+        structuredData = parseYusrAIStructuredResponse(responseText);
       }
       
       const botResponse = {
@@ -133,7 +166,7 @@ const Index = () => {
         error_help_available: errorHelpAvailable
       };
       
-      console.log('📤 Adding bot response:', {
+      console.log('📤 Adding YusrAI bot response:', {
         textLength: botResponse.text.length,
         textPreview: botResponse.text.substring(0, 100),
         hasStructuredData: !!botResponse.structuredData,
@@ -143,16 +176,51 @@ const Index = () => {
       setMessages(prev => [...prev, botResponse]);
 
     } catch (error: any) {
-      console.error('❌ Error in chat request:', error);
-      handleError(error, 'Chat message sending');
+      console.error('❌ Error in YusrAI chat request:', error);
+      handleError(error, 'YusrAI Chat message sending');
       
       const errorResponse = {
         id: Date.now() + 1,
-        text: "I encountered a technical issue, but I'm ready to help you create your automation. Please rephrase your request with specific platform names (like Gmail, Slack, HubSpot, etc.) and I'll provide a complete solution.",
+        text: JSON.stringify({
+          summary: "I encountered a technical issue, but I'm YusrAI and ready to help you create your automation. Please rephrase your request with specific platform names and I'll provide a complete solution.",
+          steps: [
+            "Specify the platforms you want to integrate",
+            "Describe your automation workflow",
+            "I'll provide complete setup instructions",
+            "Test credentials with real API calls",
+            "Execute with full monitoring"
+          ],
+          platforms: [],
+          clarification_questions: [
+            "Which platforms would you like to integrate?",
+            "What should the automation accomplish?"
+          ],
+          agents: [],
+          test_payloads: {},
+          execution_blueprint: {
+            trigger: { type: "manual", configuration: {} },
+            workflow: [],
+            error_handling: {
+              retry_attempts: 3,
+              fallback_actions: ["log_error"],
+              notification_rules: [],
+              critical_failure_actions: ["pause_automation"]
+            },
+            performance_optimization: {
+              rate_limit_handling: "exponential_backoff",
+              concurrency_limit: 5,
+              timeout_seconds_per_step: 60
+            }
+          }
+        }),
         isBot: true,
         timestamp: new Date(),
+        structuredData: null,
         error_help_available: true
       };
+      
+      // Parse the error response as structured data
+      errorResponse.structuredData = parseYusrAIStructuredResponse(errorResponse.text);
       setMessages(prev => [...prev, errorResponse]);
       
     } finally {

@@ -1,8 +1,8 @@
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Plus, X, Play, User, Code } from 'lucide-react';
-import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
+import { Plus, X, Play, User, Code, TestTube, Settings, CheckCircle2, AlertCircle } from 'lucide-react';
+import { parseYusrAIStructuredResponse, cleanDisplayText, YusrAIStructuredResponse } from "@/utils/jsonParser";
 import { useEffect, useRef, useState } from "react";
 import { useErrorRecovery } from "@/hooks/useErrorRecovery";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,13 +11,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import { agentStateManager } from '@/utils/agentStateManager';
 import ErrorHelpButton from './ErrorHelpButton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 interface Message {
   id: number;
   text: string;
   isBot: boolean;
   timestamp: Date;
-  structuredData?: StructuredResponse;
+  structuredData?: YusrAIStructuredResponse;
   error_help_available?: boolean;
 }
 
@@ -52,6 +55,15 @@ const ChatCard = ({
   const { toast } = useToast();
   const { user } = useAuth();
   const [showCodeModal, setShowCodeModal] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    summary: true,
+    steps: true,
+    platforms: true,
+    clarification_questions: true,
+    agents: true,
+    test_payloads: false,
+    execution_blueprint: false
+  });
 
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
@@ -59,6 +71,13 @@ const ChatCard = ({
   }, [messages, isLoading]);
 
   const optimizedMessages = messages.slice(-50);
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
 
   const safeFormatMessageText = (inputText: string | undefined | null): React.ReactNode[] => {
     try {
@@ -114,6 +133,36 @@ const ChatCard = ({
     if (platform && onPlatformCredentialChange) {
       console.log(`🔧 Opening credential form for ${platformName}`);
       onPlatformCredentialChange();
+    }
+  };
+
+  const testPlatformCredentials = async (platformName: string, testPayload: any) => {
+    try {
+      console.log(`🧪 Testing credentials for ${platformName}`);
+      const { data, error } = await supabase.functions.invoke('test-credential', {
+        body: {
+          platform: platformName,
+          testConfig: testPayload
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: data.success ? "✅ Test Successful" : "❌ Test Failed",
+        description: data.message || `Credential test for ${platformName} completed`,
+        variant: data.success ? "default" : "destructive",
+      });
+
+      return data.success;
+    } catch (error: any) {
+      console.error('Test error:', error);
+      toast({
+        title: "Test Error",
+        description: `Failed to test ${platformName} credentials`,
+        variant: "destructive",
+      });
+      return false;
     }
   };
 
@@ -196,193 +245,364 @@ const ChatCard = ({
     return {
       automation_id: automationId,
       created_at: new Date().toISOString(),
-      platforms: latestBotMessage.structuredData.platforms || [],
-      api_configurations: latestBotMessage.structuredData.api_configurations || [],
-      automation_blueprint: latestBotMessage.structuredData.automation_blueprint || {},
-      agents: latestBotMessage.structuredData.agents || [],
-      steps: latestBotMessage.structuredData.steps || [],
-      summary: latestBotMessage.structuredData.summary || "",
+      yusrai_response: latestBotMessage.structuredData,
       ready_for_execution: checkReadyForExecution(),
       credential_status: platformCredentialStatus
     };
   };
 
-  const renderStructuredContent = (structuredData: StructuredResponse, showErrorHelp: boolean = false) => {
+  const renderYusrAIStructuredContent = (structuredData: YusrAIStructuredResponse, showErrorHelp: boolean = false) => {
     const content = [];
 
     try {
-      // Summary
-      if (structuredData.summary && typeof structuredData.summary === 'string') {
+      // 1. Summary Section
+      if (structuredData.summary) {
         content.push(
-          <div key="summary" className="mb-4">
-            <p className="text-gray-800 leading-relaxed">{structuredData.summary}</p>
-            {showErrorHelp && (
-              <ErrorHelpButton 
-                errorMessage={structuredData.summary}
-                onHelpRequest={() => handleErrorHelp(structuredData.summary)}
-              />
-            )}
-          </div>
+          <Collapsible key="summary" open={expandedSections.summary} onOpenChange={() => toggleSection('summary')}>
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200 cursor-pointer hover:bg-blue-100 transition-colors">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <h3 className="font-semibold text-blue-800">📋 Summary</h3>
+                </div>
+                {expandedSections.summary ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="mt-3 p-3 bg-white rounded-lg border">
+                <p className="text-gray-800 leading-relaxed">{structuredData.summary}</p>
+                {showErrorHelp && (
+                  <ErrorHelpButton 
+                    errorMessage={structuredData.summary}
+                    onHelpRequest={() => handleErrorHelp(structuredData.summary)}
+                  />
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         );
       }
 
-      // Steps
+      // 2. Steps Section
       if (Array.isArray(structuredData.steps) && structuredData.steps.length > 0) {
         content.push(
-          <div key="steps" className="mb-4">
-            <p className="font-medium text-gray-800 mb-2">Steps:</p>
-            <ul className="list-disc list-inside space-y-1 text-gray-700 ml-4">
-              {structuredData.steps.map((step, index) => {
-                if (typeof step === 'string') {
-                  return <li key={index} className="leading-relaxed">{step}</li>;
-                }
-                return null;
-              }).filter(Boolean)}
-            </ul>
-          </div>
+          <Collapsible key="steps" open={expandedSections.steps} onOpenChange={() => toggleSection('steps')}>
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200 cursor-pointer hover:bg-green-100 transition-colors">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <h3 className="font-semibold text-green-800">🔄 Steps ({structuredData.steps.length})</h3>
+                </div>
+                {expandedSections.steps ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="mt-3 p-3 bg-white rounded-lg border">
+                <ol className="list-decimal list-inside space-y-2 text-gray-700">
+                  {structuredData.steps.map((step, index) => (
+                    <li key={index} className="leading-relaxed">{step}</li>
+                  ))}
+                </ol>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         );
       }
 
-      // Platforms with credentials
+      // 3. Platforms & Credentials Section
       if (Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
-        const validPlatforms = structuredData.platforms.filter(platform => 
-          platform && typeof platform === 'object' && platform.name && typeof platform.name === 'string'
-        );
-        
-        if (validPlatforms.length > 0) {
-          content.push(
-            <div key="platforms" className="mb-4">
-              <p className="font-medium text-gray-800 mb-3">Platform Credentials Required:</p>
-              <div className="grid grid-cols-6 gap-2 mb-4">
-                {validPlatforms.map((platform, index) => {
-                  const platformName = platform.name || 'Unknown Platform';
-                  const status = platformCredentialStatus[platformName] || 'unsaved';
-                  
-                  const getButtonColor = () => {
-                    switch (status) {
-                      case 'tested':
-                        return 'bg-green-100 hover:bg-green-200 text-green-800 border-green-300';
-                      case 'saved':
-                        return 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border-yellow-300';
-                      case 'missing':
-                      default:
-                        return 'bg-red-100 hover:bg-red-200 text-red-800 border-red-300 cursor-pointer';
-                    }
-                  };
-                  
-                  return (
-                    <Button
-                      key={`platform-${index}`}
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handlePlatformCredentialClick(platformName, validPlatforms)}
-                      className={`text-xs h-8 px-2 rounded-lg ${getButtonColor()} transition-colors`}
-                    >
-                      {platformName}
-                    </Button>
-                  );
-                })}
+        content.push(
+          <Collapsible key="platforms" open={expandedSections.platforms} onOpenChange={() => toggleSection('platforms')}>
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200 cursor-pointer hover:bg-purple-100 transition-colors">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                  <h3 className="font-semibold text-purple-800">🔗 Platforms & Credentials ({structuredData.platforms.length})</h3>
+                </div>
+                {expandedSections.platforms ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </div>
-              
-              <div className="text-gray-700 space-y-2">
-                {validPlatforms.map((platform, index) => {
-                  const platformName = platform.name || 'Unknown Platform';
-                  
-                  return (
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="mt-3 p-3 bg-white rounded-lg border">
+                <div className="grid grid-cols-6 gap-2 mb-4">
+                  {structuredData.platforms.map((platform, index) => {
+                    const platformName = platform.name || 'Unknown Platform';
+                    const status = platformCredentialStatus[platformName] || 'missing';
+                    
+                    const getButtonColor = () => {
+                      switch (status) {
+                        case 'tested':
+                          return 'bg-green-100 hover:bg-green-200 text-green-800 border-green-300';
+                        case 'saved':
+                          return 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border-yellow-300';
+                        case 'missing':
+                        default:
+                          return 'bg-red-100 hover:bg-red-200 text-red-800 border-red-300 cursor-pointer';
+                      }
+                    };
+                    
+                    return (
+                      <Button
+                        key={`platform-${index}`}
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handlePlatformCredentialClick(platformName, structuredData.platforms!)}
+                        className={`text-xs h-8 px-2 rounded-lg ${getButtonColor()} transition-colors`}
+                      >
+                        {platformName}
+                      </Button>
+                    );
+                  })}
+                </div>
+                
+                <div className="space-y-3">
+                  {structuredData.platforms.map((platform, index) => (
                     <div key={`platform-detail-${index}`} className="bg-blue-50/30 p-3 rounded-lg border border-blue-200/50">
-                      <p className="font-medium text-gray-800 mb-2">{platformName}</p>
+                      <p className="font-medium text-gray-800 mb-2">{platform.name}</p>
                       {Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
-                        <div className="text-sm text-gray-600 space-y-1">
-                          {platform.credentials.map((cred, credIndex) => {
-                            if (cred && typeof cred === 'object' && cred.field) {
-                              const fieldName = String(cred.field).replace(/_/g, ' ').toUpperCase();
-                              return (
-                                <div key={`cred-${credIndex}`} className="flex items-center justify-between">
-                                  <span>• {fieldName}: {cred.why_needed || 'Required for integration'}</span>
-                                  {cred.link && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => window.open(cred.link, '_blank')}
-                                      className="ml-2 h-6 px-2 py-1 text-xs"
-                                    >
-                                      Get
-                                    </Button>
-                                  )}
+                        <div className="text-sm text-gray-600 space-y-2">
+                          {platform.credentials.map((cred, credIndex) => (
+                            <div key={`cred-${credIndex}`} className="bg-white p-2 rounded border">
+                              <div className="flex items-center justify-between mb-1">
+                                <Badge variant="outline" className="text-xs">{cred.field}</Badge>
+                                {cred.link && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => window.open(cred.link, '_blank')}
+                                    className="h-6 px-2 py-1 text-xs"
+                                  >
+                                    Get
+                                  </Button>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-600">{cred.why_needed}</p>
+                              {cred.where_to_get && (
+                                <p className="text-xs text-blue-600 mt-1">{cred.where_to_get}</p>
+                              )}
+                              {cred.options && cred.options.length > 0 && (
+                                <div className="mt-1">
+                                  <span className="text-xs text-gray-500">Options: </span>
+                                  {cred.options.map((option, optIndex) => (
+                                    <Badge key={optIndex} variant="secondary" className="text-xs mr-1">{option}</Badge>
+                                  ))}
                                 </div>
-                              );
-                            }
-                            return null;
-                          }).filter(Boolean)}
+                              )}
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            </div>
-          );
-        }
+            </CollapsibleContent>
+          </Collapsible>
+        );
       }
 
-      // Agents
+      // 4. Clarification Questions Section
+      if (Array.isArray(structuredData.clarification_questions) && structuredData.clarification_questions.length > 0) {
+        content.push(
+          <Collapsible key="clarification" open={expandedSections.clarification_questions} onOpenChange={() => toggleSection('clarification_questions')}>
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200 cursor-pointer hover:bg-yellow-100 transition-colors">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                  <h3 className="font-semibold text-yellow-800">❓ Clarification Questions ({structuredData.clarification_questions.length})</h3>
+                </div>
+                {expandedSections.clarification_questions ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="mt-3 p-3 bg-white rounded-lg border">
+                <ul className="space-y-2">
+                  {structuredData.clarification_questions.map((question, index) => (
+                    <li key={index} className="text-gray-700 p-2 bg-yellow-50 rounded border-l-4 border-yellow-400">
+                      {question}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        );
+      }
+
+      // 5. AI Agents Section
       if (Array.isArray(structuredData.agents) && structuredData.agents.length > 0) {
         content.push(
-          <div key="agents" className="mb-4">
-            <p className="font-medium text-gray-800 mb-3">Recommended AI Agents:</p>
-            <div className="space-y-3">
-              {structuredData.agents.map((agent, index) => {
-                if (!agent || typeof agent !== 'object' || typeof agent.name !== 'string') {
-                  return null;
-                }
+          <Collapsible key="agents" open={expandedSections.agents} onOpenChange={() => toggleSection('agents')}>
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-200 cursor-pointer hover:bg-indigo-100 transition-colors">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                  <h3 className="font-semibold text-indigo-800">🤖 AI Agents ({structuredData.agents.length})</h3>
+                </div>
+                {expandedSections.agents ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="mt-3 p-3 bg-white rounded-lg border">
+                <div className="space-y-3">
+                  {structuredData.agents.map((agent, index) => {
+                    const agentStatus = agentStateManager.getAgentStatus(agent.name);
+                    
+                    if (agentStatus !== 'pending') {
+                      return null;
+                    }
+                    
+                    return (
+                      <div key={index} className="p-3 rounded-lg bg-gradient-to-r from-blue-50/40 to-purple-50/40 border border-blue-200/50">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-800">{agent.name}</h4>
+                            <Badge variant="secondary" className="text-xs mt-1">{agent.role}</Badge>
+                          </div>
+                          <div className="flex gap-2 ml-4">
+                            <Button
+                              size="sm"
+                              onClick={() => handleAgentAdd(agent)}
+                              className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-3 py-1 text-xs h-7"
+                            >
+                              <Plus className="w-3 h-3 mr-1" />
+                              Add
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleAgentDismiss(agent.name)}
+                              className="border-gray-300 text-gray-600 hover:bg-gray-100 px-2 py-1 text-xs h-7"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="text-sm text-gray-600 space-y-1">
+                          <p><strong>Rule:</strong> {agent.rule}</p>
+                          <p><strong>Goal:</strong> {agent.goal}</p>
+                          <p><strong>Memory:</strong> {agent.memory}</p>
+                          <p><strong>Why Needed:</strong> {agent.why_needed}</p>
+                          {agent.test_scenarios && agent.test_scenarios.length > 0 && (
+                            <div>
+                              <strong>Test Scenarios:</strong>
+                              <ul className="list-disc list-inside ml-2 text-xs">
+                                {agent.test_scenarios.map((scenario, idx) => (
+                                  <li key={idx}>{scenario}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }).filter(Boolean)}
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        );
+      }
 
-                const agentStatus = agentStateManager.getAgentStatus(agent.name);
-                
-                if (agentStatus !== 'pending') {
-                  return null;
-                }
-                
-                return (
-                  <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-blue-50/40 to-purple-50/40 border border-blue-200/50">
-                    <div className="flex-1">
-                      <h4 className="font-medium text-gray-800">{agent.name}</h4>
-                      <p className="text-sm text-gray-600">{agent.role || 'AI Agent'}</p>
-                      <p className="text-xs text-gray-500 mt-1">{agent.why_needed || 'Recommended for this automation'}</p>
+      // 6. Test Payloads Section
+      if (structuredData.test_payloads && Object.keys(structuredData.test_payloads).length > 0) {
+        content.push(
+          <Collapsible key="test_payloads" open={expandedSections.test_payloads} onOpenChange={() => toggleSection('test_payloads')}>
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-cyan-50 to-blue-50 rounded-lg border border-cyan-200 cursor-pointer hover:bg-cyan-100 transition-colors">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-cyan-500 rounded-full"></div>
+                  <h3 className="font-semibold text-cyan-800">🧪 Test Payloads ({Object.keys(structuredData.test_payloads).length})</h3>
+                </div>
+                {expandedSections.test_payloads ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="mt-3 p-3 bg-white rounded-lg border">
+                <div className="space-y-3">
+                  {Object.entries(structuredData.test_payloads).map(([platformName, testConfig]) => (
+                    <div key={platformName} className="p-3 bg-gray-50 rounded border">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-medium text-gray-800">{platformName}</h4>
+                        <Button
+                          size="sm"
+                          onClick={() => testPlatformCredentials(platformName, testConfig)}
+                          className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                        >
+                          <TestTube className="w-3 h-3 mr-1" />
+                          Test
+                        </Button>
+                      </div>
+                      <div className="text-xs text-gray-600 space-y-1">
+                        <p><strong>Method:</strong> {testConfig.method}</p>
+                        <p><strong>Endpoint:</strong> {testConfig.endpoint}</p>
+                        {testConfig.error_patterns && (
+                          <div>
+                            <strong>Common Errors:</strong>
+                            {Object.entries(testConfig.error_patterns).map(([code, meaning]) => (
+                              <span key={code} className="block ml-2">{code}: {meaning}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex gap-2 ml-4">
-                      <Button
-                        size="sm"
-                        onClick={() => handleAgentAdd(agent)}
-                        className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-3 py-1 text-xs h-7"
-                      >
-                        <Plus className="w-3 h-3 mr-1" />
-                        Add
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleAgentDismiss(agent.name)}
-                        className="border-gray-300 text-gray-600 hover:bg-gray-100 px-2 py-1 text-xs h-7"
-                      >
-                        <X className="w-3 h-3" />
-                      </Button>
-                    </div>
+                  ))}
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        );
+      }
+
+      // 7. Execution Blueprint Section
+      if (structuredData.execution_blueprint) {
+        content.push(
+          <Collapsible key="execution" open={expandedSections.execution_blueprint} onOpenChange={() => toggleSection('execution_blueprint')}>
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg border border-emerald-200 cursor-pointer hover:bg-emerald-100 transition-colors">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                  <h3 className="font-semibold text-emerald-800">⚡ Execution Blueprint</h3>
+                </div>
+                {expandedSections.execution_blueprint ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="mt-3 p-3 bg-white rounded-lg border">
+                <div className="space-y-3">
+                  <div className="p-2 bg-emerald-50 rounded">
+                    <h4 className="font-medium text-emerald-800 mb-1">Trigger</h4>
+                    <p className="text-sm text-gray-600">Type: {structuredData.execution_blueprint.trigger.type}</p>
                   </div>
-                );
-              }).filter(Boolean)}
-            </div>
-          </div>
+                  <div className="p-2 bg-blue-50 rounded">
+                    <h4 className="font-medium text-blue-800 mb-1">Workflow</h4>
+                    <p className="text-sm text-gray-600">{structuredData.execution_blueprint.workflow.length} steps defined</p>
+                  </div>
+                  <div className="p-2 bg-purple-50 rounded">
+                    <h4 className="font-medium text-purple-800 mb-1">Performance</h4>
+                    <p className="text-sm text-gray-600">
+                      Rate Limiting: {structuredData.execution_blueprint.performance_optimization.rate_limit_handling} | 
+                      Timeout: {structuredData.execution_blueprint.performance_optimization.timeout_seconds_per_step}s
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         );
       }
 
       // Execution button when ready
       if (checkReadyForExecution()) {
         content.push(
-          <div key="execution" className="mt-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200">
+          <div key="execution-ready" className="mt-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-green-800">🎉 Automation Ready!</p>
-                <p className="text-sm text-green-600">All platforms configured</p>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                <div>
+                  <p className="font-medium text-green-800">🎉 Automation Ready!</p>
+                  <p className="text-sm text-green-600">All platforms configured and ready for execution</p>
+                </div>
               </div>
               <Button
                 onClick={onExecuteAutomation || handleExecuteAutomation}
@@ -398,11 +618,14 @@ const ChatCard = ({
 
       return content;
     } catch (error: any) {
-      console.error('Critical error in renderStructuredContent:', error);
-      handleError(error, 'Structured content rendering');
+      console.error('Critical error in renderYusrAIStructuredContent:', error);
+      handleError(error, 'YusrAI structured content rendering');
       return [
-        <div key="error" className="text-blue-600 p-4 bg-blue-50 rounded-lg">
-          I'm processing your automation request. Please wait...
+        <div key="error" className="text-blue-600 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4" />
+            <span>I'm processing your automation request. Please wait...</span>
+          </div>
           {showErrorHelp && (
             <ErrorHelpButton 
               errorMessage="Content rendering error"
@@ -439,7 +662,7 @@ const ChatCard = ({
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle className="text-lg font-semibold text-blue-600">
-                Complete Automation JSON - Ready for Execution
+                Complete YusrAI Automation JSON - Ready for Execution
               </DialogTitle>
             </DialogHeader>
             <ScrollArea className="h-[60vh] w-full">
@@ -461,9 +684,9 @@ const ChatCard = ({
             // Try to parse structured data from bot messages
             if (message.isBot && !structuredData) {
               try {
-                structuredData = parseStructuredResponse(message.text);
+                structuredData = parseYusrAIStructuredResponse(message.text);
               } catch (error: any) {
-                console.log('Could not parse structured data from message:', error);
+                console.log('Could not parse YusrAI structured data from message:', error);
                 structuredData = null;
               }
             }
@@ -477,7 +700,7 @@ const ChatCard = ({
                   } transition-all duration-300 overflow-hidden`}
                 >
                   {message.isBot && (
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-2 mb-3">
                       <img 
                         src="/lovable-uploads/cf9c8f76-d8e9-4790-b043-40ba7239140d.png" 
                         alt="YusrAI" 
@@ -494,10 +717,10 @@ const ChatCard = ({
                     </div>
                   )}
 
-                  {/* Render structured content for bot messages if available */}
+                  {/* Render YusrAI structured content for bot messages if available */}
                   {message.isBot && structuredData ? (
-                    <div className="leading-relaxed">
-                      {renderStructuredContent(structuredData, message.error_help_available)}
+                    <div className="leading-relaxed space-y-4">
+                      {renderYusrAIStructuredContent(structuredData, message.error_help_available)}
                     </div>
                   ) : (
                     <div className="leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
@@ -532,7 +755,7 @@ const ChatCard = ({
                     alt="YusrAI" 
                     className="w-5 h-5 object-contain animate-pulse"
                   />
-                  <span className="font-medium">YusrAI is creating your automation...</span>
+                  <span className="font-medium">YusrAI is creating your comprehensive automation...</span>
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
                     <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>

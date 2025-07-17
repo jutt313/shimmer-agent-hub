@@ -84,23 +84,24 @@ class ChatAIConnectionService {
         };
       }
 
-      // Try to parse structured data from the response
+      // Try to parse structured data from the response - improved for GPT-4o-mini
       let structuredData = null;
       try {
-        // Look for JSON-like content in the response
-        const jsonMatch = data.response.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          structuredData = JSON.parse(jsonMatch[0]);
-          console.log('📊 Parsed YusrAI structured data:', structuredData);
-        }
+        // Since we're enforcing JSON structure with response_format in the OpenAI request,
+        // the entire response should be valid JSON already
+        structuredData = JSON.parse(data.response);
+        console.log('📊 Successfully parsed structured data from YusrAI response:', structuredData);
       } catch (parseError) {
-        console.log('ℹ️ No structured data found in YusrAI response, response might be pure JSON');
-        // Try parsing the entire response as JSON
+        console.log('⚠️ Error parsing structured JSON response:', parseError);
+        // Fallback to regex pattern extraction if JSON parsing fails
         try {
-          structuredData = JSON.parse(data.response);
-          console.log('📊 Parsed entire YusrAI response as JSON:', structuredData);
-        } catch (fullParseError) {
-          console.log('ℹ️ Response is not valid JSON, treating as text');
+          const jsonMatch = data.response.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            structuredData = JSON.parse(jsonMatch[0]);
+            console.log('📊 Extracted valid JSON using regex:', structuredData);
+          }
+        } catch (fallbackError) {
+          console.log('❌ All JSON parsing attempts failed, treating as text');
         }
       }
 

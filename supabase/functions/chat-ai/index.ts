@@ -135,20 +135,21 @@ RESPONSE FORMAT - Return ONLY this JSON structure:
 
 Generate test configuration for: ${platformName}`
 
-      const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4',
+          model: 'gpt-4o-mini',  // Using faster model
           messages: [
             { role: 'system', content: testConfigSystemPrompt },
             { role: 'user', content: `Generate test configuration for ${platformName}` }
           ],
           max_tokens: 1500,
           temperature: 0.1,
+          response_format: { type: "json_object" }  // Enforce JSON structure
         }),
       })
 
@@ -674,13 +675,14 @@ User training input: ${message}`
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4',
+        model: 'gpt-4o-mini',  // Using faster model
         messages: [
           { role: 'system', content: enhancedSystemPrompt },
           { role: 'user', content: message }
         ],
         max_tokens: 2000,
         temperature: 0.7,
+        response_format: { type: "json_object" }  // Enforce JSON structure
       }),
     })
 

@@ -19,6 +19,8 @@ export interface ChatAIResponse {
   error_help_available?: boolean;
   training_acknowledged?: boolean;
   memory_updated?: boolean;
+  attempts_required?: number;
+  validation_passed?: boolean;
 }
 
 class ChatAIConnectionService {
@@ -46,7 +48,7 @@ class ChatAIConnectionService {
 
       // Ensure we have a proper response
       if (!data || !data.response) {
-        console.warn('⚠️ Empty response from YusrAI Chat AI, using fallback');
+        console.warn('⚠️ Empty response from YusrAI Chat AI, using structured fallback');
         return {
           response: JSON.stringify({
             summary: "I'm YusrAI, ready to help you create comprehensive automations with platform integrations and AI agents.",
@@ -57,21 +59,71 @@ class ChatAIConnectionService {
               "Test your integrations with real API calls",
               "Execute your automation with full monitoring and error handling"
             ],
-            platforms: [],
+            platforms: [
+              {
+                name: "Platform Integration Required",
+                credentials: [
+                  {
+                    field: "api_key",
+                    why_needed: "Authentication required for platform access",
+                    where_to_get: "Platform developer dashboard",
+                    link: "#",
+                    example: "your_api_key_here"
+                  }
+                ]
+              }
+            ],
             clarification_questions: [
               "What specific automation would you like me to create for you?",
-              "Which platforms should be involved in your workflow?"
+              "Which platforms should be integrated in your workflow?"
             ],
-            agents: [],
-            test_payloads: {},
+            agents: [
+              {
+                name: "AutomationAssistant",
+                role: "Decision Maker",
+                rule: "Analyze requirements and recommend optimal solutions",
+                goal: "Create efficient automation workflows",
+                memory: "User preferences and successful patterns",
+                why_needed: "Essential for intelligent automation design",
+                custom_config: {},
+                test_scenarios: ["Analyze user requirements", "Validate workflow logic"]
+              }
+            ],
+            test_payloads: {
+              "example_platform": {
+                method: "GET",
+                endpoint: "/api/test",
+                headers: { "Authorization": "Bearer {api_key}" },
+                expected_response: { "status": "success" },
+                error_patterns: { "401": "Invalid credentials" }
+              }
+            },
             execution_blueprint: {
               trigger: { type: "manual", configuration: {} },
-              workflow: [],
+              workflow: [
+                {
+                  step: 1,
+                  action: "initialize_automation",
+                  platform: "YusrAI",
+                  method: "POST",
+                  endpoint: "/api/initialize",
+                  headers: { "Content-Type": "application/json" },
+                  data_mapping: { "user_input": "config" },
+                  success_condition: "response.status === 'success'",
+                  error_handling: {
+                    retry_attempts: 3,
+                    fallback_action: "log_error",
+                    on_failure: "pause_automation"
+                  },
+                  next_step: 2,
+                  description: "Initialize automation workflow"
+                }
+              ],
               error_handling: {
                 retry_attempts: 3,
-                fallback_actions: ["log_error"],
-                notification_rules: [],
-                critical_failure_actions: ["pause_automation"]
+                fallback_actions: ["log_error", "notify_user"],
+                notification_rules: [{ event: "failure", action: "alert" }],
+                critical_failure_actions: ["stop_automation"]
               },
               performance_optimization: {
                 rate_limit_handling: "exponential_backoff",
@@ -80,29 +132,32 @@ class ChatAIConnectionService {
               }
             }
           }),
-          error_help_available: true
+          error_help_available: true,
+          validation_passed: false
         };
       }
 
-      // Try to parse structured data from the response - improved for GPT-4o-mini
+      // Enhanced: Try to parse structured data from the response
       let structuredData = null;
       try {
-        // Since we're enforcing JSON structure with response_format in the OpenAI request,
-        // the entire response should be valid JSON already
-        structuredData = JSON.parse(data.response);
-        console.log('📊 Successfully parsed structured data from YusrAI response:', structuredData);
-      } catch (parseError) {
-        console.log('⚠️ Error parsing structured JSON response:', parseError);
-        // Fallback to regex pattern extraction if JSON parsing fails
-        try {
-          const jsonMatch = data.response.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            structuredData = JSON.parse(jsonMatch[0]);
-            console.log('📊 Extracted valid JSON using regex:', structuredData);
-          }
-        } catch (fallbackError) {
-          console.log('❌ All JSON parsing attempts failed, treating as text');
+        // The response should already be valid JSON from the enhanced chat-ai function
+        if (typeof data.response === 'string') {
+          structuredData = JSON.parse(data.response);
+          console.log('📊 Successfully parsed YusrAI structured data:', {
+            hasSummary: !!structuredData.summary,
+            stepsCount: structuredData.steps?.length || 0,
+            platformsCount: structuredData.platforms?.length || 0,
+            agentsCount: structuredData.agents?.length || 0,
+            hasTestPayloads: !!structuredData.test_payloads,
+            hasExecutionBlueprint: !!structuredData.execution_blueprint
+          });
+        } else if (typeof data.response === 'object') {
+          structuredData = data.response;
+          console.log('📊 Using YusrAI structured data from object response');
         }
+      } catch (parseError) {
+        console.log('⚠️ Failed to parse YusrAI structured JSON response:', parseError);
+        // If parsing fails, the response will be treated as plain text
       }
 
       return {
@@ -110,7 +165,9 @@ class ChatAIConnectionService {
         structuredData: structuredData,
         error_help_available: data.error_help_available || false,
         training_acknowledged: data.training_acknowledged || false,
-        memory_updated: data.memory_updated || false
+        memory_updated: data.memory_updated || false,
+        attempts_required: data.attempts_required || 1,
+        validation_passed: data.validation_passed || false
       };
 
     } catch (error: any) {

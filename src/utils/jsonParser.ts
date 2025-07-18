@@ -75,74 +75,102 @@ export interface YusrAIStructuredResponse {
   };
 }
 
+// Strict validation function for 7-section structure
+function validateYusrAI7Sections(data: any): { isValid: boolean; missing: string[] } {
+  const required7Sections = [
+    'summary',
+    'steps',
+    'platforms', 
+    'clarification_questions',
+    'agents',
+    'test_payloads',
+    'execution_blueprint'
+  ];
+  
+  const missing: string[] = [];
+  
+  for (const section of required7Sections) {
+    if (!data[section]) {
+      missing.push(section);
+      continue;
+    }
+    
+    // Validate specific section requirements
+    if (section === 'steps' && (!Array.isArray(data[section]) || data[section].length === 0)) {
+      missing.push(`${section} (must be non-empty array)`);
+    }
+    if (section === 'platforms' && (!Array.isArray(data[section]) || data[section].length === 0)) {
+      missing.push(`${section} (must be non-empty array)`);
+    }
+    if (section === 'clarification_questions' && !Array.isArray(data[section])) {
+      missing.push(`${section} (must be array)`);
+    }
+    if (section === 'agents' && !Array.isArray(data[section])) {
+      missing.push(`${section} (must be array)`);
+    }
+    if (section === 'test_payloads' && typeof data[section] !== 'object') {
+      missing.push(`${section} (must be object)`);
+    }
+    if (section === 'execution_blueprint') {
+      if (!data[section].trigger || !data[section].workflow || !data[section].error_handling) {
+        missing.push(`${section} (must have trigger, workflow, and error_handling)`);
+      }
+    }
+  }
+  
+  return {
+    isValid: missing.length === 0,
+    missing
+  };
+}
+
 export function parseYusrAIStructuredResponse(responseText: string): YusrAIStructuredResponse | null {
   try {
     console.log('🔍 Parsing YusrAI structured response from text:', responseText.substring(0, 200));
     
-    // First try to extract JSON from the response
-    const jsonMatches = responseText.match(/\{[\s\S]*\}/g);
-    if (jsonMatches) {
-      for (const match of jsonMatches) {
-        try {
-          const parsed = JSON.parse(match);
-          if (parsed && (
-            parsed.summary || 
-            parsed.steps || 
-            parsed.platforms || 
-            parsed.clarification_questions || 
-            parsed.agents || 
-            parsed.test_payloads || 
-            parsed.execution_blueprint
-          )) {
-            console.log('✅ Found YusrAI structured data in JSON:', parsed);
-            return parsed;
+    // First try to parse the entire response as JSON
+    let parsedData;
+    try {
+      parsedData = JSON.parse(responseText);
+    } catch (directParseError) {
+      // Try to extract JSON from the response text
+      const jsonMatches = responseText.match(/\{[\s\S]*\}/g);
+      if (jsonMatches) {
+        for (const match of jsonMatches) {
+          try {
+            parsedData = JSON.parse(match);
+            break;
+          } catch (e) {
+            continue;
           }
-        } catch (e) {
-          continue;
         }
       }
     }
 
-    // If no JSON found, try to extract structured information from text
-    const structuredData: YusrAIStructuredResponse = {};
-
-    // Extract summary from the beginning
-    const sentences = responseText.split(/[.!?]+/).filter(s => s.trim().length > 10);
-    if (sentences.length > 0) {
-      structuredData.summary = sentences.slice(0, 2).join('. ').trim() + '.';
+    if (!parsedData) {
+      console.error('❌ No valid JSON found in response');
+      return null;
     }
 
-    // Extract steps from numbered lists
-    const stepMatches = responseText.match(/(?:^|\n)\s*\d+\.\s*(.+?)(?=\n|$)/gm);
-    if (stepMatches) {
-      structuredData.steps = stepMatches.map(step => 
-        step.replace(/^\s*\d+\.\s*/, '').trim()
-      );
+    // STRICT: Validate 7-section structure
+    const validation = validateYusrAI7Sections(parsedData);
+    
+    if (!validation.isValid) {
+      console.error('❌ YusrAI response missing required sections:', validation.missing);
+      return null; // Reject incomplete responses
     }
 
-    // Extract platforms mentioned in the text
-    const platformMatches = responseText.match(/(?:platform|service|integration)[\s:]*([A-Za-z]+(?:\s+[A-Za-z]+)*)/gi);
-    if (platformMatches) {
-      const platforms = platformMatches
-        .map(match => match.replace(/(?:platform|service|integration)[\s:]*/gi, '').trim())
-        .filter(name => name.length > 2 && name.length < 20);
-      
-      if (platforms.length > 0) {
-        structuredData.platforms = platforms.map(name => ({
-          name: name,
-          credentials: [
-            {
-              field: 'api_key',
-              why_needed: `Required for ${name} integration`,
-              link: `https://${name.toLowerCase().replace(/\s+/g, '')}.com/developers`
-            }
-          ]
-        }));
-      }
-    }
+    console.log('✅ Found complete YusrAI 7-section structured data:', {
+      hasSummary: !!parsedData.summary,
+      stepsCount: parsedData.steps?.length || 0,
+      platformsCount: parsedData.platforms?.length || 0,
+      questionsCount: parsedData.clarification_questions?.length || 0,
+      agentsCount: parsedData.agents?.length || 0,
+      hasTestPayloads: !!parsedData.test_payloads,
+      hasExecutionBlueprint: !!parsedData.execution_blueprint
+    });
 
-    console.log('📊 Extracted YusrAI structured data:', structuredData);
-    return Object.keys(structuredData).length > 0 ? structuredData : null;
+    return parsedData;
 
   } catch (error) {
     console.error('❌ Error parsing YusrAI structured response:', error);
@@ -155,15 +183,12 @@ export function cleanDisplayText(text: string): string {
     return 'Processing automation details...';
   }
 
-  // Remove JSON blocks from display text
+  // For YusrAI responses, we expect structured JSON, so clean display is minimal
   let cleanText = text.replace(/\{[\s\S]*\}/g, '').trim();
-  
-  // Clean up extra whitespace
   cleanText = cleanText.replace(/\s+/g, ' ').trim();
   
-  // If text is too short after cleaning, provide a default
   if (cleanText.length < 20) {
-    return 'I\'m ready to help you create comprehensive automations with platform integrations.';
+    return 'YusrAI automation blueprint generated successfully.';
   }
   
   return cleanText;

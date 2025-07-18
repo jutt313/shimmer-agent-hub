@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -6,6 +5,50 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+
+// Validation function for YusrAI 7-section response
+const validateYusrAIResponse = (response: any): { isValid: boolean; missing: string[] } => {
+  const missing: string[] = [];
+  
+  if (!response.summary || typeof response.summary !== 'string' || response.summary.trim().length < 20) {
+    missing.push('summary (must be detailed, 20+ characters)');
+  }
+  
+  if (!response.steps || !Array.isArray(response.steps) || response.steps.length < 3) {
+    missing.push('steps (must be array with at least 3 detailed steps)');
+  }
+  
+  if (!response.platforms || !Array.isArray(response.platforms) || response.platforms.length === 0) {
+    missing.push('platforms (must include at least one platform with credentials)');
+  } else {
+    response.platforms.forEach((platform: any, index: number) => {
+      if (!platform.credentials || !Array.isArray(platform.credentials) || platform.credentials.length === 0) {
+        missing.push(`platforms[${index}].credentials (must include credential requirements)`);
+      }
+    });
+  }
+  
+  if (!response.clarification_questions || !Array.isArray(response.clarification_questions)) {
+    missing.push('clarification_questions (must be array)');
+  }
+  
+  if (!response.agents || !Array.isArray(response.agents)) {
+    missing.push('agents (must be array with AI agent recommendations)');
+  }
+  
+  if (!response.test_payloads || typeof response.test_payloads !== 'object') {
+    missing.push('test_payloads (must be object with platform test configurations)');
+  }
+  
+  if (!response.execution_blueprint || typeof response.execution_blueprint !== 'object') {
+    missing.push('execution_blueprint (must be complete automation specification)');
+  }
+  
+  return {
+    isValid: missing.length === 0,
+    missing
+  };
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -159,8 +202,7 @@ Generate test configuration for: ${platformName}`
       try {
         // Extract JSON from response
         const responseText = openAIData.choices[0]?.message?.content || '{}'
-        const jsonMatch = responseText.match(/\{[\s\S]*\}/)
-        testConfig = JSON.parse(jsonMatch ? jsonMatch[0] : responseText)
+        testConfig = JSON.parse(responseText)
         
         console.log(`✅ Generated test config for ${platformName}:`, testConfig)
       } catch (parseError) {
@@ -225,21 +267,22 @@ Generate test configuration for: ${platformName}`
       }
     }
 
-    // Build dynamic instructions string
+    // Build dynamic instructions string - SIMPLIFIED to avoid confusion
     let dynamicInstructions = ""
-    if (instructions && instructions.length > 0) {
-      dynamicInstructions = "\n\nDYNAMIC INSTRUCTIONS (Follow these in addition to base system prompt):\n"
-      instructions.forEach((instruction, index) => {
-        dynamicInstructions += `${index + 1}. [${instruction.instruction_type.toUpperCase()}] ${instruction.content}\n`
+    if (instructions && instructions.length > 0 && instructions.length < 3) {
+      dynamicInstructions = "\n\nADDITIONAL CONTEXT:\n"
+      instructions.slice(0, 2).forEach((instruction, index) => {
+        dynamicInstructions += `${index + 1}. ${instruction.content}\n`
       })
     }
 
-    // Add memory context if available
+    // Add memory context if available - SIMPLIFIED
     let memoryContext = ""
-    if (userMemory) {
-      memoryContext = `\n\nREMEMBERED CONTEXT:\n`
-      memoryContext += `Learned Patterns: ${JSON.stringify(userMemory.learned_patterns)}\n`
-      memoryContext += `Successful Solutions: ${JSON.stringify(userMemory.successful_solutions)}\n`
+    if (userMemory && userMemory.learned_patterns) {
+      const patterns = userMemory.learned_patterns;
+      if (patterns && Object.keys(patterns).length > 0) {
+        memoryContext = `\n\nREMEMBERED CONTEXT: ${JSON.stringify(patterns).substring(0, 200)}\n`
+      }
     }
 
     // The COMPLETE YusrAI system prompt as specified
@@ -668,26 +711,104 @@ User training input: ${message}`
     // Regular automation mode with the complete YusrAI system prompt
     const enhancedSystemPrompt = yusrAISystemPrompt + dynamicInstructions + memoryContext
 
-    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',  // Using faster model
-        messages: [
-          { role: 'system', content: enhancedSystemPrompt },
-          { role: 'user', content: message }
-        ],
-        max_tokens: 2000,
-        temperature: 0.7,
-        response_format: { type: "json_object" }  // Enforce JSON structure
-      }),
-    })
+    // RETRY MECHANISM: Try up to 3 times to get a valid 7-section response
+    let attempts = 0;
+    let finalResponse = '';
+    let validResponse = null;
+    
+    while (attempts < 3) {
+      console.log(`🚀 YusrAI attempt ${attempts + 1}/3`);
+      
+      const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',  // Using faster model
+          messages: [
+            { role: 'system', content: enhancedSystemPrompt },
+            { role: 'user', content: message }
+          ],
+          max_tokens: 4000,  // INCREASED: More tokens for complete 7-section response
+          temperature: 0.2,  // LOWER: More deterministic for structured output
+          response_format: { type: "json_object" }  // Enforce JSON structure
+        }),
+      })
 
-    const openAIData = await openAIResponse.json()
-    const response = openAIData.choices[0]?.message?.content
+      const openAIData = await openAIResponse.json()
+      const response = openAIData.choices[0]?.message?.content
+
+      if (!response) {
+        console.error(`❌ Attempt ${attempts + 1}: No response from OpenAI`);
+        attempts++;
+        continue;
+      }
+
+      // VALIDATION: Check if response contains all 7 sections
+      try {
+        const parsedResponse = JSON.parse(response);
+        const validation = validateYusrAIResponse(parsedResponse);
+        
+        if (validation.isValid) {
+          console.log(`✅ Attempt ${attempts + 1}: Valid 7-section response received`);
+          validResponse = parsedResponse;
+          finalResponse = response;
+          break;
+        } else {
+          console.log(`❌ Attempt ${attempts + 1}: Invalid response. Missing: ${validation.missing.join(', ')}`);
+          attempts++;
+          
+          // For retry, add specific requirements to the message
+          if (attempts < 3) {
+            message = `${message}\n\nIMPORTANT: Your previous response was incomplete. You MUST include ALL 7 sections: ${validation.missing.join(', ')}. Respond with complete JSON structure only.`;
+          }
+        }
+      } catch (parseError) {
+        console.error(`❌ Attempt ${attempts + 1}: JSON parsing failed:`, parseError);
+        attempts++;
+      }
+    }
+
+    // If all attempts failed, provide a structured fallback response
+    if (!validResponse) {
+      console.log('⚠️ All attempts failed, using structured fallback');
+      finalResponse = JSON.stringify({
+        summary: "I'm YusrAI, ready to help you create comprehensive automations with platform integrations and AI agents. Please specify your automation requirements and I'll provide a complete blueprint.",
+        steps: [
+          "Tell me what automation you want to create",
+          "I'll analyze your requirements and identify platforms needed",
+          "Generate complete credential requirements and API configurations", 
+          "Create AI agents for intelligent decision-making",
+          "Provide test payloads for validation",
+          "Build complete execution blueprint with error handling"
+        ],
+        platforms: [],
+        clarification_questions: [
+          "What specific automation workflow would you like me to create?",
+          "Which platforms should be integrated (e.g., Gmail, Slack, Salesforce, OpenAI)?",
+          "What should trigger this automation (webhook, schedule, manual, or event)?"
+        ],
+        agents: [],
+        test_payloads: {},
+        execution_blueprint: {
+          trigger: { type: "manual", configuration: {} },
+          workflow: [],
+          error_handling: {
+            retry_attempts: 3,
+            fallback_actions: ["log_error", "notify_admin"],
+            notification_rules: [],
+            critical_failure_actions: ["pause_automation"]
+          },
+          performance_optimization: {
+            rate_limit_handling: "exponential_backoff",
+            concurrency_limit: 5,
+            timeout_seconds_per_step: 60
+          }
+        }
+      });
+    }
 
     // Update conversation memory for regular interactions
     if (userId) {
@@ -695,11 +816,21 @@ User training input: ${message}`
         user_id: userId,
         conversation_context: {
           user_message: message,
-          ai_response: response,
-          timestamp: new Date().toISOString()
+          ai_response: finalResponse,
+          timestamp: new Date().toISOString(),
+          validation_attempts: attempts,
+          response_valid: !!validResponse
         },
-        learned_patterns: {},
-        successful_solutions: {},
+        learned_patterns: {
+          message_type: 'automation_request',
+          response_attempts: attempts,
+          successful: !!validResponse
+        },
+        successful_solutions: validResponse ? {
+          platforms_identified: validResponse.platforms?.length || 0,
+          agents_recommended: validResponse.agents?.length || 0,
+          test_payloads_generated: Object.keys(validResponse.test_payloads || {}).length
+        } : {},
         memory_type: 'conversation'
       }
 
@@ -708,7 +839,7 @@ User training input: ${message}`
         .insert(conversationMemory)
     }
 
-    return new Response(JSON.stringify({ response }), {
+    return new Response(JSON.stringify({ response: finalResponse }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 

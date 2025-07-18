@@ -1,7 +1,7 @@
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Plus, X, Play, User, Code, TestTube, Settings, CheckCircle2, AlertCircle } from 'lucide-react';
+import { User, Code, CheckCircle2, AlertCircle } from 'lucide-react';
 import { parseYusrAIStructuredResponse, cleanDisplayText, YusrAIStructuredResponse } from "@/utils/jsonParser";
 import { useEffect, useRef, useState } from "react";
 import { useErrorRecovery } from "@/hooks/useErrorRecovery";
@@ -11,9 +11,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { agentStateManager } from '@/utils/agentStateManager';
 import ErrorHelpButton from './ErrorHelpButton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import YusrAIStructuredDisplay from './YusrAIStructuredDisplay';
+import ExecutionBlueprintVisualizer from './ExecutionBlueprintVisualizer';
 
 interface Message {
   id: number;
@@ -22,6 +21,8 @@ interface Message {
   timestamp: Date;
   structuredData?: YusrAIStructuredResponse;
   error_help_available?: boolean;
+  yusrai_powered?: boolean;
+  seven_sections_validated?: boolean;
 }
 
 interface ChatCardProps {
@@ -55,15 +56,7 @@ const ChatCard = ({
   const { toast } = useToast();
   const { user } = useAuth();
   const [showCodeModal, setShowCodeModal] = useState(false);
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    summary: true,
-    steps: true,
-    platforms: true,
-    clarification_questions: true,
-    agents: true,
-    test_payloads: false,
-    execution_blueprint: false
-  });
+  const [showBlueprintModal, setShowBlueprintModal] = useState(false);
 
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
@@ -71,13 +64,6 @@ const ChatCard = ({
   }, [messages, isLoading]);
 
   const optimizedMessages = messages.slice(-50);
-
-  const toggleSection = (section: string) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
 
   const safeFormatMessageText = (inputText: string | undefined | null): React.ReactNode[] => {
     try {
@@ -98,12 +84,12 @@ const ChatCard = ({
 
     } catch (error: any) {
       handleError(error, 'Text formatting in ChatCard');
-      return [<span key="processing-error">Processing your automation request...</span>];
+      return [<span key="processing-error">Processing your YusrAI automation request...</span>];
     }
   };
 
   const handleAgentAdd = (agent: any) => {
-    console.log(`🤖 User adding agent: ${agent.name}`);
+    console.log(`🤖 User adding YusrAI agent: ${agent.name}`);
     agentStateManager.addAgent(agent.name, agent);
     if (onAgentAdd) {
       onAgentAdd(agent);
@@ -111,7 +97,7 @@ const ChatCard = ({
   };
 
   const handleAgentDismiss = (agentName: string) => {
-    console.log(`❌ User dismissing agent: ${agentName}`);
+    console.log(`❌ User dismissing YusrAI agent: ${agentName}`);
     agentStateManager.dismissAgent(agentName);
     if (onAgentDismiss) {
       onAgentDismiss(agentName);
@@ -120,7 +106,7 @@ const ChatCard = ({
 
   const handleErrorHelp = (errorMessage?: string) => {
     const helpMessage = errorMessage ? 
-      `I encountered this error: "${errorMessage}". Can you help me resolve it and continue with my automation?` :
+      `I encountered this error: "${errorMessage}". Can you help me resolve it and continue with my YusrAI automation?` :
       "I need help with an error I encountered. Can you assist me?";
     
     if (onSendMessage) {
@@ -128,17 +114,16 @@ const ChatCard = ({
     }
   };
 
-  const handlePlatformCredentialClick = (platformName: string, platforms: any[]) => {
-    const platform = platforms.find(p => p.name === platformName);
-    if (platform && onPlatformCredentialChange) {
-      console.log(`🔧 Opening credential form for ${platformName}`);
+  const handlePlatformCredentialClick = (platformName: string) => {
+    if (onPlatformCredentialChange) {
+      console.log(`🔧 Opening YusrAI credential form for ${platformName}`);
       onPlatformCredentialChange();
     }
   };
 
   const testPlatformCredentials = async (platformName: string, testPayload: any) => {
     try {
-      console.log(`🧪 Testing credentials for ${platformName}`);
+      console.log(`🧪 Testing YusrAI credentials for ${platformName}`);
       const { data, error } = await supabase.functions.invoke('test-credential', {
         body: {
           platform: platformName,
@@ -149,16 +134,16 @@ const ChatCard = ({
       if (error) throw error;
 
       toast({
-        title: data.success ? "✅ Test Successful" : "❌ Test Failed",
-        description: data.message || `Credential test for ${platformName} completed`,
+        title: data.success ? "✅ YusrAI Test Successful" : "❌ YusrAI Test Failed",
+        description: data.message || `YusrAI credential test for ${platformName} completed`,
         variant: data.success ? "default" : "destructive",
       });
 
       return data.success;
     } catch (error: any) {
-      console.error('Test error:', error);
+      console.error('YusrAI test error:', error);
       toast({
-        title: "Test Error",
+        title: "YusrAI Test Error",
         description: `Failed to test ${platformName} credentials`,
         variant: "destructive",
       });
@@ -167,7 +152,7 @@ const ChatCard = ({
   };
 
   const checkReadyForExecution = () => {
-    const latestBotMessage = messages.filter(msg => msg.isBot).pop();
+    const latestBotMessage = messages.filter(msg => msg.isBot && msg.yusrai_powered).pop();
     if (!latestBotMessage?.structuredData?.platforms) return false;
 
     const platforms = latestBotMessage.structuredData.platforms;
@@ -188,24 +173,24 @@ const ChatCard = ({
     if (!user?.id) {
       toast({
         title: "Authentication Required",
-        description: "Please sign in to execute automations",
+        description: "Please sign in to execute YusrAI automations",
         variant: "destructive",
       });
       return;
     }
 
-    const latestBotMessage = messages.filter(msg => msg.isBot).pop();
+    const latestBotMessage = messages.filter(msg => msg.isBot && msg.yusrai_powered).pop();
     if (!latestBotMessage?.structuredData) {
       toast({
-        title: "No Automation Found",
-        description: "Please create an automation first",
+        title: "No YusrAI Automation Found",
+        description: "Please create a YusrAI automation first",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      console.log('🚀 Executing automation');
+      console.log('🚀 Executing YusrAI automation');
       
       const { data, error } = await supabase.functions.invoke('execute-automation', {
         body: {
@@ -224,417 +209,33 @@ const ChatCard = ({
       }
 
       toast({
-        title: "🎉 Automation Executed!",
-        description: `Automation completed successfully. Run ID: ${data.run_id}`,
+        title: "🎉 YusrAI Automation Executed!",
+        description: `YusrAI automation completed successfully. Run ID: ${data.run_id}`,
       });
 
     } catch (error: any) {
-      console.error('💥 Execution error:', error);
+      console.error('💥 YusrAI execution error:', error);
       toast({
-        title: "Execution Error",
-        description: "An unexpected error occurred during execution",
+        title: "YusrAI Execution Error",
+        description: "An unexpected error occurred during YusrAI automation execution",
         variant: "destructive",
       });
     }
   };
 
   const getCompleteAutomationJSON = () => {
-    const latestBotMessage = messages.filter(msg => msg.isBot).pop();
+    const latestBotMessage = messages.filter(msg => msg.isBot && msg.yusrai_powered).pop();
     if (!latestBotMessage?.structuredData) return null;
 
     return {
       automation_id: automationId,
       created_at: new Date().toISOString(),
       yusrai_response: latestBotMessage.structuredData,
+      yusrai_powered: true,
+      seven_sections_validated: latestBotMessage.seven_sections_validated || false,
       ready_for_execution: checkReadyForExecution(),
       credential_status: platformCredentialStatus
     };
-  };
-
-  const renderYusrAIStructuredContent = (structuredData: YusrAIStructuredResponse, showErrorHelp: boolean = false) => {
-    const content = [];
-
-    try {
-      // 1. Summary Section
-      if (structuredData.summary) {
-        content.push(
-          <Collapsible key="summary" open={expandedSections.summary} onOpenChange={() => toggleSection('summary')}>
-            <CollapsibleTrigger asChild>
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200 cursor-pointer hover:bg-blue-100 transition-colors">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <h3 className="font-semibold text-blue-800">📋 Summary</h3>
-                </div>
-                {expandedSections.summary ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </div>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="mt-3 p-3 bg-white rounded-lg border">
-                <p className="text-gray-800 leading-relaxed">{structuredData.summary}</p>
-                {showErrorHelp && (
-                  <ErrorHelpButton 
-                    errorMessage={structuredData.summary}
-                    onHelpRequest={() => handleErrorHelp(structuredData.summary)}
-                  />
-                )}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        );
-      }
-
-      // 2. Steps Section
-      if (Array.isArray(structuredData.steps) && structuredData.steps.length > 0) {
-        content.push(
-          <Collapsible key="steps" open={expandedSections.steps} onOpenChange={() => toggleSection('steps')}>
-            <CollapsibleTrigger asChild>
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200 cursor-pointer hover:bg-green-100 transition-colors">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <h3 className="font-semibold text-green-800">🔄 Steps ({structuredData.steps.length})</h3>
-                </div>
-                {expandedSections.steps ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </div>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="mt-3 p-3 bg-white rounded-lg border">
-                <ol className="list-decimal list-inside space-y-2 text-gray-700">
-                  {structuredData.steps.map((step, index) => (
-                    <li key={index} className="leading-relaxed">{step}</li>
-                  ))}
-                </ol>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        );
-      }
-
-      // 3. Platforms & Credentials Section
-      if (Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
-        content.push(
-          <Collapsible key="platforms" open={expandedSections.platforms} onOpenChange={() => toggleSection('platforms')}>
-            <CollapsibleTrigger asChild>
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200 cursor-pointer hover:bg-purple-100 transition-colors">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                  <h3 className="font-semibold text-purple-800">🔗 Platforms & Credentials ({structuredData.platforms.length})</h3>
-                </div>
-                {expandedSections.platforms ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </div>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="mt-3 p-3 bg-white rounded-lg border">
-                <div className="grid grid-cols-6 gap-2 mb-4">
-                  {structuredData.platforms.map((platform, index) => {
-                    const platformName = platform.name || 'Unknown Platform';
-                    const status = platformCredentialStatus[platformName] || 'missing';
-                    
-                    const getButtonColor = () => {
-                      switch (status) {
-                        case 'tested':
-                          return 'bg-green-100 hover:bg-green-200 text-green-800 border-green-300';
-                        case 'saved':
-                          return 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border-yellow-300';
-                        case 'missing':
-                        default:
-                          return 'bg-red-100 hover:bg-red-200 text-red-800 border-red-300 cursor-pointer';
-                      }
-                    };
-                    
-                    return (
-                      <Button
-                        key={`platform-${index}`}
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handlePlatformCredentialClick(platformName, structuredData.platforms!)}
-                        className={`text-xs h-8 px-2 rounded-lg ${getButtonColor()} transition-colors`}
-                      >
-                        {platformName}
-                      </Button>
-                    );
-                  })}
-                </div>
-                
-                <div className="space-y-3">
-                  {structuredData.platforms.map((platform, index) => (
-                    <div key={`platform-detail-${index}`} className="bg-blue-50/30 p-3 rounded-lg border border-blue-200/50">
-                      <p className="font-medium text-gray-800 mb-2">{platform.name}</p>
-                      {Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
-                        <div className="text-sm text-gray-600 space-y-2">
-                          {platform.credentials.map((cred, credIndex) => (
-                            <div key={`cred-${credIndex}`} className="bg-white p-2 rounded border">
-                              <div className="flex items-center justify-between mb-1">
-                                <Badge variant="outline" className="text-xs">{cred.field}</Badge>
-                                {cred.link && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => window.open(cred.link, '_blank')}
-                                    className="h-6 px-2 py-1 text-xs"
-                                  >
-                                    Get
-                                  </Button>
-                                )}
-                              </div>
-                              <p className="text-xs text-gray-600">{cred.why_needed}</p>
-                              {cred.where_to_get && (
-                                <p className="text-xs text-blue-600 mt-1">{cred.where_to_get}</p>
-                              )}
-                              {cred.options && cred.options.length > 0 && (
-                                <div className="mt-1">
-                                  <span className="text-xs text-gray-500">Options: </span>
-                                  {cred.options.map((option, optIndex) => (
-                                    <Badge key={optIndex} variant="secondary" className="text-xs mr-1">{option}</Badge>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        );
-      }
-
-      // 4. Clarification Questions Section
-      if (Array.isArray(structuredData.clarification_questions) && structuredData.clarification_questions.length > 0) {
-        content.push(
-          <Collapsible key="clarification" open={expandedSections.clarification_questions} onOpenChange={() => toggleSection('clarification_questions')}>
-            <CollapsibleTrigger asChild>
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200 cursor-pointer hover:bg-yellow-100 transition-colors">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                  <h3 className="font-semibold text-yellow-800">❓ Clarification Questions ({structuredData.clarification_questions.length})</h3>
-                </div>
-                {expandedSections.clarification_questions ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </div>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="mt-3 p-3 bg-white rounded-lg border">
-                <ul className="space-y-2">
-                  {structuredData.clarification_questions.map((question, index) => (
-                    <li key={index} className="text-gray-700 p-2 bg-yellow-50 rounded border-l-4 border-yellow-400">
-                      {question}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        );
-      }
-
-      // 5. AI Agents Section
-      if (Array.isArray(structuredData.agents) && structuredData.agents.length > 0) {
-        content.push(
-          <Collapsible key="agents" open={expandedSections.agents} onOpenChange={() => toggleSection('agents')}>
-            <CollapsibleTrigger asChild>
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-200 cursor-pointer hover:bg-indigo-100 transition-colors">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
-                  <h3 className="font-semibold text-indigo-800">🤖 AI Agents ({structuredData.agents.length})</h3>
-                </div>
-                {expandedSections.agents ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </div>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="mt-3 p-3 bg-white rounded-lg border">
-                <div className="space-y-3">
-                  {structuredData.agents.map((agent, index) => {
-                    const agentStatus = agentStateManager.getAgentStatus(agent.name);
-                    
-                    if (agentStatus !== 'pending') {
-                      return null;
-                    }
-                    
-                    return (
-                      <div key={index} className="p-3 rounded-lg bg-gradient-to-r from-blue-50/40 to-purple-50/40 border border-blue-200/50">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex-1">
-                            <h4 className="font-medium text-gray-800">{agent.name}</h4>
-                            <Badge variant="secondary" className="text-xs mt-1">{agent.role}</Badge>
-                          </div>
-                          <div className="flex gap-2 ml-4">
-                            <Button
-                              size="sm"
-                              onClick={() => handleAgentAdd(agent)}
-                              className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-3 py-1 text-xs h-7"
-                            >
-                              <Plus className="w-3 h-3 mr-1" />
-                              Add
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleAgentDismiss(agent.name)}
-                              className="border-gray-300 text-gray-600 hover:bg-gray-100 px-2 py-1 text-xs h-7"
-                            >
-                              <X className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="text-sm text-gray-600 space-y-1">
-                          <p><strong>Rule:</strong> {agent.rule}</p>
-                          <p><strong>Goal:</strong> {agent.goal}</p>
-                          <p><strong>Memory:</strong> {agent.memory}</p>
-                          <p><strong>Why Needed:</strong> {agent.why_needed}</p>
-                          {agent.test_scenarios && agent.test_scenarios.length > 0 && (
-                            <div>
-                              <strong>Test Scenarios:</strong>
-                              <ul className="list-disc list-inside ml-2 text-xs">
-                                {agent.test_scenarios.map((scenario, idx) => (
-                                  <li key={idx}>{scenario}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  }).filter(Boolean)}
-                </div>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        );
-      }
-
-      // 6. Test Payloads Section
-      if (structuredData.test_payloads && Object.keys(structuredData.test_payloads).length > 0) {
-        content.push(
-          <Collapsible key="test_payloads" open={expandedSections.test_payloads} onOpenChange={() => toggleSection('test_payloads')}>
-            <CollapsibleTrigger asChild>
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-cyan-50 to-blue-50 rounded-lg border border-cyan-200 cursor-pointer hover:bg-cyan-100 transition-colors">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-cyan-500 rounded-full"></div>
-                  <h3 className="font-semibold text-cyan-800">🧪 Test Payloads ({Object.keys(structuredData.test_payloads).length})</h3>
-                </div>
-                {expandedSections.test_payloads ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </div>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="mt-3 p-3 bg-white rounded-lg border">
-                <div className="space-y-3">
-                  {Object.entries(structuredData.test_payloads).map(([platformName, testConfig]) => (
-                    <div key={platformName} className="p-3 bg-gray-50 rounded border">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium text-gray-800">{platformName}</h4>
-                        <Button
-                          size="sm"
-                          onClick={() => testPlatformCredentials(platformName, testConfig)}
-                          className="bg-cyan-600 hover:bg-cyan-700 text-white"
-                        >
-                          <TestTube className="w-3 h-3 mr-1" />
-                          Test
-                        </Button>
-                      </div>
-                      <div className="text-xs text-gray-600 space-y-1">
-                        <p><strong>Method:</strong> {testConfig.method}</p>
-                        <p><strong>Endpoint:</strong> {testConfig.endpoint}</p>
-                        {testConfig.error_patterns && (
-                          <div>
-                            <strong>Common Errors:</strong>
-                            {Object.entries(testConfig.error_patterns).map(([code, meaning]) => (
-                              <span key={code} className="block ml-2">{code}: {meaning}</span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        );
-      }
-
-      // 7. Execution Blueprint Section
-      if (structuredData.execution_blueprint) {
-        content.push(
-          <Collapsible key="execution" open={expandedSections.execution_blueprint} onOpenChange={() => toggleSection('execution_blueprint')}>
-            <CollapsibleTrigger asChild>
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg border border-emerald-200 cursor-pointer hover:bg-emerald-100 transition-colors">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                  <h3 className="font-semibold text-emerald-800">⚡ Execution Blueprint</h3>
-                </div>
-                {expandedSections.execution_blueprint ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </div>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="mt-3 p-3 bg-white rounded-lg border">
-                <div className="space-y-3">
-                  <div className="p-2 bg-emerald-50 rounded">
-                    <h4 className="font-medium text-emerald-800 mb-1">Trigger</h4>
-                    <p className="text-sm text-gray-600">Type: {structuredData.execution_blueprint.trigger.type}</p>
-                  </div>
-                  <div className="p-2 bg-blue-50 rounded">
-                    <h4 className="font-medium text-blue-800 mb-1">Workflow</h4>
-                    <p className="text-sm text-gray-600">{structuredData.execution_blueprint.workflow.length} steps defined</p>
-                  </div>
-                  <div className="p-2 bg-purple-50 rounded">
-                    <h4 className="font-medium text-purple-800 mb-1">Performance</h4>
-                    <p className="text-sm text-gray-600">
-                      Rate Limiting: {structuredData.execution_blueprint.performance_optimization.rate_limit_handling} | 
-                      Timeout: {structuredData.execution_blueprint.performance_optimization.timeout_seconds_per_step}s
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        );
-      }
-
-      // Execution button when ready
-      if (checkReadyForExecution()) {
-        content.push(
-          <div key="execution-ready" className="mt-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-green-600" />
-                <div>
-                  <p className="font-medium text-green-800">🎉 Automation Ready!</p>
-                  <p className="text-sm text-green-600">All platforms configured and ready for execution</p>
-                </div>
-              </div>
-              <Button
-                onClick={onExecuteAutomation || handleExecuteAutomation}
-                className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white"
-              >
-                <Play className="w-4 h-4 mr-2" />
-                Execute Automation
-              </Button>
-            </div>
-          </div>
-        );
-      }
-
-      return content;
-    } catch (error: any) {
-      console.error('Critical error in renderYusrAIStructuredContent:', error);
-      handleError(error, 'YusrAI structured content rendering');
-      return [
-        <div key="error" className="text-blue-600 p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4" />
-            <span>I'm processing your automation request. Please wait...</span>
-          </div>
-          {showErrorHelp && (
-            <ErrorHelpButton 
-              errorMessage="Content rendering error"
-              onHelpRequest={() => handleErrorHelp("I encountered an error while displaying the automation details.")}
-            />
-          )}
-        </div>
-      ];
-    }
   };
 
   return (
@@ -646,34 +247,60 @@ const ChatCard = ({
     >
       <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/20 to-purple-100/20 pointer-events-none"></div>
       
-      {/* View Code button */}
+      {/* View Code and Blueprint buttons */}
       {getCompleteAutomationJSON() && (
-        <Dialog open={showCodeModal} onOpenChange={setShowCodeModal}>
-          <DialogTrigger asChild>
-            <Button
-              size="sm"
-              variant="outline"
-              className="absolute top-4 right-4 z-20 bg-white/90 backdrop-blur-sm border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 shadow-lg"
-            >
-              <Code className="w-4 h-4 mr-1" />
-              View Code
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
-            <DialogHeader>
-              <DialogTitle className="text-lg font-semibold text-blue-600">
-                Complete YusrAI Automation JSON - Ready for Execution
-              </DialogTitle>
-            </DialogHeader>
-            <ScrollArea className="h-[60vh] w-full">
-              <pre className="bg-gray-900 text-green-400 p-4 rounded-lg text-xs overflow-x-auto">
-                <code>
-                  {JSON.stringify(getCompleteAutomationJSON(), null, 2)}
-                </code>
-              </pre>
-            </ScrollArea>
-          </DialogContent>
-        </Dialog>
+        <div className="absolute top-4 right-4 z-20 flex gap-2">
+          <Dialog open={showBlueprintModal} onOpenChange={setShowBlueprintModal}>
+            <DialogTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                className="bg-white/90 backdrop-blur-sm border-purple-200 text-purple-600 hover:bg-purple-50 hover:text-purple-700 shadow-lg"
+              >
+                Blueprint
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-6xl max-h-[80vh] overflow-hidden">
+              <DialogHeader>
+                <DialogTitle className="text-lg font-semibold text-purple-600">
+                  YusrAI Execution Blueprint Visualizer
+                </DialogTitle>
+              </DialogHeader>
+              <ScrollArea className="h-[60vh] w-full">
+                <ExecutionBlueprintVisualizer 
+                  blueprint={getCompleteAutomationJSON()?.yusrai_response?.execution_blueprint} 
+                />
+              </ScrollArea>
+            </DialogContent>
+          </Dialog>
+          
+          <Dialog open={showCodeModal} onOpenChange={setShowCodeModal}>
+            <DialogTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                className="bg-white/90 backdrop-blur-sm border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 shadow-lg"
+              >
+                <Code className="w-4 h-4 mr-1" />
+                View Code
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+              <DialogHeader>
+                <DialogTitle className="text-lg font-semibold text-blue-600">
+                  Complete YusrAI Automation JSON - 7 Sections Validated
+                </DialogTitle>
+              </DialogHeader>
+              <ScrollArea className="h-[60vh] w-full">
+                <pre className="bg-gray-900 text-green-400 p-4 rounded-lg text-xs overflow-x-auto">
+                  <code>
+                    {JSON.stringify(getCompleteAutomationJSON(), null, 2)}
+                  </code>
+                </pre>
+              </ScrollArea>
+            </DialogContent>
+          </Dialog>
+        </div>
       )}
       
       <ScrollArea className="flex-1 relative z-10 p-6 max-h-[calc(100vh-200px)]" ref={scrollAreaRef}>
@@ -681,8 +308,8 @@ const ChatCard = ({
           {optimizedMessages.map(message => {
             let structuredData = message.structuredData;
             
-            // Try to parse structured data from bot messages
-            if (message.isBot && !structuredData) {
+            // Try to parse structured data from YusrAI bot messages
+            if (message.isBot && !structuredData && message.yusrai_powered) {
               try {
                 structuredData = parseYusrAIStructuredResponse(message.text);
               } catch (error: any) {
@@ -706,7 +333,12 @@ const ChatCard = ({
                         alt="YusrAI" 
                         className="w-5 h-5 object-contain"
                       />
-                      <span className="text-sm font-medium text-blue-600">YusrAI (Fresh AI)</span>
+                      <span className="text-sm font-medium text-blue-600">
+                        YusrAI {message.yusrai_powered ? '(7-Section Validated)' : '(Processing)'}
+                      </span>
+                      {message.seven_sections_validated && (
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      )}
                     </div>
                   )}
                   
@@ -717,10 +349,20 @@ const ChatCard = ({
                     </div>
                   )}
 
-                  {/* Render YusrAI structured content for bot messages if available */}
-                  {message.isBot && structuredData ? (
+                  {/* Render YusrAI structured content for validated bot messages */}
+                  {message.isBot && structuredData && message.yusrai_powered ? (
                     <div className="leading-relaxed space-y-4">
-                      {renderYusrAIStructuredContent(structuredData, message.error_help_available)}
+                      <YusrAIStructuredDisplay
+                        data={structuredData}
+                        onAgentAdd={handleAgentAdd}
+                        onAgentDismiss={handleAgentDismiss}
+                        dismissedAgents={dismissedAgents}
+                        onPlatformCredentialClick={handlePlatformCredentialClick}
+                        platformCredentialStatus={platformCredentialStatus}
+                        onTestCredentials={testPlatformCredentials}
+                        onExecuteAutomation={onExecuteAutomation || handleExecuteAutomation}
+                        isReadyForExecution={checkReadyForExecution()}
+                      />
                     </div>
                   ) : (
                     <div className="leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
@@ -755,7 +397,7 @@ const ChatCard = ({
                     alt="YusrAI" 
                     className="w-5 h-5 object-contain animate-pulse"
                   />
-                  <span className="font-medium">YusrAI is creating your comprehensive automation...</span>
+                  <span className="font-medium">YusrAI is creating your comprehensive 7-section automation...</span>
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
                     <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>

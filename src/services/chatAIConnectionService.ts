@@ -16,6 +16,8 @@ export interface ChatAIRequest {
 export interface ChatAIResponse {
   response: string;
   structuredData?: any;
+  yusrai_powered?: boolean;
+  seven_sections_validated?: boolean;
   error_help_available?: boolean;
   training_acknowledged?: boolean;
   memory_updated?: boolean;
@@ -24,7 +26,7 @@ export interface ChatAIResponse {
 class ChatAIConnectionService {
   async processConnectionRequest(request: ChatAIRequest): Promise<ChatAIResponse> {
     try {
-      console.log('🚀 Processing YusrAI chat request:', request.message);
+      console.log('🚀 Processing YusrAI 7-section request:', request.message);
       
       const { data, error } = await supabase.functions.invoke('chat-ai', {
         body: {
@@ -32,8 +34,7 @@ class ChatAIConnectionService {
           userId: request.userId,
           messages: request.messages || [],
           context: request.context || 'yusrai_automation_creation',
-          automationContext: request.automationContext,
-          isTrainingMode: false
+          automationContext: request.automationContext
         }
       });
 
@@ -42,19 +43,20 @@ class ChatAIConnectionService {
         throw new Error(`YusrAI Chat AI service error: ${error.message}`);
       }
 
-      console.log('✅ YusrAI Chat AI response received:', data);
+      console.log('✅ YusrAI 7-section response received:', data);
 
       // Ensure we have a proper response
       if (!data || !data.response) {
-        console.warn('⚠️ Empty response from YusrAI Chat AI, using fallback');
+        console.warn('⚠️ Empty response from YusrAI, using fallback');
         return {
           response: JSON.stringify({
             summary: "I'm YusrAI, ready to help you create comprehensive automations with platform integrations and AI agents.",
             steps: [
               "Tell me what automation you'd like to create",
-              "I'll provide a complete blueprint with platforms, credentials, and AI agents",
-              "Configure your platform credentials using the provided guidance",
+              "I'll provide a complete blueprint with platforms and AI agents",
+              "Configure your platform credentials using my guidance",
               "Test your integrations with real API calls",
+              "Add recommended AI agents for intelligent decision-making",
               "Execute your automation with full monitoring and error handling"
             ],
             platforms: [],
@@ -80,34 +82,37 @@ class ChatAIConnectionService {
               }
             }
           }),
+          yusrai_powered: true,
+          seven_sections_validated: true,
           error_help_available: true
         };
       }
 
-      // Try to parse structured data from the response - improved for GPT-4o-mini
+      // Parse structured data
       let structuredData = null;
       try {
-        // Since we're enforcing JSON structure with response_format in the OpenAI request,
-        // the entire response should be valid JSON already
         structuredData = JSON.parse(data.response);
-        console.log('📊 Successfully parsed structured data from YusrAI response:', structuredData);
+        console.log('📊 Successfully parsed YusrAI 7-section structured data:', structuredData);
       } catch (parseError) {
-        console.log('⚠️ Error parsing structured JSON response:', parseError);
-        // Fallback to regex pattern extraction if JSON parsing fails
+        console.log('⚠️ Error parsing YusrAI JSON response:', parseError);
+        
+        // Fallback regex extraction
         try {
           const jsonMatch = data.response.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             structuredData = JSON.parse(jsonMatch[0]);
-            console.log('📊 Extracted valid JSON using regex:', structuredData);
+            console.log('📊 Extracted YusrAI JSON using regex:', structuredData);
           }
         } catch (fallbackError) {
-          console.log('❌ All JSON parsing attempts failed, treating as text');
+          console.log('❌ All YusrAI JSON parsing attempts failed');
         }
       }
 
       return {
         response: data.response,
         structuredData: structuredData,
+        yusrai_powered: data.yusrai_powered || true,
+        seven_sections_validated: data.seven_sections_validated || false,
         error_help_available: data.error_help_available || false,
         training_acknowledged: data.training_acknowledged || false,
         memory_updated: data.memory_updated || false
@@ -121,26 +126,26 @@ class ChatAIConnectionService {
 
   async generateTestConfig(platformName: string): Promise<any> {
     try {
-      console.log(`🔧 Generating test config for: ${platformName}`);
+      console.log(`🔧 Generating YusrAI test config for: ${platformName}`);
       
       const { data, error } = await supabase.functions.invoke('chat-ai', {
         body: {
           generateTestConfig: true,
           platformName: platformName,
-          message: `Generate test configuration for ${platformName}`
+          message: `Generate test configuration for ${platformName} with real API endpoints and exact headers`
         }
       });
 
       if (error) {
-        console.error('❌ Test config generation error:', error);
+        console.error('❌ YusrAI test config generation error:', error);
         throw new Error(`Failed to generate test config: ${error.message}`);
       }
 
-      console.log('✅ Test config generated:', data);
+      console.log('✅ YusrAI test config generated:', data);
       return data.testConfig || null;
 
     } catch (error: any) {
-      console.error('💥 Test config generation failed:', error);
+      console.error('💥 YusrAI test config generation failed:', error);
       throw error;
     }
   }

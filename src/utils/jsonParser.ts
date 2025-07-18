@@ -1,8 +1,8 @@
 
 export interface YusrAIStructuredResponse {
-  summary?: string;
-  steps?: string[];
-  platforms?: Array<{
+  summary: string;
+  steps: string[];
+  platforms: Array<{
     name: string;
     credentials: Array<{
       field: string;
@@ -13,20 +13,20 @@ export interface YusrAIStructuredResponse {
       example?: string;
     }>;
   }>;
-  clarification_questions?: string[];
-  agents?: Array<{
+  clarification_questions: string[];
+  agents: Array<{
     name: string;
-    role: string;
+    role: 'Decision Maker' | 'Data Processor' | 'Monitor' | 'Validator' | 'Responder' | 'Custom';
     rule: string;
     goal: string;
     memory: string;
     why_needed: string;
     custom_config?: any;
-    test_scenarios?: string[];
+    test_scenarios: string[];
   }>;
-  test_payloads?: {
+  test_payloads: {
     [platform_name: string]: {
-      method: string;
+      method: 'GET' | 'POST' | 'PUT' | 'DELETE';
       endpoint: string;
       headers: Record<string, string>;
       body?: any;
@@ -34,9 +34,9 @@ export interface YusrAIStructuredResponse {
       error_patterns: Record<string, string>;
     };
   };
-  execution_blueprint?: {
+  execution_blueprint: {
     trigger: {
-      type: string;
+      type: 'webhook' | 'schedule' | 'manual' | 'event';
       configuration: any;
     };
     workflow: Array<{
@@ -77,72 +77,64 @@ export interface YusrAIStructuredResponse {
 
 export function parseYusrAIStructuredResponse(responseText: string): YusrAIStructuredResponse | null {
   try {
-    console.log('🔍 Parsing YusrAI structured response from text:', responseText.substring(0, 200));
+    console.log('🔍 Parsing YusrAI 7-section response');
     
-    // First try to extract JSON from the response
-    const jsonMatches = responseText.match(/\{[\s\S]*\}/g);
-    if (jsonMatches) {
-      for (const match of jsonMatches) {
-        try {
-          const parsed = JSON.parse(match);
-          if (parsed && (
-            parsed.summary || 
-            parsed.steps || 
-            parsed.platforms || 
-            parsed.clarification_questions || 
-            parsed.agents || 
-            parsed.test_payloads || 
-            parsed.execution_blueprint
-          )) {
-            console.log('✅ Found YusrAI structured data in JSON:', parsed);
-            return parsed;
-          }
-        } catch (e) {
-          continue;
-        }
+    // First try direct JSON parse
+    let parsed: YusrAIStructuredResponse;
+    try {
+      parsed = JSON.parse(responseText);
+    } catch (e) {
+      // Try to extract JSON from text
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.error('No JSON found in YusrAI response');
+        return null;
       }
+      parsed = JSON.parse(jsonMatch[0]);
     }
 
-    // If no JSON found, try to extract structured information from text
-    const structuredData: YusrAIStructuredResponse = {};
-
-    // Extract summary from the beginning
-    const sentences = responseText.split(/[.!?]+/).filter(s => s.trim().length > 10);
-    if (sentences.length > 0) {
-      structuredData.summary = sentences.slice(0, 2).join('. ').trim() + '.';
+    // Validate all 7 mandatory sections
+    const requiredSections = ['summary', 'steps', 'platforms', 'clarification_questions', 'agents', 'test_payloads', 'execution_blueprint'];
+    const missing = requiredSections.filter(section => !parsed[section]);
+    
+    if (missing.length > 0) {
+      console.error(`❌ Missing required YusrAI sections: ${missing.join(', ')}`);
+      return null;
     }
 
-    // Extract steps from numbered lists
-    const stepMatches = responseText.match(/(?:^|\n)\s*\d+\.\s*(.+?)(?=\n|$)/gm);
-    if (stepMatches) {
-      structuredData.steps = stepMatches.map(step => 
-        step.replace(/^\s*\d+\.\s*/, '').trim()
-      );
+    // Ensure proper structure
+    if (!Array.isArray(parsed.steps) || parsed.steps.length < 3) {
+      console.error('❌ Steps must be array with at least 3 items');
+      return null;
     }
 
-    // Extract platforms mentioned in the text
-    const platformMatches = responseText.match(/(?:platform|service|integration)[\s:]*([A-Za-z]+(?:\s+[A-Za-z]+)*)/gi);
-    if (platformMatches) {
-      const platforms = platformMatches
-        .map(match => match.replace(/(?:platform|service|integration)[\s:]*/gi, '').trim())
-        .filter(name => name.length > 2 && name.length < 20);
-      
-      if (platforms.length > 0) {
-        structuredData.platforms = platforms.map(name => ({
-          name: name,
-          credentials: [
-            {
-              field: 'api_key',
-              why_needed: `Required for ${name} integration`,
-              link: `https://${name.toLowerCase().replace(/\s+/g, '')}.com/developers`
-            }
-          ]
-        }));
-      }
+    if (!Array.isArray(parsed.platforms)) {
+      console.error('❌ Platforms must be array');
+      return null;
     }
 
-    console.log('📊 Extracted YusrAI structured data:', structuredData);
-    return Object.keys(structuredData).length > 0 ? structuredData : null;
+    if (!Array.isArray(parsed.clarification_questions)) {
+      console.error('❌ Clarification questions must be array');
+      return null;
+    }
+
+    if (!Array.isArray(parsed.agents)) {
+      console.error('❌ Agents must be array');
+      return null;
+    }
+
+    if (typeof parsed.test_payloads !== 'object') {
+      console.error('❌ Test payloads must be object');
+      return null;
+    }
+
+    if (!parsed.execution_blueprint || !parsed.execution_blueprint.trigger || !Array.isArray(parsed.execution_blueprint.workflow)) {
+      console.error('❌ Execution blueprint must have trigger and workflow array');
+      return null;
+    }
+
+    console.log('✅ YusrAI 7-section validation successful');
+    return parsed;
 
   } catch (error) {
     console.error('❌ Error parsing YusrAI structured response:', error);
@@ -152,7 +144,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIStruc
 
 export function cleanDisplayText(text: string): string {
   if (!text || typeof text !== 'string') {
-    return 'Processing automation details...';
+    return 'Processing YusrAI automation details...';
   }
 
   // Remove JSON blocks from display text
@@ -163,7 +155,7 @@ export function cleanDisplayText(text: string): string {
   
   // If text is too short after cleaning, provide a default
   if (cleanText.length < 20) {
-    return 'I\'m ready to help you create comprehensive automations with platform integrations.';
+    return 'YusrAI has analyzed your request and created a comprehensive automation blueprint.';
   }
   
   return cleanText;

@@ -260,11 +260,21 @@ const AutomationDetail = () => {
         console.log('🔄 Processing stored chat message:', chat.message_content.substring(0, 100));
         
         let structuredData = null;
+        let yusraiPowered = false;
+        let sevenSectionsValidated = false;
         
-        // Parse structured data from AI messages using new parser
+        // Parse structured data from AI messages using enhanced parser
         if (chat.sender === 'ai') {
-          structuredData = parseStructuredResponse(chat.message_content);
-          console.log('📦 Extracted structured data from stored message:', !!structuredData);
+          const parseResult = parseYusrAIStructuredResponse(chat.message_content);
+          structuredData = parseResult.structuredData;
+          yusraiPowered = parseResult.metadata.yusrai_powered || false;
+          sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
+          
+          console.log('📦 Enhanced parsing result:', {
+            hasStructuredData: !!structuredData,
+            yusraiPowered,
+            sevenSectionsValidated
+          });
         }
 
         return {
@@ -272,7 +282,9 @@ const AutomationDetail = () => {
           text: chat.message_content,
           isBot: chat.sender === 'ai',
           timestamp: new Date(chat.timestamp),
-          structuredData
+          structuredData,
+          yusrai_powered: yusraiPowered,
+          seven_sections_validated: sevenSectionsValidated
         };
       });
 
@@ -374,9 +386,27 @@ const AutomationDetail = () => {
 
       console.log('✅ Received response from chat-ai function');
 
-      // The response is now already a parsed object (no double wrapping)
-      let structuredData = data;
+      // Enhanced response processing with new parser
+      let structuredData = null;
       let aiResponseText = "";
+      let yusraiPowered = false;
+      let sevenSectionsValidated = false;
+
+      // Parse the response using the enhanced parser
+      if (data && (data.response || typeof data === 'string')) {
+        const responseText = data.response || (typeof data === 'string' ? data : JSON.stringify(data));
+        const parseResult = parseYusrAIStructuredResponse(responseText);
+        
+        structuredData = parseResult.structuredData;
+        yusraiPowered = parseResult.metadata.yusrai_powered || false;
+        sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
+        
+        console.log('📋 Enhanced processing result:', {
+          hasStructuredData: !!structuredData,
+          yusraiPowered,
+          sevenSectionsValidated
+        });
+      }
 
       // Enhanced display text creation from structured data
       if (structuredData) {
@@ -427,10 +457,12 @@ const AutomationDetail = () => {
         text: aiResponseText,
         isBot: true,
         timestamp: new Date(),
-        structuredData: structuredData
+        structuredData: structuredData,
+        yusrai_powered: yusraiPowered,
+        seven_sections_validated: sevenSectionsValidated
       };
 
-      console.log('📤 Adding AI message to chat');
+      console.log('📤 Adding AI message to chat with enhanced metadata');
       setMessages(prev => [...prev, aiMessage]);
 
       // Handle platform management
@@ -500,13 +532,14 @@ const AutomationDetail = () => {
         }
       }
 
-      // Save AI response to database (save the structured data as JSON string)
+      // Save AI response to database (save the original response format)
+      const responseToSave = data.response || (typeof data === 'string' ? data : JSON.stringify(data));
       await supabase
         .from('automation_chats')
         .insert({
           automation_id: automation.id,
           sender: 'ai',
-          message_content: JSON.stringify(structuredData)
+          message_content: responseToSave
         });
 
     } catch (error) {

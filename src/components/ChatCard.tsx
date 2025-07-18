@@ -1,4 +1,3 @@
-
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { User, Code, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -308,10 +307,25 @@ const ChatCard = ({
           {optimizedMessages.map(message => {
             let structuredData = message.structuredData;
             
-            // Try to parse structured data from YusrAI bot messages
-            if (message.isBot && !structuredData && message.yusrai_powered) {
+            // Enhanced parsing for bot messages using new parser
+            if (message.isBot && !structuredData) {
               try {
-                structuredData = parseYusrAIStructuredResponse(message.text);
+                const parseResult = parseYusrAIStructuredResponse(message.text);
+                structuredData = parseResult.structuredData;
+                
+                // Update message metadata
+                if (!message.yusrai_powered && parseResult.metadata.yusrai_powered) {
+                  message.yusrai_powered = parseResult.metadata.yusrai_powered;
+                }
+                if (!message.seven_sections_validated && parseResult.metadata.seven_sections_validated) {
+                  message.seven_sections_validated = parseResult.metadata.seven_sections_validated;
+                }
+                
+                console.log('🔄 Enhanced runtime parsing for message:', {
+                  hasStructuredData: !!structuredData,
+                  yusraiPowered: message.yusrai_powered,
+                  sevenSectionsValidated: message.seven_sections_validated
+                });
               } catch (error: any) {
                 console.log('Could not parse YusrAI structured data from message:', error);
                 structuredData = null;
@@ -349,7 +363,7 @@ const ChatCard = ({
                     </div>
                   )}
 
-                  {/* Render YusrAI structured content for validated bot messages */}
+                  {/* Enhanced rendering for YusrAI structured content */}
                   {message.isBot && structuredData && message.yusrai_powered ? (
                     <div className="leading-relaxed space-y-4">
                       <YusrAIStructuredDisplay

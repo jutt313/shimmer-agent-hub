@@ -75,70 +75,116 @@ export interface YusrAIStructuredResponse {
   };
 }
 
-export function parseYusrAIStructuredResponse(responseText: string): YusrAIStructuredResponse | null {
+export interface YusrAIResponseMetadata {
+  yusrai_powered?: boolean;
+  seven_sections_validated?: boolean;
+  error_help_available?: boolean;
+}
+
+export interface YusrAIParseResult {
+  structuredData: YusrAIStructuredResponse | null;
+  metadata: YusrAIResponseMetadata;
+}
+
+export function parseYusrAIStructuredResponse(responseText: string): YusrAIParseResult {
   try {
-    console.log('🔍 Parsing YusrAI 7-section response');
+    console.log('🔍 Parsing YusrAI response - checking format');
     
-    // First try direct JSON parse
-    let parsed: YusrAIStructuredResponse;
+    let parsedResponse: any;
+    let metadata: YusrAIResponseMetadata = {};
+    
+    // First try to parse the response
     try {
-      parsed = JSON.parse(responseText);
+      parsedResponse = JSON.parse(responseText);
     } catch (e) {
       // Try to extract JSON from text
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         console.error('No JSON found in YusrAI response');
-        return null;
+        return { structuredData: null, metadata };
       }
-      parsed = JSON.parse(jsonMatch[0]);
+      parsedResponse = JSON.parse(jsonMatch[0]);
+    }
+
+    // Check if this is a wrapped response from chat-AI function
+    if (parsedResponse.response && typeof parsedResponse.response === 'string') {
+      console.log('🎯 Detected wrapped YusrAI response format from chat-AI function');
+      
+      // Extract metadata
+      metadata.yusrai_powered = parsedResponse.yusrai_powered || false;
+      metadata.seven_sections_validated = parsedResponse.seven_sections_validated || false;
+      metadata.error_help_available = parsedResponse.error_help_available || false;
+      
+      // Parse the inner JSON response
+      try {
+        parsedResponse = JSON.parse(parsedResponse.response);
+        console.log('✅ Successfully extracted inner YusrAI JSON from wrapper');
+      } catch (innerError) {
+        console.error('❌ Failed to parse inner YusrAI JSON:', innerError);
+        return { structuredData: null, metadata };
+      }
+    } else {
+      console.log('📄 Processing direct YusrAI JSON format');
+      // For direct responses, assume they are YusrAI powered
+      metadata.yusrai_powered = true;
     }
 
     // Validate all 7 mandatory sections
     const requiredSections = ['summary', 'steps', 'platforms', 'clarification_questions', 'agents', 'test_payloads', 'execution_blueprint'];
-    const missing = requiredSections.filter(section => !parsed[section]);
+    const missing = requiredSections.filter(section => !parsedResponse[section]);
     
     if (missing.length > 0) {
       console.error(`❌ Missing required YusrAI sections: ${missing.join(', ')}`);
-      return null;
+      return { structuredData: null, metadata };
     }
 
-    // Ensure proper structure
-    if (!Array.isArray(parsed.steps) || parsed.steps.length < 3) {
-      console.error('❌ Steps must be array with at least 3 items');
-      return null;
+    // Detailed validation
+    if (!parsedResponse.summary || parsedResponse.summary.trim().length < 20) {
+      console.error('❌ Summary section invalid - must be 2-3 lines');
+      return { structuredData: null, metadata };
     }
-
-    if (!Array.isArray(parsed.platforms)) {
+    
+    if (!Array.isArray(parsedResponse.steps) || parsedResponse.steps.length < 3) {
+      console.error('❌ Steps must be array with at least 3 detailed steps');
+      return { structuredData: null, metadata };
+    }
+    
+    if (!Array.isArray(parsedResponse.platforms)) {
       console.error('❌ Platforms must be array');
-      return null;
+      return { structuredData: null, metadata };
     }
-
-    if (!Array.isArray(parsed.clarification_questions)) {
+    
+    if (!Array.isArray(parsedResponse.clarification_questions)) {
       console.error('❌ Clarification questions must be array');
-      return null;
+      return { structuredData: null, metadata };
     }
-
-    if (!Array.isArray(parsed.agents)) {
+    
+    if (!Array.isArray(parsedResponse.agents)) {
       console.error('❌ Agents must be array');
-      return null;
+      return { structuredData: null, metadata };
     }
-
-    if (typeof parsed.test_payloads !== 'object') {
+    
+    if (typeof parsedResponse.test_payloads !== 'object') {
       console.error('❌ Test payloads must be object');
-      return null;
+      return { structuredData: null, metadata };
     }
-
-    if (!parsed.execution_blueprint || !parsed.execution_blueprint.trigger || !Array.isArray(parsed.execution_blueprint.workflow)) {
+    
+    if (!parsedResponse.execution_blueprint || !parsedResponse.execution_blueprint.trigger || !Array.isArray(parsedResponse.execution_blueprint.workflow)) {
       console.error('❌ Execution blueprint must have trigger and workflow array');
-      return null;
+      return { structuredData: null, metadata };
     }
 
     console.log('✅ YusrAI 7-section validation successful');
-    return parsed;
+    metadata.seven_sections_validated = true;
+    
+    return { 
+      structuredData: parsedResponse as YusrAIStructuredResponse, 
+      metadata 
+    };
 
   } catch (error) {
     console.error('❌ Error parsing YusrAI structured response:', error);
-    return null;
+    return { structuredData: null, metadata: {} };
   }
 }
 
@@ -163,4 +209,7 @@ export function cleanDisplayText(text: string): string {
 
 // Legacy support for backwards compatibility
 export interface StructuredResponse extends YusrAIStructuredResponse {}
-export const parseStructuredResponse = parseYusrAIStructuredResponse;
+export const parseStructuredResponse = (responseText: string): YusrAIStructuredResponse | null => {
+  const result = parseYusrAIStructuredResponse(responseText);
+  return result.structuredData;
+};

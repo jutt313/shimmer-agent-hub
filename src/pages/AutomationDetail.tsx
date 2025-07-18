@@ -14,7 +14,7 @@ import BlueprintCard from "@/components/BlueprintCard";
 import AutomationDiagramDisplay from "@/components/AutomationDiagramDisplay";
 import AutomationExecuteButton from "@/components/AutomationExecuteButton";
 import { AutomationBlueprint } from "@/types/automation";
-import { parseStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
+import { parseStructuredResponse, parseYusrAIStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
 import AutomationExecutionPanel from "@/components/AutomationExecutionPanel";
 import { agentStateManager } from '@/utils/agentStateManager';
 

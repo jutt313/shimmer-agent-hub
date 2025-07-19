@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,7 @@ const ModernCredentialForm = ({
   const [apiResponse, setApiResponse] = useState<any>(null);
   const [automationContext, setAutomationContext] = useState<any>(null);
   const [aiGeneratedTestConfig, setAiGeneratedTestConfig] = useState<any>(null);
+  const [isGeneratingConfig, setIsGeneratingConfig] = useState(false);
 
   // AI Configuration States
   const [selectedModel, setSelectedModel] = useState<string>('');
@@ -102,7 +104,6 @@ const ModernCredentialForm = ({
 
   const loadAutomationContext = async () => {
     try {
-      // Get automation context from Supabase
       const { data: automationData } = await supabase
         .from('automations')
         .select('*')
@@ -117,16 +118,16 @@ const ModernCredentialForm = ({
     }
   };
 
-  /**
-   * FULLY DYNAMIC: Generate AI test configuration for the platform
-   */
   const generateAITestConfiguration = async () => {
+    if (!platform.name) return;
+    
+    setIsGeneratingConfig(true);
     try {
       console.log(`🤖 Generating AI test configuration for ${platform.name}`);
       
       const { data, error } = await supabase.functions.invoke('chat-ai', {
         body: {
-          message: `Generate COMPLETE test configuration for ${platform.name} platform including:
+          message: `Generate COMPLETE and COMPREHENSIVE test configuration for ${platform.name} platform.
 
 CRITICAL: Return ONLY valid JSON with ALL required fields:
 {
@@ -138,7 +139,8 @@ CRITICAL: Return ONLY valid JSON with ALL required fields:
       "Authorization": "Bearer {api_key}",
       "Content-Type": "application/json"
     },
-    "query_params": {}
+    "query_params": {},
+    "body": null
   },
   "authentication": {
     "type": "bearer",
@@ -151,7 +153,8 @@ CRITICAL: Return ONLY valid JSON with ALL required fields:
   "validation_rules": {
     "api_key": {
       "prefix": "sk-",
-      "min_length": 20
+      "min_length": 20,
+      "format": "alphanumeric"
     }
   },
   "field_mappings": {
@@ -159,8 +162,10 @@ CRITICAL: Return ONLY valid JSON with ALL required fields:
   },
   "error_patterns": {
     "401": "Invalid credentials",
-    "403": "Access denied"
-  }
+    "403": "Access denied",
+    "404": "Endpoint not found"
+  },
+  "test_description": "Test ${platform.name} API connectivity and authentication"
 }
 
 Platform: ${platform.name}
@@ -172,6 +177,7 @@ Return ONLY the JSON configuration with NO text before or after.`,
 
       if (error) {
         console.error('Failed to generate AI test config:', error);
+        setAiGeneratedTestConfig(null);
         return;
       }
 
@@ -187,22 +193,28 @@ Return ONLY the JSON configuration with NO text before or after.`,
         }
       } catch (parseError) {
         console.error('Failed to parse AI test config:', parseError);
+        setAiGeneratedTestConfig(null);
         return;
       }
 
-      if (testConfig) {
+      if (testConfig && testConfig.base_url) {
         setAiGeneratedTestConfig(testConfig);
-        console.log(`✅ AI test configuration generated for ${platform.name}`);
+        console.log(`✅ AI test configuration generated for ${platform.name}:`, testConfig);
+      } else {
+        console.warn('Invalid AI test configuration generated');
+        setAiGeneratedTestConfig(null);
       }
 
     } catch (error) {
       console.error('Failed to generate AI test configuration:', error);
+      setAiGeneratedTestConfig(null);
+    } finally {
+      setIsGeneratingConfig(false);
     }
   };
 
   const generateAutomationContextPayload = async () => {
     try {
-      // Include AI model configs in the payload
       let credentialsWithAI = { ...credentials };
       if (selectedModel) credentialsWithAI.model = selectedModel;
       if (systemPrompt) credentialsWithAI.system_prompt = systemPrompt;
@@ -215,7 +227,6 @@ Return ONLY the JSON configuration with NO text before or after.`,
       setAutomationContextPayload(sampleCall);
     } catch (error) {
       console.error('Failed to generate automation context payload:', error);
-      // Fallback to basic payload
       const fallbackPayload = {
         task_description: `${platform.name} operation for automation: ${automationContext?.title || 'Unnamed Automation'}`,
         automation_context: 'Automation-aware testing',
@@ -255,9 +266,6 @@ Return ONLY the JSON configuration with NO text before or after.`,
     credentials[cred.field] && credentials[cred.field].trim() !== ''
   );
 
-  /**
-   * FULLY DYNAMIC: Test credentials using AI-generated configuration
-   */
   const handleTest = async () => {
     if (!user || !hasAllCredentials || !aiGeneratedTestConfig) return;
 
@@ -265,19 +273,17 @@ Return ONLY the JSON configuration with NO text before or after.`,
     setApiResponse(null);
     
     try {
-      // CRITICAL: Include AI model configs in credentials for testing
       let credentialsWithAI = { ...credentials };
       if (selectedModel) credentialsWithAI.model = selectedModel;
       if (systemPrompt) credentialsWithAI.system_prompt = systemPrompt;
 
-      console.log(`🧪 FULLY DYNAMIC Testing ${platform.name} with AI-generated config:`, Object.keys(credentialsWithAI));
+      console.log(`🧪 Testing ${platform.name} with AI-generated config:`, Object.keys(credentialsWithAI));
 
-      // Call the FULLY DYNAMIC test-credential function with AI config
       const { data: result, error } = await supabase.functions.invoke('test-credential', {
         body: {
           platformName: platform.name,
           credentials: credentialsWithAI,
-          testConfig: aiGeneratedTestConfig, // ← CRITICAL: Pass AI-generated config
+          testConfig: aiGeneratedTestConfig,
           userId: user.id
         }
       });
@@ -291,18 +297,18 @@ Return ONLY the JSON configuration with NO text before or after.`,
       
       if (result.success) {
         toast({
-          title: "✅ Fully Dynamic Test Successful",
+          title: "✅ Dynamic Test Successful",
           description: `${platform.name} credentials work with AI-generated dynamic testing!`,
         });
       } else {
         toast({
-          title: "❌ Fully Dynamic Test Failed",
+          title: "❌ Dynamic Test Failed",
           description: result.message,
           variant: "destructive",
         });
       }
     } catch (error: any) {
-      console.error(`💥 Fully dynamic test error for ${platform.name}:`, error);
+      console.error(`💥 Dynamic test error for ${platform.name}:`, error);
       toast({
         title: "Dynamic Test Error",
         description: error.message,
@@ -318,7 +324,6 @@ Return ONLY the JSON configuration with NO text before or after.`,
 
     setIsSaving(true);
     try {
-      // CRITICAL: Include AI model configs when saving
       let credentialsToSave = { ...credentials };
       if (selectedModel) credentialsToSave.model = selectedModel;
       if (systemPrompt) credentialsToSave.system_prompt = systemPrompt;
@@ -378,17 +383,22 @@ Return ONLY the JSON configuration with NO text before or after.`,
           </DialogTitle>
           <div className="text-gray-600 mt-2 space-y-1">
             <p className="font-medium">Automation: {automationContext?.title || 'Loading...'}</p>
-            <p className="text-sm">{automationContext?.description || 'Test your credentials with AI-generated dynamic configurations.'}</p>
+            <p className="text-sm">{automationContext?.description || 'Configure your credentials with AI-generated dynamic testing.'}</p>
+            {isGeneratingConfig && (
+              <div className="text-xs text-blue-600 flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span>Generating AI test configuration...</span>
+              </div>
+            )}
             {aiGeneratedTestConfig && (
               <div className="text-xs text-green-600 flex items-center gap-1">
                 <Sparkles className="w-3 h-3" />
-                <span>AI test configuration generated and ready</span>
+                <span>AI test configuration ready: {aiGeneratedTestConfig.base_url}</span>
               </div>
             )}
           </div>
         </DialogHeader>
 
-        {/* FIXED: Make the entire content area scrollable */}
         <ScrollArea className="h-[600px] w-full">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 px-2">
             {/* Left Side - Credential Form */}
@@ -396,7 +406,7 @@ Return ONLY the JSON configuration with NO text before or after.`,
               <div className="bg-gradient-to-br from-purple-50 via-blue-50 to-green-50 rounded-2xl p-6 border border-purple-200/50">
                 <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
                   <TestTube className="w-5 h-5 text-purple-600" />
-                  Fully Dynamic Credentials
+                  Dynamic Platform Credentials
                 </h3>
                 
                 <div className="space-y-5">
@@ -415,15 +425,10 @@ Return ONLY the JSON configuration with NO text before or after.`,
                             <div className="group relative">
                               <Info className="h-4 w-4 text-gray-400 cursor-help" />
                               <div className="absolute left-0 top-6 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
-                                <strong>For fully dynamic automation:</strong> {cred.why_needed}
+                                <strong>For dynamic automation:</strong> {cred.why_needed}
                                 {automationContext && (
                                   <div className="mt-2 pt-2 border-t border-gray-700">
                                     <strong>Workflow:</strong> {automationContext.title}
-                                  </div>
-                                )}
-                                {aiGeneratedTestConfig && (
-                                  <div className="mt-2 pt-2 border-t border-gray-700">
-                                    <strong>AI Config:</strong> Dynamic testing ready
                                   </div>
                                 )}
                               </div>
@@ -471,7 +476,7 @@ Return ONLY the JSON configuration with NO text before or after.`,
                     );
                   })}
 
-                  {/* AI MODEL CONFIGURATION for AI platforms */}
+                  {/* AI Model Configuration for AI platforms */}
                   {isAIPlatform && (
                     <div className="space-y-5 pt-4 border-t border-purple-200">
                       <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -497,13 +502,14 @@ Return ONLY the JSON configuration with NO text before or after.`,
 
                       {isAIPlatform.supportsSystemPrompt && (
                         <div className="space-y-3">
-                          <Label className="text-sm font-medium text-gray-700">System Prompt (Optional)</Label>
+                          <Label className="text-sm font-medium text-gray-700">System Prompt (Saved for Automation)</Label>
                           <Textarea
                             placeholder="You are a helpful AI assistant..."
                             value={systemPrompt}
                             onChange={(e) => setSystemPrompt(e.target.value)}
                             className="rounded-xl border-purple-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 bg-white/70 min-h-[100px]"
                           />
+                          <p className="text-xs text-gray-500">This system prompt will be saved and used for all automation calls.</p>
                         </div>
                       )}
                     </div>
@@ -551,17 +557,17 @@ Return ONLY the JSON configuration with NO text before or after.`,
               </div>
             </div>
 
-            {/* Right Side - AI Configuration API Playground */}
+            {/* Right Side - AI Configuration & Test Results */}
             <div className="space-y-4">
-              {/* AI Configuration Info */}
+              {/* AI Configuration Status */}
               <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-200/50">
                 <h4 className="text-sm font-semibold text-indigo-900 mb-2 flex items-center gap-2">
                   <Sparkles className="w-4 h-4" />
-                  AI Dynamic Configuration
+                  AI Dynamic Configuration Status
                 </h4>
                 <div className="text-xs text-indigo-700 space-y-1">
                   <p><strong>Platform:</strong> {platform.name}</p>
-                  <p><strong>Status:</strong> {aiGeneratedTestConfig ? '✅ AI Config Ready' : '⏳ Generating...'}</p>
+                  <p><strong>Status:</strong> {isGeneratingConfig ? '⏳ Generating...' : aiGeneratedTestConfig ? '✅ Config Ready' : '❌ Failed'}</p>
                   {aiGeneratedTestConfig && (
                     <p><strong>Base URL:</strong> {aiGeneratedTestConfig.base_url}</p>
                   )}
@@ -572,12 +578,12 @@ Return ONLY the JSON configuration with NO text before or after.`,
               <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl p-6 border border-green-200/50">
                 <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <TestTube className="w-5 h-5 text-green-600" />
-                  AI-Generated Test Config
+                  AI-Generated Test Configuration
                 </h4>
                 <ScrollArea className="h-[200px] w-full">
                   <div className="bg-gray-900 rounded-xl p-4">
                     <pre className="text-green-400 text-sm font-mono whitespace-pre-wrap">
-                      {aiGeneratedTestConfig ? JSON.stringify(aiGeneratedTestConfig, null, 2) : 'Generating AI test configuration...'}
+                      {aiGeneratedTestConfig ? JSON.stringify(aiGeneratedTestConfig, null, 2) : 'No test configuration available'}
                     </pre>
                   </div>
                 </ScrollArea>

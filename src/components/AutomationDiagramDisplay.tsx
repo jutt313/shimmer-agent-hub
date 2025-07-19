@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { 
   ReactFlow, 
@@ -91,7 +92,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   });
 
   const processNodeData = useCallback((nodeData: any) => {
-    console.log('🎯 Processing PERFECT node:', { 
+    console.log('🎯 Processing node:', { 
       label: nodeData.label, 
       stepType: nodeData.stepType, 
       platform: nodeData.platform,
@@ -152,22 +153,33 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     }
   }, [onRegenerateDiagram, retryCount, toast]);
 
+  // FIXED: Enhanced fallback diagram creation from blueprint
   const handleFallbackDiagram = useCallback(() => {
-    if (!automationBlueprint?.steps) return;
+    const blueprintToUse = automationBlueprint;
     
-    console.log('🛠️ Creating fallback diagram');
+    if (!blueprintToUse?.steps) {
+      console.warn('❌ No blueprint available for fallback diagram');
+      toast({
+        title: "No Blueprint Data",
+        description: "Cannot create fallback diagram without blueprint steps",
+        variant: "destructive",
+      });
+      return;
+    }
     
-    // Create a simple fallback diagram structure
+    console.log('🛠️ Creating enhanced fallback diagram from blueprint');
+    
+    // Create a comprehensive fallback diagram structure
     const fallbackNodes = [
       {
         id: "fallback-trigger",
         type: "triggerNode",
         position: { x: 100, y: 300 },
         data: {
-          label: `${automationBlueprint.trigger?.type || 'Manual'} Trigger`,
+          label: `${blueprintToUse.trigger?.type || 'Manual'} Trigger`,
           stepType: "trigger",
           explanation: "This automation starts here",
-          platform: automationBlueprint.trigger?.platform || "System",
+          platform: blueprintToUse.trigger?.platform || "System",
           icon: "Play"
         }
       }
@@ -176,19 +188,56 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     const fallbackEdges: any[] = [];
     let currentX = 600;
 
-    // Add basic steps
-    automationBlueprint.steps.forEach((step, index) => {
+    // FIXED: Enhanced step processing with better node types
+    blueprintToUse.steps.forEach((step, index) => {
       const nodeId = `fallback-step-${index}`;
+      
+      // Determine node type based on step type
+      let nodeType = 'actionNode';
+      let stepIcon = 'PlugZap';
+      
+      switch (step.type) {
+        case 'condition':
+          nodeType = 'conditionNode';
+          stepIcon = 'GitFork';
+          break;
+        case 'ai_agent_call':
+          nodeType = 'aiAgentNode';
+          stepIcon = 'Bot';
+          break;
+        case 'loop':
+          nodeType = 'loopNode';
+          stepIcon = 'RotateCcw';
+          break;
+        case 'delay':
+          nodeType = 'delayNode';
+          stepIcon = 'Clock';
+          break;
+        case 'retry':
+          nodeType = 'retryNode';
+          stepIcon = 'RefreshCw';
+          break;
+        case 'fallback':
+          nodeType = 'fallbackNode';
+          stepIcon = 'Shield';
+          break;
+        default:
+          nodeType = 'actionNode';
+          stepIcon = 'PlugZap';
+      }
+      
       fallbackNodes.push({
         id: nodeId,
-        type: step.type === 'condition' ? 'conditionNode' : 'actionNode',
+        type: nodeType,
         position: { x: currentX, y: 300 },
         data: {
           label: step.name || `Step ${index + 1}`,
           stepType: step.type,
-          explanation: `${step.type} step in the automation`,
+          explanation: `${step.type} step: ${step.name || 'Automation step'}`,
           platform: (step.action as any)?.integration || 'System',
-          icon: step.type === 'condition' ? 'GitFork' : 'PlugZap'
+          icon: stepIcon,
+          isRecommended: step.ai_recommended || false,
+          ai_agent_call: step.ai_agent_call || undefined
         }
       });
 
@@ -213,14 +262,14 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     // Add end node
     fallbackNodes.push({
       id: "fallback-end",
-      type: "fallbackNode",
+      type: "actionNode",
       position: { x: currentX, y: 300 },
       data: {
         label: "✅ Complete",
         stepType: "end",
-        explanation: "Automation completed",
+        explanation: "Automation completed successfully",
         platform: "System",
-        icon: "Flag"
+        icon: "CheckCircle"
       }
     });
 
@@ -231,7 +280,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       type: 'straight',
       animated: true,
       style: { 
-        stroke: '#8b5cf6', 
+        stroke: '#10b981', 
         strokeWidth: 3,
         strokeDasharray: '8,4'
       }
@@ -245,7 +294,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       totalNodes: fallbackNodes.length,
       totalEdges: fallbackEdges.length,
       conditionNodes: fallbackNodes.filter(n => n.type?.includes('condition')).length,
-      aiAgentNodes: 0,
+      aiAgentNodes: fallbackNodes.filter(n => n.data?.isRecommended).length,
       platformNodes: fallbackNodes.filter(n => n.data?.platform && n.data.platform !== 'System').length,
       stopNodes: 1
     };
@@ -253,21 +302,21 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     setDiagramStats(stats);
     
     toast({
-      title: "📋 Fallback Diagram Created",
-      description: "Basic diagram structure generated successfully",
+      title: "🛠️ Fallback Diagram Created",
+      description: `Generated diagram with ${stats.totalNodes} nodes from blueprint`,
     });
   }, [automationBlueprint, toast]);
 
   useEffect(() => {
-    console.log('🎯 Processing PERFECT diagram with animated dotted lines and gradients');
+    console.log('🎯 Processing diagram data with enhanced validation');
     
     try {
+      // FIXED: Enhanced diagram data processing with fallback logic
       if (automationDiagramData?.nodes && automationDiagramData?.edges) {
-        console.log('✅ Using PERFECT diagram data:', {
+        console.log('✅ Using diagram data:', {
           nodes: automationDiagramData.nodes.length,
           edges: automationDiagramData.edges.length,
-          source: automationDiagramData.metadata?.source || 'unknown',
-          animatedDottedLines: true
+          source: automationDiagramData.metadata?.source || 'unknown'
         });
 
         const processedNodes = automationDiagramData.nodes
@@ -283,23 +332,23 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           })
           .filter(Boolean) as Node[];
 
-        console.log('📊 Processed PERFECT nodes:', {
+        console.log('📊 Processed nodes:', {
           original: automationDiagramData.nodes.length,
           processed: processedNodes.length,
           aiRecommendations: processedNodes.filter(n => n.data?.isRecommended).length
         });
 
-        // Apply PERFECT left-to-right layout with animated dotted lines
+        // Apply enhanced layout with animated dotted lines
         const { nodes: layoutedNodes, edges: layoutedEdges } = calculateEnhancedLayout(
           processedNodes,
           automationDiagramData.edges.map(edge => ({
             ...edge,
-            animated: true, // ANIMATED!
+            animated: true,
             type: 'straight',
             style: {
               stroke: '#8b5cf6',
               strokeWidth: 3,
-              strokeDasharray: '8,4', // DOTTED ------
+              strokeDasharray: '8,4',
               filter: 'drop-shadow(0 2px 4px rgba(139, 92, 246, 0.3))',
               ...edge.style
             }
@@ -321,7 +370,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         setDiagramStats(stats);
         setDiagramError(null);
         
-        console.log('📊 PERFECT animated dotted diagram statistics:', stats);
+        console.log('📊 Diagram statistics:', stats);
         
         if (stats.aiAgentNodes > 0) {
           toast({
@@ -331,12 +380,18 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         }
         
       } else if (automationBlueprint?.steps?.length > 0) {
-        console.log('⚠️ No diagram data available, generating PERFECT animated diagram...');
-        setDiagramError('Creating perfect animated dotted diagram with gradients...');
+        // FIXED: Enhanced handling when diagram data is missing but blueprint exists
+        console.log('⚠️ No diagram data available, but blueprint exists - creating fallback');
+        setDiagramError('No diagram visualization available. Creating from blueprint...');
+        
+        // Auto-create fallback diagram from blueprint
+        setTimeout(() => {
+          handleFallbackDiagram();
+        }, 1000);
         
       } else {
         console.log('❌ No diagram data or blueprint available');
-        setDiagramError('No automation data available to display');
+        setDiagramError('No automation data available to display. Please ensure your automation has been properly configured.');
         setNodes([]);
         setEdges([]);
         setDiagramStats({
@@ -349,12 +404,12 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         });
       }
     } catch (error) {
-      console.error('💥 Error processing PERFECT diagram:', error);
+      console.error('💥 Error processing diagram:', error);
       setDiagramError(`Error processing diagram: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setNodes([]);
       setEdges([]);
     }
-  }, [automationDiagramData, automationBlueprint, processNodeData]);
+  }, [automationDiagramData, automationBlueprint, processNodeData, handleFallbackDiagram]);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -365,13 +420,13 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     if (onRegenerateDiagram) {
       setIsRegenerating(true);
       try {
-        console.log('🎯 Regenerating PERFECT diagram with feedback:', regenerateInput);
+        console.log('🎯 Regenerating diagram with feedback:', regenerateInput);
         await onRegenerateDiagram(regenerateInput.trim() || undefined);
         setShowRegenerateForm(false);
         setRegenerateInput('');
         toast({
-          title: "🎯 Creating Perfect Animated Diagram",
-          description: "Generating with dotted lines, gradients, and mobile optimization",
+          title: "🎯 Creating Enhanced Diagram",
+          description: "Generating with your specific feedback and improvements",
         });
       } catch (error) {
         console.error('Error regenerating diagram:', error);
@@ -388,11 +443,11 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
 
   const handleQuickRegenerate = () => {
     if (onRegenerateDiagram) {
-      console.log('🎯 Quick regenerating PERFECT animated diagram');
+      console.log('🎯 Quick regenerating diagram');
       onRegenerateDiagram();
       toast({
-        title: "🎯 Creating Perfect Animated Diagram",
-        description: "Generating with dotted lines and gradient colors",
+        title: "🎯 Regenerating Diagram",
+        description: "Creating improved visualization with AI",
       });
     }
   };
@@ -419,14 +474,14 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
               className="bg-white/95 backdrop-blur-sm shadow-lg hover:bg-white border-orange-200 hover:border-orange-300 rounded-xl text-xs px-2 py-1 sm:px-4 sm:py-2"
             >
               <Settings className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-              <span className="hidden md:inline">Perfect</span>
+              <span className="hidden md:inline">Enhance</span>
             </Button>
           </DialogTrigger>
           <DialogContent className="w-[95vw] max-w-md mx-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-sm sm:text-base">
                 <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
-                Perfect Your Diagram
+                Enhance Your Diagram
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
@@ -436,7 +491,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
                 </Label>
                 <Textarea
                   id="feedback"
-                  placeholder="e.g., 'More animated effects', 'Brighter gradients', 'Better mobile layout'..."
+                  placeholder="e.g., 'Add more detail to steps', 'Show error handling', 'Include platform integrations'..."
                   value={regenerateInput}
                   onChange={(e) => setRegenerateInput(e.target.value)}
                   className="mt-2 min-h-[100px] text-xs sm:text-sm"
@@ -451,12 +506,12 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
                   {isRegenerating ? (
                     <>
                       <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
-                      Perfecting...
+                      Enhancing...
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                      Perfect
+                      Enhance
                     </>
                   )}
                 </Button>
@@ -519,28 +574,28 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           connectionMode={ConnectionMode.Loose}
           fitView
           fitViewOptions={{
-            padding: 0.05, // Less padding on mobile
-            minZoom: 0.2,  // Allow more zoom out on mobile
+            padding: 0.05,
+            minZoom: 0.2,
             maxZoom: 1.5
           }}
-          defaultViewport={{ x: 0, y: 0, zoom: 0.5 }} // Start more zoomed out on mobile
+          defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
           className="bg-gradient-to-br from-blue-50 via-white to-purple-50"
           panOnScroll
           panOnDrag={[1, 2]}
           proOptions={{ hideAttribution: true }}
           defaultEdgeOptions={{
             type: 'straight',
-            animated: true, // ANIMATED!
+            animated: true,
             style: {
               stroke: '#8b5cf6',
               strokeWidth: 3,
-              strokeDasharray: '8,4' // DOTTED ------
+              strokeDasharray: '8,4'
             }
           }}
         >
           <Background 
             variant={BackgroundVariant.Dots}
-            gap={24} // Smaller gap on mobile
+            gap={24}
             size={1}
             color="#e5e7eb"
             style={{ opacity: 0.3 }}
@@ -562,14 +617,14 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
             zoomable
             className="bg-white/95 backdrop-blur-sm shadow-lg rounded-xl border border-gray-200 hidden lg:block"
             style={{
-              width: '220px', // Smaller on mobile
+              width: '220px',
               height: '140px'
             }}
           />
         </ReactFlow>
       </div>
 
-      {/* Enhanced Error State with Comprehensive Recovery */}
+      {/* FIXED: Enhanced error state with better recovery options */}
       {diagramError && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/95 backdrop-blur-sm p-2 sm:p-4">
           <DiagramErrorRecovery
@@ -581,7 +636,6 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         </div>
       )}
 
-      {/* JSON Debug Modal - Mobile Optimized */}
       {showJsonDebug && (
         <JsonDebugModal
           isOpen={showJsonDebug}

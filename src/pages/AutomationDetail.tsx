@@ -63,12 +63,95 @@ const AutomationDetail = () => {
     fetchAutomationAndChats();
   }, [user, id, navigate]);
 
+  // FIXED: Enhanced blueprint extraction from structured data
+  const extractBlueprintFromStructuredData = (structuredData: any): AutomationBlueprint | null => {
+    try {
+      // First, try to get execution_blueprint
+      if (structuredData.execution_blueprint) {
+        console.log('✅ Found execution_blueprint in structured data');
+        return structuredData.execution_blueprint;
+      }
+
+      // Second, try to get automation_blueprint
+      if (structuredData.automation_blueprint) {
+        console.log('✅ Found automation_blueprint in structured data');
+        return structuredData.automation_blueprint;
+      }
+
+      // Third, try to construct blueprint from available data
+      if (structuredData.platforms || structuredData.steps) {
+        console.log('🔧 Constructing blueprint from structured data components');
+        
+        const constructedBlueprint: AutomationBlueprint = {
+          version: "1.0",
+          description: structuredData.summary || "AI-generated automation",
+          trigger: {
+            type: 'manual'
+          },
+          steps: []
+        };
+
+        // Add steps from various sources
+        if (structuredData.steps && Array.isArray(structuredData.steps)) {
+          structuredData.steps.forEach((step: string, index: number) => {
+            constructedBlueprint.steps.push({
+              id: `step-${index + 1}`,
+              name: step,
+              type: 'action',
+              action: {
+                integration: 'system',
+                method: 'execute',
+                parameters: { description: step }
+              }
+            });
+          });
+        }
+
+        // Add platform-based steps
+        if (structuredData.platforms && Array.isArray(structuredData.platforms)) {
+          structuredData.platforms.forEach((platform: any, index: number) => {
+            constructedBlueprint.steps.push({
+              id: `platform-step-${index + 1}`,
+              name: `${platform.name} Integration`,
+              type: 'action',
+              action: {
+                integration: platform.name.toLowerCase(),
+                method: platform.method || 'api_call',
+                parameters: platform.config || {}
+              }
+            });
+          });
+        }
+
+        return constructedBlueprint;
+      }
+
+      console.warn('⚠️ No blueprint data found in structured response');
+      return null;
+    } catch (error) {
+      console.error('❌ Error extracting blueprint:', error);
+      return null;
+    }
+  };
+
   const generateAndSaveDiagram = async (automationId: string, blueprint: AutomationBlueprint, forceRegenerate = false, userFeedback?: string) => {
-    if (!blueprint || !blueprint.steps || blueprint.steps.length === 0) {
-      console.warn('❌ No blueprint or steps to generate diagram for');
+    // FIXED: Enhanced blueprint validation
+    if (!blueprint) {
+      console.warn('❌ No blueprint provided for diagram generation');
       toast({
         title: "No Blueprint",
-        description: "Cannot generate diagram without automation steps",
+        description: "Cannot generate diagram without automation blueprint",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // FIXED: Better blueprint validation
+    if (!blueprint.steps || blueprint.steps.length === 0) {
+      console.warn('❌ Blueprint has no steps to generate diagram for');
+      toast({
+        title: "Empty Blueprint",
+        description: "Blueprint contains no steps to visualize",
         variant: "destructive",
       });
       return;
@@ -77,7 +160,7 @@ const AutomationDetail = () => {
     setGeneratingDiagram(true);
     
     try {
-      console.log('🚀 Generating OpenAI-powered intelligent diagram for automation:', automationId);
+      console.log('🚀 Generating AI-powered diagram for automation:', automationId);
       console.log('📊 Blueprint analysis:', {
         mainSteps: blueprint.steps.length,
         triggerType: blueprint.trigger?.type,
@@ -91,10 +174,16 @@ const AutomationDetail = () => {
         userFeedback: userFeedback ? 'provided' : 'none'
       });
       
-      // Prepare the request body with user feedback if provided
-      const requestBody: any = { automation_blueprint: blueprint };
+      // FIXED: Enhanced request body preparation
+      const requestBody: any = { 
+        automation_blueprint: blueprint,
+        automation_id: automationId,
+        force_regenerate: forceRegenerate
+      };
+      
       if (userFeedback && userFeedback.trim()) {
         requestBody.user_feedback = userFeedback.trim();
+        requestBody.improvement_request = true;
         console.log('🎯 Including user feedback for diagram improvement:', userFeedback.substring(0, 100));
       }
       
@@ -104,44 +193,50 @@ const AutomationDetail = () => {
       });
 
       if (error) {
-        console.error('❌ Error invoking OpenAI diagram-generator:', error);
+        console.error('❌ Error invoking diagram-generator:', error);
         toast({
           title: "Diagram Generation Failed",
-          description: `Error from OpenAI diagram-generator: ${error.message || 'Unknown error'}`,
+          description: `Error from diagram-generator: ${error.message || 'Unknown error'}`,
           variant: "destructive",
         });
         return;
       }
 
       if (!data) {
-        console.error('❌ No data received from OpenAI diagram-generator');
+        console.error('❌ No data received from diagram-generator');
         toast({
           title: "No Diagram Data",
-          description: "The OpenAI diagram generator returned no data",
+          description: "The diagram generator returned no data",
           variant: "destructive",
         });
         return;
       }
 
-      // Check if there's an error in the response
+      // FIXED: Enhanced error handling
       if (data.error) {
-        console.error('❌ OpenAI diagram generation error:', data);
+        console.error('❌ Diagram generation error:', data);
         toast({
-          title: "OpenAI Diagram Generation Error",
+          title: "Diagram Generation Error",
           description: `${data.error} (Source: ${data.source || 'unknown'})`,
           variant: "destructive",
         });
         return;
       }
 
-      if (!data.nodes || !data.edges) {
-        console.error('❌ Invalid OpenAI diagram data structure received:', data);
+      // FIXED: Better validation of diagram data
+      if (!data.nodes || !Array.isArray(data.nodes) || data.nodes.length === 0) {
+        console.error('❌ Invalid diagram data structure received:', data);
         toast({
-          title: "Invalid OpenAI Diagram Data",
-          description: "Received invalid diagram structure from OpenAI",
+          title: "Invalid Diagram Data",
+          description: "Received invalid or empty diagram structure",
           variant: "destructive",
         });
         return;
+      }
+
+      if (!data.edges || !Array.isArray(data.edges)) {
+        console.warn('⚠️ No edges in diagram data, adding default edges');
+        data.edges = [];
       }
 
       const nodeCount = data.nodes.length;
@@ -150,7 +245,7 @@ const AutomationDetail = () => {
       const aiAgentNodeCount = data.nodes.filter((n: any) => n.data?.isRecommended).length;
       const platformNodeCount = data.nodes.filter((n: any) => n.data?.platform).length;
 
-      console.log('✅ Generated OpenAI-powered comprehensive diagram:', {
+      console.log('✅ Generated comprehensive diagram:', {
         nodes: nodeCount,
         edges: edgeCount,
         conditionNodes: conditionNodeCount,
@@ -160,20 +255,16 @@ const AutomationDetail = () => {
         generatedAt: data.metadata?.generatedAt
       });
 
-      // Enhanced validation for OpenAI-generated content
+      // FIXED: Enhanced validation for diagram quality
       const validationResults = {
         sufficientNodes: nodeCount >= Math.max(blueprint.steps.length * 0.5, 1),
-        hasConnections: edgeCount > 0,
+        hasConnections: edgeCount > 0 || nodeCount <= 1,
         hasIntelligentRouting: data.metadata?.routePathsTerminated > 0,
         hasAIAnalysis: data.metadata?.source === 'openai-intelligent-generator'
       };
 
       if (!validationResults.sufficientNodes) {
-        console.warn(`⚠️ OpenAI generated fewer nodes (${nodeCount}) than expected (${blueprint.steps.length})`);
-      }
-
-      if (!validationResults.hasIntelligentRouting) {
-        console.warn(`⚠️ OpenAI diagram may be missing intelligent route mapping`);
+        console.warn(`⚠️ Generated fewer nodes (${nodeCount}) than expected (${blueprint.steps.length})`);
       }
 
       // Save the generated diagram data back to the database
@@ -183,10 +274,10 @@ const AutomationDetail = () => {
         .eq('id', automationId);
 
       if (updateError) {
-        console.error('❌ Error saving OpenAI diagram data to DB:', updateError);
+        console.error('❌ Error saving diagram data to DB:', updateError);
         toast({
           title: "Save Failed", 
-          description: "Could not save generated OpenAI diagram to database",
+          description: "Could not save generated diagram to database",
           variant: "destructive",
         });
         return;
@@ -198,21 +289,21 @@ const AutomationDetail = () => {
         automation_diagram_data: data
       }));
 
-      console.log('✅ OpenAI-powered comprehensive diagram generated and saved successfully!');
+      console.log('✅ AI-powered comprehensive diagram generated and saved successfully!');
       
       const successMessage = userFeedback 
         ? `AI improved the diagram based on your feedback with ${nodeCount} nodes and ${aiAgentNodeCount} AI recommendations!`
         : `AI created a comprehensive diagram with ${nodeCount} nodes, ${conditionNodeCount} conditions, and ${aiAgentNodeCount} AI recommendations!`;
       
       toast({
-        title: "OpenAI Diagram Generated Successfully",
+        title: "Diagram Generated Successfully",
         description: successMessage,
       });
 
     } catch (err) {
-      console.error('💥 Unexpected error in OpenAI diagram generation:', err);
+      console.error('💥 Unexpected error in diagram generation:', err);
       toast({
-        title: "OpenAI Generation Error",
+        title: "Generation Error",
         description: `Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`,
         variant: "destructive",
       });
@@ -223,7 +314,7 @@ const AutomationDetail = () => {
 
   const fetchAutomationAndChats = async () => {
     try {
-      // Fetch automation details including the new diagram data
+      // Fetch automation details including the diagram data
       const { data, error: automationError } = await supabase
         .from('automations')
         .select('*, automation_diagram_data')
@@ -240,10 +331,12 @@ const AutomationDetail = () => {
 
       setAutomation(automationData);
 
-      // Generate diagram if blueprint exists but no diagram data
+      // FIXED: Enhanced diagram generation logic
       if (automationData.automation_blueprint && !automationData.automation_diagram_data) {
-        console.log('🔄 No diagram data found, generating new diagram...');
+        console.log('🔄 No diagram data found, generating new diagram from blueprint...');
         generateAndSaveDiagram(automationData.id, automationData.automation_blueprint);
+      } else if (!automationData.automation_blueprint && !automationData.automation_diagram_data) {
+        console.log('⚠️ No blueprint or diagram data found - waiting for AI response');
       }
 
       // Fetch chat messages for this automation
@@ -386,7 +479,7 @@ const AutomationDetail = () => {
 
       console.log('✅ Received response from chat-ai function');
 
-      // Enhanced response processing with new parser
+      // FIXED: Enhanced response processing with blueprint extraction
       let structuredData = null;
       let aiResponseText = "";
       let yusraiPowered = false;
@@ -507,28 +600,37 @@ const AutomationDetail = () => {
         }
       }
 
-      // Update automation blueprint and generate new diagram if available
-      if (structuredData?.automation_blueprint) {
-        console.log('🔧 Updating automation blueprint and generating new diagram');
-        const { error: updateError } = await supabase
-          .from('automations')
-          .update({ automation_blueprint: structuredData.automation_blueprint })
-          .eq('id', automation.id);
+      // FIXED: Enhanced blueprint handling and diagram generation
+      if (structuredData) {
+        const extractedBlueprint = extractBlueprintFromStructuredData(structuredData);
+        
+        if (extractedBlueprint) {
+          console.log('🔧 Updating automation blueprint and generating new diagram');
+          
+          // Save the blueprint to database
+          const { error: updateError } = await supabase
+            .from('automations')
+            .update({ automation_blueprint: extractedBlueprint })
+            .eq('id', automation.id);
 
-        if (!updateError) {
-          const updatedAutomation = {
-            ...automation,
-            automation_blueprint: structuredData.automation_blueprint
-          };
-          setAutomation(updatedAutomation);
-          
-          // Generate new diagram for updated blueprint
-          generateAndSaveDiagram(automation.id, structuredData.automation_blueprint);
-          
-          toast({
-            title: "Blueprint Updated",
-            description: "Automation blueprint has been updated with new AI-generated diagram.",
-          });
+          if (!updateError) {
+            const updatedAutomation = {
+              ...automation,
+              automation_blueprint: extractedBlueprint
+            };
+            setAutomation(updatedAutomation);
+            
+            // Generate new diagram for updated blueprint
+            console.log('🎯 Generating diagram from extracted blueprint');
+            generateAndSaveDiagram(automation.id, extractedBlueprint);
+            
+            toast({
+              title: "Blueprint Updated",
+              description: "Automation blueprint has been updated with new AI-generated diagram.",
+            });
+          } else {
+            console.error('❌ Error saving blueprint:', updateError);
+          }
         }
       }
 

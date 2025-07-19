@@ -34,21 +34,22 @@ export const useAdminAuth = () => {
 
         if (error) {
           console.error('Error fetching profile:', error);
-          setIsAdmin(false);
-          setAdminData(null);
-          setLoading(false);
-          return;
         }
 
-        // For now, check if user email is in admin list
-        // In production, this should be a proper role-based system
+        // Check admin emails - this is the definitive admin check
         const adminEmails = [
-          'chaffanjutt313@gmail.com', // Main admin
+          'chaffanjutt313@gmail.com',
           'admin@yusrai.com',
           'support@yusrai.com'
         ];
 
         const userIsAdmin = adminEmails.includes(user.email || '');
+        
+        console.log('Admin check:', { 
+          userEmail: user.email, 
+          isAdmin: userIsAdmin,
+          adminEmails 
+        });
         
         setIsAdmin(userIsAdmin);
         setAdminData(userIsAdmin ? {

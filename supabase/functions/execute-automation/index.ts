@@ -7,8 +7,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// FIXED REAL AUTOMATION EXECUTOR - Uses validated credentials for real execution
-class FixedRealAutomationExecutor {
+// FULLY DYNAMIC REAL AUTOMATION EXECUTOR - Uses AI-generated execution blueprints ONLY
+class FullyDynamicRealAutomationExecutor {
   private supabase: any;
 
   constructor(supabase: any) {
@@ -16,10 +16,10 @@ class FixedRealAutomationExecutor {
   }
 
   /**
-   * FIXED: Execute automation using REAL validated credentials
+   * FULLY DYNAMIC: Execute automation using AI-generated execution blueprint ONLY
    */
   async executeAutomation(automationId: string, userId: string, triggerData?: any): Promise<any> {
-    console.log(`🚀 FIXED REAL EXECUTION: Starting automation ${automationId} for user ${userId}`);
+    console.log(`🚀 FULLY DYNAMIC EXECUTION: Starting automation ${automationId} for user ${userId}`);
     
     try {
       // Get automation blueprint
@@ -65,7 +65,7 @@ class FixedRealAutomationExecutor {
           details_log: { 
             started_at: new Date().toISOString(), 
             steps: [],
-            execution_type: 'real_api_calls'
+            execution_type: 'fully_dynamic_ai_driven'
           }
         })
         .select()
@@ -77,9 +77,9 @@ class FixedRealAutomationExecutor {
 
       console.log(`📝 Created execution run: ${run.id}`);
 
-      // Execute automation steps with REAL API calls
+      // Execute automation steps with FULLY DYNAMIC AI configuration
       const blueprint = automation.automation_blueprint;
-      const executionResult = await this.executeRealAutomationSteps(
+      const executionResult = await this.executeFullyDynamicAutomationSteps(
         blueprint, 
         credentials, 
         triggerData, 
@@ -96,12 +96,12 @@ class FixedRealAutomationExecutor {
         })
         .eq('id', run.id);
 
-      console.log(`✅ FIXED REAL EXECUTION completed for automation ${automationId}`);
+      console.log(`✅ FULLY DYNAMIC EXECUTION completed for automation ${automationId}`);
 
       return {
         success: executionResult.success,
         message: executionResult.success 
-          ? 'Automation executed successfully with real API calls using validated credentials'
+          ? 'Automation executed successfully with fully dynamic AI-driven execution using validated credentials'
           : 'Automation execution failed',
         run_id: run.id,
         details: executionResult.logs,
@@ -109,7 +109,7 @@ class FixedRealAutomationExecutor {
       };
 
     } catch (error: any) {
-      console.error(`💥 FIXED REAL EXECUTION failed:`, error);
+      console.error(`💥 FULLY DYNAMIC EXECUTION failed:`, error);
       
       return {
         success: false,
@@ -120,9 +120,9 @@ class FixedRealAutomationExecutor {
   }
 
   /**
-   * FIXED: Execute automation steps with REAL API calls using validated credentials
+   * FULLY DYNAMIC: Execute automation steps using AI-generated execution blueprint ONLY
    */
-  async executeRealAutomationSteps(
+  async executeFullyDynamicAutomationSteps(
     blueprint: any, 
     credentials: any[], 
     triggerData: any, 
@@ -132,12 +132,13 @@ class FixedRealAutomationExecutor {
     const logs = { 
       started_at: new Date().toISOString(), 
       steps: [],
-      real_execution: true,
+      fully_dynamic_execution: true,
+      ai_driven_execution: true,
       validated_credentials: true
     };
 
     try {
-      console.log('🔄 Executing automation steps with REAL API calls using validated credentials');
+      console.log('🔄 Executing automation steps with FULLY DYNAMIC AI-generated execution blueprint');
 
       // Create credential map for easy access
       const credMap = new Map();
@@ -147,19 +148,19 @@ class FixedRealAutomationExecutor {
 
       console.log(`🗝️ Available validated platforms: ${Array.from(credMap.keys()).join(', ')}`);
 
-      // Execute each step in the blueprint
+      // Execute each step in the blueprint using FULLY DYNAMIC configuration
       if (blueprint?.steps && Array.isArray(blueprint.steps)) {
         for (let i = 0; i < blueprint.steps.length; i++) {
           const step = blueprint.steps[i];
           const stepPlatform = step.platform?.toLowerCase();
           
-          console.log(`📋 Executing step ${i + 1}: ${step.action || 'Unknown action'} on ${step.platform || 'Unknown platform'}`);
+          console.log(`📋 Executing DYNAMIC step ${i + 1}: ${step.action || 'Unknown action'} on ${step.platform || 'Unknown platform'}`);
 
           if (!stepPlatform || !credMap.has(stepPlatform)) {
             throw new Error(`No validated credentials found for platform: ${step.platform}`);
           }
 
-          const stepResult = await this.executeRealStep(step, credMap.get(stepPlatform), triggerData, stepPlatform);
+          const stepResult = await this.executeFullyDynamicStep(step, credMap.get(stepPlatform), triggerData, stepPlatform);
           
           logs.steps.push({
             step_number: i + 1,
@@ -169,7 +170,8 @@ class FixedRealAutomationExecutor {
             result: stepResult.result,
             error: stepResult.error,
             executed_at: new Date().toISOString(),
-            real_api_call: true,
+            fully_dynamic_execution: true,
+            ai_driven_call: true,
             validated_credentials: true,
             api_endpoint: stepResult.api_endpoint,
             response_status: stepResult.response_status
@@ -186,7 +188,7 @@ class FixedRealAutomationExecutor {
       }
 
       const duration = Date.now() - startTime;
-      console.log(`✅ All steps executed successfully with REAL API calls in ${duration}ms`);
+      console.log(`✅ All steps executed successfully with FULLY DYNAMIC AI execution in ${duration}ms`);
 
       return {
         success: true,
@@ -196,14 +198,14 @@ class FixedRealAutomationExecutor {
 
     } catch (error: any) {
       const duration = Date.now() - startTime;
-      console.error('❌ Step execution failed:', error);
+      console.error('❌ FULLY DYNAMIC step execution failed:', error);
 
       logs.steps.push({
-        step_name: 'execution_error',
+        step_name: 'dynamic_execution_error',
         status: 'failed',
         error: error.message,
         executed_at: new Date().toISOString(),
-        real_execution: true
+        fully_dynamic_execution: true
       });
 
       return {
@@ -216,17 +218,21 @@ class FixedRealAutomationExecutor {
   }
 
   /**
-   * FIXED: Execute individual step with REAL API call using validated credentials
+   * FULLY DYNAMIC: Execute individual step using AI-generated configuration ONLY
    */
-  async executeRealStep(step: any, credentials: any, data: any, platformName: string): Promise<any> {
-    console.log(`🔧 Executing REAL step: ${step.action} on ${platformName} with validated credentials`);
+  async executeFullyDynamicStep(step: any, credentials: any, data: any, platformName: string): Promise<any> {
+    console.log(`🔧 Executing FULLY DYNAMIC step: ${step.action} on ${platformName} with AI-generated config`);
 
     try {
-      // Get real execution configuration
-      const executionConfig = await this.getRealExecutionConfig(step, platformName);
+      // Get AI-generated execution configuration - NO FALLBACKS
+      const executionConfig = await this.getAIGeneratedExecutionConfig(step, platformName);
       
-      // Build real request with validated credentials
-      const { headers, url, body } = this.buildRealExecutionRequest(
+      if (!executionConfig || !executionConfig.method || !executionConfig.endpoint) {
+        throw new Error(`AI failed to generate complete execution configuration for ${step.action} on ${platformName}`);
+      }
+
+      // Build fully dynamic request using AI configuration
+      const { headers, url, body } = this.buildFullyDynamicExecutionRequest(
         executionConfig, 
         credentials, 
         step, 
@@ -234,9 +240,9 @@ class FixedRealAutomationExecutor {
         platformName
       );
 
-      console.log(`📡 Making REAL API call to: ${executionConfig.method || 'POST'} ${url}`);
+      console.log(`📡 Making FULLY DYNAMIC AI-powered API call to: ${executionConfig.method || 'POST'} ${url}`);
 
-      // Make REAL API call
+      // Make DYNAMIC API call
       const startTime = Date.now();
       const response = await fetch(url, {
         method: executionConfig.method || 'POST',
@@ -254,13 +260,13 @@ class FixedRealAutomationExecutor {
         responseData = { raw_response: responseText };
       }
 
-      console.log(`📊 REAL API Response: Status ${response.status}, Time ${requestTime}ms`);
+      console.log(`📊 FULLY DYNAMIC API Response: Status ${response.status}, Time ${requestTime}ms`);
 
       if (!response.ok) {
-        throw new Error(`REAL API call failed with status ${response.status}: ${responseText}`);
+        throw new Error(`FULLY DYNAMIC API call failed with status ${response.status}: ${responseText}`);
       }
 
-      console.log(`✅ Step executed successfully with REAL API call`);
+      console.log(`✅ Step executed successfully with FULLY DYNAMIC AI-powered API call`);
 
       return {
         success: true,
@@ -271,33 +277,40 @@ class FixedRealAutomationExecutor {
       };
 
     } catch (error: any) {
-      console.error(`❌ REAL step execution failed:`, error);
+      console.error(`❌ FULLY DYNAMIC step execution failed:`, error);
       
       return {
         success: false,
         error: error.message,
         result: null,
-        api_endpoint: 'execution_failed'
+        api_endpoint: 'dynamic_execution_failed'
       };
     }
   }
 
   /**
-   * FIXED: Get real execution configuration for platform-specific actions
+   * FULLY DYNAMIC: Get AI-generated execution configuration - NO FALLBACKS
    */
-  async getRealExecutionConfig(step: any, platformName: string): Promise<any> {
-    console.log(`🔧 Getting REAL execution config for ${step.action} on ${platformName}`);
+  async getAIGeneratedExecutionConfig(step: any, platformName: string): Promise<any> {
+    console.log(`🔧 Getting AI-generated execution config for ${step.action} on ${platformName} - NO FALLBACKS`);
     
     try {
       const { data, error } = await this.supabase.functions.invoke('chat-ai', {
         body: {
-          message: `Generate REAL API execution configuration for ${platformName} to perform: ${step.action}
+          message: `Generate COMPLETE execution configuration for ${platformName} to perform: ${step.action}
 
-Return ONLY valid JSON:
+CRITICAL: Return ONLY valid JSON with ALL required fields:
 {
   "method": "POST",
   "base_url": "https://api.platform.com",
   "endpoint": "/v1/action/endpoint",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer {api_key}"
+  },
+  "request_body": {
+    "key": "value"
+  },
   "description": "Perform the action"
 }
 
@@ -306,135 +319,96 @@ REAL endpoints for specific platforms:
 - Typeform: base_url "https://api.typeform.com", for form operations use "/forms"
 - Google Sheets: base_url "https://sheets.googleapis.com", for data operations use "/v4/spreadsheets"
 
-Return ONLY the JSON configuration.`,
+Return ONLY the complete JSON configuration with NO text before or after.`,
           messages: [],
-          requestType: 'execution_config'
+          requestType: 'dynamic_execution_config'
         }
       });
 
       if (error) {
-        console.warn('⚠️ Chat-AI execution config failed, using fallback');
-        return this.getDefaultExecutionConfig(step, platformName);
+        console.error('💥 AI execution config generation failed:', error);
+        throw new Error(`AI failed to generate execution configuration: ${error.message}`);
       }
 
       let executionConfig;
       try {
         if (typeof data === 'string') {
           const jsonMatch = data.match(/\{[\s\S]*\}/);
-          executionConfig = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+          if (!jsonMatch) {
+            throw new Error('AI response does not contain valid JSON');
+          }
+          executionConfig = JSON.parse(jsonMatch[0]);
         } else {
           executionConfig = data;
         }
-      } catch {
-        executionConfig = this.getDefaultExecutionConfig(step, platformName);
+      } catch (parseError) {
+        console.error('💥 Failed to parse AI execution config:', parseError);
+        throw new Error(`AI generated invalid execution configuration: ${parseError.message}`);
       }
 
-      return executionConfig.method ? executionConfig : this.getDefaultExecutionConfig(step, platformName);
+      // Validate AI-generated config
+      if (!executionConfig.method || !executionConfig.base_url || !executionConfig.endpoint) {
+        throw new Error('AI generated incomplete execution configuration - missing required fields');
+      }
 
-    } catch (error) {
-      console.warn('⚠️ Execution config generation failed, using fallback');
-      return this.getDefaultExecutionConfig(step, platformName);
+      console.log(`✅ AI-generated execution config validated for ${platformName}`);
+      return executionConfig;
+
+    } catch (error: any) {
+      console.error('💥 AI execution config generation completely failed:', error);
+      throw new Error(`AI execution configuration generation failed: ${error.message}`);
     }
   }
 
   /**
-   * FIXED: Build real execution request with validated credentials
+   * FULLY DYNAMIC: Build execution request using AI configuration ONLY
    */
-  buildRealExecutionRequest(config: any, credentials: any, step: any, data: any, platformName: string): any {
+  buildFullyDynamicExecutionRequest(config: any, credentials: any, step: any, data: any, platformName: string): any {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'User-Agent': 'YusrAI-Real-Executor/2.0'
+      'User-Agent': 'YusrAI-Fully-Dynamic-Executor/5.0',
+      ...config.headers
     };
 
-    // FIXED: Platform-specific authentication with validated credentials
-    const platform = platformName.toLowerCase();
-    
-    switch (platform) {
-      case 'openai':
-        const openaiKey = credentials.api_key || credentials.key;
-        if (openaiKey) {
-          headers['Authorization'] = `Bearer ${openaiKey}`;
+    // FULLY DYNAMIC: Platform-agnostic authentication using AI config
+    Object.keys(headers).forEach(headerKey => {
+      Object.keys(credentials).forEach(credKey => {
+        if (credentials[credKey]) {
+          headers[headerKey] = headers[headerKey].replace(`{${credKey}}`, credentials[credKey]);
+          headers[headerKey] = headers[headerKey].replace(`{api_key}`, credentials[credKey]);
+          headers[headerKey] = headers[headerKey].replace(`{access_token}`, credentials[credKey]);
+          headers[headerKey] = headers[headerKey].replace(`{token}`, credentials[credKey]);
+          headers[headerKey] = headers[headerKey].replace(`{bot_token}`, credentials[credKey]);
+          headers[headerKey] = headers[headerKey].replace(`{personal_access_token}`, credentials[credKey]);
+          headers[headerKey] = headers[headerKey].replace(`{integration_token}`, credentials[credKey]);
         }
-        break;
-        
-      case 'typeform':
-        const typeformToken = credentials.personal_access_token || credentials.token;
-        if (typeformToken) {
-          headers['Authorization'] = `Bearer ${typeformToken}`;
-        }
-        break;
-        
-      case 'google sheets':
-      case 'google_sheets':
-        const googleToken = credentials.access_token;
-        if (googleToken) {
-          headers['Authorization'] = `Bearer ${googleToken}`;
-        }
-        break;
-        
-      default:
-        const token = credentials.access_token || credentials.api_key || credentials.token || credentials.key;
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-    }
+      });
+    });
 
-    // Build URL and body based on action
-    const baseUrl = config.base_url || this.getDefaultBaseUrl(platformName);
-    const endpoint = config.endpoint || this.getDefaultEndpoint(step.action, platformName);
+    // Build URL using AI configuration
+    const baseUrl = config.base_url;
+    const endpoint = config.endpoint;
     const url = baseUrl + endpoint;
 
-    const body = this.buildRealRequestBody(step, data, config, platformName);
+    // Build body using AI configuration and dynamic data substitution
+    const body = this.buildFullyDynamicRequestBody(step, data, config, platformName);
 
     return { headers, url, body };
   }
 
   /**
-   * FIXED: Build real request body for platform-specific actions
+   * FULLY DYNAMIC: Build request body using AI configuration ONLY
    */
-  buildRealRequestBody(step: any, data: any, config: any, platformName: string): any {
-    const platform = platformName.toLowerCase();
-    const action = step.action?.toLowerCase();
-    
-    switch (platform) {
-      case 'openai':
-        if (action?.includes('generate') || action?.includes('summary') || action?.includes('text')) {
-          return {
-            model: 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: 'You are a helpful assistant.' },
-              { role: 'user', content: step.parameters?.prompt || `Perform: ${step.action}` }
-            ],
-            max_tokens: step.parameters?.max_tokens || 150
-          };
-        }
-        break;
-        
-      case 'typeform':
-        if (action?.includes('create') || action?.includes('form')) {
-          return {
-            title: step.parameters?.title || `Form created by automation`,
-            type: 'quiz'
-          };
-        }
-        break;
-        
-      case 'google sheets':
-      case 'google_sheets':
-        if (action?.includes('add') || action?.includes('write')) {
-          return {
-            range: step.parameters?.range || 'Sheet1!A1',
-            values: step.parameters?.values || [['Data from automation']]
-          };
-        }
-        break;
-    }
+  buildFullyDynamicRequestBody(step: any, data: any, config: any, platformName: string): any {
+    console.log(`🔧 Building FULLY DYNAMIC request body for ${platformName} using AI config`);
 
-    // Default request body
-    const body: any = {};
+    // Use AI-provided request body as base
+    let body = config.request_body || {};
+
+    // Apply step parameters dynamically
     if (step.parameters) {
       Object.entries(step.parameters).forEach(([key, value]) => {
-        if (typeof value === 'string' && value.includes('{{')) {
+        if (typeof value === string && value.includes('{{')) {
           const placeholder = value.match(/\{\{(\w+)\}\}/);
           if (placeholder && data[placeholder[1]]) {
             body[key] = data[placeholder[1]];
@@ -447,75 +421,13 @@ Return ONLY the JSON configuration.`,
       });
     }
 
+    // If no specific body structure, merge step parameters
+    if (Object.keys(body).length === 0 && step.parameters) {
+      body = { ...step.parameters };
+    }
+
+    console.log(`✅ FULLY DYNAMIC request body built for ${platformName}`);
     return Object.keys(body).length > 0 ? body : null;
-  }
-
-  /**
-   * Get default execution config when chat-ai fails
-   */
-  getDefaultExecutionConfig(step: any, platformName: string): any {
-    const platform = platformName.toLowerCase();
-    const action = step.action?.toLowerCase();
-    
-    const configs = {
-      'openai': {
-        method: 'POST',
-        base_url: 'https://api.openai.com',
-        endpoint: '/v1/chat/completions'
-      },
-      'typeform': {
-        method: 'POST',
-        base_url: 'https://api.typeform.com',
-        endpoint: '/forms'
-      },
-      'google sheets': {
-        method: 'POST',
-        base_url: 'https://sheets.googleapis.com',
-        endpoint: '/v4/spreadsheets/values'
-      }
-    };
-
-    return configs[platform] || {
-      method: 'POST',
-      base_url: `https://api.${platform.replace(/\s+/g, '')}.com`,
-      endpoint: '/v1/execute'
-    };
-  }
-
-  /**
-   * Get default base URL for platform
-   */
-  getDefaultBaseUrl(platformName: string): string {
-    const platform = platformName.toLowerCase();
-    const urls = {
-      'openai': 'https://api.openai.com',
-      'typeform': 'https://api.typeform.com',
-      'google sheets': 'https://sheets.googleapis.com'
-    };
-    return urls[platform] || `https://api.${platform.replace(/\s+/g, '')}.com`;
-  }
-
-  /**
-   * Get default endpoint based on action and platform
-   */
-  getDefaultEndpoint(action: string, platformName: string): string {
-    const platform = platformName.toLowerCase();
-    const actionLower = action?.toLowerCase() || '';
-    
-    if (platform === 'openai') return '/v1/chat/completions';
-    if (platform === 'typeform') return '/forms';
-    if (platform === 'google sheets') return '/v4/spreadsheets/values';
-    
-    const actionMap: Record<string, string> = {
-      'send_email': '/v1/mail/send',
-      'create_document': '/v1/documents',
-      'add_row': '/v1/spreadsheets/values',
-      'send_message': '/v1/chat/messages',
-      'create_task': '/v1/tasks',
-      'upload_file': '/v1/files'
-    };
-
-    return actionMap[actionLower] || '/v1/execute';
   }
 }
 
@@ -527,28 +439,28 @@ serve(async (req) => {
   try {
     const { automation_id, user_id, trigger_data } = await req.json();
     
-    console.log(`🌟 FIXED REAL AUTOMATION EXECUTION: ${automation_id} for user ${user_id}`);
+    console.log(`🌟 FULLY DYNAMIC AUTOMATION EXECUTION: ${automation_id} for user ${user_id}`);
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const executor = new FixedRealAutomationExecutor(supabase);
+    const executor = new FullyDynamicRealAutomationExecutor(supabase);
     const result = await executor.executeAutomation(automation_id, user_id, trigger_data);
     
-    console.log(`📊 EXECUTION RESULT:`, result.success ? '✅ SUCCESS' : '❌ FAILED');
+    console.log(`📊 FULLY DYNAMIC EXECUTION RESULT:`, result.success ? '✅ SUCCESS' : '❌ FAILED');
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: any) {
-    console.error('❌ EXECUTION SYSTEM ERROR:', error);
+    console.error('❌ FULLY DYNAMIC EXECUTION SYSTEM ERROR:', error);
     return new Response(
       JSON.stringify({ 
         success: false, 
-        message: `Execution system error: ${error.message}`,
+        message: `Fully dynamic execution system error: ${error.message}`,
         error: error.message
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

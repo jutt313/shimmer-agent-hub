@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -47,6 +46,7 @@ const ModernCredentialForm = ({
   const [automationContextPayload, setAutomationContextPayload] = useState<any>(null);
   const [apiResponse, setApiResponse] = useState<any>(null);
   const [automationContext, setAutomationContext] = useState<any>(null);
+  const [aiGeneratedTestConfig, setAiGeneratedTestConfig] = useState<any>(null);
 
   // AI Configuration States
   const [selectedModel, setSelectedModel] = useState<string>('');
@@ -56,6 +56,7 @@ const ModernCredentialForm = ({
     if (user && automationId && platform.name) {
       loadExistingCredentials();
       loadAutomationContext();
+      generateAITestConfiguration();
     }
   }, [user, automationId, platform.name]);
 
@@ -116,6 +117,89 @@ const ModernCredentialForm = ({
     }
   };
 
+  /**
+   * FULLY DYNAMIC: Generate AI test configuration for the platform
+   */
+  const generateAITestConfiguration = async () => {
+    try {
+      console.log(`🤖 Generating AI test configuration for ${platform.name}`);
+      
+      const { data, error } = await supabase.functions.invoke('chat-ai', {
+        body: {
+          message: `Generate COMPLETE test configuration for ${platform.name} platform including:
+
+CRITICAL: Return ONLY valid JSON with ALL required fields:
+{
+  "base_url": "https://api.platform.com",
+  "test_endpoint": {
+    "method": "GET",
+    "path": "/me",
+    "headers": {
+      "Authorization": "Bearer {api_key}",
+      "Content-Type": "application/json"
+    },
+    "query_params": {}
+  },
+  "authentication": {
+    "type": "bearer",
+    "location": "header",
+    "parameter_name": "Authorization",
+    "format": "Bearer {access_token}"
+  },
+  "expected_success_indicators": ["id", "name", "email"],
+  "expected_error_indicators": ["error", "invalid", "unauthorized"],
+  "validation_rules": {
+    "api_key": {
+      "prefix": "sk-",
+      "min_length": 20
+    }
+  },
+  "field_mappings": {
+    "api_key": "api_key"
+  },
+  "error_patterns": {
+    "401": "Invalid credentials",
+    "403": "Access denied"
+  }
+}
+
+Platform: ${platform.name}
+Return ONLY the JSON configuration with NO text before or after.`,
+          messages: [],
+          requestType: 'test_config_generation'
+        }
+      });
+
+      if (error) {
+        console.error('Failed to generate AI test config:', error);
+        return;
+      }
+
+      let testConfig;
+      try {
+        if (typeof data === 'string') {
+          const jsonMatch = data.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            testConfig = JSON.parse(jsonMatch[0]);
+          }
+        } else {
+          testConfig = data;
+        }
+      } catch (parseError) {
+        console.error('Failed to parse AI test config:', parseError);
+        return;
+      }
+
+      if (testConfig) {
+        setAiGeneratedTestConfig(testConfig);
+        console.log(`✅ AI test configuration generated for ${platform.name}`);
+      }
+
+    } catch (error) {
+      console.error('Failed to generate AI test configuration:', error);
+    }
+  };
+
   const generateAutomationContextPayload = async () => {
     try {
       // Include AI model configs in the payload
@@ -171,8 +255,11 @@ const ModernCredentialForm = ({
     credentials[cred.field] && credentials[cred.field].trim() !== ''
   );
 
+  /**
+   * FULLY DYNAMIC: Test credentials using AI-generated configuration
+   */
   const handleTest = async () => {
-    if (!user || !hasAllCredentials) return;
+    if (!user || !hasAllCredentials || !aiGeneratedTestConfig) return;
 
     setIsTesting(true);
     setApiResponse(null);
@@ -183,33 +270,41 @@ const ModernCredentialForm = ({
       if (selectedModel) credentialsWithAI.model = selectedModel;
       if (systemPrompt) credentialsWithAI.system_prompt = systemPrompt;
 
-      console.log(`🧪 Testing ${platform.name} with credentials:`, Object.keys(credentialsWithAI));
+      console.log(`🧪 FULLY DYNAMIC Testing ${platform.name} with AI-generated config:`, Object.keys(credentialsWithAI));
 
-      const result = await UniversalPlatformManager.testCredentials(
-        platform.name,
-        credentialsWithAI, // This will be mapped internally
-        automationContext
-      );
+      // Call the FULLY DYNAMIC test-credential function with AI config
+      const { data: result, error } = await supabase.functions.invoke('test-credential', {
+        body: {
+          platformName: platform.name,
+          credentials: credentialsWithAI,
+          testConfig: aiGeneratedTestConfig, // ← CRITICAL: Pass AI-generated config
+          userId: user.id
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
 
       setTestResult(result);
-      setApiResponse(result.response_details);
+      setApiResponse(result.details);
       
       if (result.success) {
         toast({
-          title: "✅ Automation Context Test Successful",
-          description: `${platform.name} credentials work with your automation workflow!`,
+          title: "✅ Fully Dynamic Test Successful",
+          description: `${platform.name} credentials work with AI-generated dynamic testing!`,
         });
       } else {
         toast({
-          title: "❌ Automation Context Test Failed",
+          title: "❌ Fully Dynamic Test Failed",
           description: result.message,
           variant: "destructive",
         });
       }
     } catch (error: any) {
-      console.error(`💥 Test error for ${platform.name}:`, error);
+      console.error(`💥 Fully dynamic test error for ${platform.name}:`, error);
       toast({
-        title: "Test Error",
+        title: "Dynamic Test Error",
         description: error.message,
         variant: "destructive",
       });
@@ -239,8 +334,8 @@ const ModernCredentialForm = ({
 
       if (result.success) {
         toast({
-          title: "✅ Automation Credentials Saved",
-          description: `${platform.name} credentials saved for this automation!`,
+          title: "✅ Dynamic Automation Credentials Saved",
+          description: `${platform.name} credentials saved for fully dynamic automation!`,
         });
         onCredentialSaved?.();
         onClose?.();
@@ -279,11 +374,17 @@ const ModernCredentialForm = ({
         <DialogHeader className="pb-6">
           <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-green-600 bg-clip-text text-transparent flex items-center gap-2">
             <Sparkles className="w-6 h-6 text-purple-600" />
-            Configure {platform.name} for Automation
+            Fully Dynamic {platform.name} Configuration
           </DialogTitle>
           <div className="text-gray-600 mt-2 space-y-1">
             <p className="font-medium">Automation: {automationContext?.title || 'Loading...'}</p>
-            <p className="text-sm">{automationContext?.description || 'Test your credentials with real automation workflow operations.'}</p>
+            <p className="text-sm">{automationContext?.description || 'Test your credentials with AI-generated dynamic configurations.'}</p>
+            {aiGeneratedTestConfig && (
+              <div className="text-xs text-green-600 flex items-center gap-1">
+                <Sparkles className="w-3 h-3" />
+                <span>AI test configuration generated and ready</span>
+              </div>
+            )}
           </div>
         </DialogHeader>
 
@@ -295,7 +396,7 @@ const ModernCredentialForm = ({
               <div className="bg-gradient-to-br from-purple-50 via-blue-50 to-green-50 rounded-2xl p-6 border border-purple-200/50">
                 <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
                   <TestTube className="w-5 h-5 text-purple-600" />
-                  Automation-Specific Credentials
+                  Fully Dynamic Credentials
                 </h3>
                 
                 <div className="space-y-5">
@@ -314,10 +415,15 @@ const ModernCredentialForm = ({
                             <div className="group relative">
                               <Info className="h-4 w-4 text-gray-400 cursor-help" />
                               <div className="absolute left-0 top-6 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
-                                <strong>For this automation:</strong> {cred.why_needed}
+                                <strong>For fully dynamic automation:</strong> {cred.why_needed}
                                 {automationContext && (
                                   <div className="mt-2 pt-2 border-t border-gray-700">
                                     <strong>Workflow:</strong> {automationContext.title}
+                                  </div>
+                                )}
+                                {aiGeneratedTestConfig && (
+                                  <div className="mt-2 pt-2 border-t border-gray-700">
+                                    <strong>AI Config:</strong> Dynamic testing ready
                                   </div>
                                 )}
                               </div>
@@ -365,7 +471,7 @@ const ModernCredentialForm = ({
                     );
                   })}
 
-                  {/* AI MODEL CONFIGURATION - FIXED: Add AI configs for AI platforms */}
+                  {/* AI MODEL CONFIGURATION for AI platforms */}
                   {isAIPlatform && (
                     <div className="space-y-5 pt-4 border-t border-purple-200">
                       <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -408,18 +514,18 @@ const ModernCredentialForm = ({
                 <div className="flex gap-4 mt-8">
                   <Button
                     onClick={handleTest}
-                    disabled={!hasAllCredentials || isTesting}
+                    disabled={!hasAllCredentials || !aiGeneratedTestConfig || isTesting}
                     className="flex-1 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
                   >
                     {isTesting ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Testing with Automation...
+                        AI Dynamic Testing...
                       </>
                     ) : (
                       <>
                         <TestTube className="w-4 h-4 mr-2" />
-                        Test with Automation
+                        AI Dynamic Test
                       </>
                     )}
                   </Button>
@@ -437,7 +543,7 @@ const ModernCredentialForm = ({
                     ) : (
                       <>
                         <Save className="w-4 h-4 mr-2" />
-                        Save for Automation
+                        Save for Dynamic Automation
                       </>
                     )}
                   </Button>
@@ -445,40 +551,43 @@ const ModernCredentialForm = ({
               </div>
             </div>
 
-            {/* Right Side - Automation Context API Playground - FIXED: Now scrollable */}
+            {/* Right Side - AI Configuration API Playground */}
             <div className="space-y-4">
-              {/* Automation Context Info */}
+              {/* AI Configuration Info */}
               <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-200/50">
                 <h4 className="text-sm font-semibold text-indigo-900 mb-2 flex items-center gap-2">
                   <Sparkles className="w-4 h-4" />
-                  Automation Context
+                  AI Dynamic Configuration
                 </h4>
                 <div className="text-xs text-indigo-700 space-y-1">
-                  <p><strong>Workflow:</strong> {automationContext?.title || 'Loading...'}</p>
-                  <p><strong>Purpose:</strong> {automationContextPayload?.task_description || 'Testing credentials...'}</p>
+                  <p><strong>Platform:</strong> {platform.name}</p>
+                  <p><strong>Status:</strong> {aiGeneratedTestConfig ? '✅ AI Config Ready' : '⏳ Generating...'}</p>
+                  {aiGeneratedTestConfig && (
+                    <p><strong>Base URL:</strong> {aiGeneratedTestConfig.base_url}</p>
+                  )}
                 </div>
               </div>
 
-              {/* Request Payload - FIXED: Made scrollable */}
+              {/* AI Test Configuration Display */}
               <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl p-6 border border-green-200/50">
                 <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <TestTube className="w-5 h-5 text-green-600" />
-                  Automation API Request
+                  AI-Generated Test Config
                 </h4>
                 <ScrollArea className="h-[200px] w-full">
                   <div className="bg-gray-900 rounded-xl p-4">
                     <pre className="text-green-400 text-sm font-mono whitespace-pre-wrap">
-                      {automationContextPayload ? JSON.stringify(automationContextPayload.request, null, 2) : 'Loading automation context...'}
+                      {aiGeneratedTestConfig ? JSON.stringify(aiGeneratedTestConfig, null, 2) : 'Generating AI test configuration...'}
                     </pre>
                   </div>
                 </ScrollArea>
               </div>
 
-              {/* API Response - FIXED: Made scrollable */}
+              {/* Dynamic API Response */}
               <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-200/50">
                 <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-blue-600" />
-                  Automation API Response
+                  Dynamic API Response
                 </h4>
                 <ScrollArea className="h-[280px] w-full">
                   <div className="bg-gray-900 rounded-xl p-4">
@@ -491,7 +600,7 @@ const ModernCredentialForm = ({
                         <div className="text-center space-y-2">
                           <TestTube className="w-8 h-8 mx-auto opacity-50" />
                           <p className="text-sm">
-                            Click "Test with Automation" to see how your credentials work with the actual automation workflow
+                            Click "AI Dynamic Test" to see how your credentials work with AI-generated configurations
                           </p>
                         </div>
                       </div>
@@ -507,12 +616,12 @@ const ModernCredentialForm = ({
         <div className="pt-4 border-t border-gray-200/50">
           <div className="flex items-center justify-between">
             <p className="text-xs text-gray-500">
-              🔒 Credentials are encrypted and stored securely • 🤖 AI-powered automation context testing
+              🔒 Credentials are encrypted and stored securely • 🤖 AI-powered fully dynamic testing
             </p>
             {testResult?.success && (
               <div className="flex items-center gap-2 text-xs text-green-600">
                 <TestTube className="w-4 h-4" />
-                <span>Ready for automation execution</span>
+                <span>Ready for fully dynamic automation execution</span>
               </div>
             )}
           </div>

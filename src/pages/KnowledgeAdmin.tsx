@@ -2,28 +2,22 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { 
   Brain, 
   Database, 
   MessageSquare, 
-  Plus, 
   Settings, 
   BookOpen,
-  Bot
+  Bot,
+  Sliders
 } from "lucide-react";
 import AIAgentTrainingTab from "@/components/admin/AIAgentTrainingTab";
+import AIAgentSectionController from "@/components/admin/AIAgentSectionController";
 
 const KnowledgeAdmin = () => {
   const { isAdmin, loading } = useAdminAuth();
-  const [activeTab, setActiveTab] = useState("agent-training");
+  const [activeTab, setActiveTab] = useState("section-controller");
 
   if (loading) {
     return (
@@ -66,7 +60,14 @@ const KnowledgeAdmin = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 bg-white/50 rounded-2xl p-1">
+        <TabsList className="grid w-full grid-cols-5 bg-white/50 rounded-2xl p-1">
+          <TabsTrigger 
+            value="section-controller" 
+            className="flex items-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm"
+          >
+            <Sliders className="w-4 h-4" />
+            Section Controller
+          </TabsTrigger>
           <TabsTrigger 
             value="agent-training" 
             className="flex items-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm"
@@ -96,6 +97,10 @@ const KnowledgeAdmin = () => {
             Settings
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="section-controller" className="mt-6">
+          <AIAgentSectionController />
+        </TabsContent>
 
         <TabsContent value="agent-training" className="mt-6">
           <AIAgentTrainingTab />

@@ -8,7 +8,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// COMPLETE SYSTEM PROMPT - EXACTLY AS PROVIDED
+// COMPLETE SYSTEM PROMPT - EXACTLY AS PROVIDED + ENHANCED TEST PAYLOAD REQUIREMENTS
 const YUSRAI_SYSTEM_PROMPT = `Hello! I am YusrAI - your advanced AI Automation Specialist and Platform Integration Expert. I am designed to understand complex business workflows and translate them into complete, executable automation blueprints that integrate seamlessly across various digital platforms. My core capability is to bridge your business needs with robust, production-ready automation solutions.
 
 My comprehensive expertise covers:
@@ -58,13 +58,9 @@ MANDATORY RESPONSE FORMAT - EVERY response MUST include ALL 7 sections:
       "credentials": [
         {
           "field": "exact_field_name",
-          "why_needed": "detailed explanation",
-          "where_to_get": "specific location guidance",
+          "placeholder": "example_value_format",
           "link": "actual_working_url_if_available",
-          "options": [
-            "for_dropdown_fields"
-          ],
-          "example": "sample_value_format"
+          "why_needed": "detailed explanation for this automation context"
         }
       ]
     }
@@ -91,19 +87,26 @@ MANDATORY RESPONSE FORMAT - EVERY response MUST include ALL 7 sections:
   ],
   "test_payloads": {
     "platform_name": {
-      "method": "GET|POST|PUT|DELETE",
-      "endpoint": "real_api_endpoint",
-      "headers": {
-        "exact": "headers"
+      "base_url": "https://api.platform.com",
+      "test_endpoint": {
+        "method": "GET|POST|PUT|DELETE",
+        "path": "/v1/endpoint",
+        "headers": {
+          "Authorization": "Bearer {credential_field}",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "test": "data"
+        }
       },
-      "body": {
-        "test": "data"
-      },
-      "expected_response": {
-        "success": "indicators"
-      },
-      "error_patterns": {
-        "401": "meaning"
+      "expected_success_indicators": ["field1", "field2", "status"],
+      "expected_error_indicators": ["error", "message", "invalid"],
+      "validation_rules": {
+        "credential_field": {
+          "prefix": "required_prefix_",
+          "min_length": 20,
+          "format": "description"
+        }
       }
     }
   },
@@ -119,8 +122,9 @@ MANDATORY RESPONSE FORMAT - EVERY response MUST include ALL 7 sections:
         "step": 1,
         "action": "specific_action",
         "platform": "PlatformName",
+        "base_url": "https://api.platform.com",
         "method": "HTTP_METHOD",
-        "endpoint": "exact_endpoint",
+        "endpoint": "exact_endpoint_path",
         "headers": {
           "required": "headers"
         },
@@ -249,7 +253,7 @@ Rules & Thinking:
 
 DO: Use EXACT, verifiable platform names (e.g., "Gmail," not "Email Service").
 
-DO: Provide EXACT field names that the platform's API expects (e.g., "api_key," "access_token," "client_secret").
+DO: Provide EXACT field names that the platform's API expects (e.g., "api_key," "access_token", "client_secret").
 
 DO: Include real, working links to the precise pages where users can obtain their credentials, if available.
 
@@ -375,6 +379,13 @@ What It Does: This section enables immediate verification of platform connection
 
 How It Works: I generate specific test configurations for each integrated platform. This includes defining the exact API method (GET, POST, etc.), the precise API endpoint for a simple test call, required headers (e.g., Authorization tokens), a sample body (if applicable), and clear expected_response indicators for success (e.g., HTTP status code 200, specific JSON field presence). I also specify error_patterns to help diagnose common issues. This data is fed to a test-credential function for execution.
 
+CRITICAL REQUIREMENTS FOR TEST PAYLOADS:
+- MUST include "base_url" (e.g., "https://api.platform.com")
+- MUST include "test_endpoint" object with method, path, headers, body
+- MUST include "expected_success_indicators" array (fields to look for in successful responses)
+- MUST include "expected_error_indicators" array (fields that indicate authentication failure)
+- MUST include "validation_rules" object for credential format validation
+
 Rules & Thinking:
 
 DO: Use REAL, verifiable API endpoints that genuinely exist on the respective platforms.
@@ -387,11 +398,15 @@ DO: Specify clear and unambiguous expected_response patterns to determine test s
 
 DO: Provide common error_patterns (e.g., 401 Unauthorized, 404 Not Found) with their typical meaning to aid in troubleshooting.
 
+DO: ALWAYS include base_url, test_endpoint structure, expected_success_indicators, expected_error_indicators, and validation_rules.
+
 DON'T: Invent or hallucinate fake API endpoints.
 
 DON'T: Use overly complex API endpoints for initial credential testing; keep it minimal.
 
 DON'T: Omit any authentication headers or parameters.
+
+DON'T: Skip the required test payload structure elements.
 
 Frontend Display: This data is sent to a test-credential function, displaying real-time testing results with clear success/failure indicators and troubleshooting hints.
 
@@ -402,11 +417,20 @@ What It Does: This section precisely defines how the automation will execute fro
 
 How It Works: I construct a complete, machine-readable execution specification. This includes defining the trigger (webhook, schedule, manual, event) and its configuration. The workflow array details each step, specifying the action, platform, HTTP method, exact API endpoint, necessary headers, detailed data_mapping (how inputs are transformed and passed), success_conditions, step-specific error_handling, and the next_step. Critically, ai_agent_integration is explicitly defined within the workflow steps where agents are invoked, specifying input_data and output_mapping. Overall error_handling for the entire blueprint and performance_optimization strategies (like rate_limit_handling and concurrency_limit) are also included.
 
+CRITICAL REQUIREMENTS FOR EXECUTION BLUEPRINT:
+- MUST include "base_url" for each workflow step
+- MUST include exact API "endpoint" paths for each step
+- MUST include precise "method" (GET, POST, PUT, DELETE) for each step
+- MUST include "headers" with authentication patterns for each step
+- MUST include "data_mapping" for data transformation between steps
+
 Rules & Thinking:
 
 DO: Include a complete workflow from the initial trigger event to the final action/completion.
 
 DO: Specify exact API endpoints, HTTP methods, headers, and authentication for every single API call.
+
+DO: Include base_url for each workflow step to enable dynamic execution.
 
 DO: Clearly define data_mapping to explain how data is extracted, transformed, and passed between steps.
 
@@ -424,6 +448,8 @@ DON'T: Skip any crucial execution steps or assume default values for critical pa
 
 DON'T: Neglect to define comprehensive error scenarios and explicit recovery paths.
 
+DON'T: Omit base_url, endpoint paths, or authentication details from workflow steps.
+
 Frontend Display: This blueprint is sent to an execute-automation function for live execution and monitoring. The user interface can display execution progress, status updates, and potentially a visual workflow diagram reflecting the steps.
 
 === OVERALL SYSTEM THINKING & SELF-CONTROL ===
@@ -438,6 +464,10 @@ API Veracity: Are all API endpoints REAL and appropriate for their context (test
 Credential Precision: Are all credential field names EXACT as platforms expect (e.g., api_key, access_token)?
 
 AI Configuration: For AI platforms, are model, system_prompt, and available options explicitly included and correctly defined?
+
+Test Payload Completeness: Do all test_payloads include base_url, test_endpoint structure, expected_success_indicators, expected_error_indicators, and validation_rules?
+
+Execution Blueprint Completeness: Does the execution_blueprint include base_url, exact endpoints, methods, headers, and data_mapping for each workflow step?
 
 Testability: Are all test_payloads genuinely testable with the specified endpoints and methods, including error patterns?
 
@@ -457,6 +487,10 @@ Self-Control & Core Principles:
 
 ✅ ALWAYS include complete and precise technical details for every component.
 
+✅ ALWAYS include base_url, test_endpoint structure, expected indicators, and validation_rules in test_payloads.
+
+✅ ALWAYS include base_url, exact endpoints, methods, headers, and data_mapping in execution_blueprint workflow steps.
+
 ✅ ALWAYS align the solution with the user's actual business need and desired outcome.
 
 ✅ ALWAYS provide fully executable, robust, and production-ready solutions.
@@ -473,6 +507,10 @@ Self-Control & Core Principles:
 
 ❌ NEVER omit technical details crucial for proper execution or troubleshooting.
 
+❌ NEVER skip base_url, test_endpoint structure, or validation_rules in test_payloads.
+
+❌ NEVER skip base_url, endpoints, methods, or authentication details in execution_blueprint.
+
 ❌ NEVER assume the user possesses specific technical knowledge or common practices.
 
 ❌ NEVER offer untestable, non-executable, or poorly defined solutions.
@@ -487,6 +525,71 @@ Learn: Continuously adapt and refine internal knowledge based on user feedback, 
 
 Update: Proactively update platform knowledge whenever APIs change, new features emerge, or best practices evolve.`;
 
+// Load admin section configurations from database
+async function loadSectionConfigurations(supabase: any): Promise<any> {
+  try {
+    const { data, error } = await supabase
+      .from('ai_section_configurations')
+      .select('*')
+      .eq('is_active', true);
+    
+    if (error) {
+      console.log('No section configurations found, using defaults');
+      return {};
+    }
+    
+    const sectionConfigs: any = {};
+    data?.forEach((config: any) => {
+      sectionConfigs[config.section_name] = {
+        custom_instructions: config.custom_instructions,
+        rules: config.rules,
+        examples: config.examples
+      };
+    });
+    
+    return sectionConfigs;
+  } catch (error) {
+    console.log('Error loading section configurations:', error);
+    return {};
+  }
+}
+
+// Build enhanced system prompt with admin configurations
+function buildEnhancedSystemPrompt(sectionConfigs: any): string {
+  let enhancedPrompt = YUSRAI_SYSTEM_PROMPT;
+  
+  // Add section-specific enhancements
+  if (sectionConfigs.summary?.custom_instructions) {
+    enhancedPrompt += `\n\n=== ADMIN ENHANCEMENT FOR SUMMARY SECTION ===\nAdditional Instructions: ${sectionConfigs.summary.custom_instructions}`;
+  }
+  
+  if (sectionConfigs.steps?.custom_instructions) {
+    enhancedPrompt += `\n\n=== ADMIN ENHANCEMENT FOR STEPS SECTION ===\nAdditional Instructions: ${sectionConfigs.steps.custom_instructions}`;
+  }
+  
+  if (sectionConfigs.platforms?.custom_instructions) {
+    enhancedPrompt += `\n\n=== ADMIN ENHANCEMENT FOR PLATFORMS SECTION ===\nAdditional Instructions: ${sectionConfigs.platforms.custom_instructions}`;
+  }
+  
+  if (sectionConfigs.clarification_questions?.custom_instructions) {
+    enhancedPrompt += `\n\n=== ADMIN ENHANCEMENT FOR CLARIFICATION QUESTIONS SECTION ===\nAdditional Instructions: ${sectionConfigs.clarification_questions.custom_instructions}`;
+  }
+  
+  if (sectionConfigs.agents?.custom_instructions) {
+    enhancedPrompt += `\n\n=== ADMIN ENHANCEMENT FOR AGENTS SECTION ===\nAdditional Instructions: ${sectionConfigs.agents.custom_instructions}`;
+  }
+  
+  if (sectionConfigs.test_payloads?.custom_instructions) {
+    enhancedPrompt += `\n\n=== ADMIN ENHANCEMENT FOR TEST PAYLOADS SECTION ===\nAdditional Instructions: ${sectionConfigs.test_payloads.custom_instructions}`;
+  }
+  
+  if (sectionConfigs.execution_blueprint?.custom_instructions) {
+    enhancedPrompt += `\n\n=== ADMIN ENHANCEMENT FOR EXECUTION BLUEPRINT SECTION ===\nAdditional Instructions: ${sectionConfigs.execution_blueprint.custom_instructions}`;
+  }
+  
+  return enhancedPrompt;
+}
+
 // Validation function for 7-section responses
 const validateYusrAIResponse = (response: any): { isValid: boolean; missing: string[] } => {
   const missing: string[] = [];
@@ -496,6 +599,40 @@ const validateYusrAIResponse = (response: any): { isValid: boolean; missing: str
     if (!response[section]) {
       missing.push(section);
     }
+  }
+  
+  // Enhanced validation for test_payloads
+  if (response.test_payloads) {
+    for (const [platformName, payload] of Object.entries(response.test_payloads)) {
+      const testPayload = payload as any;
+      if (!testPayload.base_url) {
+        missing.push(`test_payloads.${platformName}.base_url`);
+      }
+      if (!testPayload.test_endpoint || !testPayload.test_endpoint.method || !testPayload.test_endpoint.path) {
+        missing.push(`test_payloads.${platformName}.test_endpoint structure`);
+      }
+      if (!testPayload.expected_success_indicators || !Array.isArray(testPayload.expected_success_indicators)) {
+        missing.push(`test_payloads.${platformName}.expected_success_indicators`);
+      }
+      if (!testPayload.expected_error_indicators || !Array.isArray(testPayload.expected_error_indicators)) {
+        missing.push(`test_payloads.${platformName}.expected_error_indicators`);
+      }
+    }
+  }
+  
+  // Enhanced validation for execution_blueprint
+  if (response.execution_blueprint?.workflow) {
+    response.execution_blueprint.workflow.forEach((step: any, index: number) => {
+      if (!step.base_url) {
+        missing.push(`execution_blueprint.workflow[${index}].base_url`);
+      }
+      if (!step.endpoint) {
+        missing.push(`execution_blueprint.workflow[${index}].endpoint`);
+      }
+      if (!step.method) {
+        missing.push(`execution_blueprint.workflow[${index}].method`);
+      }
+    });
   }
   
   // Detailed validation
@@ -538,6 +675,10 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Load admin section configurations
+    const sectionConfigs = await loadSectionConfigurations(supabase);
+    const enhancedPrompt = buildEnhancedSystemPrompt(sectionConfigs);
+
     // Enhanced context
     const conversationHistory = messages.slice(-5).map((msg: any) => ({
       role: msg.isBot ? 'assistant' : 'user',
@@ -562,7 +703,7 @@ serve(async (req) => {
           messages: [
             { 
               role: 'system', 
-              content: YUSRAI_SYSTEM_PROMPT
+              content: enhancedPrompt
             },
             ...conversationHistory,
             { 
@@ -642,7 +783,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       response: finalResponse,
       yusrai_powered: true,
-      seven_sections_validated: true
+      seven_sections_validated: true,
+      admin_enhanced: Object.keys(sectionConfigs).length > 0
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

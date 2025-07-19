@@ -26,8 +26,8 @@ export const extractBlueprintFromStructuredData = (structuredData: any): Automat
       return validateAndCleanBlueprint(structuredData.automation_blueprint);
     }
 
-    // Method 3: Construct blueprint from component data
-    if (structuredData.platforms || structuredData.steps || structuredData.workflow) {
+    // Method 3: FIXED - Construct blueprint from workflow/steps data
+    if (structuredData.workflow || structuredData.steps || structuredData.platforms) {
       console.log('🔧 Constructing blueprint from structured data components');
       return constructBlueprintFromComponents(structuredData);
     }
@@ -73,13 +73,20 @@ const validateAndCleanBlueprint = (blueprint: any): AutomationBlueprint | null =
         type: step.type || 'action',
         ...step
       }));
-    } else if (blueprint.workflow && Array.isArray(blueprint.workflow)) {
-      // Handle workflow format
-      cleanedBlueprint.steps = blueprint.workflow.map((step: any, index: number) => ({
-        id: step.id || `workflow-step-${index + 1}`,
-        name: step.action || step.name || `Step ${index + 1}`,
-        type: step.type || 'action',
-        ...step
+    } 
+    // FIXED - Handle workflow format properly
+    else if (blueprint.workflow && Array.isArray(blueprint.workflow)) {
+      cleanedBlueprint.steps = blueprint.workflow.map((workflowItem: any, index: number) => ({
+        id: workflowItem.id || `workflow-step-${index + 1}`,
+        name: workflowItem.action || workflowItem.step || workflowItem.name || `Step ${index + 1}`,
+        type: workflowItem.type || 'action',
+        action: {
+          integration: workflowItem.platform || 'system',
+          method: workflowItem.method || 'execute',
+          parameters: workflowItem.parameters || { description: workflowItem.action || workflowItem.step }
+        },
+        // Preserve original workflow data
+        ...workflowItem
       }));
     }
 
@@ -98,7 +105,7 @@ const validateAndCleanBlueprint = (blueprint: any): AutomationBlueprint | null =
 };
 
 /**
- * Constructs blueprint from individual components
+ * ENHANCED - Constructs blueprint from individual components with better workflow handling
  */
 const constructBlueprintFromComponents = (structuredData: any): AutomationBlueprint => {
   const constructedBlueprint: AutomationBlueprint = {
@@ -113,7 +120,30 @@ const constructBlueprintFromComponents = (structuredData: any): AutomationBluepr
 
   let stepCounter = 1;
 
-  // Add steps from various sources
+  // ENHANCED - Handle workflow array first (most common from AI)
+  if (structuredData.workflow && Array.isArray(structuredData.workflow)) {
+    console.log('🔧 Processing workflow array with', structuredData.workflow.length, 'items');
+    structuredData.workflow.forEach((workflowItem: any, index: number) => {
+      const step = {
+        id: `workflow-${stepCounter++}`,
+        name: workflowItem.action || workflowItem.step || workflowItem.name || `Workflow Step ${index + 1}`,
+        type: workflowItem.type || 'action',
+        action: {
+          integration: workflowItem.platform || 'system',
+          method: workflowItem.method || 'execute',
+          parameters: workflowItem.parameters || { 
+            description: workflowItem.action || workflowItem.step,
+            platform: workflowItem.platform 
+          }
+        }
+      };
+      
+      console.log(`📋 Added workflow step: ${step.name} (${step.action.integration})`);
+      constructedBlueprint.steps.push(step);
+    });
+  }
+
+  // Add traditional steps if present
   if (structuredData.steps && Array.isArray(structuredData.steps)) {
     structuredData.steps.forEach((step: string | any, index: number) => {
       if (typeof step === 'string') {
@@ -128,63 +158,52 @@ const constructBlueprintFromComponents = (structuredData: any): AutomationBluepr
           }
         });
       } else if (typeof step === 'object' && step !== null) {
+        const stepObj = step as any;
         constructedBlueprint.steps.push({
-          id: (step as any).id || `step-${stepCounter++}`,
-          name: (step as any).name || (step as any).action || `Step ${index + 1}`,
-          type: (step as any).type || 'action',
-          ...(step as any)
+          id: stepObj.id || `step-${stepCounter++}`,
+          name: stepObj.name || stepObj.action || `Step ${index + 1}`,
+          type: stepObj.type || 'action',
+          ...stepObj
         });
       }
     });
   }
 
-  // Add workflow steps
-  if (structuredData.workflow && Array.isArray(structuredData.workflow)) {
-    structuredData.workflow.forEach((step: any, index: number) => {
-      constructedBlueprint.steps.push({
-        id: `workflow-${stepCounter++}`,
-        name: step.action || step.name || `Workflow Step ${index + 1}`,
-        type: step.type || 'action',
-        action: {
-          integration: step.platform || 'system',
-          method: step.method || 'execute',
-          parameters: step.parameters || {}
-        }
-      });
-    });
-  }
-
   // Add platform-based steps
   if (structuredData.platforms && Array.isArray(structuredData.platforms)) {
-    structuredData.platforms.forEach((platform: any, index: number) => {
-      constructedBlueprint.steps.push({
-        id: `platform-step-${stepCounter++}`,
-        name: `${platform.name} Integration`,
-        type: 'action',
-        action: {
-          integration: platform.name.toLowerCase(),
-          method: platform.method || 'api_call',
-          parameters: platform.config || platform.parameters || {}
-        }
-      });
+    structuredData.platforms.forEach((platform: any) => {
+      if (platform && typeof platform === 'object' && platform.name) {
+        constructedBlueprint.steps.push({
+          id: `platform-step-${stepCounter++}`,
+          name: `${platform.name} Integration`,
+          type: 'action',
+          action: {
+            integration: platform.name.toLowerCase(),
+            method: platform.method || 'api_call',
+            parameters: platform.config || platform.parameters || {}
+          }
+        });
+      }
     });
   }
 
   // Add AI agent steps
   if (structuredData.agents && Array.isArray(structuredData.agents)) {
     structuredData.agents.forEach((agent: any, index: number) => {
-      constructedBlueprint.steps.push({
-        id: `agent-step-${stepCounter++}`,
-        name: `AI Agent: ${agent.name}`,
-        type: 'ai_agent_call',
-        ai_agent_call: {
-          agent_id: agent.name,
-          input_prompt: agent.goal || 'Execute assigned tasks',
-          output_variable: `agent_${index + 1}_output`,
-          is_recommended: true
-        },
-        ai_recommended: true
-      });
+      if (agent && typeof agent === 'object' && agent.name) {
+        constructedBlueprint.steps.push({
+          id: `agent-step-${stepCounter++}`,
+          name: `AI Agent: ${agent.name}`,
+          type: 'ai_agent_call',
+          ai_agent_call: {
+            agent_id: agent.name,
+            input_prompt: agent.goal || 'Execute assigned tasks',
+            output_variable: `agent_${index + 1}_output`,
+            is_recommended: true
+          },
+          ai_recommended: true
+        });
+      }
     });
   }
 

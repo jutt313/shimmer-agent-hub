@@ -63,9 +63,11 @@ const AutomationDetail = () => {
     fetchAutomationAndChats();
   }, [user, id, navigate]);
 
-  // FIXED: Enhanced blueprint extraction from structured data
+  // ENHANCED: Improved blueprint extraction with immediate diagram generation
   const extractBlueprintFromStructuredData = (structuredData: any): AutomationBlueprint | null => {
     try {
+      console.log('🔧 ENHANCED: Extracting blueprint from structured data:', Object.keys(structuredData || {}));
+
       // First, try to get execution_blueprint
       if (structuredData.execution_blueprint) {
         console.log('✅ Found execution_blueprint in structured data');
@@ -76,6 +78,42 @@ const AutomationDetail = () => {
       if (structuredData.automation_blueprint) {
         console.log('✅ Found automation_blueprint in structured data');
         return structuredData.automation_blueprint;
+      }
+
+      // ENHANCED - Handle workflow array properly (most common from AI responses)
+      if (structuredData.workflow && Array.isArray(structuredData.workflow) && structuredData.workflow.length > 0) {
+        console.log('🔧 ENHANCED: Constructing blueprint from workflow array with', structuredData.workflow.length, 'items');
+        
+        const constructedBlueprint: AutomationBlueprint = {
+          version: "1.0",
+          description: structuredData.summary || "AI-generated automation workflow",
+          trigger: {
+            type: 'manual'
+          },
+          steps: []
+        };
+
+        // Convert workflow items to steps
+        structuredData.workflow.forEach((workflowItem: any, index: number) => {
+          if (workflowItem && (workflowItem.action || workflowItem.step)) {
+            constructedBlueprint.steps.push({
+              id: `workflow-step-${index + 1}`,
+              name: workflowItem.action || workflowItem.step || `Step ${index + 1}`,
+              type: 'action',
+              action: {
+                integration: workflowItem.platform || 'system',
+                method: workflowItem.method || 'execute',
+                parameters: workflowItem.parameters || { 
+                  description: workflowItem.action || workflowItem.step,
+                  platform: workflowItem.platform 
+                }
+              }
+            });
+          }
+        });
+
+        console.log(`✅ ENHANCED: Created blueprint with ${constructedBlueprint.steps.length} steps from workflow`);
+        return constructedBlueprint;
       }
 
       // Third, try to construct blueprint from available data
@@ -134,8 +172,9 @@ const AutomationDetail = () => {
     }
   };
 
+  // ENHANCED: Fixed diagram generation with proper error handling
   const generateAndSaveDiagram = async (automationId: string, blueprint: AutomationBlueprint, forceRegenerate = false, userFeedback?: string) => {
-    // FIXED: Enhanced blueprint validation
+    // ENHANCED: Better blueprint validation
     if (!blueprint) {
       console.warn('❌ No blueprint provided for diagram generation');
       toast({
@@ -146,9 +185,9 @@ const AutomationDetail = () => {
       return;
     }
 
-    // FIXED: Better blueprint validation
+    // ENHANCED: Better blueprint validation with detailed logging
     if (!blueprint.steps || blueprint.steps.length === 0) {
-      console.warn('❌ Blueprint has no steps to generate diagram for');
+      console.warn('❌ Blueprint has no steps to generate diagram for:', blueprint);
       toast({
         title: "Empty Blueprint",
         description: "Blueprint contains no steps to visualize",
@@ -160,8 +199,8 @@ const AutomationDetail = () => {
     setGeneratingDiagram(true);
     
     try {
-      console.log('🚀 Generating AI-powered diagram for automation:', automationId);
-      console.log('📊 Blueprint analysis:', {
+      console.log('🚀 ENHANCED: Generating AI-powered diagram for automation:', automationId);
+      console.log('📊 ENHANCED: Blueprint analysis:', {
         mainSteps: blueprint.steps.length,
         triggerType: blueprint.trigger?.type,
         conditionSteps: blueprint.steps.filter(step => step.type === 'condition').length,
@@ -171,10 +210,11 @@ const AutomationDetail = () => {
           (step.ai_agent_call && (step.ai_agent_call as any).is_recommended)
         ).length,
         forceRegenerate: forceRegenerate,
-        userFeedback: userFeedback ? 'provided' : 'none'
+        userFeedback: userFeedback ? 'provided' : 'none',
+        stepDetails: blueprint.steps.map(step => ({ name: step.name, type: step.type }))
       });
       
-      // FIXED: Enhanced request body preparation
+      // ENHANCED: Better request body preparation
       const requestBody: any = { 
         automation_blueprint: blueprint,
         automation_id: automationId,
@@ -212,7 +252,7 @@ const AutomationDetail = () => {
         return;
       }
 
-      // FIXED: Enhanced error handling
+      // ENHANCED: Better error handling
       if (data.error) {
         console.error('❌ Diagram generation error:', data);
         toast({
@@ -223,7 +263,7 @@ const AutomationDetail = () => {
         return;
       }
 
-      // FIXED: Better validation of diagram data
+      // ENHANCED: Better validation of diagram data
       if (!data.nodes || !Array.isArray(data.nodes) || data.nodes.length === 0) {
         console.error('❌ Invalid diagram data structure received:', data);
         toast({
@@ -245,7 +285,7 @@ const AutomationDetail = () => {
       const aiAgentNodeCount = data.nodes.filter((n: any) => n.data?.isRecommended).length;
       const platformNodeCount = data.nodes.filter((n: any) => n.data?.platform).length;
 
-      console.log('✅ Generated comprehensive diagram:', {
+      console.log('✅ ENHANCED: Generated comprehensive diagram:', {
         nodes: nodeCount,
         edges: edgeCount,
         conditionNodes: conditionNodeCount,
@@ -254,18 +294,6 @@ const AutomationDetail = () => {
         source: data.metadata?.source || 'unknown',
         generatedAt: data.metadata?.generatedAt
       });
-
-      // FIXED: Enhanced validation for diagram quality
-      const validationResults = {
-        sufficientNodes: nodeCount >= Math.max(blueprint.steps.length * 0.5, 1),
-        hasConnections: edgeCount > 0 || nodeCount <= 1,
-        hasIntelligentRouting: data.metadata?.routePathsTerminated > 0,
-        hasAIAnalysis: data.metadata?.source === 'openai-intelligent-generator'
-      };
-
-      if (!validationResults.sufficientNodes) {
-        console.warn(`⚠️ Generated fewer nodes (${nodeCount}) than expected (${blueprint.steps.length})`);
-      }
 
       // Save the generated diagram data back to the database
       const { error: updateError } = await supabase
@@ -289,7 +317,7 @@ const AutomationDetail = () => {
         automation_diagram_data: data
       }));
 
-      console.log('✅ AI-powered comprehensive diagram generated and saved successfully!');
+      console.log('✅ ENHANCED: AI-powered comprehensive diagram generated and saved successfully!');
       
       const successMessage = userFeedback 
         ? `AI improved the diagram based on your feedback with ${nodeCount} nodes and ${aiAgentNodeCount} AI recommendations!`
@@ -331,9 +359,10 @@ const AutomationDetail = () => {
 
       setAutomation(automationData);
 
-      // FIXED: Enhanced diagram generation logic
+      // ENHANCED: Better diagram generation logic with immediate trigger
       if (automationData.automation_blueprint && !automationData.automation_diagram_data) {
-        console.log('🔄 No diagram data found, generating new diagram from blueprint...');
+        console.log('🔄 ENHANCED: No diagram data found, generating new diagram from blueprint...');
+        // Immediate diagram generation without timeout
         generateAndSaveDiagram(automationData.id, automationData.automation_blueprint);
       } else if (!automationData.automation_blueprint && !automationData.automation_diagram_data) {
         console.log('⚠️ No blueprint or diagram data found - waiting for AI response');
@@ -479,7 +508,7 @@ const AutomationDetail = () => {
 
       console.log('✅ Received response from chat-ai function');
 
-      // FIXED: Enhanced response processing with blueprint extraction
+      // ENHANCED: Better response processing with immediate blueprint extraction and diagram generation
       let structuredData = null;
       let aiResponseText = "";
       let yusraiPowered = false;
@@ -494,10 +523,11 @@ const AutomationDetail = () => {
         yusraiPowered = parseResult.metadata.yusrai_powered || false;
         sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
         
-        console.log('📋 Enhanced processing result:', {
+        console.log('📋 ENHANCED: Processing result:', {
           hasStructuredData: !!structuredData,
           yusraiPowered,
-          sevenSectionsValidated
+          sevenSectionsValidated,
+          hasWorkflow: !!(structuredData?.workflow)
         });
       }
 
@@ -516,6 +546,19 @@ const AutomationDetail = () => {
           if (structuredData.steps && structuredData.steps.length > 0) {
             aiResponseText += "\n\nSteps:\n" + structuredData.steps.map((step: string, i: number) => `${i + 1}. ${step}`).join('\n');
           }
+          // ENHANCED: Show workflow information
+          if (structuredData.workflow && structuredData.workflow.length > 0) {
+            aiResponseText += "\n\nWorkflow:\n" + structuredData.workflow.map((item: any, i: number) => 
+              `${i + 1}. ${item.action || item.step} (${item.platform || 'System'})`
+            ).join('\n');
+          }
+        }
+        // Handle responses with workflow but no summary
+        else if (structuredData.workflow && Array.isArray(structuredData.workflow) && structuredData.workflow.length > 0) {
+          aiResponseText = "I've created a comprehensive automation workflow with " + structuredData.workflow.length + " detailed steps:\n\n" +
+            structuredData.workflow.map((item: any, i: number) => 
+              `${i + 1}. ${item.action || item.step} (Platform: ${item.platform || 'System'})`
+            ).join('\n');
         }
         // Handle responses with steps but no summary
         else if (structuredData.steps && Array.isArray(structuredData.steps) && structuredData.steps.length > 0) {
@@ -600,12 +643,12 @@ const AutomationDetail = () => {
         }
       }
 
-      // FIXED: Enhanced blueprint handling and diagram generation
+      // ENHANCED: Immediate blueprint handling and diagram generation
       if (structuredData) {
         const extractedBlueprint = extractBlueprintFromStructuredData(structuredData);
         
         if (extractedBlueprint) {
-          console.log('🔧 Updating automation blueprint and generating new diagram');
+          console.log('🔧 ENHANCED: Updating automation blueprint and generating new diagram immediately');
           
           // Save the blueprint to database
           const { error: updateError } = await supabase
@@ -620,13 +663,13 @@ const AutomationDetail = () => {
             };
             setAutomation(updatedAutomation);
             
-            // Generate new diagram for updated blueprint
-            console.log('🎯 Generating diagram from extracted blueprint');
+            // ENHANCED: Generate new diagram immediately (no timeout)
+            console.log('🎯 ENHANCED: Generating diagram from extracted blueprint immediately');
             generateAndSaveDiagram(automation.id, extractedBlueprint);
             
             toast({
               title: "Blueprint Updated",
-              description: "Automation blueprint has been updated with new AI-generated diagram.",
+              description: "Automation blueprint has been updated and diagram is being generated.",
             });
           } else {
             console.error('❌ Error saving blueprint:', updateError);

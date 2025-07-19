@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -17,36 +16,280 @@ class FullyDynamicCredentialTester {
   }
 
   /**
+   * ENHANCED: Generate AI test configurations for platforms that don't have them
+   */
+  async generateAITestConfiguration(platformName: string): Promise<any> {
+    console.log(`🤖 ENHANCED: Generating AI test configuration for ${platformName}`);
+    
+    try {
+      const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+      if (!openAIApiKey) {
+        console.error('❌ OpenAI API key not configured');
+        return null;
+      }
+
+      const prompt = `Generate a comprehensive test configuration for platform "${platformName}" with the following JSON structure:
+{
+  "base_url": "https://api.${platformName.toLowerCase()}.com",
+  "test_endpoint": {
+    "method": "GET",
+    "path": "/api/v1/me" or appropriate endpoint,
+    "headers": {
+      "Authorization": "Bearer {access_token}" or appropriate auth,
+      "Content-Type": "application/json"
+    }
+  },
+  "authentication": {
+    "location": "header",
+    "parameter_name": "Authorization",
+    "format": "Bearer {access_token}"
+  },
+  "validation_rules": {
+    "access_token": {
+      "min_length": 20,
+      "prefix": "optional_prefix"
+    }
+  },
+  "expected_success_indicators": ["user", "id", "name"],
+  "expected_error_indicators": ["error", "unauthorized", "invalid"],
+  "error_patterns": {
+    "401": "Invalid or expired access token",
+    "403": "Access denied - check permissions",
+    "404": "API endpoint not found"
+  }
+}
+
+Make this specific to ${platformName} platform with realistic API endpoints and authentication methods.`;
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { 
+              role: 'system', 
+              content: 'You are an API integration expert. Generate realistic test configurations for platform APIs. Always respond with valid JSON only.' 
+            },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.3,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('❌ OpenAI API error:', response.status, response.statusText);
+        return null;
+      }
+
+      const data = await response.json();
+      const generatedConfig = data.choices[0].message.content;
+      
+      try {
+        const parsedConfig = JSON.parse(generatedConfig);
+        console.log(`✅ ENHANCED: Generated AI test configuration for ${platformName}`);
+        return parsedConfig;
+      } catch (parseError) {
+        console.error('❌ Failed to parse AI-generated config:', parseError);
+        return null;
+      }
+
+    } catch (error) {
+      console.error(`❌ Error generating AI test configuration for ${platformName}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * ENHANCED: Get or generate test configuration for a platform
+   */
+  async getOrGenerateTestConfig(platformName: string): Promise<any> {
+    // ENHANCED: Built-in configurations for common platforms
+    const builtInConfigs: Record<string, any> = {
+      'typeform': {
+        base_url: 'https://api.typeform.com',
+        test_endpoint: {
+          method: 'GET',
+          path: '/me',
+          headers: {
+            'Authorization': 'Bearer {access_token}',
+            'Content-Type': 'application/json'
+          }
+        },
+        authentication: {
+          location: 'header',
+          parameter_name: 'Authorization',
+          format: 'Bearer {access_token}'
+        },
+        validation_rules: {
+          access_token: {
+            min_length: 20,
+            prefix: 'tfp_'
+          }
+        },
+        expected_success_indicators: ['email', 'account_id', 'alias'],
+        expected_error_indicators: ['error', 'message'],
+        error_patterns: {
+          '401': 'Invalid Typeform access token',
+          '403': 'Access denied - check Typeform permissions',
+          '404': 'Typeform API endpoint not found'
+        }
+      },
+      'slack': {
+        base_url: 'https://slack.com/api',
+        test_endpoint: {
+          method: 'GET',
+          path: '/auth.test',
+          headers: {
+            'Authorization': 'Bearer {bot_token}',
+            'Content-Type': 'application/json'
+          }
+        },
+        authentication: {
+          location: 'header',
+          parameter_name: 'Authorization',
+          format: 'Bearer {bot_token}'
+        },
+        validation_rules: {
+          bot_token: {
+            min_length: 20,
+            prefix: 'xoxb-'
+          }
+        },
+        expected_success_indicators: ['ok', 'user_id', 'team_id'],
+        expected_error_indicators: ['error'],
+        error_patterns: {
+          '401': 'Invalid Slack bot token',
+          '403': 'Access denied - check Slack app permissions'
+        }
+      },
+      'discord': {
+        base_url: 'https://discord.com/api/v10',
+        test_endpoint: {
+          method: 'GET',
+          path: '/users/@me',
+          headers: {
+            'Authorization': 'Bot {bot_token}',
+            'Content-Type': 'application/json'
+          }
+        },
+        authentication: {
+          location: 'header',
+          parameter_name: 'Authorization',
+          format: 'Bot {bot_token}'
+        },
+        validation_rules: {
+          bot_token: {
+            min_length: 50
+          }
+        },
+        expected_success_indicators: ['id', 'username', 'discriminator'],
+        expected_error_indicators: ['code', 'message'],
+        error_patterns: {
+          '401': 'Invalid Discord bot token',
+          '403': 'Access denied - check Discord bot permissions'
+        }
+      }
+    };
+
+    const platformKey = platformName.toLowerCase();
+    
+    // Check if we have a built-in configuration
+    if (builtInConfigs[platformKey]) {
+      console.log(`✅ ENHANCED: Using built-in configuration for ${platformName}`);
+      return builtInConfigs[platformKey];
+    }
+
+    // ENHANCED: Generate AI configuration for unknown platforms
+    console.log(`🤖 ENHANCED: No built-in config for ${platformName}, generating with AI...`);
+    const aiConfig = await this.generateAITestConfiguration(platformName);
+    
+    if (aiConfig) {
+      console.log(`✅ ENHANCED: Successfully generated AI config for ${platformName}`);
+      return aiConfig;
+    }
+
+    // Fallback generic configuration
+    console.log(`⚠️ ENHANCED: Using fallback generic configuration for ${platformName}`);
+    return {
+      base_url: `https://api.${platformKey}.com`,
+      test_endpoint: {
+        method: 'GET',
+        path: '/api/v1/me',
+        headers: {
+          'Authorization': 'Bearer {access_token}',
+          'Content-Type': 'application/json'
+        }
+      },
+      authentication: {
+        location: 'header',
+        parameter_name: 'Authorization',
+        format: 'Bearer {access_token}'
+      },
+      validation_rules: {
+        access_token: {
+          min_length: 10
+        }
+      },
+      expected_success_indicators: ['user', 'id'],
+      expected_error_indicators: ['error'],
+      error_patterns: {
+        '401': `Invalid ${platformName} access token`,
+        '403': `Access denied - check ${platformName} permissions`
+      }
+    };
+  }
+
+  /**
    * FULLY DYNAMIC: Test credentials using AI-generated configuration ONLY
    */
   async testPlatformCredentialsComprehensively(
     platformName: string,
     credentials: Record<string, string>,
-    testConfig: any,
+    testConfig?: any,
     userId?: string
   ): Promise<any> {
     const startTime = Date.now();
-    console.log(`🚀 FULLY DYNAMIC TESTING: ${platformName} with AI-generated config`);
+    console.log(`🚀 ENHANCED DYNAMIC TESTING: ${platformName}`);
 
     try {
-      // Step 1: Validate AI-generated configuration
-      const configValidation = this.validateAIConfig(testConfig);
+      // ENHANCED: Get or generate test configuration
+      const finalTestConfig = testConfig || await this.getOrGenerateTestConfig(platformName);
+      
+      if (!finalTestConfig) {
+        return {
+          success: false,
+          message: `Could not generate test configuration for ${platformName}`,
+          details: {
+            config_generation_failed: true,
+            platform: platformName,
+            total_time_ms: Date.now() - startTime
+          }
+        };
+      }
+
+      console.log(`🔧 ENHANCED: Using test configuration for ${platformName}:`, Object.keys(finalTestConfig));
+
+      // Step 1: Validate configuration
+      const configValidation = this.validateAIConfig(finalTestConfig);
       if (!configValidation.valid) {
         return {
           success: false,
-          message: `AI configuration validation failed: ${configValidation.message}`,
+          message: `Configuration validation failed: ${configValidation.message}`,
           details: {
             validation_failed: true,
             platform: platformName,
             total_time_ms: Date.now() - startTime,
-            ai_dynamic_test: true,
             config_error: configValidation.message
           }
         };
       }
 
       // Step 2: Enhanced format validation using AI rules
-      const formatValidation = this.validateCredentialFormatDynamic(platformName, credentials, testConfig);
+      const formatValidation = this.validateCredentialFormatDynamic(platformName, credentials, finalTestConfig);
       if (!formatValidation.valid) {
         return {
           success: false,
@@ -55,14 +298,13 @@ class FullyDynamicCredentialTester {
             validation_failed: true,
             platform: platformName,
             total_time_ms: Date.now() - startTime,
-            ai_dynamic_test: true,
             format_validation_error: true
           }
         };
       }
 
-      // Step 3: Perform real API test with AI-generated configuration
-      const testResult = await this.performDynamicAPITest(testConfig, credentials, platformName);
+      // Step 3: Perform real API test
+      const testResult = await this.performDynamicAPITest(finalTestConfig, credentials, platformName);
       const totalTime = Date.now() - startTime;
 
       // Step 4: Track API usage in database
@@ -78,13 +320,13 @@ class FullyDynamicCredentialTester {
         );
       }
 
-      console.log(`🏁 Fully dynamic testing completed for ${platformName} in ${totalTime}ms - ${testResult.success ? 'SUCCESS' : 'FAILED'}`);
+      console.log(`🏁 ENHANCED: Testing completed for ${platformName} in ${totalTime}ms - ${testResult.success ? 'SUCCESS' : 'FAILED'}`);
 
       return {
         success: testResult.success,
         message: testResult.success 
-          ? `✅ ${platformName} credentials verified successfully with AI-generated dynamic testing! Ready for automation use.`
-          : this.generateDynamicErrorMessage(platformName, testResult, testConfig),
+          ? `✅ ${platformName} credentials verified successfully! Ready for automation use.`
+          : this.generateDynamicErrorMessage(platformName, testResult, finalTestConfig),
         details: {
           // Real test results
           endpoint_tested: testResult.endpoint_tested,
@@ -95,17 +337,17 @@ class FullyDynamicCredentialTester {
           
           // Platform information
           platform: platformName,
-          config_source: 'ai_generated_dynamic',
-          base_url: testConfig.base_url,
+          config_source: testConfig ? 'provided' : 'ai_generated',
+          base_url: finalTestConfig.base_url,
           
           // Response preview (sanitized)
           api_response_preview: this.sanitizeResponse(testResult.response_data),
           
           // Testing markers
-          ai_dynamic_test: true,
+          enhanced_dynamic_test: true,
           real_api_call: true,
           format_validated: true,
-          ai_config_validated: true,
+          config_validated: true,
           
           // Usage tracking
           usage_tracked: this.usageTracker.has(platformName)
@@ -114,17 +356,17 @@ class FullyDynamicCredentialTester {
 
     } catch (error: any) {
       const totalTime = Date.now() - startTime;
-      console.error(`💥 Fully dynamic testing failed for ${platformName}:`, error);
+      console.error(`💥 ENHANCED: Testing failed for ${platformName}:`, error);
       
       return {
         success: false,
-        message: `AI-powered dynamic testing system error for ${platformName}: ${error.message}`,
+        message: `Enhanced testing system error for ${platformName}: ${error.message}`,
         details: {
           error_details: error.message,
           total_time_ms: totalTime,
           platform: platformName,
           system_error: true,
-          ai_dynamic_test: true
+          enhanced_dynamic_test: true
         }
       };
     }
@@ -134,30 +376,30 @@ class FullyDynamicCredentialTester {
    * DYNAMIC: Validate AI-generated configuration
    */
   validateAIConfig(testConfig: any): { valid: boolean; message: string } {
-    console.log(`🔍 Validating AI-generated config:`, Object.keys(testConfig || {}));
+    console.log(`🔍 Validating configuration:`, Object.keys(testConfig || {}));
     
     if (!testConfig) {
-      return { valid: false, message: 'No AI configuration provided' };
+      return { valid: false, message: 'No configuration provided' };
     }
 
     if (!testConfig.base_url) {
-      return { valid: false, message: 'AI configuration missing base_url' };
+      return { valid: false, message: 'Configuration missing base_url' };
     }
 
     if (!testConfig.test_endpoint) {
-      return { valid: false, message: 'AI configuration missing test_endpoint' };
+      return { valid: false, message: 'Configuration missing test_endpoint' };
     }
 
     if (!testConfig.test_endpoint.method) {
-      return { valid: false, message: 'AI configuration missing test_endpoint.method' };
+      return { valid: false, message: 'Configuration missing test_endpoint.method' };
     }
 
     if (!testConfig.test_endpoint.path) {
-      return { valid: false, message: 'AI configuration missing test_endpoint.path' };
+      return { valid: false, message: 'Configuration missing test_endpoint.path' };
     }
 
-    console.log(`✅ AI configuration validated successfully`);
-    return { valid: true, message: 'AI configuration is valid' };
+    console.log(`✅ Configuration validated successfully`);
+    return { valid: true, message: 'Configuration is valid' };
   }
 
   /**
@@ -265,6 +507,7 @@ class FullyDynamicCredentialTester {
             headers[headerKey] = headers[headerKey].replace(`{token}`, credentials[credKey]);
             headers[headerKey] = headers[headerKey].replace(`{access_token}`, credentials[credKey]);
             headers[headerKey] = headers[headerKey].replace(`{api_key}`, credentials[credKey]);
+            headers[headerKey] = headers[headerKey].replace(`{bot_token}`, credentials[credKey]);
           }
         });
       });
@@ -285,7 +528,7 @@ class FullyDynamicCredentialTester {
         method: testConfig.test_endpoint.method || 'GET',
         headers: {
           ...headers,
-          'User-Agent': 'YusrAI-Fully-Dynamic-Tester/5.0'
+          'User-Agent': 'YusrAI-Enhanced-Dynamic-Tester/6.0'
         },
         signal: AbortSignal.timeout(15000),
         ...(testConfig.test_endpoint.body && { body: JSON.stringify(testConfig.test_endpoint.body) })
@@ -410,7 +653,7 @@ class FullyDynamicCredentialTester {
       hasSuccessIndicators,
       hasErrorIndicators,
       finalResult: isSuccess,
-      aiGenerated: true
+      enhancedGenerated: true
     });
     
     if (isSuccess) {
@@ -453,7 +696,7 @@ class FullyDynamicCredentialTester {
       timestamp: new Date().toISOString(),
       response_time: responseTime,
       status_code: statusCode,
-      call_type: 'dynamic_credential_test'
+      call_type: 'enhanced_credential_test'
     };
     
     if (!this.usageTracker.has(platformName)) {
@@ -461,7 +704,7 @@ class FullyDynamicCredentialTester {
     }
     
     this.usageTracker.get(platformName).push(usage);
-    console.log(`📊 Tracked DYNAMIC API usage for ${platformName}:`, usage);
+    console.log(`📊 Tracked ENHANCED API usage for ${platformName}:`, usage);
   }
 
   /**
@@ -492,7 +735,7 @@ class FullyDynamicCredentialTester {
       if (error) {
         console.error("Error tracking API usage in database:", error.message);
       } else {
-        console.log(`✅ DYNAMIC API usage tracked in database for ${platformName}`);
+        console.log(`✅ ENHANCED API usage tracked in database for ${platformName}`);
       }
     } catch (e) {
       console.error("Exception in trackAPIUsageInDatabase:", e.message);
@@ -528,11 +771,11 @@ serve(async (req) => {
   try {
     const { platformName, credentials, testConfig, userId } = await req.json();
 
-    if (!platformName || !credentials || !testConfig) {
+    if (!platformName || !credentials) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: 'Platform name, credentials, and AI-generated testConfig are required for dynamic testing' 
+          message: 'Platform name and credentials are required for enhanced testing' 
         }),
         { 
           status: 400, 
@@ -541,20 +784,20 @@ serve(async (req) => {
       );
     }
 
-    console.log(`🎯 FULLY DYNAMIC TESTING REQUEST: ${platformName} with AI testConfig:`, Object.keys(testConfig));
+    console.log(`🎯 ENHANCED TESTING REQUEST: ${platformName}`);
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Initialize the fully dynamic credential tester
+    // Initialize the enhanced credential tester
     const tester = new FullyDynamicCredentialTester(supabase);
 
-    // Test platform credentials with AI-generated configuration
+    // Test platform credentials with enhanced AI configuration
     const result = await tester.testPlatformCredentialsComprehensively(platformName, credentials, testConfig, userId);
 
-    console.log(`🎯 FULLY DYNAMIC TESTING RESULT for ${platformName}:`, result.success ? 'SUCCESS' : 'FAILED');
+    console.log(`🎯 ENHANCED TESTING RESULT for ${platformName}:`, result.success ? 'SUCCESS' : 'FAILED');
 
     return new Response(
       JSON.stringify(result),
@@ -564,14 +807,14 @@ serve(async (req) => {
     );
 
   } catch (error: any) {
-    console.error('💥 Error in fully dynamic test-credential function:', error);
+    console.error('💥 Error in enhanced test-credential function:', error);
     
     return new Response(
       JSON.stringify({ 
         success: false, 
-        message: `Fully dynamic server error: ${error.message}`,
+        message: `Enhanced server error: ${error.message}`,
         details: {
-          error_type: 'dynamic_server_error',
+          error_type: 'enhanced_server_error',
           timestamp: new Date().toISOString()
         }
       }),

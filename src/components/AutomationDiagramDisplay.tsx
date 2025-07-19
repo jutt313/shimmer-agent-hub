@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { 
   ReactFlow, 
@@ -36,6 +35,19 @@ import JsonDebugModal from './diagram/JsonDebugModal';
 import DiagramErrorRecovery from './DiagramErrorRecovery';
 import { calculateEnhancedLayout } from '@/utils/diagramLayout';
 import { AutomationBlueprint, AutomationDiagramData } from '@/types/automation';
+
+// Define proper interface for node data
+interface NodeData {
+  label: string;
+  stepType: string;
+  explanation: string;
+  platform: string;
+  icon: string;
+  isRecommended?: boolean;
+  ai_agent_call?: any;
+  onAdd?: () => void;
+  onDismiss?: () => void;
+}
 
 const nodeTypes = {
   triggerNode: CustomNodeMapper,
@@ -91,7 +103,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     stopNodes: 0
   });
 
-  const processNodeData = useCallback((nodeData: any) => {
+  const processNodeData = useCallback((nodeData: any): NodeData | null => {
     console.log('🎯 Processing node:', { 
       label: nodeData.label, 
       stepType: nodeData.stepType, 
@@ -99,8 +111,14 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       isRecommended: nodeData.isRecommended 
     });
 
-    const processedData = {
-      ...nodeData,
+    const processedData: NodeData = {
+      label: nodeData.label || 'Unknown Step',
+      stepType: nodeData.stepType || 'action',
+      explanation: nodeData.explanation || 'No explanation available',
+      platform: nodeData.platform || 'System',
+      icon: nodeData.icon || 'PlugZap',
+      isRecommended: nodeData.isRecommended || false,
+      ai_agent_call: nodeData.ai_agent_call,
       onAdd: nodeData.isRecommended ? () => {
         if (onAgentAdd) {
           const agentData = {
@@ -153,7 +171,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     }
   }, [onRegenerateDiagram, retryCount, toast]);
 
-  // FIXED: Enhanced fallback diagram creation from blueprint
+  // Enhanced fallback diagram creation from blueprint
   const handleFallbackDiagram = useCallback(() => {
     const blueprintToUse = automationBlueprint;
     
@@ -180,15 +198,16 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           stepType: "trigger",
           explanation: "This automation starts here",
           platform: blueprintToUse.trigger?.platform || "System",
-          icon: "Play"
-        }
+          icon: "Play",
+          isRecommended: false
+        } as NodeData
       }
     ];
 
     const fallbackEdges: any[] = [];
     let currentX = 600;
 
-    // FIXED: Enhanced step processing with better node types
+    // Enhanced step processing with better node types
     blueprintToUse.steps.forEach((step, index) => {
       const nodeId = `fallback-step-${index}`;
       
@@ -238,7 +257,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
           icon: stepIcon,
           isRecommended: step.ai_recommended || false,
           ai_agent_call: step.ai_agent_call || undefined
-        }
+        } as NodeData
       });
 
       // Connect to previous node
@@ -269,8 +288,9 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         stepType: "end",
         explanation: "Automation completed successfully",
         platform: "System",
-        icon: "CheckCircle"
-      }
+        icon: "CheckCircle",
+        isRecommended: false
+      } as NodeData
     });
 
     fallbackEdges.push({
@@ -311,7 +331,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     console.log('🎯 Processing diagram data with enhanced validation');
     
     try {
-      // FIXED: Enhanced diagram data processing with fallback logic
+      // Enhanced diagram data processing with fallback logic
       if (automationDiagramData?.nodes && automationDiagramData?.edges) {
         console.log('✅ Using diagram data:', {
           nodes: automationDiagramData.nodes.length,
@@ -380,7 +400,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         }
         
       } else if (automationBlueprint?.steps?.length > 0) {
-        // FIXED: Enhanced handling when diagram data is missing but blueprint exists
+        // Enhanced handling when diagram data is missing but blueprint exists
         console.log('⚠️ No diagram data available, but blueprint exists - creating fallback');
         setDiagramError('No diagram visualization available. Creating from blueprint...');
         
@@ -624,7 +644,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
         </ReactFlow>
       </div>
 
-      {/* FIXED: Enhanced error state with better recovery options */}
+      {/* Enhanced error state with better recovery options */}
       {diagramError && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/95 backdrop-blur-sm p-2 sm:p-4">
           <DiagramErrorRecovery

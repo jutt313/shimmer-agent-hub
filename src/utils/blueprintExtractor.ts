@@ -115,7 +115,7 @@ const constructBlueprintFromComponents = (structuredData: any): AutomationBluepr
 
   // Add steps from various sources
   if (structuredData.steps && Array.isArray(structuredData.steps)) {
-    structuredData.steps.forEach((step: string | object, index: number) => {
+    structuredData.steps.forEach((step: string | any, index: number) => {
       if (typeof step === 'string') {
         constructedBlueprint.steps.push({
           id: `step-${stepCounter++}`,
@@ -127,12 +127,12 @@ const constructBlueprintFromComponents = (structuredData: any): AutomationBluepr
             parameters: { description: step }
           }
         });
-      } else if (typeof step === 'object') {
+      } else if (typeof step === 'object' && step !== null) {
         constructedBlueprint.steps.push({
-          id: step.id || `step-${stepCounter++}`,
-          name: step.name || step.action || `Step ${index + 1}`,
-          type: step.type || 'action',
-          ...step
+          id: (step as any).id || `step-${stepCounter++}`,
+          name: (step as any).name || (step as any).action || `Step ${index + 1}`,
+          type: (step as any).type || 'action',
+          ...(step as any)
         });
       }
     });

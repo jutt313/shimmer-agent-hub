@@ -308,7 +308,7 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
                     </Badge>
                   </CardTitle>
                 </CardHeader>
-              </ColliesibleTrigger>
+              </CollapsibleTrigger>
               
               <CollapsibleContent>
                 <CardContent className="pt-0 pb-6">

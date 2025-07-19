@@ -7,152 +7,267 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// FRESH AI CONFIG CREDENTIAL TESTER
-class FreshAICredentialTester {
+// COMPREHENSIVE PLATFORM CONFIGURATIONS
+const PLATFORM_CONFIGS = {
+  'openai': {
+    platform_name: 'OpenAI',
+    base_url: 'https://api.openai.com',
+    test_endpoint: { 
+      method: 'POST', 
+      path: '/v1/chat/completions',
+      headers: { 'Authorization': 'Bearer {api_key}', 'Content-Type': 'application/json' },
+      body: {
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: 'Test' }],
+        max_tokens: 5
+      },
+      expected_success_indicators: ['choices', 'message', 'content', 'model'],
+      expected_error_indicators: ['error', 'invalid_api_key', 'unauthorized', 'incorrect_api_key']
+    },
+    authentication: { type: 'Bearer', location: 'header', parameter_name: 'Authorization' },
+    credential_fields: ['api_key'],
+    validation: {
+      api_key: { prefix: 'sk-', min_length: 20 }
+    }
+  },
+  'typeform': {
+    platform_name: 'Typeform', 
+    base_url: 'https://api.typeform.com',
+    test_endpoint: { 
+      method: 'GET', 
+      path: '/me',
+      headers: { 'Authorization': 'Bearer {personal_access_token}' },
+      expected_success_indicators: ['alias', 'account_id', 'language', 'email'],
+      expected_error_indicators: ['error', 'invalid', 'unauthorized', 'forbidden']
+    },
+    authentication: { type: 'Bearer', location: 'header', parameter_name: 'Authorization' },
+    credential_fields: ['personal_access_token'],
+    validation: {
+      personal_access_token: { prefix: 'tfp_', min_length: 15 }
+    }
+  },
+  'google sheets': {
+    platform_name: 'Google Sheets',
+    base_url: 'https://sheets.googleapis.com',
+    test_endpoint: { 
+      method: 'GET', 
+      path: '/v4/spreadsheets/{spreadsheet_id}',
+      headers: { 'Authorization': 'Bearer {access_token}' },
+      expected_success_indicators: ['spreadsheetId', 'properties', 'sheets'],
+      expected_error_indicators: ['error', 'invalid_grant', 'unauthorized', 'invalid_token']
+    },
+    authentication: { type: 'Bearer', location: 'header', parameter_name: 'Authorization' },
+    credential_fields: ['access_token', 'spreadsheet_id'],
+    validation: {
+      access_token: { min_length: 20 },
+      spreadsheet_id: { min_length: 10 }
+    }
+  },
+  'notion': {
+    platform_name: 'Notion',
+    base_url: 'https://api.notion.com',
+    test_endpoint: { 
+      method: 'GET', 
+      path: '/v1/users/me',
+      headers: { 'Authorization': 'Bearer {integration_token}', 'Notion-Version': '2022-06-28' },
+      expected_success_indicators: ['name', 'id', 'type', 'person'],
+      expected_error_indicators: ['error', 'invalid', 'unauthorized']
+    },
+    authentication: { type: 'Bearer', location: 'header', parameter_name: 'Authorization' },
+    credential_fields: ['integration_token'],
+    validation: {
+      integration_token: { prefix: 'secret_', min_length: 20 }
+    }
+  },
+  'slack': {
+    platform_name: 'Slack',
+    base_url: 'https://slack.com',
+    test_endpoint: { 
+      method: 'POST', 
+      path: '/api/auth.test',
+      headers: { 'Authorization': 'Bearer {bot_token}', 'Content-Type': 'application/json' },
+      expected_success_indicators: ['ok', 'user_id', 'team_id'],
+      expected_error_indicators: ['error', 'invalid_auth', 'account_inactive']
+    },
+    authentication: { type: 'Bearer', location: 'header', parameter_name: 'Authorization' },
+    credential_fields: ['bot_token'],
+    validation: {
+      bot_token: { prefix: 'xoxb-', min_length: 20 }
+    }
+  },
+  'github': {
+    platform_name: 'GitHub',
+    base_url: 'https://api.github.com',
+    test_endpoint: { 
+      method: 'GET', 
+      path: '/user',
+      headers: { 'Authorization': 'Bearer {access_token}', 'User-Agent': 'YusrAI-Test' },
+      expected_success_indicators: ['login', 'id', 'node_id'],
+      expected_error_indicators: ['message', 'bad_credentials', 'requires_authentication']
+    },
+    authentication: { type: 'Bearer', location: 'header', parameter_name: 'Authorization' },
+    credential_fields: ['access_token'],
+    validation: {
+      access_token: { prefix: 'ghp_', min_length: 20 }
+    }
+  },
+  'discord': {
+    platform_name: 'Discord',
+    base_url: 'https://discord.com/api',
+    test_endpoint: { 
+      method: 'GET', 
+      path: '/users/@me',
+      headers: { 'Authorization': 'Bot {bot_token}' },
+      expected_success_indicators: ['id', 'username', 'discriminator'],
+      expected_error_indicators: ['message', 'code', 'unauthorized']
+    },
+    authentication: { type: 'Bot', location: 'header', parameter_name: 'Authorization' },
+    credential_fields: ['bot_token'],
+    validation: {
+      bot_token: { min_length: 50 }
+    }
+  },
+  'salesforce': {
+    platform_name: 'Salesforce',
+    base_url: 'https://{instance_url}.salesforce.com',
+    test_endpoint: { 
+      method: 'GET', 
+      path: '/services/data/v57.0/',
+      headers: { 'Authorization': 'Bearer {access_token}' },
+      expected_success_indicators: ['sobjects', 'encoding', 'maxBatchSize'],
+      expected_error_indicators: ['error', 'error_description', 'invalid_grant']
+    },
+    authentication: { type: 'Bearer', location: 'header', parameter_name: 'Authorization' },
+    credential_fields: ['access_token', 'instance_url'],
+    validation: {
+      access_token: { min_length: 15 },
+      instance_url: { min_length: 5 }
+    }
+  }
+};
+
+class ComprehensiveCredentialTester {
   private supabase: any;
+  private usageTracker: any;
 
   constructor(supabase: any) {
     this.supabase = supabase;
+    this.usageTracker = new Map();
   }
 
   /**
-   * Get automation context for testing
+   * FIXED: Enhanced credential format validation with platform-specific rules
    */
-  async getAutomationContext(automationId: string): Promise<any> {
-    try {
-      const { data, error } = await this.supabase
-        .from('automations')
-        .select('*')
-        .eq('id', automationId)
-        .single();
+  validateCredentialFormat(platformName: string, credentials: Record<string, string>): { valid: boolean; message: string } {
+    console.log(`🔍 ENHANCED validation for ${platformName} with credentials:`, Object.keys(credentials));
+    
+    const platformKey = platformName.toLowerCase().replace(/\s+/g, ' ');
+    const config = PLATFORM_CONFIGS[platformKey];
+    
+    if (!config) {
+      console.warn(`⚠️ No specific config for ${platformName}, using generic validation`);
+      const hasCredentials = Object.values(credentials).some(val => val && val.trim());
+      return { 
+        valid: hasCredentials, 
+        message: hasCredentials ? `${platformName} credentials format validated` : `${platformName} credentials required` 
+      };
+    }
 
-      if (error) {
-        console.error('Failed to get automation context:', error);
-        return null;
+    // Check required fields
+    for (const field of config.credential_fields) {
+      if (!credentials[field] || !credentials[field].trim()) {
+        return { 
+          valid: false, 
+          message: `${config.platform_name} requires ${field}. Please provide a valid ${field}.` 
+        };
       }
 
-      return data;
-    } catch (error) {
-      console.error('Exception getting automation context:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Enhanced credential validation with automation context
-   */
-  validateCredentialFormat(platformName: string, credentials: Record<string, string>, automationContext: any): { valid: boolean; message: string } {
-    console.log(`🔍 Validating credentials for ${platformName} in automation context`);
-    
-    const platform = platformName.toLowerCase();
-    
-    switch (platform) {
-      case 'openai':
-        const openaiKey = credentials.api_key || credentials.key;
-        if (!openaiKey) return { valid: false, message: `OpenAI API key required for automation: ${automationContext?.title || 'Workflow'}` };
-        if (!openaiKey.startsWith('sk-')) return { valid: false, message: 'OpenAI API key must start with "sk-"' };
-        if (openaiKey.length < 20) return { valid: false, message: 'OpenAI API key appears invalid (too short)' };
-        return { valid: true, message: `OpenAI API key validated for automation: ${automationContext?.title || 'Workflow'}` };
+      // Validate field format
+      const validation = config.validation?.[field];
+      if (validation) {
+        const value = credentials[field];
         
-      case 'typeform':
-        const typeformToken = credentials.personal_access_token || credentials.token;
-        if (!typeformToken) return { valid: false, message: `Typeform token required for automation: ${automationContext?.title || 'Form Workflow'}` };
-        if (!typeformToken.startsWith('tfp_')) return { valid: false, message: 'Typeform token must start with "tfp_"' };
-        return { valid: true, message: `Typeform token validated for automation: ${automationContext?.title || 'Form Workflow'}` };
+        if (validation.prefix && !value.startsWith(validation.prefix)) {
+          return { 
+            valid: false, 
+            message: `${config.platform_name} ${field} must start with "${validation.prefix}"` 
+          };
+        }
         
-      case 'notion':
-        const notionToken = credentials.access_token || credentials.token;
-        if (!notionToken) return { valid: false, message: `Notion token required for automation: ${automationContext?.title || 'Database Workflow'}` };
-        return { valid: true, message: `Notion token validated for automation: ${automationContext?.title || 'Database Workflow'}` };
-        
-      default:
-        const hasCredentials = Object.values(credentials).some(val => val && val.trim());
-        if (!hasCredentials) return { valid: false, message: `${platformName} credentials required for automation: ${automationContext?.title || 'Workflow'}` };
-        return { valid: true, message: `${platformName} credentials validated for automation: ${automationContext?.title || 'Workflow'}` };
-    }
-  }
-
-  /**
-   * Build authentication headers with fresh AI config
-   */
-  buildFreshAIAuthHeaders(aiConfig: any, credentials: Record<string, string>, platformName: string): {headers: Record<string, string>, url: string, body?: any} {
-    console.log(`🔑 Building fresh AI auth headers for ${platformName}`);
-    
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'User-Agent': 'YusrAI-FreshAI-Tester/1.0',
-      'Accept': 'application/json'
-    };
-
-    let testUrl = aiConfig.base_url + aiConfig.test_endpoint.path;
-    let requestBody = aiConfig.test_endpoint.body || null;
-    
-    // Use AI config authentication settings
-    const authConfig = aiConfig.authentication || {};
-    const testEndpoint = aiConfig.test_endpoint || {};
-    
-    // Apply headers from AI config
-    if (testEndpoint.headers) {
-      Object.keys(testEndpoint.headers).forEach(headerKey => {
-        let headerValue = testEndpoint.headers[headerKey];
-        
-        // Replace credential placeholders with real values
-        Object.keys(credentials).forEach(credKey => {
-          if (credentials[credKey]) {
-            headerValue = headerValue.replace(`{${credKey}}`, credentials[credKey]);
-          }
-        });
-        
-        headers[headerKey] = headerValue;
-      });
-    }
-    
-    // Fallback authentication if not in test endpoint headers
-    if (!headers['Authorization'] && authConfig.type) {
-      const firstCredValue = Object.values(credentials)[0];
-      if (firstCredValue) {
-        switch (authConfig.type.toLowerCase()) {
-          case 'bearer':
-            headers['Authorization'] = `Bearer ${firstCredValue}`;
-            break;
-          case 'basic':
-            headers['Authorization'] = `Basic ${btoa(firstCredValue)}`;
-            break;
-          case 'api_key':
-            if (authConfig.location === 'header') {
-              headers[authConfig.parameter_name || 'X-API-Key'] = firstCredValue;
-            } else if (authConfig.location === 'query') {
-              testUrl += `?${authConfig.parameter_name || 'api_key'}=${firstCredValue}`;
-            }
-            break;
-          default:
-            headers['Authorization'] = `Bearer ${firstCredValue}`;
+        if (validation.min_length && value.length < validation.min_length) {
+          return { 
+            valid: false, 
+            message: `${config.platform_name} ${field} appears too short (minimum ${validation.min_length} characters)` 
+          };
         }
       }
     }
 
-    return { headers, url: testUrl, body: requestBody };
+    return { 
+      valid: true, 
+      message: `${config.platform_name} credentials format validated successfully` 
+    };
   }
 
   /**
-   * Perform real API test with fresh AI config
+   * FIXED: Build real API request with proper credential substitution
    */
-  async performFreshAIAPITest(aiConfig: any, credentials: Record<string, string>, platformName: string, automationContext: any): Promise<any> {
-    console.log(`📡 Making REAL API call to ${platformName} with fresh AI config`);
+  buildRealAPIRequest(config: any, credentials: Record<string, string>): {url: string, options: any} {
+    console.log(`🔧 Building REAL API request for ${config.platform_name}`);
+    
+    let url = config.base_url + config.test_endpoint.path;
+    const headers = { ...config.test_endpoint.headers };
+    
+    // Substitute credentials in URL and headers
+    Object.keys(credentials).forEach(credKey => {
+      if (credentials[credKey]) {
+        // Replace in URL
+        url = url.replace(`{${credKey}}`, credentials[credKey]);
+        
+        // Replace in headers
+        Object.keys(headers).forEach(headerKey => {
+          headers[headerKey] = headers[headerKey].replace(`{${credKey}}`, credentials[credKey]);
+        });
+      }
+    });
+
+    // Handle special URL cases
+    if (config.platform_name === 'Google Sheets' && !url.includes('spreadsheets/')) {
+      // Use a test spreadsheet ID if none provided
+      url = url.replace('/v4/spreadsheets/{spreadsheet_id}', '/v4/spreadsheets/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms');
+    }
+
+    return {
+      url,
+      options: {
+        method: config.test_endpoint.method || 'GET',
+        headers: {
+          ...headers,
+          'User-Agent': 'YusrAI-Real-Credential-Tester/2.0'
+        },
+        signal: AbortSignal.timeout(15000),
+        ...(config.test_endpoint.body && { body: JSON.stringify(config.test_endpoint.body) })
+      }
+    };
+  }
+
+  /**
+   * FIXED: Perform real API test with comprehensive validation
+   */
+  async performRealAPITest(config: any, credentials: Record<string, string>, platformName: string): Promise<any> {
+    console.log(`📡 Making REAL API call to ${platformName}`);
     
     try {
-      const { headers, url, body } = this.buildFreshAIAuthHeaders(aiConfig, credentials, platformName);
+      const { url, options } = this.buildRealAPIRequest(config, credentials);
       
-      console.log(`🔗 Testing fresh AI endpoint: ${aiConfig.test_endpoint.method} ${url}`);
+      console.log(`🔗 Testing REAL endpoint: ${options.method} ${url}`);
       
       const startTime = Date.now();
-      const response = await fetch(url, {
-        method: aiConfig.test_endpoint.method || 'GET',
-        headers,
-        signal: AbortSignal.timeout(15000),
-        ...(body && { body: JSON.stringify(body) })
-      });
+      const response = await fetch(url, options);
       const requestTime = Date.now() - startTime;
+
+      // Track usage for real API calls
+      this.trackAPIUsage(platformName, requestTime, response.status);
 
       const responseText = await response.text();
       let responseData;
@@ -162,21 +277,21 @@ class FreshAICredentialTester {
         responseData = responseText.substring(0, 200);
       }
 
-      console.log(`📊 Fresh AI API Response: Status ${response.status}, Time ${requestTime}ms`);
+      console.log(`📊 REAL API Response: Status ${response.status}, Time ${requestTime}ms`);
 
       return {
-        success: this.analyzeFreshAIResponse(response, responseData, aiConfig, platformName, automationContext),
+        success: this.analyzeRealAPIResponse(response, responseData, config, platformName),
         status_code: response.status,
         response_data: responseData,
         request_time_ms: requestTime,
         endpoint_tested: url,
-        method_used: aiConfig.test_endpoint.method || 'GET',
-        automation_context: automationContext?.title || 'Default',
-        fresh_ai_config: true
+        method_used: options.method,
+        real_api_call: true,
+        platform_config: config.platform_name
       };
 
     } catch (error: any) {
-      console.error(`💥 Fresh AI API call failed for ${platformName}:`, error);
+      console.error(`💥 REAL API call failed for ${platformName}:`, error);
       
       return {
         success: false,
@@ -184,139 +299,172 @@ class FreshAICredentialTester {
         response_data: error.message,
         endpoint_tested: 'connection_failed',
         error_type: 'network_error',
-        automation_context: automationContext?.title || 'Default',
-        fresh_ai_config: true
+        real_api_call: true,
+        platform_config: platformName
       };
     }
   }
 
   /**
-   * Analyze API response with fresh AI config
+   * FIXED: Strengthened response analysis - requires BOTH success indicators AND no error indicators
    */
-  analyzeFreshAIResponse(response: Response, responseData: any, aiConfig: any, platformName: string, automationContext: any): boolean {
-    console.log(`🔍 Analyzing fresh AI API response for ${platformName}`);
+  analyzeRealAPIResponse(response: Response, responseData: any, config: any, platformName: string): boolean {
+    console.log(`🔍 STRENGTHENED analysis for ${platformName} response`);
     
     const status = response.status;
     
-    if (status >= 200 && status < 300) {
-      const testEndpoint = aiConfig.test_endpoint || {};
-      const successIndicators = testEndpoint.expected_success_indicators || ['success', 'data', 'user'];
-      const errorIndicators = testEndpoint.expected_error_indicators || ['error', 'invalid', 'unauthorized'];
-      
-      const responseString = JSON.stringify(responseData).toLowerCase();
-      
-      // Check for success indicators
-      const hasSuccessIndicators = successIndicators.some((indicator: string) =>
-        responseString.includes(indicator.toLowerCase())
-      );
-      
-      // Check for error indicators
-      const hasErrorIndicators = errorIndicators.some((indicator: string) =>
-        responseString.includes(indicator.toLowerCase())
-      );
-      
-      if (hasSuccessIndicators || !hasErrorIndicators) {
-        console.log(`✅ ${platformName} fresh AI success - Ready for: ${automationContext?.title || 'Workflow'}`);
-        return true;
-      }
-      
-      console.log(`⚠️ ${platformName} returned 2xx but with error indicators for automation: ${automationContext?.title || 'Workflow'}`);
+    // First check HTTP status
+    if (status < 200 || status >= 300) {
+      console.log(`❌ ${platformName} failed HTTP status check: ${status}`);
       return false;
     }
     
-    console.log(`❌ ${platformName} fresh AI failure - Status ${status} for: ${automationContext?.title || 'Workflow'}`);
+    const testEndpoint = config.test_endpoint || {};
+    const successIndicators = testEndpoint.expected_success_indicators || [];
+    const errorIndicators = testEndpoint.expected_error_indicators || [];
+    
+    const responseString = JSON.stringify(responseData).toLowerCase();
+    
+    // Check for success indicators
+    const hasSuccessIndicators = successIndicators.some((indicator: string) =>
+      responseString.includes(indicator.toLowerCase())
+    );
+    
+    // Check for error indicators
+    const hasErrorIndicators = errorIndicators.some((indicator: string) =>
+      responseString.includes(indicator.toLowerCase())
+    );
+    
+    // FIXED: Strengthened logic - require BOTH success indicators AND no error indicators
+    const isSuccess = hasSuccessIndicators && !hasErrorIndicators;
+    
+    console.log(`🎯 ${platformName} analysis result:`, {
+      hasSuccessIndicators,
+      hasErrorIndicators,
+      finalResult: isSuccess
+    });
+    
+    if (isSuccess) {
+      console.log(`✅ ${platformName} REAL credentials verified successfully`);
+      return true;
+    }
+    
+    console.log(`❌ ${platformName} REAL credentials validation failed`);
     return false;
   }
 
   /**
-   * Generate intelligent error messages with automation context
+   * Track API usage for real calls
    */
-  generateFreshAIErrorMessage(platformName: string, testResult: any, automationContext: any): string {
-    const platform = platformName.toLowerCase();
-    const status = testResult.status_code;
-    const workflowName = automationContext?.title || 'your automation workflow';
+  trackAPIUsage(platformName: string, responseTime: number, statusCode: number): void {
+    const usage = {
+      platform: platformName,
+      timestamp: new Date().toISOString(),
+      response_time: responseTime,
+      status_code: statusCode,
+      call_type: 'credential_test'
+    };
     
-    switch (platform) {
-      case 'openai':
-        if (status === 401) return `OpenAI authentication failed for ${workflowName}. Please verify your API key starts with "sk-" and is active.`;
-        if (status === 429) return `OpenAI rate limit exceeded for ${workflowName}. Please wait before retrying.`;
-        if (status === 403) return `OpenAI access denied for ${workflowName}. Check your account billing and status.`;
-        return `OpenAI API error (${status}) for ${workflowName}. Please verify your API key and account.`;
-        
-      case 'typeform':
-        if (status === 401) return `Typeform authentication failed for ${workflowName}. Please verify your Personal Access Token starts with "tfp_".`;
-        if (status === 403) return `Typeform access denied for ${workflowName}. Check your token permissions and scope.`;
-        return `Typeform API error (${status}) for ${workflowName}. Please verify your Personal Access Token.`;
-        
-      case 'notion':
-        if (status === 401) return `Notion authentication failed for ${workflowName}. Please verify your integration token.`;
-        if (status === 403) return `Notion access denied for ${workflowName}. Check your integration permissions and workspace access.`;
-        return `Notion API error (${status}) for ${workflowName}. Please verify your integration token and permissions.`;
-        
-      default:
-        if (status === 401) return `${platformName} authentication failed for ${workflowName}. Please verify your credentials.`;
-        if (status === 403) return `${platformName} access denied for ${workflowName}. Check your account permissions.`;
-        if (status === 429) return `${platformName} rate limit exceeded for ${workflowName}. Please wait before retrying.`;
-        if (status === 0) return `Failed to connect to ${platformName} for ${workflowName}. Check your internet connection.`;
-        return `${platformName} API error (${status}) for ${workflowName}. Please check your credentials and try again.`;
+    if (!this.usageTracker.has(platformName)) {
+      this.usageTracker.set(platformName, []);
+    }
+    
+    this.usageTracker.get(platformName).push(usage);
+    console.log(`📊 Tracked API usage for ${platformName}:`, usage);
+  }
+
+  /**
+   * Generate enhanced error messages with real API context
+   */
+  generateEnhancedErrorMessage(platformName: string, testResult: any): string {
+    const status = testResult.status_code;
+    const platform = platformName.toLowerCase();
+    
+    // Platform-specific error messages
+    const platformErrors = {
+      'openai': {
+        401: 'OpenAI API key is invalid or expired. Please check your API key starts with "sk-" and is active.',
+        403: 'OpenAI account access denied. Check your billing status and account standing.',
+        429: 'OpenAI rate limit exceeded. Please wait before retrying or upgrade your plan.'
+      },
+      'typeform': {
+        401: 'Typeform Personal Access Token is invalid. Please verify your token starts with "tfp_".',
+        403: 'Typeform access denied. Check your token permissions and account status.'
+      },
+      'google sheets': {
+        401: 'Google Sheets access token is invalid or expired. Please refresh your OAuth token.',
+        403: 'Google Sheets access denied. Check your API permissions and spreadsheet sharing settings.'
+      }
+    };
+
+    const specificError = platformErrors[platform]?.[status];
+    if (specificError) return specificError;
+
+    // Generic error messages
+    switch (status) {
+      case 401: return `${platformName} authentication failed. Please verify your credentials are correct and active.`;
+      case 403: return `${platformName} access denied. Check your account permissions and API access.`;
+      case 404: return `${platformName} API endpoint not found. The service may be unavailable.`;
+      case 429: return `${platformName} rate limit exceeded. Please wait before retrying.`;
+      case 0: return `Failed to connect to ${platformName}. Check your internet connection.`;
+      default: return `${platformName} API error (${status}). Please verify your credentials and try again.`;
     }
   }
 
   /**
-   * Main fresh AI testing function
+   * Main comprehensive testing function
    */
-  async testPlatformCredentialsWithFreshAI(
+  async testPlatformCredentialsComprehensively(
     platformName: string,
-    credentials: Record<string, string>,
-    automationId?: string,
-    aiGeneratedConfig?: any
+    credentials: Record<string, string>
   ): Promise<any> {
     const startTime = Date.now();
-    console.log(`🚀 Starting FRESH AI test for ${platformName}`);
+    console.log(`🚀 Starting COMPREHENSIVE test for ${platformName}`);
 
     try {
-      // Get automation context
-      const automationContext = automationId ? await this.getAutomationContext(automationId) : null;
-      console.log(`📋 Automation context loaded: ${automationContext?.title || 'No context'}`);
-
-      // Step 1: Validate credential format with automation context
-      const formatValidation = this.validateCredentialFormat(platformName, credentials, automationContext);
+      // Step 1: Enhanced format validation
+      const formatValidation = this.validateCredentialFormat(platformName, credentials);
       if (!formatValidation.valid) {
-        console.log(`❌ Credential format validation failed for ${platformName}`);
         return {
           success: false,
           message: formatValidation.message,
           details: {
             validation_failed: true,
             platform: platformName,
-            automation_context: automationContext?.title || 'None',
+            total_time_ms: Date.now() - startTime,
+            comprehensive_test: true
+          }
+        };
+      }
+
+      // Step 2: Get platform configuration
+      const platformKey = platformName.toLowerCase().replace(/\s+/g, ' ');
+      const config = PLATFORM_CONFIGS[platformKey];
+      
+      if (!config) {
+        console.warn(`⚠️ No comprehensive config for ${platformName}`);
+        return {
+          success: false,
+          message: `${platformName} is not yet supported in our comprehensive testing system`,
+          details: {
+            unsupported_platform: true,
+            platform: platformName,
             total_time_ms: Date.now() - startTime
           }
         };
       }
 
-      console.log(`✅ Credential format validation passed for ${platformName} with automation context`);
-
-      // Step 2: Use AI-generated config or create fallback
-      let config = aiGeneratedConfig;
-      if (!config) {
-        console.log(`⚠️ No AI config provided, creating fallback for ${platformName}`);
-        config = this.createFreshAIFallback(platformName, automationContext);
-      }
-
-      console.log(`📋 Fresh AI configuration loaded for ${platformName}`);
-
-      // Step 3: Perform real fresh AI API test
-      const testResult = await this.performFreshAIAPITest(config, credentials, platformName, automationContext);
+      // Step 3: Perform real API test with comprehensive validation
+      const testResult = await this.performRealAPITest(config, credentials, platformName);
       const totalTime = Date.now() - startTime;
 
-      console.log(`🏁 Fresh AI testing completed for ${platformName} in ${totalTime}ms - ${testResult.success ? 'SUCCESS' : 'FAILED'}`);
+      console.log(`🏁 Comprehensive testing completed for ${platformName} in ${totalTime}ms - ${testResult.success ? 'SUCCESS' : 'FAILED'}`);
 
       return {
         success: testResult.success,
         message: testResult.success 
-          ? `✅ ${platformName} credentials verified successfully with fresh AI for automation: ${automationContext?.title || 'Workflow'}! Ready for execution.`
-          : this.generateFreshAIErrorMessage(platformName, testResult, automationContext),
+          ? `✅ ${platformName} credentials verified successfully with REAL API testing! Ready for automation use.`
+          : this.generateEnhancedErrorMessage(platformName, testResult),
         details: {
           // Real test results
           endpoint_tested: testResult.endpoint_tested,
@@ -325,108 +473,41 @@ class FreshAICredentialTester {
           request_time_ms: testResult.request_time_ms,
           total_time_ms: totalTime,
           
-          // Automation context information
-          automation_title: automationContext?.title || 'No automation context',
-          automation_description: automationContext?.description || 'Fresh AI testing',
+          // Platform information
           platform: platformName,
-          config_source: 'fresh_ai_generated',
+          config_source: 'comprehensive_real_config',
           base_url: config.base_url,
           
           // Response preview (sanitized)
           api_response_preview: this.sanitizeResponse(testResult.response_data),
           
           // Testing markers
-          fresh_ai_test: true,
+          comprehensive_test: true,
+          real_api_call: true,
           format_validated: true,
-          automation_aware: true,
-          real_workflow_test: true
+          strengthened_validation: true,
+          
+          // Usage tracking
+          usage_tracked: this.usageTracker.has(platformName)
         }
       };
 
     } catch (error: any) {
       const totalTime = Date.now() - startTime;
-      console.error(`💥 Fresh AI testing failed for ${platformName}:`, error);
+      console.error(`💥 Comprehensive testing failed for ${platformName}:`, error);
       
       return {
         success: false,
-        message: `Fresh AI testing system error for ${platformName}: ${error.message}`,
+        message: `Comprehensive testing system error for ${platformName}: ${error.message}`,
         details: {
           error_details: error.message,
           total_time_ms: totalTime,
           platform: platformName,
           system_error: true,
-          fresh_ai_aware: true
+          comprehensive_test: true
         }
       };
     }
-  }
-
-  /**
-   * Create fresh AI fallback config
-   */
-  private createFreshAIFallback(platformName: string, automationContext: any): any {
-    console.log(`⚠️ Creating fresh AI fallback for ${platformName}`);
-    
-    const platform = platformName.toLowerCase();
-    const realConfigs = {
-      'openai': {
-        platform_name: 'OpenAI',
-        base_url: 'https://api.openai.com',
-        test_endpoint: { 
-          method: 'POST', 
-          path: '/v1/chat/completions',
-          headers: { 'Authorization': 'Bearer {api_key}', 'Content-Type': 'application/json' },
-          body: {
-            model: 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: `Fresh AI automation test: ${automationContext?.title || 'Processing'}` },
-              { role: 'user', content: 'Test fresh AI automation workflow processing' }
-            ],
-            max_tokens: 50
-          },
-          expected_success_indicators: ['choices', 'message', 'content'],
-          expected_error_indicators: ['error', 'invalid', 'unauthorized']
-        },
-        authentication: { type: 'Bearer', location: 'header', parameter_name: 'Authorization' }
-      },
-      'typeform': {
-        platform_name: 'Typeform', 
-        base_url: 'https://api.typeform.com',
-        test_endpoint: { 
-          method: 'GET', 
-          path: '/me',
-          headers: { 'Authorization': 'Bearer {personal_access_token}' },
-          expected_success_indicators: ['alias', 'account_id', 'language'],
-          expected_error_indicators: ['error', 'invalid', 'unauthorized']
-        },
-        authentication: { type: 'Bearer', location: 'header', parameter_name: 'Authorization' }
-      },
-      'notion': {
-        platform_name: 'Notion',
-        base_url: 'https://api.notion.com',
-        test_endpoint: { 
-          method: 'GET', 
-          path: '/v1/users/me',
-          headers: { 'Authorization': 'Bearer {access_token}', 'Notion-Version': '2022-06-28' },
-          expected_success_indicators: ['name', 'id', 'type'],
-          expected_error_indicators: ['error', 'invalid', 'unauthorized']
-        },
-        authentication: { type: 'Bearer', location: 'header', parameter_name: 'Authorization' }
-      }
-    };
-
-    return realConfigs[platform] || {
-      platform_name: platformName,
-      base_url: `https://api.${platform.replace(/\s+/g, '')}.com`,
-      test_endpoint: { 
-        method: 'GET', 
-        path: '/me',
-        headers: { 'Authorization': 'Bearer {api_key}' },
-        expected_success_indicators: ['success', 'data', 'user'],
-        expected_error_indicators: ['error', 'invalid', 'unauthorized']
-      },
-      authentication: { type: 'Bearer', location: 'header', parameter_name: 'Authorization' }
-    };
   }
 
   /**
@@ -456,7 +537,7 @@ serve(async (req) => {
   }
 
   try {
-    const { platformName, credentials, automationId, aiGeneratedConfig } = await req.json();
+    const { platformName, credentials } = await req.json();
 
     if (!platformName || !credentials) {
       return new Response(
@@ -476,16 +557,11 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Initialize the fresh AI credential tester
-    const tester = new FreshAICredentialTester(supabase);
+    // Initialize the comprehensive credential tester
+    const tester = new ComprehensiveCredentialTester(supabase);
 
-    // Test platform credentials with fresh AI config
-    const result = await tester.testPlatformCredentialsWithFreshAI(
-      platformName,
-      credentials,
-      automationId,
-      aiGeneratedConfig
-    );
+    // Test platform credentials with comprehensive validation
+    const result = await tester.testPlatformCredentialsComprehensively(platformName, credentials);
 
     return new Response(
       JSON.stringify(result),
@@ -495,14 +571,14 @@ serve(async (req) => {
     );
 
   } catch (error: any) {
-    console.error('Error in fresh AI test-credential function:', error);
+    console.error('Error in comprehensive test-credential function:', error);
     
     return new Response(
       JSON.stringify({ 
         success: false, 
-        message: `Fresh AI server error: ${error.message}`,
+        message: `Comprehensive server error: ${error.message}`,
         details: {
-          error_type: 'fresh_ai_server_error',
+          error_type: 'comprehensive_server_error',
           timestamp: new Date().toISOString()
         }
       }),

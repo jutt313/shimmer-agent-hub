@@ -105,6 +105,39 @@ export type Database = {
           },
         ]
       }
+      ai_section_configurations: {
+        Row: {
+          created_at: string | null
+          custom_instructions: string | null
+          examples: string[] | null
+          id: string
+          is_active: boolean | null
+          rules: string[] | null
+          section_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          custom_instructions?: string | null
+          examples?: string[] | null
+          id?: string
+          is_active?: boolean | null
+          rules?: string[] | null
+          section_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          custom_instructions?: string | null
+          examples?: string[] | null
+          id?: string
+          is_active?: boolean | null
+          rules?: string[] | null
+          section_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       api_credentials: {
         Row: {
           api_key: string

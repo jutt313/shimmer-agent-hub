@@ -24,11 +24,27 @@ import ExecutionBlueprintCodeDisplay from './ExecutionBlueprintCodeDisplay';
 interface YusrAIStructuredDisplayProps {
   data: YusrAIStructuredResponse;
   className?: string;
+  onAgentAdd?: (agent: any) => void;
+  onAgentDismiss?: (agentName: string) => void;
+  dismissedAgents?: Set<string>;
+  onPlatformCredentialClick?: (platformName: string) => void;
+  platformCredentialStatus?: { [key: string]: 'saved' | 'tested' | 'missing' };
+  onTestCredentials?: (platformName: string, testPayload: any) => Promise<boolean>;
+  onExecuteAutomation?: () => void;
+  isReadyForExecution?: boolean;
 }
 
 const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({ 
   data, 
-  className = "" 
+  className = "",
+  onAgentAdd,
+  onAgentDismiss,
+  dismissedAgents = new Set(),
+  onPlatformCredentialClick,
+  platformCredentialStatus = {},
+  onTestCredentials,
+  onExecuteAutomation,
+  isReadyForExecution = false
 }) => {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     summary: true,
@@ -100,6 +116,16 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
                   <Badge variant="outline" className="text-xs">
                     {platform.credentials.length} credential{platform.credentials.length !== 1 ? 's' : ''}
                   </Badge>
+                  {onPlatformCredentialClick && (
+                    <Button
+                      onClick={() => onPlatformCredentialClick(platform.name)}
+                      size="sm"
+                      variant={platformCredentialStatus[platform.name] === 'tested' ? 'default' : 'outline'}
+                      className="ml-auto"
+                    >
+                      {platformCredentialStatus[platform.name] === 'tested' ? 'Tested' : 'Configure'}
+                    </Button>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
@@ -152,6 +178,30 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
                   <Bot className="w-4 h-4" />
                   {agent.name}
                   <Badge variant="outline" className="text-xs">{agent.role}</Badge>
+                  {onAgentAdd && onAgentDismiss && (
+                    <div className="ml-auto flex gap-2">
+                      {!dismissedAgents.has(agent.name) ? (
+                        <>
+                          <Button
+                            onClick={() => onAgentAdd(agent)}
+                            size="sm"
+                            variant="default"
+                          >
+                            Add
+                          </Button>
+                          <Button
+                            onClick={() => onAgentDismiss(agent.name)}
+                            size="sm"
+                            variant="outline"
+                          >
+                            Dismiss
+                          </Button>
+                        </>
+                      ) : (
+                        <Badge variant="secondary">Dismissed</Badge>
+                      )}
+                    </div>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-0 space-y-2">
@@ -189,8 +239,18 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
                   <TestTube className="w-4 h-4" />
                   {platform}
                   <Badge variant="outline" className="text-xs">
-                    {payload.test_endpoint?.method || 'GET'}
+                    {payload.method || 'GET'}
                   </Badge>
+                  {onTestCredentials && (
+                    <Button
+                      onClick={() => onTestCredentials(platform, payload)}
+                      size="sm"
+                      variant="outline"
+                      className="ml-auto"
+                    >
+                      Test
+                    </Button>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
@@ -248,7 +308,7 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
                     </Badge>
                   </CardTitle>
                 </CardHeader>
-              </CollapsibleTrigger>
+              </ColliesibleTrigger>
               
               <CollapsibleContent>
                 <CardContent className="pt-0 pb-6">
@@ -259,6 +319,24 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
           </Collapsible>
         );
       })}
+      
+      {/* Execution Button */}
+      {isReadyForExecution && onExecuteAutomation && (
+        <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-xl border border-green-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-green-900">Ready for Execution!</h3>
+              <p className="text-sm text-green-700">All platforms configured and agents handled.</p>
+            </div>
+            <Button
+              onClick={onExecuteAutomation}
+              className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white"
+            >
+              Execute Automation
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

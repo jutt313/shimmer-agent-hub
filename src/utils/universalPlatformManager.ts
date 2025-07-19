@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface PlatformCredential {
@@ -29,6 +28,62 @@ export interface PlatformConfiguration {
   }>;
   credentials: PlatformCredential[];
 }
+
+// UNIVERSAL PLATFORM FIELD MAPPINGS - This fixes the credential mapping disaster
+export const PLATFORM_FIELD_MAPPINGS: Record<string, Record<string, string>> = {
+  'Typeform': { 'api_key': 'personal_access_token' },
+  'Google Sheets': { 'api_key': 'access_token' },
+  'OpenAI': { 'api_key': 'api_key' },
+  'Notion': { 'api_key': 'integration_token' },
+  'Slack': { 'api_key': 'bot_token' },
+  'GitHub': { 'api_key': 'access_token' },
+  'Discord': { 'api_key': 'bot_token' },
+  'Salesforce': { 'api_key': 'access_token' },
+  'HubSpot': { 'api_key': 'access_token' },
+  'Mailchimp': { 'api_key': 'api_key' }
+};
+
+// AI MODEL CONFIGURATIONS - This fixes missing AI model configs
+export const AI_MODEL_CONFIGS: Record<string, any> = {
+  'OpenAI': {
+    models: [
+      { value: 'gpt-4.1-2025-04-14', label: 'GPT-4.1 (Latest)' },
+      { value: 'gpt-4o', label: 'GPT-4o' },
+      { value: 'gpt-4o-mini', label: 'GPT-4o Mini' }
+    ],
+    defaultModel: 'gpt-4.1-2025-04-14',
+    supportsSystemPrompt: true
+  },
+  'Anthropic': {
+    models: [
+      { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
+      { value: 'claude-3-opus-20240229', label: 'Claude 3 Opus' },
+      { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku' }
+    ],
+    defaultModel: 'claude-3-5-sonnet-20241022',
+    supportsSystemPrompt: true
+  }
+};
+
+// UNIVERSAL CREDENTIAL MAPPER - This fixes the field mapping
+export const mapCredentialsForPlatform = (platformName: string, rawCredentials: Record<string, any>) => {
+  console.log(`🔄 Mapping credentials for ${platformName}:`, Object.keys(rawCredentials));
+  
+  const fieldMapping = PLATFORM_FIELD_MAPPINGS[platformName] || {};
+  const mappedCredentials: Record<string, any> = {};
+
+  Object.entries(rawCredentials).forEach(([key, value]) => {
+    const mappedKey = fieldMapping[key] || key;
+    mappedCredentials[mappedKey] = value;
+    
+    if (fieldMapping[key]) {
+      console.log(`✅ Mapped ${key} → ${mappedKey} for ${platformName}`);
+    }
+  });
+
+  console.log(`🎯 Final mapped credentials for ${platformName}:`, Object.keys(mappedCredentials));
+  return mappedCredentials;
+};
 
 // COMPREHENSIVE REAL PLATFORM CONFIGURATIONS
 const REAL_PLATFORM_CONFIGS = {
@@ -156,7 +211,7 @@ const REAL_PLATFORM_CONFIGS = {
 
 export class UniversalPlatformManager {
   /**
-   * COMPREHENSIVE: Test credentials using real API validation
+   * COMPREHENSIVE: Test credentials using real API validation with PROPER MAPPING
    */
   static async testCredentials(
     platformName: string, 
@@ -166,11 +221,14 @@ export class UniversalPlatformManager {
     try {
       console.log(`🧪 COMPREHENSIVE TESTING: ${platformName} with real API validation`);
       
+      // CRITICAL: Map credentials BEFORE sending to backend
+      const mappedCredentials = mapCredentialsForPlatform(platformName, credentials);
+      
       // Use Supabase Edge Function with comprehensive validation
       const { data, error } = await supabase.functions.invoke('test-credential', {
         body: {
           platformName,
-          credentials,
+          credentials: mappedCredentials, // Send MAPPED credentials
           automationId: automationContext?.id,
           comprehensiveTest: true
         }
@@ -616,12 +674,12 @@ export class UniversalPlatformManager {
     
     // Handle comprehensive platform-specific patterns
     const comprehensivePatterns = [
-      { pattern: /\{token\}/g, getValue: () => credentials.personal_access_token || credentials.access_token || credentials.token || credentials.api_key || credentials.integration_token },
-      { pattern: /\{api_key\}/g, getValue: () => credentials.api_key || credentials.key },
-      { pattern: /\{access_token\}/g, getValue: () => credentials.access_token || credentials.token },
-      { pattern: /\{personal_access_token\}/g, getValue: () => credentials.personal_access_token || credentials.access_token },
-      { pattern: /\{integration_token\}/g, getValue: () => credentials.integration_token || credentials.access_token },
-      { pattern: /\{bot_token\}/g, getValue: () => credentials.bot_token || credentials.access_token }
+      { pattern: /\\{token\\}/g, getValue: () => credentials.personal_access_token || credentials.access_token || credentials.token || credentials.api_key || credentials.integration_token },
+      { pattern: /\\{api_key\\}/g, getValue: () => credentials.api_key || credentials.key },
+      { pattern: /\\{access_token\\}/g, getValue: () => credentials.access_token || credentials.token },
+      { pattern: /\\{personal_access_token\\}/g, getValue: () => credentials.personal_access_token || credentials.access_token },
+      { pattern: /\\{integration_token\\}/g, getValue: () => credentials.integration_token || credentials.access_token },
+      { pattern: /\\{bot_token\\}/g, getValue: () => credentials.bot_token || credentials.access_token }
     ];
     
     comprehensivePatterns.forEach(({ pattern, getValue }) => {

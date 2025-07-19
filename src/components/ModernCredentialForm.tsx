@@ -1,12 +1,16 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Info, ExternalLink, TestTube, Save, Eye, EyeOff, Loader2, Sparkles } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { AutomationCredentialManager } from '@/utils/automationCredentialManager';
-import { UniversalPlatformManager } from '@/utils/universalPlatformManager';
+import { UniversalPlatformManager, mapCredentialsForPlatform, AI_MODEL_CONFIGS } from '@/utils/universalPlatformManager';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -44,6 +48,10 @@ const ModernCredentialForm = ({
   const [apiResponse, setApiResponse] = useState<any>(null);
   const [automationContext, setAutomationContext] = useState<any>(null);
 
+  // AI Configuration States
+  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [systemPrompt, setSystemPrompt] = useState<string>('');
+
   useEffect(() => {
     if (user && automationId && platform.name) {
       loadExistingCredentials();
@@ -55,7 +63,15 @@ const ModernCredentialForm = ({
     if (automationContext) {
       generateAutomationContextPayload();
     }
-  }, [credentials, automationContext]);
+  }, [credentials, automationContext, selectedModel, systemPrompt]);
+
+  // Initialize AI model selection for AI platforms
+  useEffect(() => {
+    const aiConfig = AI_MODEL_CONFIGS[platform.name];
+    if (aiConfig && !selectedModel) {
+      setSelectedModel(aiConfig.defaultModel);
+    }
+  }, [platform.name, selectedModel]);
 
   const loadExistingCredentials = async () => {
     if (!user) return;
@@ -69,6 +85,14 @@ const ModernCredentialForm = ({
 
       if (existingCredentials) {
         setCredentials(existingCredentials);
+        
+        // Load AI configs if they exist
+        if (existingCredentials.model) {
+          setSelectedModel(existingCredentials.model);
+        }
+        if (existingCredentials.system_prompt) {
+          setSystemPrompt(existingCredentials.system_prompt);
+        }
       }
     } catch (error) {
       console.error('Failed to load existing credentials:', error);
@@ -94,9 +118,14 @@ const ModernCredentialForm = ({
 
   const generateAutomationContextPayload = async () => {
     try {
+      // Include AI model configs in the payload
+      let credentialsWithAI = { ...credentials };
+      if (selectedModel) credentialsWithAI.model = selectedModel;
+      if (systemPrompt) credentialsWithAI.system_prompt = systemPrompt;
+
       const sampleCall = await UniversalPlatformManager.generateSampleCall(
         platform.name,
-        credentials,
+        credentialsWithAI,
         automationContext
       );
       setAutomationContextPayload(sampleCall);
@@ -149,9 +178,16 @@ const ModernCredentialForm = ({
     setApiResponse(null);
     
     try {
+      // CRITICAL: Include AI model configs in credentials for testing
+      let credentialsWithAI = { ...credentials };
+      if (selectedModel) credentialsWithAI.model = selectedModel;
+      if (systemPrompt) credentialsWithAI.system_prompt = systemPrompt;
+
+      console.log(`🧪 Testing ${platform.name} with credentials:`, Object.keys(credentialsWithAI));
+
       const result = await UniversalPlatformManager.testCredentials(
         platform.name,
-        credentials,
+        credentialsWithAI, // This will be mapped internally
         automationContext
       );
 
@@ -160,17 +196,18 @@ const ModernCredentialForm = ({
       
       if (result.success) {
         toast({
-          title: "Automation Context Test Successful",
+          title: "✅ Automation Context Test Successful",
           description: `${platform.name} credentials work with your automation workflow!`,
         });
       } else {
         toast({
-          title: "Automation Context Test Failed",
+          title: "❌ Automation Context Test Failed",
           description: result.message,
           variant: "destructive",
         });
       }
     } catch (error: any) {
+      console.error(`💥 Test error for ${platform.name}:`, error);
       toast({
         title: "Test Error",
         description: error.message,
@@ -186,28 +223,36 @@ const ModernCredentialForm = ({
 
     setIsSaving(true);
     try {
+      // CRITICAL: Include AI model configs when saving
+      let credentialsToSave = { ...credentials };
+      if (selectedModel) credentialsToSave.model = selectedModel;
+      if (systemPrompt) credentialsToSave.system_prompt = systemPrompt;
+
+      console.log(`💾 Saving ${platform.name} credentials:`, Object.keys(credentialsToSave));
+
       const result = await AutomationCredentialManager.saveCredentials(
         automationId,
         platform.name,
-        credentials,
+        credentialsToSave,
         user.id
       );
 
       if (result.success) {
         toast({
-          title: "Automation Credentials Saved",
+          title: "✅ Automation Credentials Saved",
           description: `${platform.name} credentials saved for this automation!`,
         });
         onCredentialSaved?.();
         onClose?.();
       } else {
         toast({
-          title: "Save Failed",
+          title: "❌ Save Failed",
           description: result.error || "Failed to save credentials",
           variant: "destructive",
         });
       }
     } catch (error: any) {
+      console.error(`💥 Save error for ${platform.name}:`, error);
       toast({
         title: "Save Error",
         description: error.message,
@@ -226,9 +271,11 @@ const ModernCredentialForm = ({
            lowerField.includes('token') ? 'password' : 'text';
   };
 
+  const isAIPlatform = AI_MODEL_CONFIGS[platform.name];
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-7xl max-h-[90vh] bg-white/95 backdrop-blur-md border-0 shadow-2xl rounded-3xl overflow-hidden">
+      <DialogContent className="max-w-7xl max-h-[95vh] bg-white/95 backdrop-blur-md border-0 shadow-2xl rounded-3xl overflow-hidden">
         <DialogHeader className="pb-6">
           <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-green-600 bg-clip-text text-transparent flex items-center gap-2">
             <Sparkles className="w-6 h-6 text-purple-600" />
@@ -240,176 +287,221 @@ const ModernCredentialForm = ({
           </div>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-[600px]">
-          {/* Left Side - Credential Form */}
-          <div className="space-y-6">
-            <div className="bg-gradient-to-br from-purple-50 via-blue-50 to-green-50 rounded-2xl p-6 border border-purple-200/50">
-              <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
-                <TestTube className="w-5 h-5 text-purple-600" />
-                Automation-Specific Credentials
-              </h3>
-              
-              <div className="space-y-5">
-                {platform.credentials.map((cred, index) => {
-                  const inputType = getInputType(cred.field);
-                  const showPassword = showPasswords[cred.field];
-                  const currentValue = credentials[cred.field] || '';
-                  
-                  return (
-                    <div key={index} className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-sm font-medium text-gray-700">
-                            {cred.field}
-                          </Label>
-                          <div className="group relative">
-                            <Info className="h-4 w-4 text-gray-400 cursor-help" />
-                            <div className="absolute left-0 top-6 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
-                              <strong>For this automation:</strong> {cred.why_needed}
-                              {automationContext && (
-                                <div className="mt-2 pt-2 border-t border-gray-700">
-                                  <strong>Workflow:</strong> {automationContext.title}
-                                </div>
-                              )}
+        {/* FIXED: Make the entire content area scrollable */}
+        <ScrollArea className="h-[600px] w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 px-2">
+            {/* Left Side - Credential Form */}
+            <div className="space-y-6">
+              <div className="bg-gradient-to-br from-purple-50 via-blue-50 to-green-50 rounded-2xl p-6 border border-purple-200/50">
+                <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                  <TestTube className="w-5 h-5 text-purple-600" />
+                  Automation-Specific Credentials
+                </h3>
+                
+                <div className="space-y-5">
+                  {platform.credentials.map((cred, index) => {
+                    const inputType = getInputType(cred.field);
+                    const showPassword = showPasswords[cred.field];
+                    const currentValue = credentials[cred.field] || '';
+                    
+                    return (
+                      <div key={index} className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm font-medium text-gray-700">
+                              {cred.field}
+                            </Label>
+                            <div className="group relative">
+                              <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                              <div className="absolute left-0 top-6 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                                <strong>For this automation:</strong> {cred.why_needed}
+                                {automationContext && (
+                                  <div className="mt-2 pt-2 border-t border-gray-700">
+                                    <strong>Workflow:</strong> {automationContext.title}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
+                          
+                          {cred.link && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => window.open(cred.link, '_blank')}
+                              className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 p-2"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                         
-                        {cred.link && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(cred.link, '_blank')}
-                            className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 p-2"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <div className="relative">
+                          <Input
+                            type={inputType === 'password' && !showPassword ? 'password' : 'text'}
+                            placeholder={cred.placeholder}
+                            value={currentValue}
+                            onChange={(e) => handleCredentialChange(cred.field, e.target.value)}
+                            className="rounded-xl border-purple-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 bg-white/70 pr-12"
+                          />
+                          
+                          {inputType === 'password' && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-purple-100"
+                              onClick={() => togglePasswordVisibility(cred.field)}
+                            >
+                              {showPassword ? (
+                                <EyeOff className="h-4 w-4 text-gray-400" />
+                              ) : (
+                                <Eye className="h-4 w-4 text-gray-400" />
+                              )}
+                            </Button>
+                          )}
+                        </div>
                       </div>
+                    );
+                  })}
+
+                  {/* AI MODEL CONFIGURATION - FIXED: Add AI configs for AI platforms */}
+                  {isAIPlatform && (
+                    <div className="space-y-5 pt-4 border-t border-purple-200">
+                      <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-purple-600" />
+                        AI Model Configuration
+                      </h4>
                       
-                      <div className="relative">
-                        <Input
-                          type={inputType === 'password' && !showPassword ? 'password' : 'text'}
-                          placeholder={cred.placeholder}
-                          value={currentValue}
-                          onChange={(e) => handleCredentialChange(cred.field, e.target.value)}
-                          className="rounded-xl border-purple-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 bg-white/70 pr-12"
-                        />
-                        
-                        {inputType === 'password' && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-purple-100"
-                            onClick={() => togglePasswordVisibility(cred.field)}
-                          >
-                            {showPassword ? (
-                              <EyeOff className="h-4 w-4 text-gray-400" />
-                            ) : (
-                              <Eye className="h-4 w-4 text-gray-400" />
-                            )}
-                          </Button>
-                        )}
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium text-gray-700">AI Model</Label>
+                        <Select value={selectedModel} onValueChange={setSelectedModel}>
+                          <SelectTrigger className="rounded-xl border-purple-200 focus:border-purple-500">
+                            <SelectValue placeholder="Select an AI model" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {isAIPlatform.models.map((model: any) => (
+                              <SelectItem key={model.value} value={model.value}>
+                                {model.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
+
+                      {isAIPlatform.supportsSystemPrompt && (
+                        <div className="space-y-3">
+                          <Label className="text-sm font-medium text-gray-700">System Prompt (Optional)</Label>
+                          <Textarea
+                            placeholder="You are a helpful AI assistant..."
+                            value={systemPrompt}
+                            onChange={(e) => setSystemPrompt(e.target.value)}
+                            className="rounded-xl border-purple-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 bg-white/70 min-h-[100px]"
+                          />
+                        </div>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-4 mt-8">
-                <Button
-                  onClick={handleTest}
-                  disabled={!hasAllCredentials || isTesting}
-                  className="flex-1 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-                >
-                  {isTesting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Testing with Automation...
-                    </>
-                  ) : (
-                    <>
-                      <TestTube className="w-4 h-4 mr-2" />
-                      Test with Automation
-                    </>
                   )}
-                </Button>
+                </div>
 
-                <Button
-                  onClick={handleSave}
-                  disabled={!testResult?.success || isSaving}
-                  className="flex-1 rounded-xl bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50"
-                >
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Save for Automation
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
+                {/* Action Buttons */}
+                <div className="flex gap-4 mt-8">
+                  <Button
+                    onClick={handleTest}
+                    disabled={!hasAllCredentials || isTesting}
+                    className="flex-1 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                  >
+                    {isTesting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Testing with Automation...
+                      </>
+                    ) : (
+                      <>
+                        <TestTube className="w-4 h-4 mr-2" />
+                        Test with Automation
+                      </>
+                    )}
+                  </Button>
 
-          {/* Right Side - Automation Context API Playground */}
-          <div className="space-y-4">
-            {/* Automation Context Info */}
-            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-200/50">
-              <h4 className="text-sm font-semibold text-indigo-900 mb-2 flex items-center gap-2">
-                <Sparkles className="w-4 h-4" />
-                Automation Context
-              </h4>
-              <div className="text-xs text-indigo-700 space-y-1">
-                <p><strong>Workflow:</strong> {automationContext?.title || 'Loading...'}</p>
-                <p><strong>Purpose:</strong> {automationContextPayload?.task_description || 'Testing credentials...'}</p>
-              </div>
-            </div>
-
-            {/* Request Payload */}
-            <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl p-6 border border-green-200/50">
-              <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <TestTube className="w-5 h-5 text-green-600" />
-                Automation API Request
-              </h4>
-              <div className="bg-gray-900 rounded-xl p-4 overflow-auto" style={{ height: '200px' }}>
-                <pre className="text-green-400 text-sm font-mono">
-                  {automationContextPayload ? JSON.stringify(automationContextPayload.request, null, 2) : 'Loading automation context...'}
-                </pre>
+                  <Button
+                    onClick={handleSave}
+                    disabled={!testResult?.success || isSaving}
+                    className="flex-1 rounded-xl bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save for Automation
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
 
-            {/* API Response */}
-            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-200/50">
-              <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-blue-600" />
-                Automation API Response
-              </h4>
-              <div className="bg-gray-900 rounded-xl p-4 overflow-auto" style={{ height: '280px' }}>
-                {apiResponse ? (
-                  <pre className="text-blue-400 text-sm font-mono">
-                    {JSON.stringify(apiResponse, null, 2)}
-                  </pre>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    <div className="text-center space-y-2">
-                      <TestTube className="w-8 h-8 mx-auto opacity-50" />
-                      <p className="text-sm">
-                        Click "Test with Automation" to see how your credentials work with the actual automation workflow
-                      </p>
-                    </div>
+            {/* Right Side - Automation Context API Playground - FIXED: Now scrollable */}
+            <div className="space-y-4">
+              {/* Automation Context Info */}
+              <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-200/50">
+                <h4 className="text-sm font-semibold text-indigo-900 mb-2 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  Automation Context
+                </h4>
+                <div className="text-xs text-indigo-700 space-y-1">
+                  <p><strong>Workflow:</strong> {automationContext?.title || 'Loading...'}</p>
+                  <p><strong>Purpose:</strong> {automationContextPayload?.task_description || 'Testing credentials...'}</p>
+                </div>
+              </div>
+
+              {/* Request Payload - FIXED: Made scrollable */}
+              <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl p-6 border border-green-200/50">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <TestTube className="w-5 h-5 text-green-600" />
+                  Automation API Request
+                </h4>
+                <ScrollArea className="h-[200px] w-full">
+                  <div className="bg-gray-900 rounded-xl p-4">
+                    <pre className="text-green-400 text-sm font-mono whitespace-pre-wrap">
+                      {automationContextPayload ? JSON.stringify(automationContextPayload.request, null, 2) : 'Loading automation context...'}
+                    </pre>
                   </div>
-                )}
+                </ScrollArea>
+              </div>
+
+              {/* API Response - FIXED: Made scrollable */}
+              <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-200/50">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-blue-600" />
+                  Automation API Response
+                </h4>
+                <ScrollArea className="h-[280px] w-full">
+                  <div className="bg-gray-900 rounded-xl p-4">
+                    {apiResponse ? (
+                      <pre className="text-blue-400 text-sm font-mono whitespace-pre-wrap">
+                        {JSON.stringify(apiResponse, null, 2)}
+                      </pre>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-gray-500">
+                        <div className="text-center space-y-2">
+                          <TestTube className="w-8 h-8 mx-auto opacity-50" />
+                          <p className="text-sm">
+                            Click "Test with Automation" to see how your credentials work with the actual automation workflow
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
               </div>
             </div>
           </div>
-        </div>
+        </ScrollArea>
 
         {/* Enhanced Footer */}
         <div className="pt-4 border-t border-gray-200/50">

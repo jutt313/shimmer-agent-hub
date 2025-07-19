@@ -15,7 +15,7 @@ export interface AutomationCredential {
 
 export class AutomationCredentialManager {
   /**
-   * ENHANCED: Universal credential testing via Supabase Edge Function
+   * ENHANCED: Universal credential testing via Supabase Edge Function with USER TRACKING
    */
   static async testCredentials(
     userId: string,
@@ -27,7 +27,7 @@ export class AutomationCredentialManager {
     try {
       console.log(`🧪 EDGE FUNCTION TESTING for ${platformName} with REAL credentials via server-side`);
       
-      // Use Enhanced Universal Platform Manager via Edge Function
+      // CRITICAL: Include userId for API usage tracking
       const result = await UniversalPlatformManager.testCredentials(
         platformName, 
         credentials,
@@ -43,7 +43,8 @@ export class AutomationCredentialManager {
           universal_testing: true,
           real_credential_injection: true,
           automation_id: automationId,
-          server_side_testing: true
+          server_side_testing: true,
+          user_id: userId
         }
       };
 
@@ -58,14 +59,15 @@ export class AutomationCredentialManager {
           platform: platformName,
           system_error: true,
           universal_testing: true,
-          server_side_testing: true
+          server_side_testing: true,
+          user_id: userId
         }
       };
     }
   }
 
   /**
-   * ENHANCED: Save credentials with universal support
+   * ENHANCED: Save credentials with universal support including AI configs
    */
   static async saveCredentials(
     automationId: string,

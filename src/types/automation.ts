@@ -64,9 +64,28 @@ export type AutomationBlueprint = {
 
     on_error?: 'continue' | 'stop' | 'retry';
     ai_recommended?: boolean; // For marking AI-recommended steps
+    
+    // NEW: Additional properties for workflow data preservation
+    originalWorkflowData?: any; // Store original workflow data for diagram generation
+    platform?: string; // Platform info for diagram generator
+    platformDetails?: any; // Platform details for diagram generator
   }>;
 
   variables?: Record<string, any>;
+  
+  // NEW: Additional properties for AI-generated data
+  platforms?: Array<{
+    name: string;
+    config?: any;
+    parameters?: any;
+    test_payloads?: any[];
+    [key: string]: any;
+  }>;
+  test_payloads?: Array<{
+    platform: string;
+    payload: any;
+    [key: string]: any;
+  }>;
 };
 
 export interface AutomationDiagramData {

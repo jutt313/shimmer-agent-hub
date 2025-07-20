@@ -422,20 +422,27 @@ const AutomationDetail = () => {
 
       setMessages(prev => [...prev, aiMessage]);
 
-      // Enhanced platform management
+      // ENHANCED PLATFORM MANAGEMENT WITH TEST PAYLOADS
       if (structuredData?.platforms?.length > 0) {
         console.log('🔗 FINAL: Processing platform additions:', structuredData.platforms.length);
+        console.log('🧪 Test payloads in structured data:', structuredData.test_payloads);
+        
         setCurrentPlatforms(prev => {
           const newPlatforms = [...prev];
           structuredData.platforms.forEach((platform: any) => {
             if (platform?.name && !newPlatforms.find(p => p.name === platform.name)) {
-              // Add test payloads to platform data
-              if (structuredData.test_payloads) {
-                platform.test_payloads = structuredData.test_payloads.filter(
-                  (payload: any) => payload.platform === platform.name
-                );
-              }
-              newPlatforms.push(platform);
+              // CRITICAL FIX: Add test payloads to platform data
+              const platformWithTestPayloads = {
+                ...platform,
+                test_payloads: structuredData.test_payloads ? 
+                  structuredData.test_payloads.filter((payload: any) => 
+                    payload.platform === platform.name || 
+                    payload.platform?.toLowerCase() === platform.name.toLowerCase()
+                  ) : []
+              };
+              
+              console.log(`🧪 Adding test payloads for ${platform.name}:`, platformWithTestPayloads.test_payloads);
+              newPlatforms.push(platformWithTestPayloads);
             }
           });
           return newPlatforms;

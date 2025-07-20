@@ -1,363 +1,437 @@
-import React, { useState, useEffect } from 'react';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/components/ui/use-toast";
-import { AlertCircle, CheckCircle, Loader2, Bot, Settings, Zap } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
-import { EnhancedTestCredentialManager } from '@/utils/enhancedTestCredentialManager';
-import { AutomationCredentialManager } from '@/utils/automationCredentialManager';
 
-interface EnhancedCredentialFormProps {
-  platform: {
-    name: string;
-    fields: Array<{
-      name: string;
-      type: string;
-      label: string;
-      placeholder?: string;
-      required?: boolean;
-    }>;
-  };
-  automationId: string;
-  onCredentialSaved?: () => void;
+import React, { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/components/ui/use-toast';
+import { Loader2, CheckCircle, AlertCircle, Code, Clock, Zap, ExternalLink } from 'lucide-react';
+import { AutomationCredentialManager } from '@/utils/automationCredentialManager';
+import { EnhancedTestCredentialManager } from '@/utils/enhancedTestCredentialManager';
+
+interface Platform {
+  name: string;
+  credentials: Array<{
+    field: string;
+    placeholder: string;
+    link: string;
+    why_needed: string;
+  }>;
+  test_payloads?: Array<{
+    platform: string;
+    test_data: any;
+    field_mapping: Record<string, string>;
+    api_config: any;
+  }>;
 }
 
-const EnhancedCredentialForm: React.FC<EnhancedCredentialFormProps> = ({
-  platform,
-  automationId,
-  onCredentialSaved
-}) => {
+interface EnhancedCredentialFormProps {
+  automationId: string;
+  platform: Platform;
+  onCredentialSaved: () => void;
+  onClose: () => void;
+  isOpen: boolean;
+}
+
+const EnhancedCredentialForm = ({ 
+  automationId, 
+  platform, 
+  onCredentialSaved, 
+  onClose, 
+  isOpen 
+}: EnhancedCredentialFormProps) => {
   const { toast } = useToast();
   const [credentials, setCredentials] = useState<Record<string, string>>({});
-  const [isTestingCredentials, setIsTestingCredentials] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [aiConfigStatus, setAiConfigStatus] = useState<'generating' | 'ready' | 'error' | null>(null);
-  const [aiConfigDetails, setAiConfigDetails] = useState<any>(null);
+  const [testStatus, setTestStatus] = useState<'idle' | 'generating' | 'ai_ready' | 'testing' | 'success' | 'error'>('idle');
+  const [testPayloadConfig, setTestPayloadConfig] = useState<any>(null);
 
   useEffect(() => {
-    // Initialize credentials object
-    const initialCredentials: Record<string, string> = {};
-    platform.fields.forEach(field => {
-      initialCredentials[field.name] = '';
-    });
-    setCredentials(initialCredentials);
+    if (isOpen && platform) {
+      loadExistingCredentials();
+      processTestPayloads();
+    }
+  }, [isOpen, platform, automationId]);
 
-    // CRITICAL FIX: Load AI configuration for ALL platforms
-    loadAIConfiguration();
-  }, [platform.name]);
-
-  const loadAIConfiguration = async () => {
-    try {
-      setAiConfigStatus('generating');
-      console.log('🤖 CRITICAL FIX: Loading AI configuration for ALL platforms:', platform.name);
+  const processTestPayloads = () => {
+    console.log('🧪 Processing test payloads for platform:', platform.name);
+    console.log('🧪 Available test payloads:', platform.test_payloads);
+    
+    if (platform.test_payloads && platform.test_payloads.length > 0) {
+      const platformTestPayload = platform.test_payloads.find(
+        payload => payload.platform === platform.name || 
+                  payload.platform?.toLowerCase() === platform.name.toLowerCase()
+      );
       
-      // CRITICAL FIX: Always show AI configuration regardless of platform support
-      // Remove the isPlatformSupported check that was blocking AI configs
-      
-      try {
-        // Try to get platform capabilities (this may fail for new platforms, that's OK)
-        const capabilities = await AutomationCredentialManager.getPlatformCapabilities(platform.name);
-        setAiConfigDetails(capabilities || {
-          platform: platform.name,
-          ai_generated: true,
-          test_endpoints: ['Default AI Test Endpoint'],
-          supports_ai_testing: true
-        });
-        setAiConfigStatus('ready');
-        console.log('✅ CRITICAL FIX: AI configuration loaded successfully for', platform.name);
-      } catch (error) {
-        // CRITICAL FIX: Even if capabilities fail, still show AI config
-        console.log('⚠️ Platform capabilities not found, using AI-generated config for', platform.name);
-        setAiConfigDetails({
-          platform: platform.name,
-          ai_generated: true,
-          test_endpoints: ['AI-Generated Test Endpoint'],
-          supports_ai_testing: true,
-          note: 'AI will generate test configuration dynamically'
-        });
-        setAiConfigStatus('ready'); // CRITICAL: Set to ready, not error
+      if (platformTestPayload) {
+        console.log('✅ Found test payload configuration:', platformTestPayload);
+        setTestPayloadConfig(platformTestPayload);
+        setTestStatus('ai_ready');
+        
+        // Pre-fill credentials with test data if available
+        if (platformTestPayload.test_data) {
+          const testCredentials: Record<string, string> = {};
+          Object.entries(platformTestPayload.test_data).forEach(([key, value]) => {
+            testCredentials[key] = String(value);
+          });
+          setCredentials(prev => ({ ...prev, ...testCredentials }));
+        }
+      } else {
+        console.log('⚠️ No test payload found for platform:', platform.name);
+        setTestStatus('idle');
       }
-    } catch (error) {
-      console.error('❌ CRITICAL: Error in AI configuration loading:', error);
-      // CRITICAL FIX: Even on error, show basic AI config
-      setAiConfigDetails({
-        platform: platform.name,
-        ai_generated: true,
-        fallback_mode: true,
-        note: 'AI will attempt dynamic configuration'
-      });
-      setAiConfigStatus('ready'); // CRITICAL: Still set to ready
+    } else {
+      console.log('⚠️ No test payloads available for platform:', platform.name);
+      setTestStatus('idle');
     }
   };
 
-  const handleCredentialChange = (fieldName: string, value: string) => {
+  const loadExistingCredentials = async () => {
+    try {
+      const existingCreds = await AutomationCredentialManager.getCredentials(
+        automationId,
+        platform.name,
+        ''
+      );
+      
+      if (existingCreds) {
+        setCredentials(existingCreds);
+      }
+    } catch (error) {
+      console.error('Failed to load existing credentials:', error);
+    }
+  };
+
+  const handleInputChange = (field: string, value: string) => {
     setCredentials(prev => ({
       ...prev,
-      [fieldName]: value
+      [field]: value
     }));
-    // Clear test results when credentials change
-    setTestResult(null);
   };
 
   const handleTestCredentials = async () => {
+    if (Object.keys(credentials).length === 0) {
+      toast({
+        title: "Missing Credentials",
+        description: "Please enter your credentials before testing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsTesting(true);
+    setTestStatus('testing');
+    const startTime = Date.now();
+
     try {
-      setIsTestingCredentials(true);
-      setTestResult(null);
+      console.log('🧪 Testing credentials with AI-enhanced system for:', platform.name);
       
-      console.log('🧪 CRITICAL FIX: Enhanced credential testing with AI configuration for', platform.name);
-      
-      // CRITICAL FIX: Use enhanced test manager with AI for ALL platforms
       const result = await EnhancedTestCredentialManager.testCredentialsWithAI(
         platform.name,
         credentials,
-        'current-user-id' // This should come from auth context
+        ''
       );
-      
-      setTestResult(result);
-      
+
+      const endTime = Date.now();
+      const testDuration = endTime - startTime;
+
+      console.log('🧪 Test result received:', result);
+
+      setTestResult({
+        ...result,
+        test_duration: testDuration,
+        timestamp: new Date().toISOString()
+      });
+
       if (result.success) {
+        setTestStatus('success');
         toast({
           title: "✅ Credentials Verified",
           description: `${platform.name} credentials are working correctly!`,
         });
       } else {
+        setTestStatus('error');
         toast({
-          title: "❌ Credential Test Failed",
+          title: "❌ Test Failed",
           description: result.message,
           variant: "destructive",
         });
       }
-      
-    } catch (error) {
-      console.error('CRITICAL: Error testing credentials:', error);
+    } catch (error: any) {
+      console.error('Test failed:', error);
+      setTestStatus('error');
       setTestResult({
         success: false,
-        message: `Testing failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        error_type: 'test_error'
+        message: `Test failed: ${error.message}`,
+        error_type: 'connection_error'
+      });
+      
+      toast({
+        title: "Test Error",
+        description: "Failed to test credentials. Please try again.",
+        variant: "destructive",
       });
     } finally {
-      setIsTestingCredentials(false);
+      setIsTesting(false);
     }
   };
 
-  const handleSaveCredentials = async () => {
+  const handleSave = async () => {
+    if (Object.keys(credentials).length === 0) {
+      toast({
+        title: "Missing Credentials",
+        description: "Please enter your credentials before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
     try {
-      setIsSaving(true);
-      
       const result = await AutomationCredentialManager.saveCredentials(
         automationId,
         platform.name,
         credentials,
-        'current-user-id' // This should come from auth context
+        ''
       );
-      
+
       if (result.success) {
         toast({
           title: "✅ Credentials Saved",
           description: `${platform.name} credentials saved successfully!`,
         });
-        onCredentialSaved?.();
+        onCredentialSaved();
       } else {
-        toast({
-          title: "❌ Save Failed",
-          description: result.error || 'Failed to save credentials',
-          variant: "destructive",
-        });
+        throw new Error(result.error || 'Failed to save credentials');
       }
-      
-    } catch (error) {
-      console.error('CRITICAL: Error saving credentials:', error);
+    } catch (error: any) {
+      console.error('Save failed:', error);
       toast({
-        title: "❌ Save Error",
-        description: 'An error occurred while saving credentials',
+        title: "Save Error",
+        description: error.message || "Failed to save credentials. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setIsSaving(false);
+      setIsLoading(false);
     }
   };
 
-  const canTest = Object.values(credentials).some(value => value.trim() !== '');
-  const canSave = testResult?.success === true;
+  const getStatusIndicator = () => {
+    switch (testStatus) {
+      case 'generating':
+        return (
+          <div className="flex items-center gap-2 text-blue-600">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="text-sm">Generating AI configuration...</span>
+          </div>
+        );
+      case 'ai_ready':
+        return (
+          <div className="flex items-center gap-2 text-green-600">
+            <Zap className="w-4 h-4" />
+            <span className="text-sm font-medium">AI Configuration Ready</span>
+          </div>
+        );
+      case 'testing':
+        return (
+          <div className="flex items-center gap-2 text-blue-600">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="text-sm">Testing credentials...</span>
+          </div>
+        );
+      case 'success':
+        return (
+          <div className="flex items-center gap-2 text-green-600">
+            <CheckCircle className="w-4 h-4" />
+            <span className="text-sm font-medium">Credentials Verified</span>
+          </div>
+        );
+      case 'error':
+        return (
+          <div className="flex items-center gap-2 text-red-600">
+            <AlertCircle className="w-4 h-4" />
+            <span className="text-sm font-medium">Test Failed</span>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const formatFieldLabel = (field: string) => {
+    return field
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader className="space-y-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="w-5 h-5" />
-            {platform.name} Credentials
-          </CardTitle>
-          
-          {/* CRITICAL FIX: AI Configuration Status Display - Always shows for ALL platforms */}
-          <div className="flex items-center gap-2">
-            {aiConfigStatus === 'generating' && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                AI Configuring...
-              </Badge>
-            )}
-            {aiConfigStatus === 'ready' && (
-              <Badge variant="default" className="flex items-center gap-1 bg-green-500">
-                <Bot className="w-3 h-3" />
-                AI Ready
-              </Badge>
-            )}
-            {aiConfigStatus === 'error' && (
-              <Badge variant="destructive" className="flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" />
-                Config Error
-              </Badge>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg text-white">
+              <Code className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">{platform.name} Credentials</h3>
+              <p className="text-sm text-gray-600 font-normal">AI-Enhanced Configuration & Testing</p>
+            </div>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          {/* AI Status Indicator */}
+          <div className="p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+            {getStatusIndicator()}
+            {testPayloadConfig && (
+              <div className="mt-2 text-xs text-gray-600">
+                AI-generated test configuration loaded with {Object.keys(testPayloadConfig.field_mapping || {}).length} field mappings
+              </div>
             )}
           </div>
-        </div>
-        
-        {/* CRITICAL FIX: AI Configuration Details - Shows for ALL platforms */}
-        {aiConfigDetails && (
-          <Alert>
-            <Bot className="h-4 w-4" />
-            <AlertDescription>
-              AI-powered testing enabled for {platform.name}. 
-              {aiConfigDetails.test_endpoints ? ` ${aiConfigDetails.test_endpoints.length} test endpoints available.` : ' Dynamic configuration will be generated.'}
-              {aiConfigDetails.ai_generated && ' (AI-Generated Configuration)'}
-            </AlertDescription>
-          </Alert>
-        )}
-      </CardHeader>
-      
-      <CardContent className="space-y-6">
-        {/* Credential Input Fields */}
-        <div className="space-y-4">
-          {platform.fields.map((field) => (
-            <div key={field.name} className="space-y-2">
-              <Label htmlFor={field.name} className="text-sm font-medium">
-                {field.label}
-                {field.required && <span className="text-red-500 ml-1">*</span>}
-              </Label>
-              <Input
-                id={field.name}
-                type={field.type === 'password' ? 'password' : 'text'}
-                placeholder={field.placeholder}
-                value={credentials[field.name] || ''}
-                onChange={(e) => handleCredentialChange(field.name, e.target.value)}
-                className="w-full"
-              />
+
+          {/* Test Payload Code Display */}
+          {testPayloadConfig && (
+            <div className="p-4 bg-gray-50 rounded-lg border">
+              <div className="flex items-center gap-2 mb-2">
+                <Code className="w-4 h-4 text-purple-600" />
+                <span className="text-sm font-medium text-gray-900">AI Test Configuration</span>
+              </div>
+              <pre className="text-xs text-gray-700 overflow-x-auto">
+                {JSON.stringify(testPayloadConfig, null, 2)}
+              </pre>
             </div>
-          ))}
-        </div>
+          )}
 
-        <Separator />
+          {/* Credential Input Fields */}
+          <div className="space-y-4">
+            {platform.credentials.map((credField) => (
+              <div key={credField.field} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor={credField.field} className="text-sm font-medium">
+                    {formatFieldLabel(credField.field)}
+                  </Label>
+                  {credField.link && (
+                    <a
+                      href={credField.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                    >
+                      Get API Key <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+                <Input
+                  id={credField.field}
+                  type={credField.field.toLowerCase().includes('password') || 
+                        credField.field.toLowerCase().includes('secret') || 
+                        credField.field.toLowerCase().includes('token') || 
+                        credField.field.toLowerCase().includes('key') ? 'password' : 'text'}
+                  placeholder={credField.placeholder}
+                  value={credentials[credField.field] || ''}
+                  onChange={(e) => handleInputChange(credField.field, e.target.value)}
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-gray-600">{credField.why_needed}</p>
+              </div>
+            ))}
+          </div>
 
-        {/* Test Credentials Section */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium">Test Credentials</h3>
+          {/* Test Results Display */}
+          {testResult && (
+            <div className={`p-4 rounded-lg border ${
+              testResult.success 
+                ? 'bg-green-50 border-green-200' 
+                : 'bg-red-50 border-red-200'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                {testResult.success ? (
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-red-600" />
+                )}
+                <span className="text-sm font-medium">
+                  {testResult.success ? 'Test Successful' : 'Test Failed'}
+                </span>
+                {testResult.test_duration && (
+                  <div className="flex items-center gap-1 text-xs text-gray-600 ml-auto">
+                    <Clock className="w-3 h-3" />
+                    {testResult.test_duration}ms
+                  </div>
+                )}
+              </div>
+              
+              <p className="text-sm text-gray-700 mb-2">{testResult.message}</p>
+              
+              {testResult.details && (
+                <details className="text-xs text-gray-600">
+                  <summary className="cursor-pointer hover:text-gray-800">View Details</summary>
+                  <pre className="mt-2 p-2 bg-white rounded border overflow-x-auto">
+                    {JSON.stringify(testResult.details, null, 2)}
+                  </pre>
+                </details>
+              )}
+
+              {testResult.troubleshooting && testResult.troubleshooting.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs font-medium text-gray-700 mb-1">Troubleshooting:</p>
+                  <ul className="text-xs text-gray-600 space-y-1">
+                    {testResult.troubleshooting.map((tip: string, index: number) => (
+                      <li key={index} className="flex items-start gap-1">
+                        <span>•</span>
+                        <span>{tip}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-4 border-t">
             <Button
               onClick={handleTestCredentials}
-              disabled={!canTest || isTestingCredentials}
+              disabled={isTesting || Object.keys(credentials).length === 0}
               variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
+              className="flex-1"
             >
-              {isTestingCredentials ? (
+              {isTesting ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Testing...
                 </>
               ) : (
                 <>
-                  <Zap className="w-4 h-4" />
-                  Test Connection
+                  <Zap className="w-4 h-4 mr-2" />
+                  AI Test
                 </>
               )}
             </Button>
+            
+            <Button
+              onClick={handleSave}
+              disabled={isLoading || Object.keys(credentials).length === 0}
+              className="flex-1"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Credentials'
+              )}
+            </Button>
           </div>
-
-          {/* CRITICAL FIX: Enhanced Test Results Display */}
-          {testResult && (
-            <Alert className={testResult.success ? "border-green-500 bg-green-50" : "border-red-500 bg-red-50"}>
-              <div className="flex items-start gap-2">
-                {testResult.success ? (
-                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
-                ) : (
-                  <AlertCircle className="h-4 w-4 text-red-600 mt-0.5" />
-                )}
-                <div className="flex-1 space-y-2">
-                  <AlertDescription className="font-medium">
-                    {testResult.message}
-                  </AlertDescription>
-                  
-                  {/* CRITICAL FIX: Display AI-powered test details for ALL platforms */}
-                  {testResult.details && (
-                    <div className="text-xs space-y-1 mt-2">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">
-                          Status: {testResult.details.status}
-                        </Badge>
-                        {(testResult.details.ai_generated_config || aiConfigDetails?.ai_generated) && (
-                          <Badge variant="outline" className="bg-blue-50">
-                            <Bot className="w-3 h-3 mr-1" />
-                            AI Config
-                          </Badge>
-                        )}
-                      </div>
-                      {testResult.details.endpoint_tested && (
-                        <p className="text-gray-600">
-                          Endpoint: {testResult.details.endpoint_tested}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* CRITICAL FIX: Display troubleshooting steps */}
-                  {testResult.troubleshooting && testResult.troubleshooting.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-xs font-medium mb-1">Troubleshooting:</p>
-                      <ul className="text-xs space-y-1">
-                        {testResult.troubleshooting.map((step: string, index: number) => (
-                          <li key={index} className="flex items-start gap-1">
-                            <span className="text-gray-400">•</span>
-                            <span>{step}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Alert>
-          )}
         </div>
-
-        <Separator />
-
-        {/* Save Credentials */}
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-600">
-            {canSave ? 'Credentials verified and ready to save' : 'Test credentials first before saving'}
-          </p>
-          <Button
-            onClick={handleSaveCredentials}
-            disabled={!canSave || isSaving}
-            className="flex items-center gap-2"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              'Save Credentials'
-            )}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+      </DialogContent>
+    </Dialog>
   );
 };
 

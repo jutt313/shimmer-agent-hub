@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useParams } from 'react-router-dom';
-import ModernCredentialForm from './ModernCredentialForm';
+import EnhancedCredentialForm from './EnhancedCredentialForm';
 import { AutomationCredentialManager } from '@/utils/automationCredentialManager';
 
 interface Platform {
@@ -13,6 +13,12 @@ interface Platform {
     placeholder: string;
     link: string;
     why_needed: string;
+  }>;
+  test_payloads?: Array<{
+    platform: string;
+    test_data: any;
+    field_mapping: Record<string, string>;
+    api_config: any;
   }>;
 }
 
@@ -89,21 +95,21 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
     const status = credentialStatus[platform.name];
     
     if (!status || !status.configured) {
-      return "bg-gradient-to-r from-red-400 to-red-500 text-white hover:from-red-500 hover:to-red-600 shadow-lg";
+      return "bg-red-500 hover:bg-red-600 text-white";
     }
     
     if (status.tested && status.status === 'success') {
-      return "bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600 shadow-lg";
+      return "bg-green-500 hover:bg-green-600 text-white";
     }
     
-    return "bg-gradient-to-r from-yellow-500 to-orange-500 text-white hover:from-yellow-600 hover:to-orange-600 shadow-lg";
+    return "bg-yellow-500 hover:bg-yellow-600 text-white";
   };
 
   const getStatusText = (platform: Platform) => {
     const status = credentialStatus[platform.name];
     
     if (!status || !status.configured) {
-      return "Not Configured";
+      return "Setup Required";
     }
     
     if (status.tested && status.status === 'success') {
@@ -113,64 +119,80 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
     return "⚠️ Saved";
   };
 
+  const getStatusIcon = (platform: Platform) => {
+    const status = credentialStatus[platform.name];
+    
+    if (!status || !status.configured) {
+      return "🔴";
+    }
+    
+    if (status.tested && status.status === 'success') {
+      return "✅";
+    }
+    
+    return "⚠️";
+  };
+
   if (!platforms || platforms.length === 0) {
     console.log('⚠️ No platforms provided to PlatformButtons');
     return null;
   }
 
   console.log('🎯 Rendering PlatformButtons with platforms:', platforms.map(p => p.name));
+  console.log('🧪 Platform test payloads:', platforms.map(p => ({ name: p.name, hasTestPayloads: !!p.test_payloads })));
 
   return (
     <>
-      <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-purple-200/50 p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Settings className="w-5 h-5 text-purple-600" />
-          <h3 className="text-lg font-semibold text-gray-900">Platform Credentials</h3>
-          <span className="text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded-full">
-            Automation-Specific
+      <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-purple-200/50 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Settings className="w-4 h-4 text-purple-600" />
+          <h3 className="text-sm font-semibold text-gray-900">Platform Credentials</h3>
+          <span className="text-xs text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
+            AI-Enhanced
           </span>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {/* Compact pill-style buttons */}
+        <div className="flex flex-wrap gap-2">
           {platforms.map((platform) => {
-            const statusInfo = getStatusText(platform);
+            const statusIcon = getStatusIcon(platform);
+            const statusText = getStatusText(platform);
+            
             return (
               <button
                 key={platform.name}
                 onClick={() => {
-                  console.log(`🔧 Opening credential form for ${platform.name}`);
+                  console.log(`🔧 Opening enhanced credential form for ${platform.name}`);
+                  console.log('🧪 Platform test payloads:', platform.test_payloads);
                   setSelectedPlatform(platform);
                 }}
                 className={`
-                  p-4 text-left rounded-xl font-medium
-                  transition-all duration-200 hover:scale-105 hover:shadow-xl
+                  inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium
+                  transition-all duration-200 hover:scale-105 hover:shadow-md
                   ${getButtonStyle(platform)}
                 `}
               >
-                <div className="flex flex-col">
-                  <span className="text-sm font-semibold">{platform.name}</span>
-                  <span className="text-xs opacity-90 mt-1">{statusInfo}</span>
-                </div>
+                <span>{platform.name}</span>
+                <span className="text-xs">{statusIcon}</span>
               </button>
             );
           })}
         </div>
 
-        <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200/50">
+        <div className="mt-3 p-2 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200/50">
           <p className="text-xs text-gray-700 leading-relaxed">
-            <strong>🔒 Secure & Isolated:</strong> These credentials are encrypted and stored only for this automation. 
-            They won't be shared with other automations or users.
+            <strong>🤖 AI-Enhanced Testing:</strong> Each platform uses AI-generated configurations for automatic credential validation and testing.
           </p>
         </div>
       </div>
 
       {selectedPlatform && automationId && (
-        <ModernCredentialForm
+        <EnhancedCredentialForm
           automationId={automationId}
           platform={selectedPlatform}
           onCredentialSaved={handleCredentialSaved}
           onClose={() => {
-            console.log('❌ Closing credential form');
+            console.log('❌ Closing enhanced credential form');
             setSelectedPlatform(null);
           }}
           isOpen={!!selectedPlatform}

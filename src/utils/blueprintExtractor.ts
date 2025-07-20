@@ -1,4 +1,3 @@
-
 import { AutomationBlueprint } from "@/types/automation";
 
 /**
@@ -25,7 +24,7 @@ export const extractBlueprintFromStructuredData = (structuredData: any): Automat
       return validateAndCleanBlueprint(structuredData.automation_blueprint);
     }
 
-    // Method 3: CRITICAL FIX - Enhanced workflow handling
+    // Method 3: CRITICAL FIX - Enhanced workflow handling with COMPLETE data preservation
     if (structuredData.workflow && Array.isArray(structuredData.workflow) && structuredData.workflow.length > 0) {
       console.log('🔧 FIXED: Enhanced workflow processing with', structuredData.workflow.length, 'items');
       return constructBlueprintFromWorkflow(structuredData);
@@ -54,10 +53,10 @@ export const extractBlueprintFromStructuredData = (structuredData: any): Automat
 };
 
 /**
- * CRITICAL FIX: Enhanced workflow to blueprint conversion
+ * CRITICAL FIX: Complete workflow to blueprint conversion with ALL data preservation
  */
 const constructBlueprintFromWorkflow = (structuredData: any): AutomationBlueprint => {
-  console.log('🔧 FIXED: Enhanced workflow to blueprint conversion');
+  console.log('🔧 FIXED: Complete workflow to blueprint conversion');
   
   const blueprint: AutomationBlueprint = {
     version: "1.0",
@@ -69,14 +68,16 @@ const constructBlueprintFromWorkflow = (structuredData: any): AutomationBlueprin
     steps: []
   };
 
-  // Enhanced workflow processing
+  // CRITICAL FIX: Complete workflow processing with ALL data preservation
   if (structuredData.workflow && Array.isArray(structuredData.workflow)) {
     blueprint.steps = structuredData.workflow.map((workflowItem: any, index: number) => {
       console.log(`📋 FIXED: Processing workflow item ${index + 1}:`, {
         action: workflowItem.action,
         step: workflowItem.step,
         platform: workflowItem.platform,
-        method: workflowItem.method
+        method: workflowItem.method,
+        parameters: workflowItem.parameters,
+        details: workflowItem.details
       });
 
       return {
@@ -86,19 +87,39 @@ const constructBlueprintFromWorkflow = (structuredData: any): AutomationBlueprin
         action: {
           integration: workflowItem.platform || 'system',
           method: workflowItem.method || 'execute',
-          parameters: workflowItem.parameters || { 
+          parameters: {
+            ...workflowItem.parameters,
             description: workflowItem.action || workflowItem.step,
             platform: workflowItem.platform || 'system',
-            details: workflowItem.details || workflowItem.description
+            details: workflowItem.details || workflowItem.description,
+            // CRITICAL: Preserve ALL workflow data
+            originalAction: workflowItem.action,
+            originalStep: workflowItem.step,
+            originalPlatform: workflowItem.platform,
+            originalMethod: workflowItem.method,
+            allWorkflowData: workflowItem
           }
         },
-        // Preserve all original data
-        originalWorkflowData: workflowItem
+        // CRITICAL: Store original workflow data for diagram generation
+        originalWorkflowData: workflowItem,
+        // Add platform info for diagram generator
+        platform: workflowItem.platform,
+        platformDetails: workflowItem.platform_details || workflowItem.config
       };
     });
   }
 
-  console.log(`✅ FIXED: Created blueprint with ${blueprint.steps.length} steps from workflow`);
+  // CRITICAL: Add test payloads if available from AI
+  if (structuredData.test_payloads && Array.isArray(structuredData.test_payloads)) {
+    blueprint.test_payloads = structuredData.test_payloads;
+  }
+
+  // CRITICAL: Add platforms info for credential forms
+  if (structuredData.platforms && Array.isArray(structuredData.platforms)) {
+    blueprint.platforms = structuredData.platforms;
+  }
+
+  console.log(`✅ FIXED: Created complete blueprint with ${blueprint.steps.length} steps from workflow`);
   return blueprint;
 };
 
@@ -152,6 +173,14 @@ const validateAndCleanBlueprint = (blueprint: any): AutomationBlueprint | null =
 
     if (blueprint.variables) {
       cleanedBlueprint.variables = blueprint.variables;
+    }
+
+    // CRITICAL: Preserve test payloads and platforms
+    if (blueprint.test_payloads) {
+      cleanedBlueprint.test_payloads = blueprint.test_payloads;
+    }
+    if (blueprint.platforms) {
+      cleanedBlueprint.platforms = blueprint.platforms;
     }
 
     console.log(`✅ FIXED: Validated blueprint with ${cleanedBlueprint.steps.length} steps`);

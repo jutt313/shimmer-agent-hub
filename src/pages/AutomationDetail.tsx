@@ -64,122 +64,13 @@ const AutomationDetail = () => {
     fetchAutomationAndChats();
   }, [user, id, navigate]);
 
-  // ENHANCED: Improved blueprint extraction with immediate diagram generation
-  const extractBlueprintFromStructuredDataLocal = (structuredData: any): AutomationBlueprint | null => {
-    try {
-      console.log('🔧 ENHANCED: Extracting blueprint from structured data:', Object.keys(structuredData || {}));
-
-      // First, try to get execution_blueprint
-      if (structuredData.execution_blueprint) {
-        console.log('✅ Found execution_blueprint in structured data');
-        return structuredData.execution_blueprint;
-      }
-
-      // Second, try to get automation_blueprint
-      if (structuredData.automation_blueprint) {
-        console.log('✅ Found automation_blueprint in structured data');
-        return structuredData.automation_blueprint;
-      }
-
-      // ENHANCED - Handle workflow array properly (most common from AI responses)
-      if (structuredData.workflow && Array.isArray(structuredData.workflow) && structuredData.workflow.length > 0) {
-        console.log('🔧 ENHANCED: Constructing blueprint from workflow array with', structuredData.workflow.length, 'items');
-        
-        const constructedBlueprint: AutomationBlueprint = {
-          version: "1.0",
-          description: structuredData.summary || "AI-generated automation workflow",
-          trigger: {
-            type: 'manual'
-          },
-          steps: []
-        };
-
-        // Convert workflow items to steps
-        structuredData.workflow.forEach((workflowItem: any, index: number) => {
-          if (workflowItem && (workflowItem.action || workflowItem.step)) {
-            constructedBlueprint.steps.push({
-              id: `workflow-step-${index + 1}`,
-              name: workflowItem.action || workflowItem.step || `Step ${index + 1}`,
-              type: 'action',
-              action: {
-                integration: workflowItem.platform || 'system',
-                method: workflowItem.method || 'execute',
-                parameters: workflowItem.parameters || { 
-                  description: workflowItem.action || workflowItem.step,
-                  platform: workflowItem.platform 
-                }
-              }
-            });
-          }
-        });
-
-        console.log(`✅ ENHANCED: Created blueprint with ${constructedBlueprint.steps.length} steps from workflow`);
-        return constructedBlueprint;
-      }
-
-      // Third, try to construct blueprint from available data
-      if (structuredData.platforms || structuredData.steps) {
-        console.log('🔧 Constructing blueprint from structured data components');
-        
-        const constructedBlueprint: AutomationBlueprint = {
-          version: "1.0",
-          description: structuredData.summary || "AI-generated automation",
-          trigger: {
-            type: 'manual'
-          },
-          steps: []
-        };
-
-        // Add steps from various sources
-        if (structuredData.steps && Array.isArray(structuredData.steps)) {
-          structuredData.steps.forEach((step: string, index: number) => {
-            constructedBlueprint.steps.push({
-              id: `step-${index + 1}`,
-              name: step,
-              type: 'action',
-              action: {
-                integration: 'system',
-                method: 'execute',
-                parameters: { description: step }
-              }
-            });
-          });
-        }
-
-        // Add platform-based steps
-        if (structuredData.platforms && Array.isArray(structuredData.platforms)) {
-          structuredData.platforms.forEach((platform: any, index: number) => {
-            constructedBlueprint.steps.push({
-              id: `platform-step-${index + 1}`,
-              name: `${platform.name} Integration`,
-              type: 'action',
-              action: {
-                integration: platform.name.toLowerCase(),
-                method: platform.method || 'api_call',
-                parameters: platform.config || {}
-              }
-            });
-          });
-        }
-
-        return constructedBlueprint;
-      }
-
-      console.warn('⚠️ No blueprint data found in structured response');
-      return null;
-    } catch (error) {
-      console.error('❌ Error extracting blueprint:', error);
-      return null;
-    }
-  };
-
-  // ENHANCED: Fixed diagram generation with proper error handling and immediate triggering
+  // CRITICAL FIX: Enhanced diagram generation with proper blueprint handling
   const generateAndSaveDiagram = async (automationId: string, blueprint: AutomationBlueprint, forceRegenerate = false, userFeedback?: string) => {
-    console.log('🚀 FIXED: Starting diagram generation with enhanced pipeline');
+    console.log('🚀 CRITICAL FIX: Starting diagram generation with properly formatted blueprint');
     
-    // Enhanced validation
+    // CRITICAL: Validate blueprint format before proceeding
     if (!validateBlueprintForDiagram(blueprint)) {
-      console.error('❌ FIXED: Blueprint validation failed for diagram generation');
+      console.error('❌ CRITICAL: Blueprint validation failed for diagram generation');
       toast({
         title: "Invalid Blueprint",
         description: "Cannot generate diagram from invalid blueprint structure",
@@ -191,19 +82,26 @@ const AutomationDetail = () => {
     setGeneratingDiagram(true);
     
     try {
-      console.log('📊 FIXED: Enhanced blueprint analysis:', {
+      console.log('📊 CRITICAL FIX: Enhanced blueprint analysis:', {
         steps: blueprint.steps?.length || 0,
         triggerType: blueprint.trigger?.type,
-        hasWorkflow: blueprint.steps?.some(step => step.name?.includes('workflow')),
+        hasWorkflow: blueprint.steps?.some(step => step.originalWorkflowData),
         forceRegenerate,
-        userFeedback: userFeedback ? 'provided' : 'none'
+        userFeedback: userFeedback ? 'provided' : 'none',
+        // CRITICAL: Log blueprint structure for debugging
+        blueprintStructure: {
+          hasSteps: !!blueprint.steps,
+          stepsFormat: blueprint.steps?.[0] ? Object.keys(blueprint.steps[0]) : [],
+          hasPlatforms: !!blueprint.platforms,
+          hasTestPayloads: !!blueprint.test_payloads
+        }
       });
       
       const requestBody: any = { 
-        automation_blueprint: blueprint,
+        automation_blueprint: blueprint, // CRITICAL: Use the properly formatted blueprint
         automation_id: automationId,
         force_regenerate: forceRegenerate,
-        enhanced_processing: true // Enable enhanced processing
+        enhanced_processing: true
       };
       
       if (userFeedback?.trim()) {
@@ -211,13 +109,13 @@ const AutomationDetail = () => {
         requestBody.improvement_request = true;
       }
       
-      // Call the diagram-generator with enhanced error handling
+      // CRITICAL: Call diagram generator with properly formatted data
       const { data, error } = await supabase.functions.invoke('diagram-generator', {
         body: requestBody,
       });
 
       if (error) {
-        console.error('❌ FIXED: Diagram generation error:', error);
+        console.error('❌ CRITICAL: Diagram generation error:', error);
         toast({
           title: "Diagram Generation Failed",
           description: `Error: ${error.message}`,
@@ -228,7 +126,7 @@ const AutomationDetail = () => {
 
       // Enhanced validation of response data
       if (!data || !data.nodes || !Array.isArray(data.nodes) || data.nodes.length === 0) {
-        console.error('❌ FIXED: Invalid diagram data received:', data);
+        console.error('❌ CRITICAL: Invalid diagram data received:', data);
         toast({
           title: "Invalid Diagram Data",
           description: "Received empty or invalid diagram structure",
@@ -237,7 +135,7 @@ const AutomationDetail = () => {
         return;
       }
 
-      console.log('✅ FIXED: Valid diagram data received:', {
+      console.log('✅ CRITICAL: Valid diagram data received:', {
         nodes: data.nodes.length,
         edges: data.edges?.length || 0,
         metadata: data.metadata
@@ -259,35 +157,34 @@ const AutomationDetail = () => {
         .update({ automation_diagram_data: diagramDataToSave })
         .eq('id', automationId);
 
-      if (updateError) {
-        console.error('❌ FIXED: Error saving diagram to database:', updateError);
+      if (!updateError) {
+        // Update local state immediately
+        setAutomation(prev => ({
+          ...prev!,
+          automation_diagram_data: diagramDataToSave
+        }));
+
+        const successMessage = userFeedback 
+          ? `Enhanced diagram with ${data.nodes.length} nodes based on your feedback!`
+          : `Generated comprehensive diagram with ${data.nodes.length} nodes successfully!`;
+        
+        toast({
+          title: "✅ Diagram Generated",
+          description: successMessage,
+        });
+
+        console.log('🎯 CRITICAL: Diagram generation pipeline completed successfully');
+      } else {
+        console.error('❌ CRITICAL: Error saving diagram to database:', updateError);
         toast({
           title: "Save Failed", 
           description: "Generated diagram but failed to save to database",
           variant: "destructive",
         });
-        return;
       }
 
-      // Update local state immediately
-      setAutomation(prev => ({
-        ...prev!,
-        automation_diagram_data: diagramDataToSave
-      }));
-
-      const successMessage = userFeedback 
-        ? `Enhanced diagram with ${data.nodes.length} nodes based on your feedback!`
-        : `Generated comprehensive diagram with ${data.nodes.length} nodes successfully!`;
-      
-      toast({
-        title: "✅ Diagram Generated",
-        description: successMessage,
-      });
-
-      console.log('🎯 FIXED: Diagram generation pipeline completed successfully');
-
     } catch (err) {
-      console.error('💥 FIXED: Unexpected error in diagram generation:', err);
+      console.error('💥 CRITICAL: Unexpected error in diagram generation:', err);
       toast({
         title: "Generation Error",
         description: `Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`,
@@ -317,11 +214,11 @@ const AutomationDetail = () => {
 
       setAutomation(automationData);
 
-      // ENHANCED: Better diagram generation logic with immediate trigger
+      // CRITICAL: Immediate diagram generation with the CORRECT blueprint
       if (automationData.automation_blueprint && !automationData.automation_diagram_data) {
-        console.log('🔄 ENHANCED: No diagram data found, generating new diagram from blueprint...');
+        console.log('🔄 CRITICAL: No diagram data found, generating new diagram from blueprint...');
         // Immediate diagram generation without timeout
-        generateAndSaveDiagram(automationData.id, automationData.automation_blueprint);
+        await generateAndSaveDiagram(automationData.id, automationData.automation_blueprint);
       } else if (!automationData.automation_blueprint && !automationData.automation_diagram_data) {
         console.log('⚠️ No blueprint or diagram data found - waiting for AI response');
       }
@@ -425,7 +322,7 @@ const AutomationDetail = () => {
     setSendingMessage(true);
 
     try {
-      console.log('🚀 FIXED: Enhanced message sending with improved pipeline');
+      console.log('🚀 CRITICAL FIX: Enhanced message sending with improved pipeline');
 
       // Save user message to database
       await supabase
@@ -456,16 +353,16 @@ const AutomationDetail = () => {
           automationId: automation.id,
           automationContext: automationContext,
           agentStatusSummary: agentStatusSummary,
-          requestDiagramGeneration: true // Signal need for diagram
+          requestDiagramGeneration: true
         }
       });
 
       if (error) {
-        console.error('❌ FIXED: Chat AI error:', error);
+        console.error('❌ CRITICAL: Chat AI error:', error);
         throw error;
       }
 
-      console.log('✅ FIXED: Enhanced AI response processing');
+      console.log('✅ CRITICAL: Enhanced AI response processing');
 
       // Enhanced response processing
       let structuredData = null;
@@ -481,12 +378,14 @@ const AutomationDetail = () => {
         yusraiPowered = parseResult.metadata.yusrai_powered || false;
         sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
         
-        console.log('📋 FIXED: Enhanced parsing result:', {
+        console.log('📋 CRITICAL: Enhanced parsing result:', {
           hasStructuredData: !!structuredData,
           yusraiPowered,
           sevenSectionsValidated,
           hasWorkflow: !!(structuredData?.workflow),
-          workflowLength: structuredData?.workflow?.length || 0
+          workflowLength: structuredData?.workflow?.length || 0,
+          hasTestPayloads: !!(structuredData?.test_payloads),
+          hasPlatforms: !!(structuredData?.platforms)
         });
       }
 
@@ -529,11 +428,17 @@ const AutomationDetail = () => {
 
       // Enhanced platform management
       if (structuredData?.platforms?.length > 0) {
-        console.log('🔗 FIXED: Processing platform additions:', structuredData.platforms.length);
+        console.log('🔗 CRITICAL: Processing platform additions:', structuredData.platforms.length);
         setCurrentPlatforms(prev => {
           const newPlatforms = [...prev];
           structuredData.platforms.forEach((platform: any) => {
             if (platform?.name && !newPlatforms.find(p => p.name === platform.name)) {
+              // CRITICAL: Add test payloads to platform data
+              if (structuredData.test_payloads) {
+                platform.test_payloads = structuredData.test_payloads.filter(
+                  (payload: any) => payload.platform === platform.name
+                );
+              }
               newPlatforms.push(platform);
             }
           });
@@ -556,7 +461,6 @@ const AutomationDetail = () => {
 
       // Handle agent state after receiving AI response
       if (structuredData?.agents && Array.isArray(structuredData.agents)) {
-        // Check if this is a new agent recommendation or repeat
         const newAgents = structuredData.agents.filter(agent => 
           !agentStateManager.hasDecisionFor(agent.name)
         );
@@ -566,14 +470,14 @@ const AutomationDetail = () => {
         }
       }
 
-      // CRITICAL FIX: Enhanced blueprint extraction and immediate diagram generation
+      // CRITICAL FIX: Enhanced blueprint extraction and IMMEDIATE diagram generation
       if (structuredData) {
-        console.log('🔧 FIXED: Starting enhanced blueprint extraction and diagram generation');
+        console.log('🔧 CRITICAL: Starting enhanced blueprint extraction and diagram generation');
         
         const extractedBlueprint = extractBlueprintFromStructuredData(structuredData);
         
         if (extractedBlueprint) {
-          console.log('✅ FIXED: Successfully extracted blueprint, saving and generating diagram');
+          console.log('✅ CRITICAL: Successfully extracted blueprint, saving and generating diagram');
           
           // Save blueprint to database
           const { error: updateError } = await supabase
@@ -589,8 +493,8 @@ const AutomationDetail = () => {
             };
             setAutomation(updatedAutomation);
             
-            // IMMEDIATE diagram generation - this is the critical fix
-            console.log('🎯 FIXED: Triggering immediate diagram generation');
+            // CRITICAL FIX: Immediate diagram generation with the CORRECT blueprint
+            console.log('🎯 CRITICAL: Triggering immediate diagram generation with properly formatted blueprint');
             await generateAndSaveDiagram(automation.id, extractedBlueprint);
             
             toast({
@@ -598,10 +502,10 @@ const AutomationDetail = () => {
               description: "Automation blueprint saved and diagram generated successfully!",
             });
           } else {
-            console.error('❌ FIXED: Error saving blueprint:', updateError);
+            console.error('❌ CRITICAL: Error saving blueprint:', updateError);
           }
         } else {
-          console.log('⚠️ FIXED: No valid blueprint extracted from structured data');
+          console.log('⚠️ CRITICAL: No valid blueprint extracted from structured data');
         }
       }
 
@@ -616,7 +520,7 @@ const AutomationDetail = () => {
         });
 
     } catch (error) {
-      console.error('💥 FIXED: Error in enhanced message handling:', error);
+      console.error('💥 CRITICAL: Error in enhanced message handling:', error);
       toast({
         title: "Error",
         description: "Failed to process message. Please try again.",

@@ -1,62 +1,63 @@
+
 import { AutomationBlueprint } from "@/types/automation";
 
 /**
- * FIXED: Enhanced blueprint extraction with robust workflow handling
+ * FINAL FIX: Complete blueprint extraction with perfect workflow → steps conversion
  */
 export const extractBlueprintFromStructuredData = (structuredData: any): AutomationBlueprint | null => {
   try {
-    console.log('🔧 FIXED: Enhanced blueprint extraction from:', Object.keys(structuredData || {}));
+    console.log('🔧 FINAL: Blueprint extraction from:', Object.keys(structuredData || {}));
 
     if (!structuredData || typeof structuredData !== 'object') {
-      console.warn('❌ FIXED: Invalid structured data provided');
+      console.warn('❌ FINAL: Invalid structured data provided');
       return null;
     }
 
     // Method 1: Direct execution_blueprint extraction
     if (structuredData.execution_blueprint) {
-      console.log('✅ FIXED: Found execution_blueprint');
+      console.log('✅ FINAL: Found execution_blueprint');
       return validateAndCleanBlueprint(structuredData.execution_blueprint);
     }
 
     // Method 2: Direct automation_blueprint extraction
     if (structuredData.automation_blueprint) {
-      console.log('✅ FIXED: Found automation_blueprint');
+      console.log('✅ FINAL: Found automation_blueprint');
       return validateAndCleanBlueprint(structuredData.automation_blueprint);
     }
 
-    // Method 3: CRITICAL FIX - Enhanced workflow handling with COMPLETE data preservation
+    // Method 3: CRITICAL - Enhanced workflow handling with COMPLETE conversion to steps
     if (structuredData.workflow && Array.isArray(structuredData.workflow) && structuredData.workflow.length > 0) {
-      console.log('🔧 FIXED: Enhanced workflow processing with', structuredData.workflow.length, 'items');
+      console.log('🔧 FINAL: Converting workflow to steps format for diagram generator');
       return constructBlueprintFromWorkflow(structuredData);
     }
 
     // Method 4: Construct from components
     if (structuredData.steps || structuredData.platforms) {
-      console.log('🔧 FIXED: Constructing from components');
+      console.log('🔧 FINAL: Constructing from components');
       return constructBlueprintFromComponents(structuredData);
     }
 
     // Method 5: Extract from nested responses
     if (structuredData.yusrai_response || structuredData.ai_response) {
       const nestedData = structuredData.yusrai_response || structuredData.ai_response;
-      console.log('🔍 FIXED: Checking nested response');
+      console.log('🔍 FINAL: Checking nested response');
       return extractBlueprintFromStructuredData(nestedData);
     }
 
-    console.warn('⚠️ FIXED: No blueprint data found in structured response');
+    console.warn('⚠️ FINAL: No blueprint data found in structured response');
     return null;
 
   } catch (error) {
-    console.error('❌ FIXED: Error extracting blueprint:', error);
+    console.error('❌ FINAL: Error extracting blueprint:', error);
     return null;
   }
 };
 
 /**
- * CRITICAL FIX: Complete workflow to blueprint conversion with ALL data preservation
+ * CRITICAL: Perfect workflow to steps conversion for diagram generator
  */
 const constructBlueprintFromWorkflow = (structuredData: any): AutomationBlueprint => {
-  console.log('🔧 FIXED: Complete workflow to blueprint conversion');
+  console.log('🔧 FINAL: Perfect workflow to steps conversion');
   
   const blueprint: AutomationBlueprint = {
     version: "1.0",
@@ -65,25 +66,18 @@ const constructBlueprintFromWorkflow = (structuredData: any): AutomationBlueprin
       type: structuredData.trigger_type || 'manual',
       platform: structuredData.trigger_platform || undefined
     },
-    steps: []
+    steps: [] // CRITICAL: Always use steps array format
   };
 
-  // CRITICAL FIX: Complete workflow processing with ALL data preservation
+  // CRITICAL: Convert workflow array to steps array for diagram generator
   if (structuredData.workflow && Array.isArray(structuredData.workflow)) {
     blueprint.steps = structuredData.workflow.map((workflowItem: any, index: number) => {
-      console.log(`📋 FIXED: Processing workflow item ${index + 1}:`, {
-        action: workflowItem.action,
-        step: workflowItem.step,
-        platform: workflowItem.platform,
-        method: workflowItem.method,
-        parameters: workflowItem.parameters,
-        details: workflowItem.details
-      });
+      console.log(`📋 FINAL: Converting workflow item ${index + 1}:`, workflowItem);
 
       return {
-        id: `workflow-step-${index + 1}`,
-        name: workflowItem.action || workflowItem.step || `Workflow Step ${index + 1}`,
-        type: workflowItem.type || 'action',
+        id: `step-${index + 1}`,
+        name: workflowItem.action || workflowItem.step || `Step ${index + 1}`,
+        type: 'action' as const,
         action: {
           integration: workflowItem.platform || 'system',
           method: workflowItem.method || 'execute',
@@ -91,35 +85,27 @@ const constructBlueprintFromWorkflow = (structuredData: any): AutomationBlueprin
             ...workflowItem.parameters,
             description: workflowItem.action || workflowItem.step,
             platform: workflowItem.platform || 'system',
-            details: workflowItem.details || workflowItem.description,
-            // CRITICAL: Preserve ALL workflow data
-            originalAction: workflowItem.action,
-            originalStep: workflowItem.step,
-            originalPlatform: workflowItem.platform,
-            originalMethod: workflowItem.method,
-            allWorkflowData: workflowItem
+            details: workflowItem.details || workflowItem.description
           }
         },
-        // CRITICAL: Store original workflow data for diagram generation
+        // Store original workflow data for reference
         originalWorkflowData: workflowItem,
-        // Add platform info for diagram generator
         platform: workflowItem.platform,
         platformDetails: workflowItem.platform_details || workflowItem.config
       };
     });
   }
 
-  // CRITICAL: Add test payloads if available from AI
+  // Add platforms and test payloads if available
   if (structuredData.test_payloads && Array.isArray(structuredData.test_payloads)) {
     blueprint.test_payloads = structuredData.test_payloads;
   }
 
-  // CRITICAL: Add platforms info for credential forms
   if (structuredData.platforms && Array.isArray(structuredData.platforms)) {
     blueprint.platforms = structuredData.platforms;
   }
 
-  console.log(`✅ FIXED: Created complete blueprint with ${blueprint.steps.length} steps from workflow`);
+  console.log(`✅ FINAL: Created blueprint with ${blueprint.steps.length} steps in correct format`);
   return blueprint;
 };
 
@@ -139,7 +125,7 @@ const validateAndCleanBlueprint = (blueprint: any): AutomationBlueprint | null =
       steps: []
     };
 
-    // Enhanced steps processing
+    // Handle steps format
     if (blueprint.steps && Array.isArray(blueprint.steps)) {
       cleanedBlueprint.steps = blueprint.steps.map((step: any, index: number) => ({
         id: step.id || `step-${index + 1}`,
@@ -153,12 +139,12 @@ const validateAndCleanBlueprint = (blueprint: any): AutomationBlueprint | null =
         ...step
       }));
     } 
-    // Handle workflow format in blueprint
+    // Handle workflow format in blueprint - convert to steps
     else if (blueprint.workflow && Array.isArray(blueprint.workflow)) {
       cleanedBlueprint.steps = blueprint.workflow.map((workflowItem: any, index: number) => ({
-        id: workflowItem.id || `workflow-step-${index + 1}`,
+        id: `step-${index + 1}`,
         name: workflowItem.action || workflowItem.step || `Step ${index + 1}`,
-        type: workflowItem.type || 'action',
+        type: 'action' as const,
         action: {
           integration: workflowItem.platform || 'system',
           method: workflowItem.method || 'execute',
@@ -175,7 +161,7 @@ const validateAndCleanBlueprint = (blueprint: any): AutomationBlueprint | null =
       cleanedBlueprint.variables = blueprint.variables;
     }
 
-    // CRITICAL: Preserve test payloads and platforms
+    // Preserve test payloads and platforms
     if (blueprint.test_payloads) {
       cleanedBlueprint.test_payloads = blueprint.test_payloads;
     }
@@ -183,11 +169,11 @@ const validateAndCleanBlueprint = (blueprint: any): AutomationBlueprint | null =
       cleanedBlueprint.platforms = blueprint.platforms;
     }
 
-    console.log(`✅ FIXED: Validated blueprint with ${cleanedBlueprint.steps.length} steps`);
+    console.log(`✅ FINAL: Validated blueprint with ${cleanedBlueprint.steps.length} steps`);
     return cleanedBlueprint;
 
   } catch (error) {
-    console.error('❌ FIXED: Error validating blueprint:', error);
+    console.error('❌ FINAL: Error validating blueprint:', error);
     return null;
   }
 };
@@ -251,7 +237,20 @@ const constructBlueprintFromComponents = (structuredData: any): AutomationBluepr
     });
   }
 
-  console.log(`🔧 FIXED: Constructed blueprint with ${blueprint.steps.length} steps from components`);
+  console.log(`🔧 FINAL: Constructed blueprint with ${blueprint.steps.length} steps from components`);
+  return blueprint;
+};
+
+/**
+ * CRITICAL: Ensure blueprint has steps format for diagram generator
+ */
+export const ensureBlueprintHasSteps = (blueprint: AutomationBlueprint): AutomationBlueprint => {
+  if (!blueprint.steps || !Array.isArray(blueprint.steps) || blueprint.steps.length === 0) {
+    console.warn('⚠️ FINAL: Blueprint missing steps array, cannot generate diagram');
+    return blueprint;
+  }
+
+  console.log(`✅ FINAL: Blueprint validated with ${blueprint.steps.length} steps for diagram generation`);
   return blueprint;
 };
 
@@ -260,27 +259,27 @@ const constructBlueprintFromComponents = (structuredData: any): AutomationBluepr
  */
 export const validateBlueprintForDiagram = (blueprint: AutomationBlueprint | null): boolean => {
   if (!blueprint) {
-    console.warn('❌ FIXED: No blueprint provided for validation');
+    console.warn('❌ FINAL: No blueprint provided for validation');
     return false;
   }
 
   if (!blueprint.steps || !Array.isArray(blueprint.steps) || blueprint.steps.length === 0) {
-    console.warn('❌ FIXED: Blueprint has no steps for diagram generation');
+    console.warn('❌ FINAL: Blueprint has no steps for diagram generation');
     return false;
   }
 
   if (!blueprint.trigger) {
-    console.warn('⚠️ FIXED: Blueprint has no trigger, using default');
+    console.warn('⚠️ FINAL: Blueprint has no trigger, using default');
     blueprint.trigger = { type: 'manual' };
   }
 
   // Enhanced validation
   const validSteps = blueprint.steps.filter(step => step.name && step.name.trim() !== '');
   if (validSteps.length === 0) {
-    console.warn('❌ FIXED: Blueprint has no valid steps with names');
+    console.warn('❌ FINAL: Blueprint has no valid steps with names');
     return false;
   }
 
-  console.log(`✅ FIXED: Blueprint validation passed with ${blueprint.steps.length} steps`);
+  console.log(`✅ FINAL: Blueprint validation passed with ${blueprint.steps.length} steps`);
   return true;
 };

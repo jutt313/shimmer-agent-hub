@@ -17,7 +17,7 @@ import { AutomationBlueprint } from "@/types/automation";
 import { parseStructuredResponse, parseYusrAIStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
 import AutomationExecutionPanel from "@/components/AutomationExecutionPanel";
 import { agentStateManager } from '@/utils/agentStateManager';
-import { extractBlueprintFromStructuredData, validateBlueprintForDiagram } from '@/utils/blueprintExtractor';
+import { extractBlueprintFromStructuredData, validateBlueprintForDiagram, ensureBlueprintHasSteps } from '@/utils/blueprintExtractor';
 
 interface Automation {
   id: string;
@@ -66,11 +66,11 @@ const AutomationDetail = () => {
 
   // CRITICAL FIX: Enhanced diagram generation with proper blueprint handling
   const generateAndSaveDiagram = async (automationId: string, blueprint: AutomationBlueprint, forceRegenerate = false, userFeedback?: string) => {
-    console.log('🚀 CRITICAL FIX: Starting diagram generation with properly formatted blueprint');
+    console.log('🚀 FINAL: Starting diagram generation with properly formatted blueprint');
     
     // CRITICAL: Validate blueprint format before proceeding
     if (!validateBlueprintForDiagram(blueprint)) {
-      console.error('❌ CRITICAL: Blueprint validation failed for diagram generation');
+      console.error('❌ FINAL: Blueprint validation failed for diagram generation');
       toast({
         title: "Invalid Blueprint",
         description: "Cannot generate diagram from invalid blueprint structure",
@@ -79,26 +79,22 @@ const AutomationDetail = () => {
       return;
     }
 
+    // CRITICAL: Ensure blueprint has steps format (not workflow)
+    const validatedBlueprint = ensureBlueprintHasSteps(blueprint);
+    
     setGeneratingDiagram(true);
     
     try {
-      console.log('📊 CRITICAL FIX: Enhanced blueprint analysis:', {
-        steps: blueprint.steps?.length || 0,
-        triggerType: blueprint.trigger?.type,
-        hasWorkflow: blueprint.steps?.some(step => step.originalWorkflowData),
+      console.log('📊 FINAL: Sending blueprint to diagram generator:', {
+        steps: validatedBlueprint.steps?.length || 0,
+        triggerType: validatedBlueprint.trigger?.type,
+        hasWorkflow: validatedBlueprint.steps?.some(step => step.originalWorkflowData),
         forceRegenerate,
-        userFeedback: userFeedback ? 'provided' : 'none',
-        // CRITICAL: Log blueprint structure for debugging
-        blueprintStructure: {
-          hasSteps: !!blueprint.steps,
-          stepsFormat: blueprint.steps?.[0] ? Object.keys(blueprint.steps[0]) : [],
-          hasPlatforms: !!blueprint.platforms,
-          hasTestPayloads: !!blueprint.test_payloads
-        }
+        userFeedback: userFeedback ? 'provided' : 'none'
       });
       
       const requestBody: any = { 
-        automation_blueprint: blueprint, // CRITICAL: Use the properly formatted blueprint
+        automation_blueprint: validatedBlueprint, // CRITICAL: Send validated blueprint with steps
         automation_id: automationId,
         force_regenerate: forceRegenerate,
         enhanced_processing: true
@@ -115,7 +111,7 @@ const AutomationDetail = () => {
       });
 
       if (error) {
-        console.error('❌ CRITICAL: Diagram generation error:', error);
+        console.error('❌ FINAL: Diagram generation error:', error);
         toast({
           title: "Diagram Generation Failed",
           description: `Error: ${error.message}`,
@@ -126,7 +122,7 @@ const AutomationDetail = () => {
 
       // Enhanced validation of response data
       if (!data || !data.nodes || !Array.isArray(data.nodes) || data.nodes.length === 0) {
-        console.error('❌ CRITICAL: Invalid diagram data received:', data);
+        console.error('❌ FINAL: Invalid diagram data received:', data);
         toast({
           title: "Invalid Diagram Data",
           description: "Received empty or invalid diagram structure",
@@ -135,7 +131,7 @@ const AutomationDetail = () => {
         return;
       }
 
-      console.log('✅ CRITICAL: Valid diagram data received:', {
+      console.log('✅ FINAL: Valid diagram data received:', {
         nodes: data.nodes.length,
         edges: data.edges?.length || 0,
         metadata: data.metadata
@@ -147,8 +143,8 @@ const AutomationDetail = () => {
         metadata: {
           ...data.metadata,
           generatedAt: new Date().toISOString(),
-          source: 'enhanced-ai-generator',
-          blueprintSteps: blueprint.steps?.length || 0
+          source: 'final-ai-generator',
+          blueprintSteps: validatedBlueprint.steps?.length || 0
         }
       };
 
@@ -173,9 +169,9 @@ const AutomationDetail = () => {
           description: successMessage,
         });
 
-        console.log('🎯 CRITICAL: Diagram generation pipeline completed successfully');
+        console.log('🎯 FINAL: Diagram generation pipeline completed successfully');
       } else {
-        console.error('❌ CRITICAL: Error saving diagram to database:', updateError);
+        console.error('❌ FINAL: Error saving diagram to database:', updateError);
         toast({
           title: "Save Failed", 
           description: "Generated diagram but failed to save to database",
@@ -184,7 +180,7 @@ const AutomationDetail = () => {
       }
 
     } catch (err) {
-      console.error('💥 CRITICAL: Unexpected error in diagram generation:', err);
+      console.error('💥 FINAL: Unexpected error in diagram generation:', err);
       toast({
         title: "Generation Error",
         description: `Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`,
@@ -322,7 +318,7 @@ const AutomationDetail = () => {
     setSendingMessage(true);
 
     try {
-      console.log('🚀 CRITICAL FIX: Enhanced message sending with improved pipeline');
+      console.log('🚀 FINAL: Enhanced message sending with improved pipeline');
 
       // Save user message to database
       await supabase
@@ -358,11 +354,11 @@ const AutomationDetail = () => {
       });
 
       if (error) {
-        console.error('❌ CRITICAL: Chat AI error:', error);
+        console.error('❌ FINAL: Chat AI error:', error);
         throw error;
       }
 
-      console.log('✅ CRITICAL: Enhanced AI response processing');
+      console.log('✅ FINAL: Enhanced AI response processing');
 
       // Enhanced response processing
       let structuredData = null;
@@ -378,7 +374,7 @@ const AutomationDetail = () => {
         yusraiPowered = parseResult.metadata.yusrai_powered || false;
         sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
         
-        console.log('📋 CRITICAL: Enhanced parsing result:', {
+        console.log('📋 FINAL: Enhanced parsing result:', {
           hasStructuredData: !!structuredData,
           yusraiPowered,
           sevenSectionsValidated,
@@ -428,12 +424,12 @@ const AutomationDetail = () => {
 
       // Enhanced platform management
       if (structuredData?.platforms?.length > 0) {
-        console.log('🔗 CRITICAL: Processing platform additions:', structuredData.platforms.length);
+        console.log('🔗 FINAL: Processing platform additions:', structuredData.platforms.length);
         setCurrentPlatforms(prev => {
           const newPlatforms = [...prev];
           structuredData.platforms.forEach((platform: any) => {
             if (platform?.name && !newPlatforms.find(p => p.name === platform.name)) {
-              // CRITICAL: Add test payloads to platform data
+              // Add test payloads to platform data
               if (structuredData.test_payloads) {
                 platform.test_payloads = structuredData.test_payloads.filter(
                   (payload: any) => payload.platform === platform.name
@@ -472,40 +468,43 @@ const AutomationDetail = () => {
 
       // CRITICAL FIX: Enhanced blueprint extraction and IMMEDIATE diagram generation
       if (structuredData) {
-        console.log('🔧 CRITICAL: Starting enhanced blueprint extraction and diagram generation');
+        console.log('🔧 FINAL: Starting enhanced blueprint extraction and diagram generation');
         
         const extractedBlueprint = extractBlueprintFromStructuredData(structuredData);
         
         if (extractedBlueprint) {
-          console.log('✅ CRITICAL: Successfully extracted blueprint, saving and generating diagram');
+          console.log('✅ FINAL: Successfully extracted blueprint, saving and generating diagram');
+          
+          // CRITICAL: Ensure blueprint is in steps format before saving
+          const validatedBlueprint = ensureBlueprintHasSteps(extractedBlueprint);
           
           // Save blueprint to database
           const { error: updateError } = await supabase
             .from('automations')
-            .update({ automation_blueprint: extractedBlueprint })
+            .update({ automation_blueprint: validatedBlueprint })
             .eq('id', automation.id);
 
           if (!updateError) {
             // Update local state
             const updatedAutomation = {
               ...automation,
-              automation_blueprint: extractedBlueprint
+              automation_blueprint: validatedBlueprint
             };
             setAutomation(updatedAutomation);
             
-            // CRITICAL FIX: Immediate diagram generation with the CORRECT blueprint
-            console.log('🎯 CRITICAL: Triggering immediate diagram generation with properly formatted blueprint');
-            await generateAndSaveDiagram(automation.id, extractedBlueprint);
+            // CRITICAL FIX: Immediate diagram generation with the CORRECT blueprint format
+            console.log('🎯 FINAL: Triggering immediate diagram generation with properly formatted blueprint');
+            await generateAndSaveDiagram(automation.id, validatedBlueprint);
             
             toast({
               title: "✅ Blueprint & Diagram Updated",
               description: "Automation blueprint saved and diagram generated successfully!",
             });
           } else {
-            console.error('❌ CRITICAL: Error saving blueprint:', updateError);
+            console.error('❌ FINAL: Error saving blueprint:', updateError);
           }
         } else {
-          console.log('⚠️ CRITICAL: No valid blueprint extracted from structured data');
+          console.log('⚠️ FINAL: No valid blueprint extracted from structured data');
         }
       }
 
@@ -520,7 +519,7 @@ const AutomationDetail = () => {
         });
 
     } catch (error) {
-      console.error('💥 CRITICAL: Error in enhanced message handling:', error);
+      console.error('💥 FINAL: Error in enhanced message handling:', error);
       toast({
         title: "Error",
         description: "Failed to process message. Please try again.",

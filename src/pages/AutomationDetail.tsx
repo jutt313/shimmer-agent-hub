@@ -17,6 +17,7 @@ import { AutomationBlueprint } from "@/types/automation";
 import { parseStructuredResponse, parseYusrAIStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
 import AutomationExecutionPanel from "@/components/AutomationExecutionPanel";
 import { agentStateManager } from '@/utils/agentStateManager';
+import { extractBlueprintFromStructuredData, validateBlueprintForDiagram } from '@/utils/blueprintExtractor';
 
 interface Automation {
   id: string;
@@ -64,7 +65,7 @@ const AutomationDetail = () => {
   }, [user, id, navigate]);
 
   // ENHANCED: Improved blueprint extraction with immediate diagram generation
-  const extractBlueprintFromStructuredData = (structuredData: any): AutomationBlueprint | null => {
+  const extractBlueprintFromStructuredDataLocal = (structuredData: any): AutomationBlueprint | null => {
     try {
       console.log('🔧 ENHANCED: Extracting blueprint from structured data:', Object.keys(structuredData || {}));
 
@@ -172,25 +173,16 @@ const AutomationDetail = () => {
     }
   };
 
-  // ENHANCED: Fixed diagram generation with proper error handling
+  // ENHANCED: Fixed diagram generation with proper error handling and immediate triggering
   const generateAndSaveDiagram = async (automationId: string, blueprint: AutomationBlueprint, forceRegenerate = false, userFeedback?: string) => {
-    // ENHANCED: Better blueprint validation
-    if (!blueprint) {
-      console.warn('❌ No blueprint provided for diagram generation');
+    console.log('🚀 FIXED: Starting diagram generation with enhanced pipeline');
+    
+    // Enhanced validation
+    if (!validateBlueprintForDiagram(blueprint)) {
+      console.error('❌ FIXED: Blueprint validation failed for diagram generation');
       toast({
-        title: "No Blueprint",
-        description: "Cannot generate diagram without automation blueprint",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // ENHANCED: Better blueprint validation with detailed logging
-    if (!blueprint.steps || blueprint.steps.length === 0) {
-      console.warn('❌ Blueprint has no steps to generate diagram for:', blueprint);
-      toast({
-        title: "Empty Blueprint",
-        description: "Blueprint contains no steps to visualize",
+        title: "Invalid Blueprint",
+        description: "Cannot generate diagram from invalid blueprint structure",
         variant: "destructive",
       });
       return;
@@ -199,137 +191,103 @@ const AutomationDetail = () => {
     setGeneratingDiagram(true);
     
     try {
-      console.log('🚀 ENHANCED: Generating AI-powered diagram for automation:', automationId);
-      console.log('📊 ENHANCED: Blueprint analysis:', {
-        mainSteps: blueprint.steps.length,
+      console.log('📊 FIXED: Enhanced blueprint analysis:', {
+        steps: blueprint.steps?.length || 0,
         triggerType: blueprint.trigger?.type,
-        conditionSteps: blueprint.steps.filter(step => step.type === 'condition').length,
-        aiAgentSteps: blueprint.steps.filter(step => 
-          step.type === 'ai_agent_call' || 
-          (step as any).ai_recommended === true ||
-          (step.ai_agent_call && (step.ai_agent_call as any).is_recommended)
-        ).length,
-        forceRegenerate: forceRegenerate,
-        userFeedback: userFeedback ? 'provided' : 'none',
-        stepDetails: blueprint.steps.map(step => ({ name: step.name, type: step.type }))
+        hasWorkflow: blueprint.steps?.some(step => step.name?.includes('workflow')),
+        forceRegenerate,
+        userFeedback: userFeedback ? 'provided' : 'none'
       });
       
-      // ENHANCED: Better request body preparation
       const requestBody: any = { 
         automation_blueprint: blueprint,
         automation_id: automationId,
-        force_regenerate: forceRegenerate
+        force_regenerate: forceRegenerate,
+        enhanced_processing: true // Enable enhanced processing
       };
       
-      if (userFeedback && userFeedback.trim()) {
+      if (userFeedback?.trim()) {
         requestBody.user_feedback = userFeedback.trim();
         requestBody.improvement_request = true;
-        console.log('🎯 Including user feedback for diagram improvement:', userFeedback.substring(0, 100));
       }
       
-      // Call the OpenAI-powered diagram-generator Edge Function
+      // Call the diagram-generator with enhanced error handling
       const { data, error } = await supabase.functions.invoke('diagram-generator', {
         body: requestBody,
       });
 
       if (error) {
-        console.error('❌ Error invoking diagram-generator:', error);
+        console.error('❌ FIXED: Diagram generation error:', error);
         toast({
           title: "Diagram Generation Failed",
-          description: `Error from diagram-generator: ${error.message || 'Unknown error'}`,
+          description: `Error: ${error.message}`,
           variant: "destructive",
         });
         return;
       }
 
-      if (!data) {
-        console.error('❌ No data received from diagram-generator');
-        toast({
-          title: "No Diagram Data",
-          description: "The diagram generator returned no data",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // ENHANCED: Better error handling
-      if (data.error) {
-        console.error('❌ Diagram generation error:', data);
-        toast({
-          title: "Diagram Generation Error",
-          description: `${data.error} (Source: ${data.source || 'unknown'})`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // ENHANCED: Better validation of diagram data
-      if (!data.nodes || !Array.isArray(data.nodes) || data.nodes.length === 0) {
-        console.error('❌ Invalid diagram data structure received:', data);
+      // Enhanced validation of response data
+      if (!data || !data.nodes || !Array.isArray(data.nodes) || data.nodes.length === 0) {
+        console.error('❌ FIXED: Invalid diagram data received:', data);
         toast({
           title: "Invalid Diagram Data",
-          description: "Received invalid or empty diagram structure",
+          description: "Received empty or invalid diagram structure",
           variant: "destructive",
         });
         return;
       }
 
-      if (!data.edges || !Array.isArray(data.edges)) {
-        console.warn('⚠️ No edges in diagram data, adding default edges');
-        data.edges = [];
-      }
-
-      const nodeCount = data.nodes.length;
-      const edgeCount = data.edges.length;
-      const conditionNodeCount = data.nodes.filter((n: any) => n.type?.includes('condition')).length;
-      const aiAgentNodeCount = data.nodes.filter((n: any) => n.data?.isRecommended).length;
-      const platformNodeCount = data.nodes.filter((n: any) => n.data?.platform).length;
-
-      console.log('✅ ENHANCED: Generated comprehensive diagram:', {
-        nodes: nodeCount,
-        edges: edgeCount,
-        conditionNodes: conditionNodeCount,
-        aiAgentNodes: aiAgentNodeCount,
-        platformNodes: platformNodeCount,
-        source: data.metadata?.source || 'unknown',
-        generatedAt: data.metadata?.generatedAt
+      console.log('✅ FIXED: Valid diagram data received:', {
+        nodes: data.nodes.length,
+        edges: data.edges?.length || 0,
+        metadata: data.metadata
       });
 
-      // Save the generated diagram data back to the database
+      // Save diagram data to database with enhanced metadata
+      const diagramDataToSave = {
+        ...data,
+        metadata: {
+          ...data.metadata,
+          generatedAt: new Date().toISOString(),
+          source: 'enhanced-ai-generator',
+          blueprintSteps: blueprint.steps?.length || 0
+        }
+      };
+
       const { error: updateError } = await supabase
         .from('automations')
-        .update({ automation_diagram_data: data })
+        .update({ automation_diagram_data: diagramDataToSave })
         .eq('id', automationId);
 
       if (updateError) {
-        console.error('❌ Error saving diagram data to DB:', updateError);
+        console.error('❌ FIXED: Error saving diagram to database:', updateError);
         toast({
           title: "Save Failed", 
-          description: "Could not save generated diagram to database",
+          description: "Generated diagram but failed to save to database",
           variant: "destructive",
         });
         return;
       }
 
-      // Update local state
+      // Update local state immediately
       setAutomation(prev => ({
         ...prev!,
-        automation_diagram_data: data
+        automation_diagram_data: diagramDataToSave
       }));
 
-      console.log('✅ ENHANCED: AI-powered comprehensive diagram generated and saved successfully!');
-      
       const successMessage = userFeedback 
-        ? `AI improved the diagram based on your feedback with ${nodeCount} nodes and ${aiAgentNodeCount} AI recommendations!`
-        : `AI created a comprehensive diagram with ${nodeCount} nodes, ${conditionNodeCount} conditions, and ${aiAgentNodeCount} AI recommendations!`;
+        ? `Enhanced diagram with ${data.nodes.length} nodes based on your feedback!`
+        : `Generated comprehensive diagram with ${data.nodes.length} nodes successfully!`;
       
       toast({
-        title: "Diagram Generated Successfully",
+        title: "✅ Diagram Generated",
         description: successMessage,
       });
 
+      console.log('🎯 FIXED: Diagram generation pipeline completed successfully');
+
     } catch (err) {
-      console.error('💥 Unexpected error in diagram generation:', err);
+      console.error('💥 FIXED: Unexpected error in diagram generation:', err);
       toast({
         title: "Generation Error",
         description: `Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`,
@@ -467,7 +425,7 @@ const AutomationDetail = () => {
     setSendingMessage(true);
 
     try {
-      console.log('🚀 Sending message with agent state context:', messageText.substring(0, 50));
+      console.log('🚀 FIXED: Enhanced message sending with improved pipeline');
 
       // Save user message to database
       await supabase
@@ -478,43 +436,43 @@ const AutomationDetail = () => {
           message_content: messageText
         });
 
-      // Prepare automation context with agent decisions
+      // Prepare enhanced automation context
       const automationContext = {
         id: automation.id,
         title: automation.title,
         description: automation.description,
         status: automation.status,
-        automation_blueprint: automation.automation_blueprint
+        automation_blueprint: automation.automation_blueprint,
+        existing_diagram: automation.automation_diagram_data ? 'present' : 'missing'
       };
 
-      // Get agent status summary for AI context
       const agentStatusSummary = agentStateManager.getStatusSummary();
 
-      // Call the chat-ai function with FULL conversation context + agent state
+      // Call chat-ai with enhanced context
       const { data, error } = await supabase.functions.invoke('chat-ai', {
         body: {
           message: messageText,
           messages: messages,
           automationId: automation.id,
           automationContext: automationContext,
-          agentStatusSummary: agentStatusSummary // Include agent decisions
+          agentStatusSummary: agentStatusSummary,
+          requestDiagramGeneration: true // Signal need for diagram
         }
       });
 
       if (error) {
-        console.error('❌ Supabase function error:', error);
+        console.error('❌ FIXED: Chat AI error:', error);
         throw error;
       }
 
-      console.log('✅ Received response from chat-ai function');
+      console.log('✅ FIXED: Enhanced AI response processing');
 
-      // ENHANCED: Better response processing with immediate blueprint extraction and diagram generation
+      // Enhanced response processing
       let structuredData = null;
       let aiResponseText = "";
       let yusraiPowered = false;
       let sevenSectionsValidated = false;
 
-      // Parse the response using the enhanced parser
       if (data && (data.response || typeof data === 'string')) {
         const responseText = data.response || (typeof data === 'string' ? data : JSON.stringify(data));
         const parseResult = parseYusrAIStructuredResponse(responseText);
@@ -523,69 +481,38 @@ const AutomationDetail = () => {
         yusraiPowered = parseResult.metadata.yusrai_powered || false;
         sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
         
-        console.log('📋 ENHANCED: Processing result:', {
+        console.log('📋 FIXED: Enhanced parsing result:', {
           hasStructuredData: !!structuredData,
           yusraiPowered,
           sevenSectionsValidated,
-          hasWorkflow: !!(structuredData?.workflow)
+          hasWorkflow: !!(structuredData?.workflow),
+          workflowLength: structuredData?.workflow?.length || 0
         });
       }
 
-      // Enhanced display text creation from structured data
+      // Enhanced display text creation
       if (structuredData) {
-        console.log('📋 Processing structured data:', Object.keys(structuredData));
-        
-        // Handle clarification questions
-        if (structuredData.clarification_questions && Array.isArray(structuredData.clarification_questions) && structuredData.clarification_questions.length > 0) {
-          aiResponseText = "I need some clarification to provide the best solution:\n\n" + 
+        if (structuredData.clarification_questions?.length > 0) {
+          aiResponseText = "I need clarification:\n\n" + 
             structuredData.clarification_questions.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n');
-        }
-        // Handle responses with summary
-        else if (structuredData.summary && structuredData.summary.trim() !== '') {
+        } else if (structuredData.summary?.trim()) {
           aiResponseText = structuredData.summary;
-          if (structuredData.steps && structuredData.steps.length > 0) {
-            aiResponseText += "\n\nSteps:\n" + structuredData.steps.map((step: string, i: number) => `${i + 1}. ${step}`).join('\n');
+          if (structuredData.workflow?.length > 0) {
+            aiResponseText += "\n\nWorkflow Steps:\n" + 
+              structuredData.workflow.map((item: any, i: number) => 
+                `${i + 1}. ${item.action || item.step} (${item.platform || 'System'})`
+              ).join('\n');
           }
-          // ENHANCED: Show workflow information
-          if (structuredData.workflow && structuredData.workflow.length > 0) {
-            aiResponseText += "\n\nWorkflow:\n" + structuredData.workflow.map((item: any, i: number) => 
+        } else if (structuredData.workflow?.length > 0) {
+          aiResponseText = `Created automation with ${structuredData.workflow.length} workflow steps:\n\n` +
+            structuredData.workflow.map((item: any, i: number) => 
               `${i + 1}. ${item.action || item.step} (${item.platform || 'System'})`
             ).join('\n');
-          }
+        } else {
+          aiResponseText = "I'm creating a comprehensive automation solution for you.";
         }
-        // Handle responses with workflow but no summary
-        else if (structuredData.workflow && Array.isArray(structuredData.workflow) && structuredData.workflow.length > 0) {
-          aiResponseText = "I've created a comprehensive automation workflow with " + structuredData.workflow.length + " detailed steps:\n\n" +
-            structuredData.workflow.map((item: any, i: number) => 
-              `${i + 1}. ${item.action || item.step} (Platform: ${item.platform || 'System'})`
-            ).join('\n');
-        }
-        // Handle responses with steps but no summary
-        else if (structuredData.steps && Array.isArray(structuredData.steps) && structuredData.steps.length > 0) {
-          aiResponseText = "I've created a comprehensive automation plan with " + structuredData.steps.length + " detailed steps:\n\n" +
-            structuredData.steps.map((step: string, i: number) => `${i + 1}. ${step}`).join('\n');
-        }
-        // Handle responses with platforms but no summary
-        else if (structuredData.platforms && Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
-          const platformNames = structuredData.platforms.map((p: any) => p.name).join(', ');
-          aiResponseText = `I've identified the platforms you'll need: ${platformNames}. Let me set up the complete automation workflow.`;
-        }
-        // Handle any other structured response
-        else if (typeof structuredData === 'string' && structuredData.trim() !== '') {
-          aiResponseText = structuredData;
-        }
-        // Final fallback with helpful message
-        else {
-          aiResponseText = "I'm analyzing your automation requirements and will provide a complete solution with all necessary platforms and credentials.";
-        }
-      }
-      // Handle case where no structured data is received
-      else if (typeof data === 'string' && data.trim() !== '') {
-        aiResponseText = data;
-      }
-      // Ultimate fallback
-      else {
-        aiResponseText = "I'm ready to help you create a comprehensive automation. Please let me know which specific platforms you'd like to integrate, and I'll provide complete setup instructions.";
+      } else {
+        aiResponseText = typeof data === 'string' ? data : "I'm ready to help you build your automation.";
       }
 
       const aiMessage = {
@@ -598,37 +525,33 @@ const AutomationDetail = () => {
         seven_sections_validated: sevenSectionsValidated
       };
 
-      console.log('📤 Adding AI message to chat with enhanced metadata');
       setMessages(prev => [...prev, aiMessage]);
 
-      // Handle platform management
-      if (structuredData) {
-        // Handle platform additions
-        if (structuredData.platforms && Array.isArray(structuredData.platforms)) {
-          console.log('🔗 Processing platform additions:', structuredData.platforms.length);
-          setCurrentPlatforms(prev => {
-            const newPlatforms = [...prev];
-            structuredData.platforms.forEach((platform: any) => {
-              if (platform && platform.name && !newPlatforms.find(p => p.name === platform.name)) {
-                newPlatforms.push(platform);
-              }
-            });
-            return newPlatforms;
+      // Enhanced platform management
+      if (structuredData?.platforms?.length > 0) {
+        console.log('🔗 FIXED: Processing platform additions:', structuredData.platforms.length);
+        setCurrentPlatforms(prev => {
+          const newPlatforms = [...prev];
+          structuredData.platforms.forEach((platform: any) => {
+            if (platform?.name && !newPlatforms.find(p => p.name === platform.name)) {
+              newPlatforms.push(platform);
+            }
           });
-        }
+          return newPlatforms;
+        });
+      }
 
-        // Handle platform removals
-        if (structuredData.platforms_to_remove && Array.isArray(structuredData.platforms_to_remove)) {
-          console.log('🗑️ Processing platform removals');
-          setCurrentPlatforms(prev => 
-            prev.filter(platform => !structuredData.platforms_to_remove.includes(platform.name))
-          );
-          
-          toast({
-            title: "Platforms Updated",
-            description: `Removed platforms: ${structuredData.platforms_to_remove.join(', ')}`,
-          });
-        }
+      // Handle platform removals
+      if (structuredData?.platforms_to_remove && Array.isArray(structuredData.platforms_to_remove)) {
+        console.log('🗑️ Processing platform removals');
+        setCurrentPlatforms(prev => 
+          prev.filter(platform => !structuredData.platforms_to_remove.includes(platform.name))
+        );
+        
+        toast({
+          title: "Platforms Updated",
+          description: `Removed platforms: ${structuredData.platforms_to_remove.join(', ')}`,
+        });
       }
 
       // Handle agent state after receiving AI response
@@ -643,41 +566,46 @@ const AutomationDetail = () => {
         }
       }
 
-      // ENHANCED: Immediate blueprint handling and diagram generation
+      // CRITICAL FIX: Enhanced blueprint extraction and immediate diagram generation
       if (structuredData) {
+        console.log('🔧 FIXED: Starting enhanced blueprint extraction and diagram generation');
+        
         const extractedBlueprint = extractBlueprintFromStructuredData(structuredData);
         
         if (extractedBlueprint) {
-          console.log('🔧 ENHANCED: Updating automation blueprint and generating new diagram immediately');
+          console.log('✅ FIXED: Successfully extracted blueprint, saving and generating diagram');
           
-          // Save the blueprint to database
+          // Save blueprint to database
           const { error: updateError } = await supabase
             .from('automations')
             .update({ automation_blueprint: extractedBlueprint })
             .eq('id', automation.id);
 
           if (!updateError) {
+            // Update local state
             const updatedAutomation = {
               ...automation,
               automation_blueprint: extractedBlueprint
             };
             setAutomation(updatedAutomation);
             
-            // ENHANCED: Generate new diagram immediately (no timeout)
-            console.log('🎯 ENHANCED: Generating diagram from extracted blueprint immediately');
-            generateAndSaveDiagram(automation.id, extractedBlueprint);
+            // IMMEDIATE diagram generation - this is the critical fix
+            console.log('🎯 FIXED: Triggering immediate diagram generation');
+            await generateAndSaveDiagram(automation.id, extractedBlueprint);
             
             toast({
-              title: "Blueprint Updated",
-              description: "Automation blueprint has been updated and diagram is being generated.",
+              title: "✅ Blueprint & Diagram Updated",
+              description: "Automation blueprint saved and diagram generated successfully!",
             });
           } else {
-            console.error('❌ Error saving blueprint:', updateError);
+            console.error('❌ FIXED: Error saving blueprint:', updateError);
           }
+        } else {
+          console.log('⚠️ FIXED: No valid blueprint extracted from structured data');
         }
       }
 
-      // Save AI response to database (save the original response format)
+      // Save AI response to database
       const responseToSave = data.response || (typeof data === 'string' ? data : JSON.stringify(data));
       await supabase
         .from('automation_chats')
@@ -688,16 +616,16 @@ const AutomationDetail = () => {
         });
 
     } catch (error) {
-      console.error('💥 Error sending message:', error);
+      console.error('💥 FIXED: Error in enhanced message handling:', error);
       toast({
         title: "Error",
-        description: "Failed to send message. Please try again.",
+        description: "Failed to process message. Please try again.",
         variant: "destructive",
       });
       
       const errorMessage = {
         id: Date.now() + 1,
-        text: "Sorry, I'm having trouble responding right now. Please try again.",
+        text: "I'm having trouble responding. Please try again.",
         isBot: true,
         timestamp: new Date()
       };

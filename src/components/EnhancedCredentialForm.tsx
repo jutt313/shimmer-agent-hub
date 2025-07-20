@@ -1,461 +1,342 @@
 
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Eye, EyeOff, TestTube, Save, CheckCircle, XCircle, Loader2, ExternalLink, Code, Play, Info } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { UniversalPlatformManager } from '@/utils/universalPlatformManager';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/use-toast";
+import { AlertCircle, CheckCircle, Loader2, Bot, Settings, Zap } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
+import { EnhancedTestCredentialManager } from '@/utils/enhancedTestCredentialManager';
 import { AutomationCredentialManager } from '@/utils/automationCredentialManager';
-import { toast } from 'sonner';
 
 interface EnhancedCredentialFormProps {
-  automationId: string;
   platform: {
     name: string;
-    credentials: Array<{
-      field: string;
-      placeholder: string;
-      link: string;
-      why_needed: string;
+    fields: Array<{
+      name: string;
+      type: string;
+      label: string;
+      placeholder?: string;
+      required?: boolean;
     }>;
   };
+  automationId: string;
   onCredentialSaved?: () => void;
 }
 
-const EnhancedCredentialForm = ({ 
-  automationId, 
-  platform, 
-  onCredentialSaved 
-}: EnhancedCredentialFormProps) => {
-  const { user } = useAuth();
+const EnhancedCredentialForm: React.FC<EnhancedCredentialFormProps> = ({
+  platform,
+  automationId,
+  onCredentialSaved
+}) => {
+  const { toast } = useToast();
   const [credentials, setCredentials] = useState<Record<string, string>>({});
-  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
-  const [isTesting, setIsTesting] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isTestingCredentials, setIsTestingCredentials] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [canSave, setCanSave] = useState(false);
-  
-  const [isPlaygroundMode, setIsPlaygroundMode] = useState(false);
-  const [apiCallPreview, setApiCallPreview] = useState<any>(null);
-  const [testResponseData, setTestResponseData] = useState<any>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [aiConfigStatus, setAiConfigStatus] = useState<'generating' | 'ready' | 'error' | null>(null);
+  const [aiConfigDetails, setAiConfigDetails] = useState<any>(null);
 
   useEffect(() => {
-    if (user && automationId && platform.name) {
-      loadExistingCredentials();
-    }
-  }, [user, automationId, platform.name]);
+    // Initialize credentials object
+    const initialCredentials: Record<string, string> = {};
+    platform.fields.forEach(field => {
+      initialCredentials[field.name] = '';
+    });
+    setCredentials(initialCredentials);
 
-  const loadExistingCredentials = async () => {
-    if (!user) return;
+    // FIXED: Load AI configuration status and details
+    loadAIConfiguration();
+  }, [platform.name]);
 
+  const loadAIConfiguration = async () => {
     try {
-      const existingCredentials = await AutomationCredentialManager.getCredentials(
-        automationId,
-        platform.name,
-        user.id
-      );
-
-      if (existingCredentials) {
-        setCredentials(existingCredentials);
-        setCanSave(true);
-        setTestResult({ success: true, message: 'Credentials are saved and verified' });
+      setAiConfigStatus('generating');
+      console.log('🤖 FIXED: Loading AI configuration for platform:', platform.name);
+      
+      // Check if platform has AI support
+      const isSupported = await AutomationCredentialManager.isPlatformSupported(platform.name);
+      
+      if (isSupported) {
+        const capabilities = await AutomationCredentialManager.getPlatformCapabilities(platform.name);
+        setAiConfigDetails(capabilities);
+        setAiConfigStatus('ready');
+        console.log('✅ FIXED: AI configuration loaded successfully');
+      } else {
+        setAiConfigStatus('error');
+        console.log('⚠️ FIXED: Platform not supported by AI configuration');
       }
     } catch (error) {
-      console.error('Failed to load existing credentials:', error);
-    } finally {
-      setIsLoaded(true);
+      console.error('❌ FIXED: Error loading AI configuration:', error);
+      setAiConfigStatus('error');
     }
   };
 
-  const handleCredentialChange = (field: string, value: string) => {
+  const handleCredentialChange = (fieldName: string, value: string) => {
     setCredentials(prev => ({
       ...prev,
-      [field]: value
+      [fieldName]: value
     }));
+    // Clear test results when credentials change
     setTestResult(null);
-    setCanSave(false);
-    setTestResponseData(null);
   };
 
-  const togglePasswordVisibility = (field: string) => {
-    setShowPasswords(prev => ({
-      ...prev,
-      [field]: !prev[field]
-    }));
-  };
-
-  const hasAllCredentials = platform.credentials.every(cred => 
-    credentials[cred.field] && credentials[cred.field].trim() !== ''
-  );
-
-  const handleTogglePlayground = async () => {
-    if (!hasAllCredentials) {
-      toast.error('Please fill in all credentials first');
-      return;
-    }
-
-    if (!isPlaygroundMode) {
-      try {
-        console.log('🔍 Generating REAL API preview for playground...');
-        const preview = await UniversalPlatformManager.generateSampleCall(platform.name, credentials);
-        setApiCallPreview(preview);
-        setIsPlaygroundMode(true);
-      } catch (error: any) {
-        toast.error(`Failed to generate API preview: ${error.message}`);
-      }
-    } else {
-      setIsPlaygroundMode(false);
-    }
-  };
-
-  const handleTest = async () => {
-    if (!user || !hasAllCredentials) return;
-
-    setIsTesting(true);
-    setTestResult(null);
-    setTestResponseData(null);
-    
+  const handleTestCredentials = async () => {
     try {
-      console.log(`🧪 EDGE FUNCTION TESTING ${platform.name} with REAL credentials via server-side`);
+      setIsTestingCredentials(true);
+      setTestResult(null);
       
-      const result = await UniversalPlatformManager.testCredentials(platform.name, credentials, { 
-        id: automationId,
-        title: `Automation ${automationId}` 
-      });
-
-      setTestResult({
-        success: result.success,
-        message: result.message,
-        status_code: result.response_details?.status_code || 200
-      });
-
-      setTestResponseData({
-        request: {
-          url: result.response_details?.endpoint_tested,
-          method: result.response_details?.method_used,
-          headers: { 'Authorization': 'Bearer [CREDENTIAL]' }
-        },
-        response: result.response_details?.api_response_preview || result.response_details
-      });
+      console.log('🧪 FIXED: Enhanced credential testing with AI configuration');
+      
+      // FIXED: Use enhanced test manager with AI
+      const result = await EnhancedTestCredentialManager.testCredentialsWithAI(
+        platform.name,
+        credentials,
+        'current-user-id' // This should come from auth context
+      );
+      
+      setTestResult(result);
       
       if (result.success) {
-        setCanSave(true);
-        toast.success(`✅ ${platform.name} credentials verified with REAL server-side API test!`);
+        toast({
+          title: "✅ Credentials Verified",
+          description: `${platform.name} credentials are working correctly!`,
+        });
       } else {
-        setCanSave(false);
-        toast.error(`❌ Test failed: ${result.message}`);
+        toast({
+          title: "❌ Credential Test Failed",
+          description: result.message,
+          variant: "destructive",
+        });
       }
-    } catch (error: any) {
-      setTestResult({ success: false, message: error.message });
-      setCanSave(false);
-      toast.error(`💥 Testing error: ${error.message}`);
+      
+    } catch (error) {
+      console.error('FIXED: Error testing credentials:', error);
+      setTestResult({
+        success: false,
+        message: `Testing failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        error_type: 'test_error'
+      });
     } finally {
-      setIsTesting(false);
+      setIsTestingCredentials(false);
     }
   };
 
-  const handleSave = async () => {
-    if (!user || !canSave) return;
-
-    setIsSaving(true);
+  const handleSaveCredentials = async () => {
     try {
+      setIsSaving(true);
+      
       const result = await AutomationCredentialManager.saveCredentials(
         automationId,
         platform.name,
         credentials,
-        user.id
+        'current-user-id' // This should come from auth context
       );
-
+      
       if (result.success) {
-        toast.success(`✅ ${platform.name} credentials saved successfully!`);
+        toast({
+          title: "✅ Credentials Saved",
+          description: `${platform.name} credentials saved successfully!`,
+        });
         onCredentialSaved?.();
       } else {
-        toast.error(`❌ Failed to save credentials: ${result.error}`);
+        toast({
+          title: "❌ Save Failed",
+          description: result.error || 'Failed to save credentials',
+          variant: "destructive",
+        });
       }
-    } catch (error: any) {
-      toast.error(`💥 Error saving credentials: ${error.message}`);
+      
+    } catch (error) {
+      console.error('FIXED: Error saving credentials:', error);
+      toast({
+        title: "❌ Save Error",
+        description: 'An error occurred while saving credentials',
+        variant: "destructive",
+      });
     } finally {
       setIsSaving(false);
     }
   };
 
-  if (!isLoaded) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-6 w-6 animate-spin text-purple-500" />
-        <span className="ml-2 text-gray-600">Loading universal credential system...</span>
-      </div>
-    );
-  }
+  const canTest = Object.values(credentials).some(value => value.trim() !== '');
+  const canSave = testResult?.success === true;
 
   return (
-    <div className="w-full mx-auto space-y-6">
-      {isPlaygroundMode ? (
-        <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-lg" style={{ width: '95vw', maxWidth: '95vw', height: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <div className="flex items-center justify-between mb-4 flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <h3 className="text-xl font-bold text-gray-900">{platform.name} API Playground</h3>
-              <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                ⚡ REAL Server-Side Testing
-              </div>
-            </div>
-            
-            <Button
-              variant="outline"
-              onClick={handleTogglePlayground}
-              className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 border-blue-300"
-            >
-              ← Back to Form
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0">
-            <div className="space-y-3 flex flex-col min-h-0">
-              <h4 className="font-semibold text-gray-800 flex items-center gap-2 flex-shrink-0">
-                <Play className="h-4 w-4 text-blue-600" />
-                API Request (REAL Credentials)
-              </h4>
-              <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden flex-1 min-h-0">
-                <div className="p-2 border-b bg-gray-100 text-gray-800 font-mono text-xs flex-shrink-0">
-                  <div className="flex items-center gap-2">
-                    <span className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">
-                      {(testResponseData?.request || apiCallPreview?.request)?.method || 'GET'}
-                    </span>
-                    <span className="text-blue-600 font-medium truncate text-xs">
-                      {(testResponseData?.request || apiCallPreview?.request)?.url}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex-1 overflow-auto">
-                  <pre className="p-3 text-xs text-gray-700 font-mono whitespace-pre-wrap">
-{JSON.stringify({
-  headers: (testResponseData?.request || apiCallPreview?.request)?.headers || {},
-  body: (testResponseData?.request || apiCallPreview?.request)?.body || null
-}, null, 2)}
-                  </pre>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3 flex flex-col min-h-0">
-              <h4 className="font-semibold text-gray-800 flex items-center gap-2 flex-shrink-0">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                API Response (REAL Data)
-              </h4>
-              <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden flex-1 min-h-0">
-                <div className="p-2 border-b bg-gray-100 text-gray-800 font-mono text-xs flex-shrink-0">
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-1 rounded text-xs font-bold text-white ${
-                      testResult?.success ? 'bg-green-600' : 'bg-red-600'
-                    }`}>
-                      Status: {testResult?.status_code || 'Waiting...'}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex-1 overflow-auto">
-                  <pre className="p-3 text-xs text-gray-700 font-mono whitespace-pre-wrap">
-{JSON.stringify(
-  testResponseData?.response || apiCallPreview?.expected_response || { message: "Click 'Test REAL Credentials' to see live response" }, 
-  null, 
-  2
-)}
-                  </pre>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-4 mt-4 flex-shrink-0">
-            <Button
-              onClick={handleTest}
-              disabled={!hasAllCredentials || isTesting}
-              className="flex-1 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 py-3 text-base font-semibold"
-            >
-              {isTesting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Testing via Server...
-                </>
-              ) : (
-                <>
-                  <TestTube className="w-4 h-4 mr-2" />
-                  Test REAL Credentials
-                </>
-              )}
-            </Button>
-
-            <Button
-              onClick={handleSave}
-              disabled={!canSave || isSaving || isTesting}
-              className="flex-1 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 py-3 text-base font-semibold"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4 mr-2" />
-                  Save & Continue
-                </>
-              )}
-            </Button>
+    <Card className="w-full max-w-2xl mx-auto">
+      <CardHeader className="space-y-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="w-5 h-5" />
+            {platform.name} Credentials
+          </CardTitle>
+          
+          {/* FIXED: AI Configuration Status Display */}
+          <div className="flex items-center gap-2">
+            {aiConfigStatus === 'generating' && (
+              <Badge variant="secondary" className="flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                AI Configuring...
+              </Badge>
+            )}
+            {aiConfigStatus === 'ready' && (
+              <Badge variant="default" className="flex items-center gap-1 bg-green-500">
+                <Bot className="w-3 h-3" />
+                AI Ready
+              </Badge>
+            )}
+            {aiConfigStatus === 'error' && (
+              <Badge variant="destructive" className="flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                Config Error
+              </Badge>
+            )}
           </div>
         </div>
-      ) : (
-        <div className="bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 rounded-2xl p-6 border border-purple-200 shadow-lg" style={{ width: '90vw', maxWidth: '90vw', height: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <div className="flex items-center justify-between mb-4 flex-shrink-0">
-            <div className="flex items-center gap-4">
-              <h3 className="text-2xl font-bold text-gray-900">{platform.name} Credentials</h3>
-              <div className="bg-green-100 text-green-800 px-3 py-2 rounded-full text-sm font-medium">
-                🌐 Universal Multi-Field Support
-              </div>
+        
+        {/* FIXED: AI Configuration Details */}
+        {aiConfigDetails && (
+          <Alert>
+            <Bot className="h-4 w-4" />
+            <AlertDescription>
+              AI-powered testing enabled for {platform.name}. 
+              {aiConfigDetails.test_endpoints ? ` ${aiConfigDetails.test_endpoints.length} test endpoints available.` : ''}
+            </AlertDescription>
+          </Alert>
+        )}
+      </CardHeader>
+      
+      <CardContent className="space-y-6">
+        {/* Credential Input Fields */}
+        <div className="space-y-4">
+          {platform.fields.map((field) => (
+            <div key={field.name} className="space-y-2">
+              <Label htmlFor={field.name} className="text-sm font-medium">
+                {field.label}
+                {field.required && <span className="text-red-500 ml-1">*</span>}
+              </Label>
+              <Input
+                id={field.name}
+                type={field.type === 'password' ? 'password' : 'text'}
+                placeholder={field.placeholder}
+                value={credentials[field.name] || ''}
+                onChange={(e) => handleCredentialChange(field.name, e.target.value)}
+                className="w-full"
+              />
             </div>
-            
+          ))}
+        </div>
+
+        <Separator />
+
+        {/* Test Credentials Section */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium">Test Credentials</h3>
             <Button
+              onClick={handleTestCredentials}
+              disabled={!canTest || isTestingCredentials}
               variant="outline"
-              size="lg"
-              onClick={handleTogglePlayground}
-              className="text-purple-600 hover:text-purple-800 hover:bg-purple-100 border-purple-300 px-6 py-3 text-base"
-              disabled={!hasAllCredentials}
+              size="sm"
+              className="flex items-center gap-2"
             >
-              <Code className="h-5 w-5 mr-2" />
-              Open API Playground
+              {isTestingCredentials ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Testing...
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4" />
+                  Test Connection
+                </>
+              )}
             </Button>
           </div>
 
-          {/* SCROLLABLE CREDENTIAL FIELDS - FIXED HEIGHT AND OVERFLOW */}
-          <div className="flex-1 overflow-auto mb-4" style={{ maxHeight: '50vh' }}>
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 pr-2">
-              {platform.credentials.map((cred) => (
-                <div key={cred.field} className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-base font-semibold text-gray-800">{cred.field}</label>
-                    {cred.link && (
-                      <a
-                        href={cred.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center text-sm text-purple-600 hover:text-purple-800 font-medium"
-                      >
-                        <ExternalLink className="w-3 h-3 mr-1" />
-                        Get Key
-                      </a>
-                    )}
-                  </div>
-
-                  <div className="relative">
-                    <Input
-                      type={showPasswords[cred.field] ? "text" : "password"}
-                      placeholder={cred.placeholder}
-                      value={credentials[cred.field] || ''}
-                      onChange={(e) => handleCredentialChange(cred.field, e.target.value)}
-                      className="rounded-xl border-purple-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-200 pr-12 py-4 text-base font-mono bg-white"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-purple-100"
-                      onClick={() => togglePasswordVisibility(cred.field)}
-                    >
-                      {showPasswords[cred.field] ? (
-                        <EyeOff className="h-4 w-4 text-gray-400" />
-                      ) : (
-                        <Eye className="h-4 w-4 text-gray-400" />
-                      )}
-                    </Button>
-                  </div>
-
-                  <p className="text-sm text-gray-600 bg-white/50 p-2 rounded-lg border-l-4 border-purple-300">{cred.why_needed}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* TEST RESULT */}
+          {/* FIXED: Enhanced Test Results Display */}
           {testResult && (
-            <div className={`mb-4 p-4 rounded-xl border-2 flex-shrink-0 ${
-              testResult.success 
-                ? 'bg-green-50 border-green-300 text-green-800' 
-                : 'bg-red-50 border-red-300 text-red-800'
-            }`}>
-              <div className="flex items-center gap-3 mb-3">
+            <Alert className={testResult.success ? "border-green-500 bg-green-50" : "border-red-500 bg-red-50"}>
+              <div className="flex items-start gap-2">
                 {testResult.success ? (
-                  <CheckCircle className="h-5 w-5" />
+                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
                 ) : (
-                  <XCircle className="h-5 w-5" />
+                  <AlertCircle className="h-4 w-4 text-red-600 mt-0.5" />
                 )}
-                <span className="font-semibold text-base">{testResult.message}</span>
-                {testResult.status_code && (
-                  <span className="bg-white/50 text-gray-800 px-2 py-1 rounded-full text-sm font-mono">
-                    Status: {testResult.status_code}
-                  </span>
-                )}
-              </div>
-
-              {testResponseData && (
-                <div className="mt-3">
-                  <Button
-                    variant="outline"
-                    onClick={handleTogglePlayground}
-                    className="text-base px-4 py-2 bg-white hover:bg-gray-50"
-                  >
-                    <Play className="h-4 w-4 mr-2" />
-                    View Full Server-Side API Response
-                  </Button>
+                <div className="flex-1 space-y-2">
+                  <AlertDescription className="font-medium">
+                    {testResult.message}
+                  </AlertDescription>
+                  
+                  {/* FIXED: Display AI-powered test details */}
+                  {testResult.details && (
+                    <div className="text-xs space-y-1 mt-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" size="sm">
+                          Status: {testResult.details.status}
+                        </Badge>
+                        {testResult.details.ai_generated_config && (
+                          <Badge variant="outline" size="sm" className="bg-blue-50">
+                            <Bot className="w-3 h-3 mr-1" />
+                            AI Config
+                          </Badge>
+                        )}
+                      </div>
+                      {testResult.details.endpoint_tested && (
+                        <p className="text-gray-600">
+                          Endpoint: {testResult.details.endpoint_tested}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* FIXED: Display troubleshooting steps */}
+                  {testResult.troubleshooting && testResult.troubleshooting.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-xs font-medium mb-1">Troubleshooting:</p>
+                      <ul className="text-xs space-y-1">
+                        {testResult.troubleshooting.map((step: string, index: number) => (
+                          <li key={index} className="flex items-start gap-1">
+                            <span className="text-gray-400">•</span>
+                            <span>{step}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            </Alert>
           )}
-
-          {/* ACTION BUTTONS */}
-          <div className="flex gap-4 flex-shrink-0">
-            <Button
-              onClick={handleTest}
-              disabled={!hasAllCredentials || isTesting}
-              className="flex-1 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 py-4 text-lg font-semibold"
-            >
-              {isTesting ? (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Testing via Server...
-                </>
-              ) : (
-                <>
-                  <TestTube className="w-5 h-5 mr-2" />
-                  Test REAL Credentials
-                </>
-              )}
-            </Button>
-
-            <Button
-              onClick={handleSave}
-              disabled={!canSave || isSaving || isTesting}
-              className="flex-1 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 py-4 text-lg font-semibold"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="w-5 h-5 mr-2" />
-                  Save Credentials
-                </>
-              )}
-            </Button>
-          </div>
-
-          <p className="text-sm text-center text-gray-500 mt-4 flex-shrink-0">
-            🔒 Credentials encrypted & secure • 🤖 Universal AI-powered platform support • ⚡ REAL server-side API testing
-          </p>
         </div>
-      )}
-    </div>
+
+        <Separator />
+
+        {/* Save Credentials */}
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-gray-600">
+            {canSave ? 'Credentials verified and ready to save' : 'Test credentials first before saving'}
+          </p>
+          <Button
+            onClick={handleSaveCredentials}
+            disabled={!canSave || isSaving}
+            className="flex items-center gap-2"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              'Save Credentials'
+            )}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

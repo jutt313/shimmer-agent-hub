@@ -275,11 +275,11 @@ const EnhancedCredentialForm: React.FC<EnhancedCredentialFormProps> = ({
                   {testResult.details && (
                     <div className="text-xs space-y-1 mt-2">
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" size="sm">
+                        <Badge variant="outline">
                           Status: {testResult.details.status}
                         </Badge>
                         {testResult.details.ai_generated_config && (
-                          <Badge variant="outline" size="sm" className="bg-blue-50">
+                          <Badge variant="outline" className="bg-blue-50">
                             <Bot className="w-3 h-3 mr-1" />
                             AI Config
                           </Badge>

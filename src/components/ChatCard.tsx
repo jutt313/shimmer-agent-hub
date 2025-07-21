@@ -1,3 +1,4 @@
+
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { User, Code, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -12,6 +13,7 @@ import ErrorHelpButton from './ErrorHelpButton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import YusrAIStructuredDisplay from './YusrAIStructuredDisplay';
 import ExecutionBlueprintVisualizer from './ExecutionBlueprintVisualizer';
+import { FlagPropagationLogger } from '@/utils/flagPropagationLogger';
 
 interface Message {
   id: number;
@@ -57,7 +59,6 @@ const ChatCard = ({
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [showBlueprintModal, setShowBlueprintModal] = useState(false);
 
-  // Auto-scroll to bottom when new messages are added
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
@@ -306,25 +307,30 @@ const ChatCard = ({
         <div className="space-y-6 pb-4">
           {optimizedMessages.map(message => {
             let structuredData = message.structuredData;
+            let yusraiPowered = message.yusrai_powered || false;
+            let sevenSectionsValidated = message.seven_sections_validated || false;
             
-            // Enhanced parsing for bot messages using new parser
+            // PHASE 1 FIX: Enhanced parsing for bot messages using new parser
             if (message.isBot && !structuredData) {
               try {
                 const parseResult = parseYusrAIStructuredResponse(message.text);
                 structuredData = parseResult.structuredData;
+                yusraiPowered = parseResult.metadata.yusrai_powered || false;
+                sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
                 
-                // Update message metadata
-                if (!message.yusrai_powered && parseResult.metadata.yusrai_powered) {
-                  message.yusrai_powered = parseResult.metadata.yusrai_powered;
-                }
-                if (!message.seven_sections_validated && parseResult.metadata.seven_sections_validated) {
-                  message.seven_sections_validated = parseResult.metadata.seven_sections_validated;
-                }
+                // PHASE 1: Log flag state during runtime parsing
+                FlagPropagationLogger.logFlagState(
+                  yusraiPowered,
+                  sevenSectionsValidated,
+                  `ChatCard - runtime parsing message ${message.id}`,
+                  !!structuredData,
+                  structuredData ? Object.keys(structuredData) : undefined
+                );
                 
-                console.log('🔄 Enhanced runtime parsing for message:', {
+                console.log('🔄 PHASE 1: Enhanced runtime parsing for message:', {
                   hasStructuredData: !!structuredData,
-                  yusraiPowered: message.yusrai_powered,
-                  sevenSectionsValidated: message.seven_sections_validated
+                  yusraiPowered,
+                  sevenSectionsValidated
                 });
               } catch (error: any) {
                 console.log('Could not parse YusrAI structured data from message:', error);
@@ -348,9 +354,9 @@ const ChatCard = ({
                         className="w-5 h-5 object-contain"
                       />
                       <span className="text-sm font-medium text-blue-600">
-                        YusrAI {message.yusrai_powered ? '(7-Section Validated)' : '(Processing)'}
+                        YusrAI {yusraiPowered ? '(7-Section Validated)' : '(Processing)'}
                       </span>
-                      {message.seven_sections_validated && (
+                      {sevenSectionsValidated && (
                         <CheckCircle2 className="w-4 h-4 text-green-500" />
                       )}
                     </div>
@@ -363,8 +369,8 @@ const ChatCard = ({
                     </div>
                   )}
 
-                  {/* Enhanced rendering for YusrAI structured content */}
-                  {message.isBot && structuredData && message.yusrai_powered ? (
+                  {/* PHASE 1 FIX: Enhanced rendering for YusrAI structured content */}
+                  {message.isBot && structuredData && yusraiPowered ? (
                     <div className="leading-relaxed space-y-4">
                       <YusrAIStructuredDisplay
                         data={structuredData}

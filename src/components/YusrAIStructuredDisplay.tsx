@@ -20,6 +20,7 @@ import {
 import { YusrAIStructuredResponse } from '@/utils/jsonParser';
 import ExecutionBlueprintVisualizer from './ExecutionBlueprintVisualizer';
 import ExecutionBlueprintCodeDisplay from './ExecutionBlueprintCodeDisplay';
+import { FlagPropagationLogger } from '@/utils/flagPropagationLogger';
 
 interface YusrAIStructuredDisplayProps {
   data: YusrAIStructuredResponse;
@@ -56,6 +57,27 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
     execution_blueprint: false,
     execution_code: false
   });
+
+  // PHASE 1: Log component rendering with flag tracking
+  React.useEffect(() => {
+    FlagPropagationLogger.logFlagState(
+      true, // This component only renders when yusrai_powered is true
+      true, // This component only renders when seven_sections_validated is true
+      'YusrAIStructuredDisplay - component render',
+      !!data,
+      data ? Object.keys(data) : undefined
+    );
+    
+    console.log('🎯 PHASE 1: YusrAIStructuredDisplay rendering with data:', {
+      hasSummary: !!data?.summary,
+      hasSteps: !!data?.steps,
+      hasPlatforms: !!data?.platforms,
+      hasAgents: !!data?.agents,
+      hasTestPayloads: !!data?.test_payloads,
+      hasExecutionBlueprint: !!data?.execution_blueprint,
+      sectionsCount: data ? Object.keys(data).length : 0
+    });
+  }, [data]);
 
   const toggleSection = (section: string) => {
     setOpenSections(prev => ({

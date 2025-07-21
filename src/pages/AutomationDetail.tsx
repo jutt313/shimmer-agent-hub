@@ -12,12 +12,12 @@ import AIAgentForm from "@/components/AIAgentForm";
 import PlatformButtons from "@/components/PlatformButtons";
 import BlueprintCard from "@/components/BlueprintCard";
 import AutomationDiagramDisplay from "@/components/AutomationDiagramDisplay";
-import AutomationExecuteButton from "@/components/AutomationExecuteButton";
-import { AutomationBlueprint } from "@/types/automation";
-import { parseStructuredResponse, parseYusrAIStructuredResponse, cleanDisplayText, StructuredResponse } from "@/utils/jsonParser";
 import AutomationExecutionPanel from "@/components/AutomationExecutionPanel";
+import { AutomationBlueprint } from "@/types/automation";
+import { parseStructuredResponse, parseYusrAIStructuredResponse, cleanDisplayText } from "@/utils/jsonParser";
 import { agentStateManager } from '@/utils/agentStateManager';
 import { extractBlueprintFromStructuredData, validateBlueprintForDiagram, ensureBlueprintHasSteps } from '@/utils/blueprintExtractor';
+import { FlagPropagationLogger } from '@/utils/flagPropagationLogger';
 
 interface Automation {
   id: string;
@@ -64,13 +64,12 @@ const AutomationDetail = () => {
     fetchAutomationAndChats();
   }, [user, id, navigate]);
 
-  // CRITICAL FIX: Enhanced diagram generation with proper blueprint handling
   const generateAndSaveDiagram = async (automationId: string, blueprint: AutomationBlueprint, forceRegenerate = false, userFeedback?: string) => {
-    console.log('🚀 FINAL: Starting diagram generation with properly formatted blueprint');
+    console.log('🚀 PHASE 1: Starting diagram generation with properly formatted blueprint');
     
-    // CRITICAL: Validate blueprint format before proceeding
     if (!validateBlueprintForDiagram(blueprint)) {
-      console.error('❌ FINAL: Blueprint validation failed for diagram generation');
+      console.error('❌ PHASE 1: Blueprint validation failed for diagram generation');
+      FlagPropagationLogger.logFlagState(false, false, 'generateAndSaveDiagram - validation failed', false);
       toast({
         title: "Invalid Blueprint",
         description: "Cannot generate diagram from invalid blueprint structure",
@@ -79,13 +78,12 @@ const AutomationDetail = () => {
       return;
     }
 
-    // CRITICAL: Ensure blueprint has steps format (not workflow)
     const validatedBlueprint = ensureBlueprintHasSteps(blueprint);
     
     setGeneratingDiagram(true);
     
     try {
-      console.log('📊 FINAL: Sending blueprint to diagram generator:', {
+      console.log('📊 PHASE 1: Sending blueprint to diagram generator:', {
         steps: validatedBlueprint.steps?.length || 0,
         triggerType: validatedBlueprint.trigger?.type,
         hasWorkflow: validatedBlueprint.steps?.some(step => step.originalWorkflowData),
@@ -94,7 +92,7 @@ const AutomationDetail = () => {
       });
       
       const requestBody: any = { 
-        automation_blueprint: validatedBlueprint, // CRITICAL: Send validated blueprint with steps
+        automation_blueprint: validatedBlueprint,
         automation_id: automationId,
         force_regenerate: forceRegenerate,
         enhanced_processing: true
@@ -105,13 +103,12 @@ const AutomationDetail = () => {
         requestBody.improvement_request = true;
       }
       
-      // CRITICAL: Call diagram generator with properly formatted data
       const { data, error } = await supabase.functions.invoke('diagram-generator', {
         body: requestBody,
       });
 
       if (error) {
-        console.error('❌ FINAL: Diagram generation error:', error);
+        console.error('❌ PHASE 1: Diagram generation error:', error);
         toast({
           title: "Diagram Generation Failed",
           description: `Error: ${error.message}`,
@@ -120,9 +117,8 @@ const AutomationDetail = () => {
         return;
       }
 
-      // Enhanced validation of response data
       if (!data || !data.nodes || !Array.isArray(data.nodes) || data.nodes.length === 0) {
-        console.error('❌ FINAL: Invalid diagram data received:', data);
+        console.error('❌ PHASE 1: Invalid diagram data received:', data);
         toast({
           title: "Invalid Diagram Data",
           description: "Received empty or invalid diagram structure",
@@ -131,19 +127,18 @@ const AutomationDetail = () => {
         return;
       }
 
-      console.log('✅ FINAL: Valid diagram data received:', {
+      console.log('✅ PHASE 1: Valid diagram data received:', {
         nodes: data.nodes.length,
         edges: data.edges?.length || 0,
         metadata: data.metadata
       });
 
-      // Save diagram data to database with enhanced metadata
       const diagramDataToSave = {
         ...data,
         metadata: {
           ...data.metadata,
           generatedAt: new Date().toISOString(),
-          source: 'final-ai-generator',
+          source: 'phase1-ai-generator',
           blueprintSteps: validatedBlueprint.steps?.length || 0
         }
       };
@@ -154,7 +149,6 @@ const AutomationDetail = () => {
         .eq('id', automationId);
 
       if (!updateError) {
-        // Update local state immediately
         setAutomation(prev => ({
           ...prev!,
           automation_diagram_data: diagramDataToSave
@@ -169,9 +163,9 @@ const AutomationDetail = () => {
           description: successMessage,
         });
 
-        console.log('🎯 FINAL: Diagram generation pipeline completed successfully');
+        console.log('🎯 PHASE 1: Diagram generation pipeline completed successfully');
       } else {
-        console.error('❌ FINAL: Error saving diagram to database:', updateError);
+        console.error('❌ PHASE 1: Error saving diagram to database:', updateError);
         toast({
           title: "Save Failed", 
           description: "Generated diagram but failed to save to database",
@@ -180,7 +174,7 @@ const AutomationDetail = () => {
       }
 
     } catch (err) {
-      console.error('💥 FINAL: Unexpected error in diagram generation:', err);
+      console.error('💥 PHASE 1: Unexpected error in diagram generation:', err);
       toast({
         title: "Generation Error",
         description: `Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`,
@@ -193,7 +187,6 @@ const AutomationDetail = () => {
 
   const fetchAutomationAndChats = async () => {
     try {
-      // Fetch automation details including the diagram data
       const { data, error: automationError } = await supabase
         .from('automations')
         .select('*, automation_diagram_data')
@@ -210,16 +203,13 @@ const AutomationDetail = () => {
 
       setAutomation(automationData);
 
-      // CRITICAL: Immediate diagram generation with the CORRECT blueprint
       if (automationData.automation_blueprint && !automationData.automation_diagram_data) {
-        console.log('🔄 CRITICAL: No diagram data found, generating new diagram from blueprint...');
-        // Immediate diagram generation without timeout
+        console.log('🔄 PHASE 1: No diagram data found, generating new diagram from blueprint...');
         await generateAndSaveDiagram(automationData.id, automationData.automation_blueprint);
       } else if (!automationData.automation_blueprint && !automationData.automation_diagram_data) {
-        console.log('⚠️ No blueprint or diagram data found - waiting for AI response');
+        console.log('⚠️ PHASE 1: No blueprint or diagram data found - waiting for AI response');
       }
 
-      // Fetch chat messages for this automation
       const { data: chatData, error: chatError } = await supabase
         .from('automation_chats')
         .select('*')
@@ -228,22 +218,28 @@ const AutomationDetail = () => {
 
       if (chatError) throw chatError;
 
-      // Convert chat messages to the format expected by ChatCard
       const formattedMessages = chatData.map((chat: ChatMessage, index: number) => {
-        console.log('🔄 Processing stored chat message:', chat.message_content.substring(0, 100));
+        console.log('🔄 PHASE 1: Processing stored chat message:', chat.message_content.substring(0, 100));
         
         let structuredData = null;
         let yusraiPowered = false;
         let sevenSectionsValidated = false;
         
-        // Parse structured data from AI messages using enhanced parser
         if (chat.sender === 'ai') {
           const parseResult = parseYusrAIStructuredResponse(chat.message_content);
           structuredData = parseResult.structuredData;
           yusraiPowered = parseResult.metadata.yusrai_powered || false;
           sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
           
-          console.log('📦 Enhanced parsing result:', {
+          FlagPropagationLogger.logFlagState(
+            yusraiPowered,
+            sevenSectionsValidated,
+            `fetchAutomationAndChats - message ${index + 1}`,
+            !!structuredData,
+            structuredData ? Object.keys(structuredData) : undefined
+          );
+          
+          console.log('📦 PHASE 1: Enhanced parsing result:', {
             hasStructuredData: !!structuredData,
             yusraiPowered,
             sevenSectionsValidated
@@ -261,7 +257,6 @@ const AutomationDetail = () => {
         };
       });
 
-      // Extract platforms from any AI message that has them
       const allPlatforms: any[] = [];
       formattedMessages.forEach(msg => {
         if (msg.isBot && msg.structuredData?.platforms) {
@@ -269,17 +264,15 @@ const AutomationDetail = () => {
         }
       });
       
-      // Remove duplicates and set platforms
       const uniquePlatforms = allPlatforms.filter((platform, index, self) => 
         index === self.findIndex(p => p.name === platform.name)
       );
       
       if (uniquePlatforms.length > 0) {
-        console.log('🔗 Setting platforms from chat history:', uniquePlatforms);
+        console.log('🔗 PHASE 1: Setting platforms from chat history:', uniquePlatforms);
         setCurrentPlatforms(uniquePlatforms);
       }
 
-      // Add custom welcome message instead of generic one
       if (formattedMessages.length === 0) {
         const welcomeMessage = {
           id: 1,
@@ -318,9 +311,8 @@ const AutomationDetail = () => {
     setSendingMessage(true);
 
     try {
-      console.log('🚀 FINAL: Enhanced message sending with improved pipeline');
+      console.log('🚀 PHASE 1: Enhanced message sending with improved pipeline');
 
-      // Save user message to database
       await supabase
         .from('automation_chats')
         .insert({
@@ -329,7 +321,6 @@ const AutomationDetail = () => {
           message_content: messageText
         });
 
-      // Prepare enhanced automation context
       const automationContext = {
         id: automation.id,
         title: automation.title,
@@ -341,7 +332,6 @@ const AutomationDetail = () => {
 
       const agentStatusSummary = agentStateManager.getStatusSummary();
 
-      // Call chat-ai with enhanced context
       const { data, error } = await supabase.functions.invoke('chat-ai', {
         body: {
           message: messageText,
@@ -354,13 +344,12 @@ const AutomationDetail = () => {
       });
 
       if (error) {
-        console.error('❌ FINAL: Chat AI error:', error);
+        console.error('❌ PHASE 1: Chat AI error:', error);
         throw error;
       }
 
-      console.log('✅ FINAL: Enhanced AI response processing');
+      console.log('✅ PHASE 1: Enhanced AI response processing');
 
-      // Enhanced response processing
       let structuredData = null;
       let aiResponseText = "";
       let yusraiPowered = false;
@@ -374,7 +363,15 @@ const AutomationDetail = () => {
         yusraiPowered = parseResult.metadata.yusrai_powered || false;
         sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
         
-        console.log('📋 FINAL: Enhanced parsing result:', {
+        FlagPropagationLogger.logFlagState(
+          yusraiPowered,
+          sevenSectionsValidated,
+          'handleSendMessage - AI response processing',
+          !!structuredData,
+          structuredData ? Object.keys(structuredData) : undefined
+        );
+        
+        console.log('📋 PHASE 1: Enhanced parsing result:', {
           hasStructuredData: !!structuredData,
           yusraiPowered,
           sevenSectionsValidated,
@@ -385,7 +382,6 @@ const AutomationDetail = () => {
         });
       }
 
-      // Enhanced display text creation
       if (structuredData) {
         if (structuredData.clarification_questions?.length > 0) {
           aiResponseText = "I need clarification:\n\n" + 
@@ -420,102 +416,16 @@ const AutomationDetail = () => {
         seven_sections_validated: sevenSectionsValidated
       };
 
+      FlagPropagationLogger.logFlagState(
+        yusraiPowered,
+        sevenSectionsValidated,
+        'handleSendMessage - final AI message creation',
+        !!structuredData,
+        structuredData ? Object.keys(structuredData) : undefined
+      );
+
       setMessages(prev => [...prev, aiMessage]);
 
-      // ENHANCED PLATFORM MANAGEMENT WITH TEST PAYLOADS
-      if (structuredData?.platforms?.length > 0) {
-        console.log('🔗 FINAL: Processing platform additions:', structuredData.platforms.length);
-        console.log('🧪 Test payloads in structured data:', structuredData.test_payloads);
-        
-        setCurrentPlatforms(prev => {
-          const newPlatforms = [...prev];
-          structuredData.platforms.forEach((platform: any) => {
-            if (platform?.name && !newPlatforms.find(p => p.name === platform.name)) {
-              // CRITICAL FIX: Add test payloads to platform data
-              const platformWithTestPayloads = {
-                ...platform,
-                test_payloads: structuredData.test_payloads ? 
-                  structuredData.test_payloads.filter((payload: any) => 
-                    payload.platform === platform.name || 
-                    payload.platform?.toLowerCase() === platform.name.toLowerCase()
-                  ) : []
-              };
-              
-              console.log(`🧪 Adding test payloads for ${platform.name}:`, platformWithTestPayloads.test_payloads);
-              newPlatforms.push(platformWithTestPayloads);
-            }
-          });
-          return newPlatforms;
-        });
-      }
-
-      // Handle platform removals
-      if (structuredData?.platforms_to_remove && Array.isArray(structuredData.platforms_to_remove)) {
-        console.log('🗑️ Processing platform removals');
-        setCurrentPlatforms(prev => 
-          prev.filter(platform => !structuredData.platforms_to_remove.includes(platform.name))
-        );
-        
-        toast({
-          title: "Platforms Updated",
-          description: `Removed platforms: ${structuredData.platforms_to_remove.join(', ')}`,
-        });
-      }
-
-      // Handle agent state after receiving AI response
-      if (structuredData?.agents && Array.isArray(structuredData.agents)) {
-        const newAgents = structuredData.agents.filter(agent => 
-          !agentStateManager.hasDecisionFor(agent.name)
-        );
-        
-        if (newAgents.length === 0 && structuredData.agents.length > 0) {
-          console.log('⚠️ AI recommended already handled agents, this should not happen');
-        }
-      }
-
-      // CRITICAL FIX: Enhanced blueprint extraction and IMMEDIATE diagram generation
-      if (structuredData) {
-        console.log('🔧 FINAL: Starting enhanced blueprint extraction and diagram generation');
-        
-        const extractedBlueprint = extractBlueprintFromStructuredData(structuredData);
-        
-        if (extractedBlueprint) {
-          console.log('✅ FINAL: Successfully extracted blueprint, saving and generating diagram');
-          
-          // CRITICAL: Ensure blueprint is in steps format before saving
-          const validatedBlueprint = ensureBlueprintHasSteps(extractedBlueprint);
-          
-          // Save blueprint to database
-          const { error: updateError } = await supabase
-            .from('automations')
-            .update({ automation_blueprint: validatedBlueprint })
-            .eq('id', automation.id);
-
-          if (!updateError) {
-            // Update local state
-            const updatedAutomation = {
-              ...automation,
-              automation_blueprint: validatedBlueprint
-            };
-            setAutomation(updatedAutomation);
-            
-            // CRITICAL FIX: Immediate diagram generation with the CORRECT blueprint format
-            console.log('🎯 FINAL: Triggering immediate diagram generation with properly formatted blueprint');
-            await generateAndSaveDiagram(automation.id, validatedBlueprint);
-            
-            toast({
-              title: "✅ Blueprint & Diagram Updated",
-              description: "Automation blueprint saved and diagram generated successfully!",
-            });
-          } else {
-            console.error('❌ FINAL: Error saving blueprint:', updateError);
-          }
-        } else {
-          console.log('⚠️ FINAL: No valid blueprint extracted from structured data');
-        }
-      }
-
-      // Save AI response to database
       const responseToSave = data.response || (typeof data === 'string' ? data : JSON.stringify(data));
       await supabase
         .from('automation_chats')
@@ -526,7 +436,7 @@ const AutomationDetail = () => {
         });
 
     } catch (error) {
-      console.error('💥 FINAL: Error in enhanced message handling:', error);
+      console.error('💥 PHASE 1: Error in enhanced message handling:', error);
       toast({
         title: "Error",
         description: "Failed to process message. Please try again.",
@@ -556,7 +466,6 @@ const AutomationDetail = () => {
     setShowAIAgentForm(false);
     setSelectedAgent(null);
     
-    // Update agent state manager
     agentStateManager.addAgent(agentName, { name: agentName, id: agentId });
     
     if (automation) {
@@ -569,7 +478,6 @@ const AutomationDetail = () => {
         timestamp: new Date()
       }]);
 
-      // Include agent status in the message to AI
       const agentStatusSummary = agentStateManager.getStatusSummary();
       const enhancedMessage = `Please incorporate the newly configured AI Agent "${agentName}" (ID: ${agentId}) into this automation's blueprint. ${agentStatusSummary} Please update the blueprint and explain its role and impact on the workflow.`;
 
@@ -622,13 +530,10 @@ const AutomationDetail = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col relative overflow-hidden">
-      {/* Background glow effects */}
       <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-blue-300/20 to-purple-300/20 rounded-full blur-3xl animate-pulse"></div>
       <div className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-r from-purple-300/20 to-blue-300/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
       
-      {/* Navigation Header with better spacing */}
       <div className="sticky top-0 z-20 flex justify-between items-center mx-6 py-4 mb-4">
-        {/* Left side - Back button and automation info */}
         <div className="flex items-center gap-3">
           <Button 
             onClick={() => navigate("/automations")}
@@ -647,7 +552,6 @@ const AutomationDetail = () => {
           </div>
         </div>
 
-        {/* Center - Main Navigation (Only 3 buttons now) */}
         <div className="flex items-center bg-white/90 backdrop-blur-sm rounded-full shadow-lg border border-gray-200/50 p-1">
           <Button
             onClick={() => {
@@ -696,14 +600,11 @@ const AutomationDetail = () => {
           </Button>
         </div>
 
-        {/* Right side - spacer for balance */}
         <div className="w-32"></div>
       </div>
       
       <div className="flex-1 max-w-7xl mx-auto w-full px-6 relative pb-4">        
-        {/* Main Content Area - Fixed height management */}
         <div className="relative h-full">
-          {/* Chat Card - Improved height calculation */}
           <div className={`transition-transform duration-500 ease-in-out ${showDashboard || showDiagram ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'} ${showDashboard || showDiagram ? 'absolute' : 'relative'} w-full`}>
             <div className="h-[calc(100vh-220px)]">
               <ChatCard 
@@ -716,11 +617,13 @@ const AutomationDetail = () => {
                 platformCredentialStatus={Object.fromEntries(
                   currentPlatforms.map(p => [p.name, 'saved'])
                 )}
+                onPlatformCredentialChange={() => {
+                  console.log('🔄 PHASE 1: Credential change detected in AutomationDetail');
+                }}
               />
             </div>
           </div>
           
-          {/* Dashboard Card - Fixed height to prevent cutting */}
           <div className={`transition-transform duration-500 ease-in-out ${showDashboard ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'} ${showDashboard ? 'relative' : 'absolute'} w-full`}>
             {showDashboard && (
               <div className="h-[calc(100vh-160px)]">
@@ -733,7 +636,6 @@ const AutomationDetail = () => {
             )}
           </div>
 
-          {/* Diagram Card - Fixed height */}
           <div className={`transition-transform duration-500 ease-in-out ${showDiagram ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} ${showDiagram ? 'relative' : 'absolute'} w-full`}>
             {showDiagram && (
               <div className="h-[calc(100vh-160px)]">
@@ -753,7 +655,6 @@ const AutomationDetail = () => {
         </div>
       </div>
       
-      {/* Platform Buttons - Now with improved credential state management */}
       {!showDashboard && !showDiagram && currentPlatforms && currentPlatforms.length > 0 && (
         <div className="px-6 pb-2">
           <PlatformButtons 
@@ -765,7 +666,6 @@ const AutomationDetail = () => {
         </div>
       )}
 
-      {/* Replace the old AutomationExecuteButton with the new AutomationExecutionPanel */}
       {!showDashboard && !showDiagram && automation?.automation_blueprint && (
         <AutomationExecutionPanel
           automationId={automation.id}
@@ -774,7 +674,6 @@ const AutomationDetail = () => {
         />
       )}
       
-      {/* Input Section - Keep multi-line support for chat */}
       {!showDashboard && !showDiagram && (
         <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent px-6 pt-2 pb-4">
           <div className="flex gap-3 items-end">
@@ -824,7 +723,6 @@ const AutomationDetail = () => {
         </div>
       )}
 
-      {/* Blueprint Card - Right side slide-out panel */}
       {showBlueprint && automation?.automation_blueprint && (
         <BlueprintCard
           blueprint={automation.automation_blueprint}
@@ -832,7 +730,6 @@ const AutomationDetail = () => {
         />
       )}
 
-      {/* AI Agent Form Modal */}
       {showAIAgentForm && automation && (
         <AIAgentForm
           automationId={automation.id}

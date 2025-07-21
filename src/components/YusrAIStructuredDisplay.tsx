@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -206,8 +205,8 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
               </CardHeader>
               <CardContent className="pt-0 space-y-2">
                 <div className="text-xs">
-                  <span className="font-medium text-gray-700">Rule:</span>
-                  <p className="text-gray-600 mt-1">{agent.rule}</p>
+                  <span className="font-medium text-gray-700">Rules:</span>
+                  <p className="text-gray-600 mt-1">{agent.rules}</p>
                 </div>
                 <div className="text-xs">
                   <span className="font-medium text-gray-700">Goal:</span>
@@ -239,7 +238,7 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
                   <TestTube className="w-4 h-4" />
                   {platform}
                   <Badge variant="outline" className="text-xs">
-                    {payload.method || 'GET'}
+                    {(payload as any).method || 'GET'}
                   </Badge>
                   {onTestCredentials && (
                     <Button

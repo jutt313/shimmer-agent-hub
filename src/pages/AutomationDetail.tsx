@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -124,12 +123,12 @@ const AutomationDetail = () => {
     if (!id || !user) return;
     
     try {
+      // Use automation_chats table instead of chat_messages
       const { data, error } = await supabase
-        .from('chat_messages')
+        .from('automation_chats')
         .select('*')
         .eq('automation_id', id)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true });
+        .order('timestamp', { ascending: true });
 
       if (error) throw error;
 
@@ -138,18 +137,18 @@ const AutomationDetail = () => {
       const processedMessages = (data || []).map((msg: any) => {
         const message: Message = {
           id: msg.id,
-          text: msg.message,
-          isBot: msg.is_bot,
-          timestamp: new Date(msg.created_at),
-          yusrai_powered: msg.yusrai_powered || false,
-          seven_sections_validated: msg.seven_sections_validated || false,
-          error_help_available: msg.error_help_available || false
+          text: msg.message_content,
+          isBot: msg.sender === 'bot',
+          timestamp: new Date(msg.timestamp),
+          yusrai_powered: false,
+          seven_sections_validated: false,
+          error_help_available: false
         };
 
         // Parse structured data for bot messages
-        if (msg.is_bot && msg.message) {
+        if (msg.sender === 'bot' && msg.message_content) {
           try {
-            const parseResult = parseYusrAIStructuredResponse(msg.message);
+            const parseResult = parseYusrAIStructuredResponse(msg.message_content);
             if (parseResult.structuredData) {
               message.structuredData = parseResult.structuredData;
               message.yusrai_powered = parseResult.metadata.yusrai_powered;
@@ -201,19 +200,23 @@ const AutomationDetail = () => {
       console.log('✅ Extracted platforms:', extractedPlatforms);
       
       // Ensure platforms have the correct structure with test_payloads
-      const formattedPlatforms = extractedPlatforms.map((platform: any) => ({
-        name: platform.name,
-        credentials: platform.credentials || [],
-        test_payloads: latestBotMessage.structuredData.test_payloads ? 
-          Object.entries(latestBotMessage.structuredData.test_payloads)
-            .filter(([platformName]) => platformName.toLowerCase() === platform.name.toLowerCase())
-            .map(([platformName, payload]) => ({
-              platform: platformName,
-              test_data: payload,
-              field_mapping: payload?.field_mapping || {},
-              api_config: payload?.api_config || {}
-            })) : []
-      }));
+      const formattedPlatforms = extractedPlatforms.map((platform: any) => {
+        const testPayloads = latestBotMessage.structuredData.test_payloads || {};
+        const platformTestPayloads = Object.entries(testPayloads)
+          .filter(([platformName]) => platformName.toLowerCase() === platform.name.toLowerCase())
+          .map(([platformName, payload]) => ({
+            platform: platformName,
+            test_data: payload,
+            field_mapping: (payload as any)?.field_mapping || {},
+            api_config: (payload as any)?.api_config || {}
+          }));
+
+        return {
+          name: platform.name,
+          credentials: platform.credentials || [],
+          test_payloads: platformTestPayloads
+        };
+      });
 
       setPlatforms(formattedPlatforms);
       console.log('🎯 Formatted platforms with test payloads:', formattedPlatforms);
@@ -236,8 +239,13 @@ const AutomationDetail = () => {
         user.id
       );
 
-      setPlatformCredentialStatus(validation.status);
-      console.log('📊 Platform credential status:', validation.status);
+      const statusMap: {[key: string]: 'saved' | 'tested' | 'missing'} = {};
+      Object.entries(validation.status).forEach(([key, value]) => {
+        statusMap[key] = value === 'unsaved' ? 'missing' : value as 'saved' | 'tested' | 'missing';
+      });
+
+      setPlatformCredentialStatus(statusMap);
+      console.log('📊 Platform credential status:', statusMap);
     } catch (error) {
       console.error('Failed to check platform credential status:', error);
     }
@@ -264,14 +272,11 @@ const AutomationDetail = () => {
     try {
       // Save user message to database
       await supabase
-        .from('chat_messages')
+        .from('automation_chats')
         .insert({
           automation_id: id,
-          user_id: user.id,
-          message: message,
-          is_bot: false,
-          yusrai_powered: false,
-          seven_sections_validated: false
+          message_content: message,
+          sender: 'user'
         });
 
       // Call YusrAI API
@@ -303,17 +308,13 @@ const AutomationDetail = () => {
 
       setMessages(prev => [...prev, botMessage]);
 
-      // Save bot message to database with flags
+      // Save bot message to database
       await supabase
-        .from('chat_messages')
+        .from('automation_chats')
         .insert({
           automation_id: id,
-          user_id: user.id,
-          message: botResponse,
-          is_bot: true,
-          yusrai_powered: parseResult.metadata.yusrai_powered,
-          seven_sections_validated: parseResult.metadata.seven_sections_validated,
-          error_help_available: false
+          message_content: botResponse,
+          sender: 'bot'
         });
 
       // Extract platforms from new response
@@ -731,6 +732,8 @@ const AutomationDetail = () => {
                   onSendMessage={sendMessage}
                   platformCredentialStatus={platformCredentialStatus}
                   onPlatformCredentialChange={handlePlatformCredentialChange}
+                  yusrai_powered={messages.some(m => m.yusrai_powered)}
+                  seven_sections_validated={messages.some(m => m.seven_sections_validated)}
                 />
               </div>
             )}

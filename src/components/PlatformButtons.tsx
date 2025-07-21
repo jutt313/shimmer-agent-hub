@@ -161,6 +161,7 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
           {platforms.map((platform) => {
             const statusIcon = getStatusIcon(platform);
             const statusText = getStatusText(platform);
+            const hasTestPayloads = platform.test_payloads && platform.test_payloads.length > 0;
             
             return (
               <button
@@ -178,6 +179,11 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
               >
                 <span>{platform.name}</span>
                 <span className="text-xs">{statusIcon}</span>
+                {hasTestPayloads && (
+                  <span className="text-xs bg-white/20 px-1 rounded">
+                    AI
+                  </span>
+                )}
               </button>
             );
           })}

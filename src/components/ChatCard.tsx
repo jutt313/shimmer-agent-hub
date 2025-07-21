@@ -35,8 +35,6 @@ interface ChatCardProps {
   onExecuteAutomation?: () => void;
   platformCredentialStatus?: { [key: string]: 'saved' | 'tested' | 'missing' };
   onPlatformCredentialChange?: () => void;
-  yusrai_powered?: boolean;
-  seven_sections_validated?: boolean;
 }
 
 const ChatCard = ({
@@ -49,9 +47,7 @@ const ChatCard = ({
   onSendMessage,
   onExecuteAutomation,
   platformCredentialStatus = {},
-  onPlatformCredentialChange,
-  yusrai_powered = false,
-  seven_sections_validated = false
+  onPlatformCredentialChange
 }: ChatCardProps) => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);

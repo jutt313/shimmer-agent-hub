@@ -31,21 +31,6 @@ export interface YusrAIStructuredResponse {
     version: string;
     description: string;
     trigger: { type: string };
-    workflow?: Array<{
-      step: number;
-      action: string;
-      platform?: string;
-      method?: string;
-      endpoint?: string;
-      description?: string;
-      ai_agent_integration?: {
-        agent_name: string;
-      };
-      error_handling?: {
-        retry_attempts: number;
-        fallback_action: string;
-      };
-    }>;
     steps: Array<{
       id: string;
       name: string;
@@ -54,16 +39,6 @@ export interface YusrAIStructuredResponse {
       ai_agent_call?: any;
     }>;
     variables: Record<string, any>;
-    error_handling?: {
-      retry_attempts: number;
-      fallback_actions: string[];
-      critical_failure_actions: string[];
-    };
-    performance_optimization?: {
-      rate_limit_handling: string;
-      concurrency_limit: number;
-      timeout_seconds_per_step: number;
-    };
   };
 }
 
@@ -169,40 +144,7 @@ export function parseYusrAIStructuredResponse(text: string): ParseResult {
       console.log('✅ All 7 YusrAI sections validated successfully');
     }
 
-    // Create structured response object with enhanced execution blueprint
-    const executionBlueprint = parsedData.execution_blueprint || {
-      version: '1.0.0',
-      description: parsedData.summary || 'YusrAI Automation',
-      trigger: { type: 'manual' },
-      steps: [],
-      variables: {}
-    };
-
-    // Add missing properties with defaults
-    if (!executionBlueprint.workflow) {
-      executionBlueprint.workflow = parsedData.steps?.map((step: string, index: number) => ({
-        step: index + 1,
-        action: step,
-        description: step
-      })) || [];
-    }
-
-    if (!executionBlueprint.error_handling) {
-      executionBlueprint.error_handling = {
-        retry_attempts: 3,
-        fallback_actions: ['log and continue'],
-        critical_failure_actions: ['stop execution and notify user']
-      };
-    }
-
-    if (!executionBlueprint.performance_optimization) {
-      executionBlueprint.performance_optimization = {
-        rate_limit_handling: 'Automatic rate limit detection',
-        concurrency_limit: 5,
-        timeout_seconds_per_step: 30
-      };
-    }
-
+    // Create structured response object
     result.structuredData = {
       summary: parsedData.summary || '',
       steps: parsedData.steps || [],
@@ -210,7 +152,13 @@ export function parseYusrAIStructuredResponse(text: string): ParseResult {
       agents: parsedData.agents || [],
       clarification_questions: parsedData.clarification_questions || [],
       test_payloads: parsedData.test_payloads || {},
-      execution_blueprint: executionBlueprint
+      execution_blueprint: parsedData.execution_blueprint || {
+        version: '1.0.0',
+        description: parsedData.summary || 'YusrAI Automation',
+        trigger: { type: 'manual' },
+        steps: [],
+        variables: {}
+      }
     };
 
     console.log('🎯 Final parsing result:', {

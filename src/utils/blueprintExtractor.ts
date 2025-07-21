@@ -115,7 +115,7 @@ const constructBlueprintFromWorkflow = (structuredData: any): AutomationBlueprin
       : Object.entries(structuredData.test_payloads).map(([platform, payload]) => ({
           platform,
           payload,
-          ...payload
+          ...(typeof payload === 'object' && payload !== null ? payload : {})
         }));
   }
 
@@ -150,7 +150,7 @@ const validateAndCleanBlueprint = (blueprint: any): AutomationBlueprint | null =
           method: 'execute',
           parameters: { description: step.name || `Step ${index + 1}` }
         },
-        ...step
+        ...(typeof step === 'object' && step !== null ? step : {})
       }));
     } 
     // CRITICAL: Handle workflow format in blueprint - convert to steps
@@ -171,7 +171,7 @@ const validateAndCleanBlueprint = (blueprint: any): AutomationBlueprint | null =
             method: workflowItem.method,
             headers: workflowItem.headers,
             data_mapping: workflowItem.data_mapping,
-            ...workflowItem.parameters
+            ...(typeof workflowItem.parameters === 'object' && workflowItem.parameters !== null ? workflowItem.parameters : {})
           }
         },
         originalWorkflowData: workflowItem,
@@ -301,7 +301,7 @@ export const ensureBlueprintHasSteps = (blueprint: AutomationBlueprint): Automat
           parameters: {
             description: workflowItem.action || workflowItem.step,
             platform: workflowItem.platform,
-            ...workflowItem.parameters
+            ...(typeof workflowItem.parameters === 'object' && workflowItem.parameters !== null ? workflowItem.parameters : {})
           }
         },
         originalWorkflowData: workflowItem,

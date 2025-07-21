@@ -77,6 +77,18 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
     }));
   };
 
+  // Helper function to safely get step display text
+  const getStepDisplayText = (step: unknown, index: number): string => {
+    if (typeof step === 'string') {
+      return step;
+    }
+    if (typeof step === 'object' && step !== null) {
+      const stepObj = step as any;
+      return stepObj.name || stepObj.action || `Step ${index + 1}`;
+    }
+    return `Step ${index + 1}`;
+  };
+
   // PHASE 2: Enhanced section processing with fallback handling
   const sections = [
     {
@@ -109,7 +121,7 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
                 <div className="flex-shrink-0 w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium">
                   {index + 1}
                 </div>
-                <p className="text-gray-700 text-sm">{typeof step === 'string' ? step : step.name || step.action || `Step ${index + 1}`}</p>
+                <p className="text-gray-700 text-sm">{getStepDisplayText(step, index)}</p>
               </div>
             ))
           ) : (

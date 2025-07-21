@@ -5,12 +5,25 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle, AlertCircle, Code, Clock, Zap, ExternalLink, Copy } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle, Code, Clock, Zap, ExternalLink } from 'lucide-react';
 import { AutomationCredentialManager } from '@/utils/automationCredentialManager';
 import { EnhancedTestCredentialManager } from '@/utils/enhancedTestCredentialManager';
-import { Platform, EnhancedTestResult } from '@/types/platform';
+
+interface Platform {
+  name: string;
+  credentials: Array<{
+    field: string;
+    placeholder: string;
+    link: string;
+    why_needed: string;
+  }>;
+  test_payloads?: Array<{
+    platform: string;
+    test_data: any;
+    field_mapping: Record<string, string>;
+    api_config: any;
+  }>;
+}
 
 interface EnhancedCredentialFormProps {
   automationId: string;
@@ -31,10 +44,9 @@ const EnhancedCredentialForm = ({
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<EnhancedTestResult | null>(null);
+  const [testResult, setTestResult] = useState<any>(null);
   const [testStatus, setTestStatus] = useState<'idle' | 'generating' | 'ai_ready' | 'testing' | 'success' | 'error'>('idle');
   const [testPayloadConfig, setTestPayloadConfig] = useState<any>(null);
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && platform) {
@@ -127,13 +139,11 @@ const EnhancedCredentialForm = ({
 
       console.log('🧪 Test result received:', result);
 
-      const enhancedResult: EnhancedTestResult = {
+      setTestResult({
         ...result,
         test_duration: testDuration,
         timestamp: new Date().toISOString()
-      };
-
-      setTestResult(enhancedResult);
+      });
 
       if (result.success) {
         setTestStatus('success');
@@ -155,9 +165,7 @@ const EnhancedCredentialForm = ({
       setTestResult({
         success: false,
         message: `Test failed: ${error.message}`,
-        error_type: 'connection_error',
-        test_duration: Date.now() - startTime,
-        timestamp: new Date().toISOString()
+        error_type: 'connection_error'
       });
       
       toast({
@@ -208,20 +216,6 @@ const EnhancedCredentialForm = ({
       });
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const copyToClipboard = async (text: string, label: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedCode(label);
-      setTimeout(() => setCopiedCode(null), 2000);
-      toast({
-        title: "Copied!",
-        description: `${label} copied to clipboard`,
-      });
-    } catch (error) {
-      console.error('Failed to copy:', error);
     }
   };
 
@@ -276,7 +270,7 @@ const EnhancedCredentialForm = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg text-white">
@@ -300,194 +294,103 @@ const EnhancedCredentialForm = ({
             )}
           </div>
 
-          {/* Test Payload Code Display - Enhanced UI */}
+          {/* Test Payload Code Display */}
           {testPayloadConfig && (
-            <Card className="border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Code className="w-4 h-4 text-purple-600" />
-                  AI Test Configuration for {platform.name}
-                  <Badge variant="secondary" className="ml-auto">
-                    AI Generated
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* API Config Section */}
-                {testPayloadConfig.api_config && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium text-gray-700">API Configuration</Label>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => copyToClipboard(JSON.stringify(testPayloadConfig.api_config, null, 2), 'API Config')}
-                        className="h-7 px-2 text-xs"
-                      >
-                        {copiedCode === 'API Config' ? <CheckCircle className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                        {copiedCode === 'API Config' ? 'Copied!' : 'Copy'}
-                      </Button>
-                    </div>
-                    <div className="bg-gray-900 text-green-400 p-3 rounded-lg text-xs overflow-x-auto">
-                      <pre>{JSON.stringify(testPayloadConfig.api_config, null, 2)}</pre>
-                    </div>
-                  </div>
-                )}
-
-                {/* Field Mapping Section */}
-                {testPayloadConfig.field_mapping && Object.keys(testPayloadConfig.field_mapping).length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium text-gray-700">Field Mapping</Label>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => copyToClipboard(JSON.stringify(testPayloadConfig.field_mapping, null, 2), 'Field Mapping')}
-                        className="h-7 px-2 text-xs"
-                      >
-                        {copiedCode === 'Field Mapping' ? <CheckCircle className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                        {copiedCode === 'Field Mapping' ? 'Copied!' : 'Copy'}
-                      </Button>
-                    </div>
-                    <div className="bg-gray-900 text-blue-400 p-3 rounded-lg text-xs overflow-x-auto">
-                      <pre>{JSON.stringify(testPayloadConfig.field_mapping, null, 2)}</pre>
-                    </div>
-                  </div>
-                )}
-
-                {/* Test Data Section */}
-                {testPayloadConfig.test_data && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium text-gray-700">Test Data Sample</Label>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => copyToClipboard(JSON.stringify(testPayloadConfig.test_data, null, 2), 'Test Data')}
-                        className="h-7 px-2 text-xs"
-                      >
-                        {copiedCode === 'Test Data' ? <CheckCircle className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                        {copiedCode === 'Test Data' ? 'Copied!' : 'Copy'}
-                      </Button>
-                    </div>
-                    <div className="bg-gray-900 text-yellow-400 p-3 rounded-lg text-xs overflow-x-auto">
-                      <pre>{JSON.stringify(testPayloadConfig.test_data, null, 2)}</pre>
-                    </div>
-                  </div>
-                )}
-
-                {/* Full Configuration */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium text-gray-700">Complete AI Configuration</Label>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyToClipboard(JSON.stringify(testPayloadConfig, null, 2), 'Full Config')}
-                      className="h-7 px-2 text-xs"
-                    >
-                      {copiedCode === 'Full Config' ? <CheckCircle className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                      {copiedCode === 'Full Config' ? 'Copied!' : 'Copy'}
-                    </Button>
-                  </div>
-                  <div className="bg-gray-900 text-white p-3 rounded-lg text-xs overflow-x-auto max-h-48">
-                    <pre>{JSON.stringify(testPayloadConfig, null, 2)}</pre>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="p-4 bg-gray-50 rounded-lg border">
+              <div className="flex items-center gap-2 mb-2">
+                <Code className="w-4 h-4 text-purple-600" />
+                <span className="text-sm font-medium text-gray-900">AI Test Configuration</span>
+              </div>
+              <pre className="text-xs text-gray-700 overflow-x-auto">
+                {JSON.stringify(testPayloadConfig, null, 2)}
+              </pre>
+            </div>
           )}
 
           {/* Credential Input Fields */}
-          <Card className="border border-gray-200">
-            <CardHeader>
-              <CardTitle className="text-sm font-medium">Enter Your Credentials</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {platform.credentials.map((credField) => (
-                <div key={credField.field} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor={credField.field} className="text-sm font-medium">
-                      {formatFieldLabel(credField.field)}
-                    </Label>
-                    {credField.link && (
-                      <a
-                        href={credField.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                      >
-                        Get API Key <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
-                  </div>
-                  <Input
-                    id={credField.field}
-                    type={credField.field.toLowerCase().includes('password') || 
-                          credField.field.toLowerCase().includes('secret') || 
-                          credField.field.toLowerCase().includes('token') || 
-                          credField.field.toLowerCase().includes('key') ? 'password' : 'text'}
-                    placeholder={credField.placeholder}
-                    value={credentials[credField.field] || ''}
-                    onChange={(e) => handleInputChange(credField.field, e.target.value)}
-                    className="font-mono text-sm"
-                  />
-                  <p className="text-xs text-gray-600">{credField.why_needed}</p>
+          <div className="space-y-4">
+            {platform.credentials.map((credField) => (
+              <div key={credField.field} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor={credField.field} className="text-sm font-medium">
+                    {formatFieldLabel(credField.field)}
+                  </Label>
+                  {credField.link && (
+                    <a
+                      href={credField.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                    >
+                      Get API Key <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
                 </div>
-              ))}
-            </CardContent>
-          </Card>
+                <Input
+                  id={credField.field}
+                  type={credField.field.toLowerCase().includes('password') || 
+                        credField.field.toLowerCase().includes('secret') || 
+                        credField.field.toLowerCase().includes('token') || 
+                        credField.field.toLowerCase().includes('key') ? 'password' : 'text'}
+                  placeholder={credField.placeholder}
+                  value={credentials[credField.field] || ''}
+                  onChange={(e) => handleInputChange(credField.field, e.target.value)}
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-gray-600">{credField.why_needed}</p>
+              </div>
+            ))}
+          </div>
 
           {/* Test Results Display */}
           {testResult && (
-            <Card className={`border-2 ${
+            <div className={`p-4 rounded-lg border ${
               testResult.success 
-                ? 'border-green-200 bg-green-50' 
-                : 'border-red-200 bg-red-50'
+                ? 'bg-green-50 border-green-200' 
+                : 'bg-red-50 border-red-200'
             }`}>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  {testResult.success ? (
-                    <CheckCircle className="w-4 h-4 text-green-600" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 text-red-600" />
-                  )}
-                  {testResult.success ? 'Test Successful' : 'Test Failed'}
-                  {testResult.test_duration && (
-                    <div className="flex items-center gap-1 text-xs text-gray-600 ml-auto">
-                      <Clock className="w-3 h-3" />
-                      {testResult.test_duration}ms
-                    </div>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-700 mb-2">{testResult.message}</p>
-                
-                {testResult.details && (
-                  <details className="text-xs text-gray-600">
-                    <summary className="cursor-pointer hover:text-gray-800">View Details</summary>
-                    <pre className="mt-2 p-2 bg-white rounded border overflow-x-auto">
-                      {JSON.stringify(testResult.details, null, 2)}
-                    </pre>
-                  </details>
+              <div className="flex items-center gap-2 mb-2">
+                {testResult.success ? (
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-red-600" />
                 )}
-
-                {testResult.troubleshooting && testResult.troubleshooting.length > 0 && (
-                  <div className="mt-3">
-                    <p className="text-xs font-medium text-gray-700 mb-1">Troubleshooting:</p>
-                    <ul className="text-xs text-gray-600 space-y-1">
-                      {testResult.troubleshooting.map((tip: string, index: number) => (
-                        <li key={index} className="flex items-start gap-1">
-                          <span>•</span>
-                          <span>{tip}</span>
-                        </li>
-                      ))}
-                    </ul>
+                <span className="text-sm font-medium">
+                  {testResult.success ? 'Test Successful' : 'Test Failed'}
+                </span>
+                {testResult.test_duration && (
+                  <div className="flex items-center gap-1 text-xs text-gray-600 ml-auto">
+                    <Clock className="w-3 h-3" />
+                    {testResult.test_duration}ms
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+              
+              <p className="text-sm text-gray-700 mb-2">{testResult.message}</p>
+              
+              {testResult.details && (
+                <details className="text-xs text-gray-600">
+                  <summary className="cursor-pointer hover:text-gray-800">View Details</summary>
+                  <pre className="mt-2 p-2 bg-white rounded border overflow-x-auto">
+                    {JSON.stringify(testResult.details, null, 2)}
+                  </pre>
+                </details>
+              )}
+
+              {testResult.troubleshooting && testResult.troubleshooting.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs font-medium text-gray-700 mb-1">Troubleshooting:</p>
+                  <ul className="text-xs text-gray-600 space-y-1">
+                    {testResult.troubleshooting.map((tip: string, index: number) => (
+                      <li key={index} className="flex items-start gap-1">
+                        <span>•</span>
+                        <span>{tip}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Action Buttons */}

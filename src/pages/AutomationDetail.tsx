@@ -36,6 +36,23 @@ interface ChatMessage {
   timestamp: string;
 }
 
+// Enhanced interface for platform with proper test_payloads structure
+interface Platform {
+  name: string;
+  credentials: Array<{
+    field: string;
+    placeholder: string;
+    link: string;
+    why_needed: string;
+  }>;
+  test_payloads?: Array<{
+    platform: string;
+    test_data: any;
+    field_mapping: Record<string, string>;
+    api_config: any;
+  }>;
+}
+
 const AutomationDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -50,7 +67,7 @@ const AutomationDetail = () => {
   const [showAIAgentForm, setShowAIAgentForm] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<any>(null);
   const [dismissedAgents, setDismissedAgents] = useState<Set<string>>(new Set());
-  const [currentPlatforms, setCurrentPlatforms] = useState<any[]>([]);
+  const [currentPlatforms, setCurrentPlatforms] = useState<Platform[]>([]);
   const [showBlueprint, setShowBlueprint] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showDiagram, setShowDiagram] = useState(false);
@@ -191,6 +208,37 @@ const AutomationDetail = () => {
     }
   };
 
+  // CRITICAL FIX: Safe test payload processing function
+  const processTestPayloads = (structuredData: any): any[] => {
+    try {
+      console.log('🔧 SAFE: Processing test payloads with enhanced error handling');
+      
+      if (!structuredData || !structuredData.test_payloads) {
+        console.log('⚠️ No test payloads found in structured data');
+        return [];
+      }
+
+      // CRITICAL FIX: Handle both object and array formats
+      let testPayloads: any[] = [];
+      
+      if (Array.isArray(structuredData.test_payloads)) {
+        testPayloads = structuredData.test_payloads;
+      } else if (typeof structuredData.test_payloads === 'object') {
+        // Convert object to array format
+        testPayloads = Object.keys(structuredData.test_payloads).map(key => ({
+          platform: key,
+          ...structuredData.test_payloads[key]
+        }));
+      }
+
+      console.log('✅ SAFE: Successfully processed test payloads:', testPayloads.length);
+      return testPayloads;
+    } catch (error) {
+      console.error('❌ SAFE: Error processing test payloads:', error);
+      return []; // Return empty array on error
+    }
+  };
+
   const fetchAutomationAndChats = async () => {
     try {
       // Fetch automation details including the diagram data
@@ -261,11 +309,28 @@ const AutomationDetail = () => {
         };
       });
 
-      // Extract platforms from any AI message that has them
-      const allPlatforms: any[] = [];
+      // CRITICAL FIX: Enhanced platform extraction with safe test payload processing
+      const allPlatforms: Platform[] = [];
       formattedMessages.forEach(msg => {
         if (msg.isBot && msg.structuredData?.platforms) {
-          allPlatforms.push(...msg.structuredData.platforms);
+          const processedTestPayloads = processTestPayloads(msg.structuredData);
+          
+          msg.structuredData.platforms.forEach((platform: any) => {
+            if (platform?.name) {
+              // CRITICAL FIX: Safely attach test payloads to each platform
+              const platformTestPayloads = processedTestPayloads.filter((payload: any) => 
+                payload.platform === platform.name || 
+                payload.platform?.toLowerCase() === platform.name.toLowerCase()
+              );
+              
+              const enhancedPlatform: Platform = {
+                ...platform,
+                test_payloads: platformTestPayloads
+              };
+              
+              allPlatforms.push(enhancedPlatform);
+            }
+          });
         }
       });
       
@@ -275,7 +340,7 @@ const AutomationDetail = () => {
       );
       
       if (uniquePlatforms.length > 0) {
-        console.log('🔗 Setting platforms from chat history:', uniquePlatforms);
+        console.log('🔗 Setting platforms with safe test payload processing:', uniquePlatforms);
         setCurrentPlatforms(uniquePlatforms);
       }
 
@@ -422,26 +487,28 @@ const AutomationDetail = () => {
 
       setMessages(prev => [...prev, aiMessage]);
 
-      // ENHANCED PLATFORM MANAGEMENT WITH TEST PAYLOADS
+      // CRITICAL FIX: Enhanced platform management with safe test payload processing
       if (structuredData?.platforms?.length > 0) {
-        console.log('🔗 FINAL: Processing platform additions:', structuredData.platforms.length);
-        console.log('🧪 Test payloads in structured data:', structuredData.test_payloads);
+        console.log('🔗 FINAL: Processing platform additions with safe test payload handling');
+        
+        const processedTestPayloads = processTestPayloads(structuredData);
         
         setCurrentPlatforms(prev => {
           const newPlatforms = [...prev];
           structuredData.platforms.forEach((platform: any) => {
             if (platform?.name && !newPlatforms.find(p => p.name === platform.name)) {
-              // CRITICAL FIX: Add test payloads to platform data
-              const platformWithTestPayloads = {
+              // CRITICAL FIX: Safely attach test payloads to platform data
+              const platformTestPayloads = processedTestPayloads.filter((payload: any) => 
+                payload.platform === platform.name || 
+                payload.platform?.toLowerCase() === platform.name.toLowerCase()
+              );
+              
+              const platformWithTestPayloads: Platform = {
                 ...platform,
-                test_payloads: structuredData.test_payloads ? 
-                  structuredData.test_payloads.filter((payload: any) => 
-                    payload.platform === platform.name || 
-                    payload.platform?.toLowerCase() === platform.name.toLowerCase()
-                  ) : []
+                test_payloads: platformTestPayloads
               };
               
-              console.log(`🧪 Adding test payloads for ${platform.name}:`, platformWithTestPayloads.test_payloads);
+              console.log(`🧪 Adding test payloads for ${platform.name}:`, platformTestPayloads);
               newPlatforms.push(platformWithTestPayloads);
             }
           });

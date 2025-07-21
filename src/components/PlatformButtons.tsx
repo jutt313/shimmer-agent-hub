@@ -6,6 +6,7 @@ import { useParams } from 'react-router-dom';
 import EnhancedCredentialForm from './EnhancedCredentialForm';
 import { AutomationCredentialManager } from '@/utils/automationCredentialManager';
 
+// Enhanced interface matching AutomationDetail.tsx
 interface Platform {
   name: string;
   credentials: Array<{
@@ -139,7 +140,10 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
   }
 
   console.log('🎯 Rendering PlatformButtons with platforms:', platforms.map(p => p.name));
-  console.log('🧪 Platform test payloads:', platforms.map(p => ({ name: p.name, hasTestPayloads: !!p.test_payloads })));
+  console.log('🧪 Platform test payloads:', platforms.map(p => ({ 
+    name: p.name, 
+    hasTestPayloads: !!(p.test_payloads && p.test_payloads.length > 0)
+  })));
 
   return (
     <>

@@ -8,22 +8,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Loader2, CheckCircle, AlertCircle, Code, Clock, Zap, ExternalLink } from 'lucide-react';
 import { AutomationCredentialManager } from '@/utils/automationCredentialManager';
 import { EnhancedTestCredentialManager } from '@/utils/enhancedTestCredentialManager';
-
-interface Platform {
-  name: string;
-  credentials: Array<{
-    field: string;
-    placeholder: string;
-    link: string;
-    why_needed: string;
-  }>;
-  test_payloads?: Array<{
-    platform: string;
-    test_data: any;
-    field_mapping: Record<string, string>;
-    api_config: any;
-  }>;
-}
+import { Platform, EnhancedTestResult } from '@/types/platform';
 
 interface EnhancedCredentialFormProps {
   automationId: string;
@@ -44,7 +29,7 @@ const EnhancedCredentialForm = ({
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<any>(null);
+  const [testResult, setTestResult] = useState<EnhancedTestResult | null>(null);
   const [testStatus, setTestStatus] = useState<'idle' | 'generating' | 'ai_ready' | 'testing' | 'success' | 'error'>('idle');
   const [testPayloadConfig, setTestPayloadConfig] = useState<any>(null);
 
@@ -139,11 +124,13 @@ const EnhancedCredentialForm = ({
 
       console.log('🧪 Test result received:', result);
 
-      setTestResult({
+      const enhancedResult: EnhancedTestResult = {
         ...result,
         test_duration: testDuration,
         timestamp: new Date().toISOString()
-      });
+      };
+
+      setTestResult(enhancedResult);
 
       if (result.success) {
         setTestStatus('success');
@@ -165,7 +152,9 @@ const EnhancedCredentialForm = ({
       setTestResult({
         success: false,
         message: `Test failed: ${error.message}`,
-        error_type: 'connection_error'
+        error_type: 'connection_error',
+        test_duration: Date.now() - startTime,
+        timestamp: new Date().toISOString()
       });
       
       toast({

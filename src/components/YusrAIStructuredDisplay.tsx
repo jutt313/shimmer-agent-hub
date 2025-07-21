@@ -20,7 +20,6 @@ import {
 import { YusrAIStructuredResponse } from '@/utils/jsonParser';
 import ExecutionBlueprintVisualizer from './ExecutionBlueprintVisualizer';
 import ExecutionBlueprintCodeDisplay from './ExecutionBlueprintCodeDisplay';
-import { FlagPropagationLogger } from '@/utils/flagPropagationLogger';
 
 interface YusrAIStructuredDisplayProps {
   data: YusrAIStructuredResponse;
@@ -58,24 +57,16 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
     execution_code: false
   });
 
-  // PHASE 1: Log component rendering with flag tracking
+  // PHASE 2: Enhanced logging for YusrAI rendering
   React.useEffect(() => {
-    FlagPropagationLogger.logFlagState(
-      true, // This component only renders when yusrai_powered is true
-      true, // This component only renders when seven_sections_validated is true
-      'YusrAIStructuredDisplay - component render',
-      !!data,
-      data ? Object.keys(data) : undefined
-    );
-    
-    console.log('🎯 PHASE 1: YusrAIStructuredDisplay rendering with data:', {
+    console.log('🎯 PHASE 2: YusrAI sections rendering with data:', {
       hasSummary: !!data?.summary,
-      hasSteps: !!data?.steps,
-      hasPlatforms: !!data?.platforms,
-      hasAgents: !!data?.agents,
+      stepsCount: data?.steps?.length || 0,
+      platformsCount: data?.platforms?.length || 0,
+      agentsCount: data?.agents?.length || 0,
       hasTestPayloads: !!data?.test_payloads,
       hasExecutionBlueprint: !!data?.execution_blueprint,
-      sectionsCount: data ? Object.keys(data).length : 0
+      totalSections: data ? Object.keys(data).length : 0
     });
   }, [data]);
 
@@ -86,6 +77,7 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
     }));
   };
 
+  // PHASE 2: Enhanced section processing with fallback handling
   const sections = [
     {
       key: 'summary',
@@ -96,7 +88,9 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       borderColor: 'border-blue-200',
       component: (
         <div className="prose prose-sm max-w-none">
-          <p className="text-gray-700 leading-relaxed">{data.summary}</p>
+          <p className="text-gray-700 leading-relaxed">
+            {data.summary || "YusrAI is creating your comprehensive automation solution..."}
+          </p>
         </div>
       )
     },
@@ -109,14 +103,20 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       borderColor: 'border-green-200',
       component: (
         <div className="space-y-3">
-          {data.steps.map((step, index) => (
-            <div key={index} className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-100">
-              <div className="flex-shrink-0 w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium">
-                {index + 1}
+          {(data.steps && Array.isArray(data.steps) && data.steps.length > 0) ? (
+            data.steps.map((step, index) => (
+              <div key={index} className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-100">
+                <div className="flex-shrink-0 w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                  {index + 1}
+                </div>
+                <p className="text-gray-700 text-sm">{typeof step === 'string' ? step : step.name || step.action || `Step ${index + 1}`}</p>
               </div>
-              <p className="text-gray-700 text-sm">{step}</p>
+            ))
+          ) : (
+            <div className="text-center py-4 text-gray-500">
+              <p>YusrAI is generating detailed automation steps...</p>
             </div>
-          ))}
+          )}
         </div>
       )
     },
@@ -129,38 +129,44 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       borderColor: 'border-purple-200',
       component: (
         <div className="space-y-4">
-          {data.platforms.map((platform, index) => (
-            <Card key={index} className="border border-gray-200">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Database className="w-4 h-4" />
-                  {platform.name}
-                  <Badge variant="outline" className="text-xs">
-                    {platform.credentials.length} credential{platform.credentials.length !== 1 ? 's' : ''}
-                  </Badge>
-                  {onPlatformCredentialClick && (
-                    <Button
-                      onClick={() => onPlatformCredentialClick(platform.name)}
-                      size="sm"
-                      variant={platformCredentialStatus[platform.name] === 'tested' ? 'default' : 'outline'}
-                      className="ml-auto"
-                    >
-                      {platformCredentialStatus[platform.name] === 'tested' ? 'Tested' : 'Configure'}
-                    </Button>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="space-y-2">
-                  {platform.credentials.map((cred, credIndex) => (
-                    <div key={credIndex} className="text-xs text-gray-600">
-                      <span className="font-medium">{cred.field}:</span> {cred.why_needed}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          {(data.platforms && Array.isArray(data.platforms) && data.platforms.length > 0) ? (
+            data.platforms.map((platform, index) => (
+              <Card key={index} className="border border-gray-200">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <Database className="w-4 h-4" />
+                    {platform.name}
+                    <Badge variant="outline" className="text-xs">
+                      {platform.credentials?.length || 0} credential{(platform.credentials?.length || 0) !== 1 ? 's' : ''}
+                    </Badge>
+                    {onPlatformCredentialClick && (
+                      <Button
+                        onClick={() => onPlatformCredentialClick(platform.name)}
+                        size="sm"
+                        variant={platformCredentialStatus[platform.name] === 'tested' ? 'default' : 'outline'}
+                        className="ml-auto"
+                      >
+                        {platformCredentialStatus[platform.name] === 'tested' ? 'Tested' : 'Configure'}
+                      </Button>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-2">
+                    {(platform.credentials || []).map((cred, credIndex) => (
+                      <div key={credIndex} className="text-xs text-gray-600">
+                        <span className="font-medium">{cred.field}:</span> {cred.why_needed}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <div className="text-center py-4 text-gray-500">
+              <p>YusrAI is identifying required platform integrations...</p>
+            </div>
+          )}
         </div>
       )
     },
@@ -173,14 +179,20 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       borderColor: 'border-orange-200',
       component: (
         <div className="space-y-2">
-          {data.clarification_questions.map((question, index) => (
-            <div key={index} className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-100">
-              <div className="flex-shrink-0 w-5 h-5 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs">
-                ?
+          {(data.clarification_questions && Array.isArray(data.clarification_questions) && data.clarification_questions.length > 0) ? (
+            data.clarification_questions.map((question, index) => (
+              <div key={index} className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-100">
+                <div className="flex-shrink-0 w-5 h-5 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs">
+                  ?
+                </div>
+                <p className="text-gray-700 text-sm">{question}</p>
               </div>
-              <p className="text-gray-700 text-sm">{question}</p>
+            ))
+          ) : (
+            <div className="text-center py-4 text-gray-500">
+              <p>No clarification questions - YusrAI has all the information needed!</p>
             </div>
-          ))}
+          )}
         </div>
       )
     },
@@ -193,55 +205,61 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       borderColor: 'border-pink-200',
       component: (
         <div className="space-y-4">
-          {data.agents.map((agent, index) => (
-            <Card key={index} className="border border-gray-200">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Bot className="w-4 h-4" />
-                  {agent.name}
-                  <Badge variant="outline" className="text-xs">{agent.role}</Badge>
-                  {onAgentAdd && onAgentDismiss && (
-                    <div className="ml-auto flex gap-2">
-                      {!dismissedAgents.has(agent.name) ? (
-                        <>
-                          <Button
-                            onClick={() => onAgentAdd(agent)}
-                            size="sm"
-                            variant="default"
-                          >
-                            Add
-                          </Button>
-                          <Button
-                            onClick={() => onAgentDismiss(agent.name)}
-                            size="sm"
-                            variant="outline"
-                          >
-                            Dismiss
-                          </Button>
-                        </>
-                      ) : (
-                        <Badge variant="secondary">Dismissed</Badge>
-                      )}
-                    </div>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 space-y-2">
-                <div className="text-xs">
-                  <span className="font-medium text-gray-700">Rule:</span>
-                  <p className="text-gray-600 mt-1">{agent.rule}</p>
-                </div>
-                <div className="text-xs">
-                  <span className="font-medium text-gray-700">Goal:</span>
-                  <p className="text-gray-600 mt-1">{agent.goal}</p>
-                </div>
-                <div className="text-xs">
-                  <span className="font-medium text-gray-700">Why Needed:</span>
-                  <p className="text-gray-600 mt-1">{agent.why_needed}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          {(data.agents && Array.isArray(data.agents) && data.agents.length > 0) ? (
+            data.agents.map((agent, index) => (
+              <Card key={index} className="border border-gray-200">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <Bot className="w-4 h-4" />
+                    {agent.name}
+                    <Badge variant="outline" className="text-xs">{agent.role}</Badge>
+                    {onAgentAdd && onAgentDismiss && (
+                      <div className="ml-auto flex gap-2">
+                        {!dismissedAgents.has(agent.name) ? (
+                          <>
+                            <Button
+                              onClick={() => onAgentAdd(agent)}
+                              size="sm"
+                              variant="default"
+                            >
+                              Add
+                            </Button>
+                            <Button
+                              onClick={() => onAgentDismiss(agent.name)}
+                              size="sm"
+                              variant="outline"
+                            >
+                              Dismiss
+                            </Button>
+                          </>
+                        ) : (
+                          <Badge variant="secondary">Dismissed</Badge>
+                        )}
+                      </div>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0 space-y-2">
+                  <div className="text-xs">
+                    <span className="font-medium text-gray-700">Rule:</span>
+                    <p className="text-gray-600 mt-1">{agent.rule}</p>
+                  </div>
+                  <div className="text-xs">
+                    <span className="font-medium text-gray-700">Goal:</span>
+                    <p className="text-gray-600 mt-1">{agent.goal}</p>
+                  </div>
+                  <div className="text-xs">
+                    <span className="font-medium text-gray-700">Why Needed:</span>
+                    <p className="text-gray-600 mt-1">{agent.why_needed}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <div className="text-center py-4 text-gray-500">
+              <p>YusrAI is designing intelligent agents for your automation...</p>
+            </div>
+          )}
         </div>
       )
     },
@@ -254,36 +272,42 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       borderColor: 'border-cyan-200',
       component: (
         <div className="space-y-4">
-          {Object.entries(data.test_payloads).map(([platform, payload]) => (
-            <Card key={platform} className="border border-gray-200">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <TestTube className="w-4 h-4" />
-                  {platform}
-                  <Badge variant="outline" className="text-xs">
-                    {payload.method || 'GET'}
-                  </Badge>
-                  {onTestCredentials && (
-                    <Button
-                      onClick={() => onTestCredentials(platform, payload)}
-                      size="sm"
-                      variant="outline"
-                      className="ml-auto"
-                    >
-                      Test
-                    </Button>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <ScrollArea className="h-32 w-full">
-                  <pre className="text-xs text-gray-600 whitespace-pre-wrap">
-                    {JSON.stringify(payload, null, 2)}
-                  </pre>
-                </ScrollArea>
-              </CardContent>
-            </Card>
-          ))}
+          {(data.test_payloads && typeof data.test_payloads === 'object' && Object.keys(data.test_payloads).length > 0) ? (
+            Object.entries(data.test_payloads).map(([platform, payload]) => (
+              <Card key={platform} className="border border-gray-200">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <TestTube className="w-4 h-4" />
+                    {platform}
+                    <Badge variant="outline" className="text-xs">
+                      {(payload as any)?.test_endpoint?.method || 'GET'}
+                    </Badge>
+                    {onTestCredentials && (
+                      <Button
+                        onClick={() => onTestCredentials(platform, payload)}
+                        size="sm"
+                        variant="outline"
+                        className="ml-auto"
+                      >
+                        Test
+                      </Button>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <ScrollArea className="h-32 w-full">
+                    <pre className="text-xs text-gray-600 whitespace-pre-wrap">
+                      {JSON.stringify(payload, null, 2)}
+                    </pre>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <div className="text-center py-4 text-gray-500">
+              <p>YusrAI is generating platform test configurations...</p>
+            </div>
+          )}
         </div>
       )
     },
@@ -294,7 +318,11 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       color: 'text-indigo-600',
       bgColor: 'bg-indigo-50',
       borderColor: 'border-indigo-200',
-      component: <ExecutionBlueprintVisualizer blueprint={data.execution_blueprint} />
+      component: data.execution_blueprint ? <ExecutionBlueprintVisualizer blueprint={data.execution_blueprint} /> : (
+        <div className="text-center py-4 text-gray-500">
+          <p>YusrAI is creating the technical execution blueprint...</p>
+        </div>
+      )
     },
     {
       key: 'execution_code',
@@ -303,7 +331,11 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       color: 'text-violet-600',
       bgColor: 'bg-violet-50',
       borderColor: 'border-violet-200',
-      component: <ExecutionBlueprintCodeDisplay blueprint={data.execution_blueprint} />
+      component: data.execution_blueprint ? <ExecutionBlueprintCodeDisplay blueprint={data.execution_blueprint} /> : (
+        <div className="text-center py-4 text-gray-500">
+          <p>YusrAI is generating the execution code...</p>
+        </div>
+      )
     }
   ];
 
@@ -342,17 +374,17 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
         );
       })}
       
-      {/* Execution Button */}
+      {/* PHASE 2: Enhanced Execution Button */}
       {isReadyForExecution && onExecuteAutomation && (
         <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-xl border border-green-200">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-semibold text-green-900">Ready for Execution!</h3>
-              <p className="text-sm text-green-700">All platforms configured and agents handled.</p>
+              <h3 className="font-semibold text-green-900">🚀 YusrAI Automation Ready!</h3>
+              <p className="text-sm text-green-700">All platforms configured and agents handled. Ready to execute your automation.</p>
             </div>
             <Button
               onClick={onExecuteAutomation}
-              className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white"
+              className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white px-6 py-3 text-lg"
             >
               Execute Automation
             </Button>

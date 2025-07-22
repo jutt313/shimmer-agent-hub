@@ -70,8 +70,8 @@ const ChatCard = ({
         return [<span key="fallback-input-error">Message content unavailable.</span>];
       }
 
-      const cleanHtmlString = cleanDisplayText(inputText);
-      const processedText = cleanHtmlString.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      // For plain text, format it nicely
+      const processedText = inputText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
       const lines = processedText.split('\n');
       
       return lines.map((line, index) => (
@@ -309,7 +309,7 @@ const ChatCard = ({
             let yusraiPowered = message.yusrai_powered || false;
             let sevenSectionsValidated = message.seven_sections_validated || false;
             
-            // Enhanced parsing for bot messages using new parser
+            // Enhanced parsing for bot messages
             if (message.isBot && !structuredData) {
               try {
                 const parseResult = parseYusrAIStructuredResponse(message.text);
@@ -329,7 +329,8 @@ const ChatCard = ({
                 console.log('🔄 Enhanced runtime parsing for message:', {
                   hasStructuredData: !!structuredData,
                   yusraiPowered,
-                  sevenSectionsValidated
+                  sevenSectionsValidated,
+                  isPlainText: parseResult.isPlainText
                 });
               } catch (error: any) {
                 console.log('Could not parse YusrAI structured data from message:', error);
@@ -368,7 +369,7 @@ const ChatCard = ({
                     </div>
                   )}
 
-                  {/* Enhanced rendering for YusrAI content */}
+                  {/* Display logic: structured vs plain text */}
                   {message.isBot && structuredData && yusraiPowered ? (
                     <div className="leading-relaxed space-y-4">
                       <YusrAIStructuredDisplay
@@ -416,7 +417,7 @@ const ChatCard = ({
                     alt="YusrAI" 
                     className="w-5 h-5 object-contain animate-pulse"
                   />
-                  <span className="font-medium">YusrAI is creating your automation...</span>
+                  <span className="font-medium">YusrAI is processing your request...</span>
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
                     <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>

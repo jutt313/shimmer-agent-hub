@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -109,12 +108,13 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       bgColor: 'bg-green-50',
       borderColor: 'border-green-200',
       component: (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {(data.steps && Array.isArray(data.steps) && data.steps.length > 0) ? (
-            <div className="text-gray-700 leading-relaxed space-y-2">
+            <div className="text-gray-700 leading-relaxed space-y-3">
               {data.steps.map((step, index) => (
-                <div key={index} className="text-sm">
-                  <span className="font-medium text-green-600">{index + 1}.</span> {getStepDisplayText(step, index)}
+                <div key={index} className="flex gap-3 text-sm">
+                  <span className="font-bold text-green-600 text-lg min-w-[24px]">{index + 1}.</span>
+                  <span className="flex-1">{getStepDisplayText(step, index)}</span>
                 </div>
               ))}
             </div>
@@ -134,26 +134,40 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       bgColor: 'bg-purple-50',
       borderColor: 'border-purple-200',
       component: (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {(data.platforms && Array.isArray(data.platforms) && data.platforms.length > 0) ? (
-            <div className="text-gray-700 leading-relaxed space-y-3">
+            <div className="text-gray-700 leading-relaxed space-y-4">
               {data.platforms.map((platform, index) => (
-                <div key={index} className="text-sm">
-                  <div className="font-medium text-purple-600 mb-1">{platform.name}:</div>
-                  <div className="pl-3 space-y-1">
-                    <div><span className="font-medium">Credentials:</span> {(platform.credentials || []).map(cred => cred.field).join(', ')}</div>
-                    <div><span className="font-medium">Why we need:</span> {(platform.credentials || [])[0]?.why_needed || 'For platform authentication and API access'}</div>
+                <div key={index} className="bg-white p-4 rounded-lg border border-purple-100">
+                  <div className="space-y-3">
+                    <div className="font-semibold text-purple-700 text-lg">
+                      {platform.name}
+                    </div>
+                    <div className="text-sm space-y-2">
+                      <div>
+                        <span className="font-medium text-gray-900">Credentials:</span>{' '}
+                        <span className="text-gray-600">
+                          {(platform.credentials || []).map(cred => cred.field).join(', ')}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-900">Why we need:</span>{' '}
+                        <span className="text-gray-600">
+                          {(platform.credentials || [])[0]?.why_needed || 'For platform authentication and API access'}
+                        </span>
+                      </div>
+                    </div>
+                    {onPlatformCredentialClick && (
+                      <Button
+                        onClick={() => onPlatformCredentialClick(platform.name)}
+                        size="sm"
+                        variant={platformCredentialStatus[platform.name] === 'tested' ? 'default' : 'outline'}
+                        className="mt-3"
+                      >
+                        {platformCredentialStatus[platform.name] === 'tested' ? 'Tested ✓' : 'Configure'}
+                      </Button>
+                    )}
                   </div>
-                  {onPlatformCredentialClick && (
-                    <Button
-                      onClick={() => onPlatformCredentialClick(platform.name)}
-                      size="sm"
-                      variant={platformCredentialStatus[platform.name] === 'tested' ? 'default' : 'outline'}
-                      className="mt-2"
-                    >
-                      {platformCredentialStatus[platform.name] === 'tested' ? 'Tested ✓' : 'Configure'}
-                    </Button>
-                  )}
                 </div>
               ))}
             </div>
@@ -173,12 +187,13 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       bgColor: 'bg-orange-50',
       borderColor: 'border-orange-200',
       component: (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {(data.clarification_questions && Array.isArray(data.clarification_questions) && data.clarification_questions.length > 0) ? (
-            <div className="text-gray-700 leading-relaxed space-y-2">
+            <div className="text-gray-700 leading-relaxed space-y-3">
               {data.clarification_questions.map((question, index) => (
-                <div key={index} className="text-sm">
-                  <span className="font-medium text-orange-600">❓</span> {question}
+                <div key={index} className="flex gap-3 text-sm">
+                  <span className="font-medium text-orange-600 text-lg">❓</span>
+                  <span className="flex-1">{question}</span>
                 </div>
               ))}
             </div>
@@ -214,21 +229,22 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
                             <Button
                               onClick={() => onAgentAdd(agent)}
                               size="sm"
-                              className="bg-green-100 hover:bg-green-200 text-green-700 border-green-200"
+                              className="bg-green-100 hover:bg-green-200 text-green-700 border-green-300 text-xs px-3 py-1"
+                              variant="outline"
                             >
                               Add
                             </Button>
                             <Button
                               onClick={() => onAgentDismiss(agent.name)}
                               size="sm"
-                              className="bg-red-100 hover:bg-red-200 text-red-700 border-red-200"
+                              className="bg-red-100 hover:bg-red-200 text-red-700 border-red-300 text-xs px-3 py-1"
                               variant="outline"
                             >
                               Dismiss
                             </Button>
                           </>
                         ) : (
-                          <Badge variant="secondary">Dismissed</Badge>
+                          <Badge variant="secondary" className="text-xs">Dismissed</Badge>
                         )}
                       </div>
                     )}

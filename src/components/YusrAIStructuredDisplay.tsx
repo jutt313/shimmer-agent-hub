@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -60,7 +59,6 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       hasSummary: !!data?.summary,
       stepsCount: data?.steps?.length || 0,
       platformsCount: data?.platforms?.length || 0,
-      platformsData: data?.platforms,
       agentsCount: data?.agents?.length || 0,
       hasTestPayloads: !!data?.test_payloads,
       hasExecutionBlueprint: !!data?.execution_blueprint,
@@ -147,13 +145,13 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
                     </div>
                     <div className="text-sm space-y-2">
                       <div>
-                        <span className="font-medium text-gray-900">Credentials needed:</span>{' '}
+                        <span className="font-medium text-gray-900">Credentials:</span>{' '}
                         <span className="text-gray-600">
                           {(platform.credentials || []).map(cred => cred.field).join(', ')}
                         </span>
                       </div>
                       <div>
-                        <span className="font-medium text-gray-900">Why needed:</span>{' '}
+                        <span className="font-medium text-gray-900">Why we need:</span>{' '}
                         <span className="text-gray-600">
                           {(platform.credentials || [])[0]?.why_needed || 'For platform authentication and API access'}
                         </span>
@@ -278,16 +276,15 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
     }
   ];
 
-  // **CRITICAL FIX**: Show platforms section even if it's empty to debug the issue
+  // Filter sections to only show available ones
   const availableSections = sections.filter(section => {
     switch (section.key) {
       case 'summary':
-        return !!data.summary;
+        return data.summary;
       case 'steps':
         return data.steps && Array.isArray(data.steps) && data.steps.length > 0;
       case 'platforms':
-        // Always show platforms section if data exists to debug
-        return !!data.platforms || data.platforms === undefined;
+        return data.platforms && Array.isArray(data.platforms) && data.platforms.length > 0;
       case 'clarification_questions':
         return data.clarification_questions && Array.isArray(data.clarification_questions) && data.clarification_questions.length > 0;
       case 'agents':

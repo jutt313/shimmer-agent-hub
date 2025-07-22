@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -15,11 +17,10 @@ import {
   Bot, 
   TestTube, 
   Code,
-  Sparkles
+  Sparkles,
+  Info
 } from 'lucide-react';
 import { YusrAIStructuredResponse } from '@/utils/jsonParser';
-import ExecutionBlueprintVisualizer from './ExecutionBlueprintVisualizer';
-import ExecutionBlueprintCodeDisplay from './ExecutionBlueprintCodeDisplay';
 
 interface YusrAIStructuredDisplayProps {
   data: YusrAIStructuredResponse;
@@ -51,15 +52,11 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
     steps: true,
     platforms: true,
     clarification_questions: false,
-    agents: false,
-    test_payloads: false,
-    execution_blueprint: false,
-    execution_code: false
+    agents: false
   });
 
-  // PHASE 2: Enhanced logging for YusrAI rendering
   React.useEffect(() => {
-    console.log('🎯 PHASE 2: YusrAI sections rendering with data:', {
+    console.log('🎯 YusrAI sections rendering with data:', {
       hasSummary: !!data?.summary,
       stepsCount: data?.steps?.length || 0,
       platformsCount: data?.platforms?.length || 0,
@@ -77,7 +74,6 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
     }));
   };
 
-  // Helper function to safely get step display text
   const getStepDisplayText = (step: unknown, index: number): string => {
     if (typeof step === 'string') {
       return step;
@@ -89,7 +85,6 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
     return `Step ${index + 1}`;
   };
 
-  // PHASE 2: Enhanced section processing with fallback handling
   const sections = [
     {
       key: 'summary',
@@ -100,9 +95,9 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       borderColor: 'border-blue-200',
       component: (
         <div className="prose prose-sm max-w-none">
-          <p className="text-gray-700 leading-relaxed">
+          <div className="text-gray-700 leading-relaxed whitespace-pre-wrap">
             {data.summary || "YusrAI is creating your comprehensive automation solution..."}
-          </p>
+          </div>
         </div>
       )
     },
@@ -114,16 +109,15 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       bgColor: 'bg-green-50',
       borderColor: 'border-green-200',
       component: (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {(data.steps && Array.isArray(data.steps) && data.steps.length > 0) ? (
-            data.steps.map((step, index) => (
-              <div key={index} className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-100">
-                <div className="flex-shrink-0 w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium">
-                  {index + 1}
+            <div className="text-gray-700 leading-relaxed space-y-2">
+              {data.steps.map((step, index) => (
+                <div key={index} className="text-sm">
+                  <span className="font-medium text-green-600">{index + 1}.</span> {getStepDisplayText(step, index)}
                 </div>
-                <p className="text-gray-700 text-sm">{getStepDisplayText(step, index)}</p>
-              </div>
-            ))
+              ))}
+            </div>
           ) : (
             <div className="text-center py-4 text-gray-500">
               <p>YusrAI is generating detailed automation steps...</p>
@@ -140,40 +134,29 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       bgColor: 'bg-purple-50',
       borderColor: 'border-purple-200',
       component: (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {(data.platforms && Array.isArray(data.platforms) && data.platforms.length > 0) ? (
-            data.platforms.map((platform, index) => (
-              <Card key={index} className="border border-gray-200">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Database className="w-4 h-4" />
-                    {platform.name}
-                    <Badge variant="outline" className="text-xs">
-                      {platform.credentials?.length || 0} credential{(platform.credentials?.length || 0) !== 1 ? 's' : ''}
-                    </Badge>
-                    {onPlatformCredentialClick && (
-                      <Button
-                        onClick={() => onPlatformCredentialClick(platform.name)}
-                        size="sm"
-                        variant={platformCredentialStatus[platform.name] === 'tested' ? 'default' : 'outline'}
-                        className="ml-auto"
-                      >
-                        {platformCredentialStatus[platform.name] === 'tested' ? 'Tested' : 'Configure'}
-                      </Button>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-2">
-                    {(platform.credentials || []).map((cred, credIndex) => (
-                      <div key={credIndex} className="text-xs text-gray-600">
-                        <span className="font-medium">{cred.field}:</span> {cred.why_needed}
-                      </div>
-                    ))}
+            <div className="text-gray-700 leading-relaxed space-y-3">
+              {data.platforms.map((platform, index) => (
+                <div key={index} className="text-sm">
+                  <div className="font-medium text-purple-600 mb-1">{platform.name}:</div>
+                  <div className="pl-3 space-y-1">
+                    <div><span className="font-medium">Credentials:</span> {(platform.credentials || []).map(cred => cred.field).join(', ')}</div>
+                    <div><span className="font-medium">Why we need:</span> {(platform.credentials || [])[0]?.why_needed || 'For platform authentication and API access'}</div>
                   </div>
-                </CardContent>
-              </Card>
-            ))
+                  {onPlatformCredentialClick && (
+                    <Button
+                      onClick={() => onPlatformCredentialClick(platform.name)}
+                      size="sm"
+                      variant={platformCredentialStatus[platform.name] === 'tested' ? 'default' : 'outline'}
+                      className="mt-2"
+                    >
+                      {platformCredentialStatus[platform.name] === 'tested' ? 'Tested ✓' : 'Configure'}
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="text-center py-4 text-gray-500">
               <p>YusrAI is identifying required platform integrations...</p>
@@ -192,14 +175,13 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       component: (
         <div className="space-y-2">
           {(data.clarification_questions && Array.isArray(data.clarification_questions) && data.clarification_questions.length > 0) ? (
-            data.clarification_questions.map((question, index) => (
-              <div key={index} className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-100">
-                <div className="flex-shrink-0 w-5 h-5 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs">
-                  ?
+            <div className="text-gray-700 leading-relaxed space-y-2">
+              {data.clarification_questions.map((question, index) => (
+                <div key={index} className="text-sm">
+                  <span className="font-medium text-orange-600">❓</span> {question}
                 </div>
-                <p className="text-gray-700 text-sm">{question}</p>
-              </div>
-            ))
+              ))}
+            </div>
           ) : (
             <div className="text-center py-4 text-gray-500">
               <p>No clarification questions - YusrAI has all the information needed!</p>
@@ -219,10 +201,10 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
         <div className="space-y-4">
           {(data.agents && Array.isArray(data.agents) && data.agents.length > 0) ? (
             data.agents.map((agent, index) => (
-              <Card key={index} className="border border-gray-200">
+              <Card key={index} className="border border-gray-200 bg-white">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Bot className="w-4 h-4" />
+                    <Bot className="w-4 h-4 text-pink-600" />
                     {agent.name}
                     <Badge variant="outline" className="text-xs">{agent.role}</Badge>
                     {onAgentAdd && onAgentDismiss && (
@@ -232,13 +214,14 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
                             <Button
                               onClick={() => onAgentAdd(agent)}
                               size="sm"
-                              variant="default"
+                              className="bg-green-100 hover:bg-green-200 text-green-700 border-green-200"
                             >
                               Add
                             </Button>
                             <Button
                               onClick={() => onAgentDismiss(agent.name)}
                               size="sm"
+                              className="bg-red-100 hover:bg-red-200 text-red-700 border-red-200"
                               variant="outline"
                             >
                               Dismiss
@@ -274,86 +257,30 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
           )}
         </div>
       )
-    },
-    {
-      key: 'test_payloads',
-      title: 'Test Payloads',
-      icon: TestTube,
-      color: 'text-cyan-600',
-      bgColor: 'bg-cyan-50',
-      borderColor: 'border-cyan-200',
-      component: (
-        <div className="space-y-4">
-          {(data.test_payloads && typeof data.test_payloads === 'object' && Object.keys(data.test_payloads).length > 0) ? (
-            Object.entries(data.test_payloads).map(([platform, payload]) => (
-              <Card key={platform} className="border border-gray-200">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <TestTube className="w-4 h-4" />
-                    {platform}
-                    <Badge variant="outline" className="text-xs">
-                      {(payload as any)?.test_endpoint?.method || 'GET'}
-                    </Badge>
-                    {onTestCredentials && (
-                      <Button
-                        onClick={() => onTestCredentials(platform, payload)}
-                        size="sm"
-                        variant="outline"
-                        className="ml-auto"
-                      >
-                        Test
-                      </Button>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <ScrollArea className="h-32 w-full">
-                    <pre className="text-xs text-gray-600 whitespace-pre-wrap">
-                      {JSON.stringify(payload, null, 2)}
-                    </pre>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            <div className="text-center py-4 text-gray-500">
-              <p>YusrAI is generating platform test configurations...</p>
-            </div>
-          )}
-        </div>
-      )
-    },
-    {
-      key: 'execution_blueprint',
-      title: 'Execution Blueprint',
-      icon: Code,
-      color: 'text-indigo-600',
-      bgColor: 'bg-indigo-50',
-      borderColor: 'border-indigo-200',
-      component: data.execution_blueprint ? <ExecutionBlueprintVisualizer blueprint={data.execution_blueprint} /> : (
-        <div className="text-center py-4 text-gray-500">
-          <p>YusrAI is creating the technical execution blueprint...</p>
-        </div>
-      )
-    },
-    {
-      key: 'execution_code',
-      title: 'Execution Code',
-      icon: Sparkles,
-      color: 'text-violet-600',
-      bgColor: 'bg-violet-50',
-      borderColor: 'border-violet-200',
-      component: data.execution_blueprint ? <ExecutionBlueprintCodeDisplay blueprint={data.execution_blueprint} /> : (
-        <div className="text-center py-4 text-gray-500">
-          <p>YusrAI is generating the execution code...</p>
-        </div>
-      )
     }
   ];
 
+  // Filter sections to only show available ones
+  const availableSections = sections.filter(section => {
+    switch (section.key) {
+      case 'summary':
+        return data.summary;
+      case 'steps':
+        return data.steps && Array.isArray(data.steps) && data.steps.length > 0;
+      case 'platforms':
+        return data.platforms && Array.isArray(data.platforms) && data.platforms.length > 0;
+      case 'clarification_questions':
+        return data.clarification_questions && Array.isArray(data.clarification_questions) && data.clarification_questions.length > 0;
+      case 'agents':
+        return data.agents && Array.isArray(data.agents) && data.agents.length > 0;
+      default:
+        return false;
+    }
+  });
+
   return (
     <div className={`space-y-4 ${className}`}>
-      {sections.map((section) => {
+      {availableSections.map((section) => {
         const IconComponent = section.icon;
         const isOpen = openSections[section.key];
         
@@ -386,7 +313,7 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
         );
       })}
       
-      {/* PHASE 2: Enhanced Execution Button */}
+      {/* Enhanced Execution Button */}
       {isReadyForExecution && onExecuteAutomation && (
         <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-xl border border-green-200">
           <div className="flex items-center justify-between">

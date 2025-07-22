@@ -1,4 +1,3 @@
-
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { User, Code, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -288,7 +287,7 @@ const ChatCard = ({
             <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
               <DialogHeader>
                 <DialogTitle className="text-lg font-semibold text-blue-600">
-                  Complete YusrAI Automation JSON - 7 Sections Validated
+                  Complete YusrAI Automation JSON
                 </DialogTitle>
               </DialogHeader>
               <ScrollArea className="h-[60vh] w-full">
@@ -310,7 +309,7 @@ const ChatCard = ({
             let yusraiPowered = message.yusrai_powered || false;
             let sevenSectionsValidated = message.seven_sections_validated || false;
             
-            // PHASE 1 FIX: Enhanced parsing for bot messages using new parser
+            // Enhanced parsing for bot messages using new parser
             if (message.isBot && !structuredData) {
               try {
                 const parseResult = parseYusrAIStructuredResponse(message.text);
@@ -318,7 +317,7 @@ const ChatCard = ({
                 yusraiPowered = parseResult.metadata.yusrai_powered || false;
                 sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
                 
-                // PHASE 1: Log flag state during runtime parsing
+                // Log flag state during runtime parsing
                 FlagPropagationLogger.logFlagState(
                   yusraiPowered,
                   sevenSectionsValidated,
@@ -327,7 +326,7 @@ const ChatCard = ({
                   structuredData ? Object.keys(structuredData) : undefined
                 );
                 
-                console.log('🔄 PHASE 1: Enhanced runtime parsing for message:', {
+                console.log('🔄 Enhanced runtime parsing for message:', {
                   hasStructuredData: !!structuredData,
                   yusraiPowered,
                   sevenSectionsValidated
@@ -354,7 +353,7 @@ const ChatCard = ({
                         className="w-5 h-5 object-contain"
                       />
                       <span className="text-sm font-medium text-blue-600">
-                        YusrAI {yusraiPowered ? '(7-Section Validated)' : '(Processing)'}
+                        YusrAI {yusraiPowered ? (sevenSectionsValidated ? '(Structured)' : '(Simple)') : '(Processing)'}
                       </span>
                       {sevenSectionsValidated && (
                         <CheckCircle2 className="w-4 h-4 text-green-500" />
@@ -369,7 +368,7 @@ const ChatCard = ({
                     </div>
                   )}
 
-                  {/* PHASE 1 FIX: Enhanced rendering for YusrAI structured content */}
+                  {/* Enhanced rendering for YusrAI content */}
                   {message.isBot && structuredData && yusraiPowered ? (
                     <div className="leading-relaxed space-y-4">
                       <YusrAIStructuredDisplay
@@ -417,7 +416,7 @@ const ChatCard = ({
                     alt="YusrAI" 
                     className="w-5 h-5 object-contain animate-pulse"
                   />
-                  <span className="font-medium">YusrAI is creating your comprehensive 7-section automation...</span>
+                  <span className="font-medium">YusrAI is creating your automation...</span>
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
                     <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>

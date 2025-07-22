@@ -1,3 +1,4 @@
+
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { User, Code, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -12,6 +13,7 @@ import ErrorHelpButton from './ErrorHelpButton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import YusrAIStructuredDisplay from './YusrAIStructuredDisplay';
 import ExecutionBlueprintVisualizer from './ExecutionBlueprintVisualizer';
+import PlatformButtons from './PlatformButtons';
 import { FlagPropagationLogger } from '@/utils/flagPropagationLogger';
 
 interface Message {
@@ -63,6 +65,26 @@ const ChatCard = ({
   }, [messages, isLoading]);
 
   const optimizedMessages = messages.slice(-50);
+
+  // **CRITICAL**: Extract platforms from latest bot message for PlatformButtons
+  const getLatestPlatformsData = () => {
+    const latestBotMessage = messages.filter(msg => msg.isBot && msg.yusrai_powered).pop();
+    if (!latestBotMessage?.structuredData?.platforms) {
+      // Try to parse from latest bot message text
+      const latestBotMessageWithText = messages.filter(msg => msg.isBot).pop();
+      if (latestBotMessageWithText) {
+        try {
+          const parseResult = parseYusrAIStructuredResponse(latestBotMessageWithText.text);
+          return parseResult.structuredData?.platforms || [];
+        } catch (error) {
+          console.log('No platforms found in latest message');
+          return [];
+        }
+      }
+      return [];
+    }
+    return latestBotMessage.structuredData.platforms;
+  };
 
   const safeFormatMessageText = (inputText: string | undefined | null): React.ReactNode[] => {
     try {
@@ -237,200 +259,216 @@ const ChatCard = ({
     };
   };
 
+  const latestPlatforms = getLatestPlatformsData();
+
   return (
-    <div 
-      className="w-full h-full bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-0 relative mx-auto flex flex-col overflow-hidden"
-      style={{
-        boxShadow: '0 0 60px rgba(92, 142, 246, 0.15), 0 0 120px rgba(154, 94, 255, 0.08)',
-      }}
-    >
-      <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/20 to-purple-100/20 pointer-events-none"></div>
-      
-      {/* View Code and Blueprint buttons */}
-      {getCompleteAutomationJSON() && (
-        <div className="absolute top-4 right-4 z-20 flex gap-2">
-          <Dialog open={showBlueprintModal} onOpenChange={setShowBlueprintModal}>
-            <DialogTrigger asChild>
-              <Button
-                size="sm"
-                variant="outline"
-                className="bg-white/90 backdrop-blur-sm border-purple-200 text-purple-600 hover:bg-purple-50 hover:text-purple-700 shadow-lg"
-              >
-                Blueprint
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-6xl max-h-[80vh] overflow-hidden">
-              <DialogHeader>
-                <DialogTitle className="text-lg font-semibold text-purple-600">
-                  YusrAI Execution Blueprint Visualizer
-                </DialogTitle>
-              </DialogHeader>
-              <ScrollArea className="h-[60vh] w-full">
-                <ExecutionBlueprintVisualizer 
-                  blueprint={getCompleteAutomationJSON()?.yusrai_response?.execution_blueprint} 
-                />
-              </ScrollArea>
-            </DialogContent>
-          </Dialog>
-          
-          <Dialog open={showCodeModal} onOpenChange={setShowCodeModal}>
-            <DialogTrigger asChild>
-              <Button
-                size="sm"
-                variant="outline"
-                className="bg-white/90 backdrop-blur-sm border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 shadow-lg"
-              >
-                <Code className="w-4 h-4 mr-1" />
-                View Code
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
-              <DialogHeader>
-                <DialogTitle className="text-lg font-semibold text-blue-600">
-                  Complete YusrAI Automation JSON
-                </DialogTitle>
-              </DialogHeader>
-              <ScrollArea className="h-[60vh] w-full">
-                <pre className="bg-gray-900 text-green-400 p-4 rounded-lg text-xs overflow-x-auto">
-                  <code>
-                    {JSON.stringify(getCompleteAutomationJSON(), null, 2)}
-                  </code>
-                </pre>
-              </ScrollArea>
-            </DialogContent>
-          </Dialog>
-        </div>
-      )}
-      
-      <ScrollArea className="flex-1 relative z-10 p-6 max-h-[calc(100vh-200px)]" ref={scrollAreaRef}>
-        <div className="space-y-6 pb-4">
-          {optimizedMessages.map(message => {
-            let structuredData = message.structuredData;
-            let yusraiPowered = message.yusrai_powered || false;
-            let sevenSectionsValidated = message.seven_sections_validated || false;
-            
-            // Enhanced parsing for bot messages
-            if (message.isBot && !structuredData) {
-              try {
-                const parseResult = parseYusrAIStructuredResponse(message.text);
-                structuredData = parseResult.structuredData;
-                yusraiPowered = parseResult.metadata.yusrai_powered || false;
-                sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
-                
-                // Log flag state during runtime parsing
-                FlagPropagationLogger.logFlagState(
-                  yusraiPowered,
-                  sevenSectionsValidated,
-                  `ChatCard - runtime parsing message ${message.id}`,
-                  !!structuredData,
-                  structuredData ? Object.keys(structuredData) : undefined
-                );
-                
-                console.log('🔄 Enhanced runtime parsing for message:', {
-                  hasStructuredData: !!structuredData,
-                  yusraiPowered,
-                  sevenSectionsValidated,
-                  isPlainText: parseResult.isPlainText
-                });
-              } catch (error: any) {
-                console.log('Could not parse YusrAI structured data from message:', error);
-                structuredData = null;
-              }
-            }
-
-            return (
-              <div key={message.id} className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}>
-                <div className={`max-w-4xl px-6 py-4 rounded-2xl ${
-                  message.isBot 
-                    ? 'bg-white border border-blue-100/50 text-gray-800 shadow-lg backdrop-blur-sm' 
-                    : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
-                  } transition-all duration-300 overflow-hidden`}
+    <div className="w-full h-full flex flex-col">
+      {/* Main Chat Area */}
+      <div 
+        className="flex-1 bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-0 relative mx-auto flex flex-col overflow-hidden"
+        style={{
+          boxShadow: '0 0 60px rgba(92, 142, 246, 0.15), 0 0 120px rgba(154, 94, 255, 0.08)',
+        }}
+      >
+        <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/20 to-purple-100/20 pointer-events-none"></div>
+        
+        {/* View Code and Blueprint buttons */}
+        {getCompleteAutomationJSON() && (
+          <div className="absolute top-4 right-4 z-20 flex gap-2">
+            <Dialog open={showBlueprintModal} onOpenChange={setShowBlueprintModal}>
+              <DialogTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="bg-white/90 backdrop-blur-sm border-purple-200 text-purple-600 hover:bg-purple-50 hover:text-purple-700 shadow-lg"
                 >
-                  {message.isBot && (
-                    <div className="flex items-center gap-2 mb-3">
-                      <img 
-                        src="/lovable-uploads/cf9c8f76-d8e9-4790-b043-40ba7239140d.png" 
-                        alt="YusrAI" 
-                        className="w-5 h-5 object-contain"
-                      />
-                      <span className="text-sm font-medium text-blue-600">
-                        YusrAI {yusraiPowered ? (sevenSectionsValidated ? '(Structured)' : '(Simple)') : '(Processing)'}
-                      </span>
-                      {sevenSectionsValidated && (
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
-                      )}
-                    </div>
-                  )}
-                  
-                  {!message.isBot && (
-                    <div className="flex items-start gap-2 mb-2">
-                      <User className="w-4 h-4 mt-1 flex-shrink-0" />
-                      <span className="text-sm">You</span>
-                    </div>
-                  )}
-
-                  {/* Display logic: structured vs plain text */}
-                  {message.isBot && structuredData && yusraiPowered ? (
-                    <div className="leading-relaxed space-y-4">
-                      <YusrAIStructuredDisplay
-                        data={structuredData}
-                        onAgentAdd={handleAgentAdd}
-                        onAgentDismiss={handleAgentDismiss}
-                        dismissedAgents={dismissedAgents}
-                        onPlatformCredentialClick={handlePlatformCredentialClick}
-                        platformCredentialStatus={platformCredentialStatus}
-                        onTestCredentials={testPlatformCredentials}
-                        onExecuteAutomation={onExecuteAutomation || handleExecuteAutomation}
-                        isReadyForExecution={checkReadyForExecution()}
-                      />
-                    </div>
-                  ) : (
-                    <div className="leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
-                      {safeFormatMessageText(message.text)}
-                      {message.isBot && message.error_help_available && (
-                        <ErrorHelpButton 
-                          errorMessage={message.text}
-                          onHelpRequest={() => handleErrorHelp(message.text)}
-                        />
-                      )}
-                    </div>
-                  )}
-                  
-                  <p className={`text-xs mt-3 ${message.isBot ? 'text-gray-500' : 'text-blue-100'}`}>
-                    {message.timestamp.toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-          
-          {/* Loading indicator */}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="max-w-4xl px-6 py-4 rounded-2xl bg-white border border-blue-100/50 text-gray-800 shadow-lg backdrop-blur-sm">
-                <div className="flex items-center space-x-3">
-                  <img 
-                    src="/lovable-uploads/cf9c8f76-d8e9-4790-b043-40ba7239140d.png" 
-                    alt="YusrAI" 
-                    className="w-5 h-5 object-contain animate-pulse"
+                  Blueprint
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-6xl max-h-[80vh] overflow-hidden">
+                <DialogHeader>
+                  <DialogTitle className="text-lg font-semibold text-purple-600">
+                    YusrAI Execution Blueprint Visualizer
+                  </DialogTitle>
+                </DialogHeader>
+                <ScrollArea className="h-[60vh] w-full">
+                  <ExecutionBlueprintVisualizer 
+                    blueprint={getCompleteAutomationJSON()?.yusrai_response?.execution_blueprint} 
                   />
-                  <span className="font-medium">YusrAI is processing your request...</span>
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                </ScrollArea>
+              </DialogContent>
+            </Dialog>
+            
+            <Dialog open={showCodeModal} onOpenChange={setShowCodeModal}>
+              <DialogTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="bg-white/90 backdrop-blur-sm border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 shadow-lg"
+                >
+                  <Code className="w-4 h-4 mr-1" />
+                  View Code
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+                <DialogHeader>
+                  <DialogTitle className="text-lg font-semibold text-blue-600">
+                    Complete YusrAI Automation JSON
+                  </DialogTitle>
+                </DialogHeader>
+                <ScrollArea className="h-[60vh] w-full">
+                  <pre className="bg-gray-900 text-green-400 p-4 rounded-lg text-xs overflow-x-auto">
+                    <code>
+                      {JSON.stringify(getCompleteAutomationJSON(), null, 2)}
+                    </code>
+                  </pre>
+                </ScrollArea>
+              </DialogContent>
+            </Dialog>
+          </div>
+        )}
+        
+        <ScrollArea className="flex-1 relative z-10 p-6 max-h-[calc(100vh-300px)]" ref={scrollAreaRef}>
+          <div className="space-y-6 pb-4">
+            {optimizedMessages.map(message => {
+              let structuredData = message.structuredData;
+              let yusraiPowered = message.yusrai_powered || false;
+              let sevenSectionsValidated = message.seven_sections_validated || false;
+              
+              // Enhanced parsing for bot messages
+              if (message.isBot && !structuredData) {
+                try {
+                  const parseResult = parseYusrAIStructuredResponse(message.text);
+                  structuredData = parseResult.structuredData;
+                  yusraiPowered = parseResult.metadata.yusrai_powered || false;
+                  sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
+                  
+                  // Log flag state during runtime parsing
+                  FlagPropagationLogger.logFlagState(
+                    yusraiPowered,
+                    sevenSectionsValidated,
+                    `ChatCard - runtime parsing message ${message.id}`,
+                    !!structuredData,
+                    structuredData ? Object.keys(structuredData) : undefined
+                  );
+                  
+                  console.log('🔄 Enhanced runtime parsing for message:', {
+                    hasStructuredData: !!structuredData,
+                    yusraiPowered,
+                    sevenSectionsValidated,
+                    isPlainText: parseResult.isPlainText,
+                    platformsFound: structuredData?.platforms?.length || 0
+                  });
+                } catch (error: any) {
+                  console.log('Could not parse YusrAI structured data from message:', error);
+                  structuredData = null;
+                }
+              }
+
+              return (
+                <div key={message.id} className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}>
+                  <div className={`max-w-4xl px-6 py-4 rounded-2xl ${
+                    message.isBot 
+                      ? 'bg-white border border-blue-100/50 text-gray-800 shadow-lg backdrop-blur-sm' 
+                      : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
+                    } transition-all duration-300 overflow-hidden`}
+                  >
+                    {message.isBot && (
+                      <div className="flex items-center gap-2 mb-3">
+                        <img 
+                          src="/lovable-uploads/cf9c8f76-d8e9-4790-b043-40ba7239140d.png" 
+                          alt="YusrAI" 
+                          className="w-5 h-5 object-contain"
+                        />
+                        <span className="text-sm font-medium text-blue-600">
+                          YusrAI {yusraiPowered ? (sevenSectionsValidated ? '(Structured)' : '(Simple)') : '(Processing)'}
+                        </span>
+                        {sevenSectionsValidated && (
+                          <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        )}
+                      </div>
+                    )}
+                    
+                    {!message.isBot && (
+                      <div className="flex items-start gap-2 mb-2">
+                        <User className="w-4 h-4 mt-1 flex-shrink-0" />
+                        <span className="text-sm">You</span>
+                      </div>
+                    )}
+
+                    {/* Display logic: structured vs plain text */}
+                    {message.isBot && structuredData && yusraiPowered ? (
+                      <div className="leading-relaxed space-y-4">
+                        <YusrAIStructuredDisplay
+                          data={structuredData}
+                          onAgentAdd={handleAgentAdd}
+                          onAgentDismiss={handleAgentDismiss}
+                          dismissedAgents={dismissedAgents}
+                          onPlatformCredentialClick={handlePlatformCredentialClick}
+                          platformCredentialStatus={platformCredentialStatus}
+                          onTestCredentials={testPlatformCredentials}
+                          onExecuteAutomation={onExecuteAutomation || handleExecuteAutomation}
+                          isReadyForExecution={checkReadyForExecution()}
+                        />
+                      </div>
+                    ) : (
+                      <div className="leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
+                        {safeFormatMessageText(message.text)}
+                        {message.isBot && message.error_help_available && (
+                          <ErrorHelpButton 
+                            errorMessage={message.text}
+                            onHelpRequest={() => handleErrorHelp(message.text)}
+                          />
+                        )}
+                      </div>
+                    )}
+                    
+                    <p className={`text-xs mt-3 ${message.isBot ? 'text-gray-500' : 'text-blue-100'}`}>
+                      {message.timestamp.toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+            
+            {/* Loading indicator */}
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="max-w-4xl px-6 py-4 rounded-2xl bg-white border border-blue-100/50 text-gray-800 shadow-lg backdrop-blur-sm">
+                  <div className="flex items-center space-x-3">
+                    <img 
+                      src="/lovable-uploads/cf9c8f76-d8e9-4790-b043-40ba7239140d.png" 
+                      alt="YusrAI" 
+                      className="w-5 h-5 object-contain animate-pulse"
+                    />
+                    <span className="font-medium">YusrAI is processing your request...</span>
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-          
-          <div ref={messagesEndRef} />
+            )}
+            
+            <div ref={messagesEndRef} />
+          </div>
+        </ScrollArea>
+      </div>
+
+      {/* **CRITICAL FIX**: Platform Buttons Section Below Chat */}
+      {latestPlatforms && latestPlatforms.length > 0 && (
+        <div className="mt-4">
+          <PlatformButtons 
+            platforms={latestPlatforms}
+            onCredentialChange={onPlatformCredentialChange}
+          />
         </div>
-      </ScrollArea>
+      )}
     </div>
   );
 };

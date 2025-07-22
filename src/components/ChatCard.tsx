@@ -1,4 +1,3 @@
-
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { User, Code, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -66,7 +65,7 @@ const ChatCard = ({
 
   const optimizedMessages = messages.slice(-50);
 
-  // **CRITICAL**: Extract platforms from latest bot message for PlatformButtons
+  // **CRITICAL FIX**: Transform YusrAI platform data to PlatformButtons format
   const getLatestPlatformsData = () => {
     const latestBotMessage = messages.filter(msg => msg.isBot && msg.yusrai_powered).pop();
     if (!latestBotMessage?.structuredData?.platforms) {
@@ -75,7 +74,8 @@ const ChatCard = ({
       if (latestBotMessageWithText) {
         try {
           const parseResult = parseYusrAIStructuredResponse(latestBotMessageWithText.text);
-          return parseResult.structuredData?.platforms || [];
+          const yusraiPlatforms = parseResult.structuredData?.platforms || [];
+          return transformPlatformsForButtons(yusraiPlatforms);
         } catch (error) {
           console.log('No platforms found in latest message');
           return [];
@@ -83,7 +83,21 @@ const ChatCard = ({
       }
       return [];
     }
-    return latestBotMessage.structuredData.platforms;
+    return transformPlatformsForButtons(latestBotMessage.structuredData.platforms);
+  };
+
+  // Transform YusrAI platform format to PlatformButtons format
+  const transformPlatformsForButtons = (yusraiPlatforms: any[]) => {
+    return yusraiPlatforms.map(platform => ({
+      name: platform.name,
+      credentials: platform.credentials.map((cred: any) => ({
+        field: cred.field,
+        placeholder: cred.example || cred.field || `Enter your ${cred.field}`,
+        link: cred.link || cred.where_to_get || '#',
+        why_needed: cred.why_needed
+      })),
+      test_payloads: platform.test_payloads || []
+    }));
   };
 
   const safeFormatMessageText = (inputText: string | undefined | null): React.ReactNode[] => {
@@ -460,7 +474,7 @@ const ChatCard = ({
         </ScrollArea>
       </div>
 
-      {/* **CRITICAL FIX**: Platform Buttons Section Below Chat */}
+      {/* **FIXED**: Platform Buttons Section Below Chat with proper data transformation */}
       {latestPlatforms && latestPlatforms.length > 0 && (
         <div className="mt-4">
           <PlatformButtons 

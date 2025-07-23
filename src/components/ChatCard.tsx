@@ -239,7 +239,7 @@ const ChatCard = ({
     };
   };
 
-  // CRITICAL FIX: Get latest structured data and platforms
+  // Get latest structured data and platforms
   const getLatestStructuredData = () => {
     const latestBotMessage = messages.filter(msg => msg.isBot && msg.yusrai_powered).pop();
     return latestBotMessage?.structuredData || null;
@@ -248,6 +248,20 @@ const ChatCard = ({
   const getLatestPlatforms = () => {
     const structuredData = getLatestStructuredData();
     return structuredData?.platforms || [];
+  };
+
+  // Transform YusrAI platform format to PlatformButtons format
+  const transformPlatformsForButtons = (yusraiPlatforms: any[]) => {
+    return yusraiPlatforms.map(platform => ({
+      name: platform.name,
+      credentials: platform.credentials.map((cred: any) => ({
+        field: cred.field,
+        placeholder: cred.example || `Enter ${cred.field}`,
+        link: cred.link || cred.where_to_get || '#',
+        why_needed: cred.why_needed
+      })),
+      test_payloads: platform.test_payloads || []
+    }));
   };
 
   return (
@@ -323,7 +337,7 @@ const ChatCard = ({
               let yusraiPowered = message.yusrai_powered || false;
               let sevenSectionsValidated = message.seven_sections_validated || false;
               
-              // CRITICAL FIX: Enhanced parsing for bot messages
+              // Enhanced parsing for bot messages
               if (message.isBot && !structuredData) {
                 try {
                   const parseResult = parseYusrAIStructuredResponse(message.text);
@@ -383,7 +397,7 @@ const ChatCard = ({
                       </div>
                     )}
 
-                    {/* CRITICAL FIX: Display logic: structured vs plain text */}
+                    {/* Display logic: structured vs plain text */}
                     {message.isBot && structuredData && yusraiPowered && sevenSectionsValidated ? (
                       <div className="leading-relaxed space-y-4">
                         <YusrAIStructuredDisplay
@@ -447,11 +461,11 @@ const ChatCard = ({
         </ScrollArea>
       </div>
 
-      {/* CRITICAL FIX: Platform Buttons Outside Card */}
+      {/* Platform Buttons Outside Card */}
       {getLatestPlatforms().length > 0 && (
         <div className="mt-4">
           <PlatformButtons 
-            platforms={getLatestPlatforms()}
+            platforms={transformPlatformsForButtons(getLatestPlatforms())}
             onCredentialChange={onPlatformCredentialChange}
           />
         </div>

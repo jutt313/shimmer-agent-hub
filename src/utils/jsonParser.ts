@@ -98,43 +98,30 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
     try {
       parsedResponse = JSON.parse(responseText);
     } catch (e) {
-      // Try to extract JSON from text
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        console.log('📄 Plain text response detected, no JSON found')
-        return { 
-          structuredData: null, 
-          metadata: { yusrai_powered: true }, 
-          isPlainText: true 
-        };
-      }
-      try {
-        parsedResponse = JSON.parse(jsonMatch[0]);
-      } catch (innerError) {
-        console.log('📄 Plain text response, JSON parsing failed')
-        return { 
-          structuredData: null, 
-          metadata: { yusrai_powered: true }, 
-          isPlainText: true 
-        };
-      }
+      console.log('📄 Plain text response detected, no JSON found')
+      return { 
+        structuredData: null, 
+        metadata: { yusrai_powered: true }, 
+        isPlainText: true 
+      };
     }
 
-    // Check if this is a wrapped response from chat-AI function
+    // CRITICAL FIX: Check if this is a wrapped response from chat-AI function
     if (parsedResponse.response && typeof parsedResponse.response === 'string') {
       console.log('🎯 Wrapped YusrAI response detected from chat-AI function')
       
-      // Extract metadata
+      // Extract metadata from wrapper
       metadata.yusrai_powered = parsedResponse.yusrai_powered || true;
       metadata.seven_sections_validated = parsedResponse.seven_sections_validated || false;
       metadata.error_help_available = parsedResponse.error_help_available || false;
       
-      // Try to parse the inner JSON response
+      // CRITICAL FIX: Parse the inner JSON response
       try {
-        parsedResponse = JSON.parse(parsedResponse.response);
-        console.log('✅ Successfully extracted inner YusrAI JSON from wrapper')
+        const innerResponse = JSON.parse(parsedResponse.response);
+        console.log('✅ Successfully extracted inner YusrAI JSON from wrapper:', innerResponse);
+        parsedResponse = innerResponse;
       } catch (innerError) {
-        console.log('📄 Inner response is plain text, treating as such')
+        console.log('📄 Inner response is plain text, treating as such');
         return { 
           structuredData: null, 
           metadata, 
@@ -146,7 +133,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       metadata.yusrai_powered = true;
     }
 
-    // Check if this is a structured response (has multiple expected sections)
+    // CRITICAL FIX: Check if this is a structured response with required sections
     const hasStructuredSections = parsedResponse.summary && 
       (parsedResponse.steps || parsedResponse.platforms || parsedResponse.agents);
 
@@ -159,50 +146,16 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       };
     }
 
-    // Flexible validation - only validate what's present
+    // CRITICAL FIX: Validate structured sections properly
     console.log('🔍 Validating structured sections...')
     
-    // Basic validation for required structured format
-    if (parsedResponse.summary && typeof parsedResponse.summary === 'string' && parsedResponse.summary.trim().length > 0) {
-      console.log('✅ Summary section valid')
-    } else if (parsedResponse.summary !== undefined) {
-      console.log('⚠️ Summary section present but invalid format')
-      return { structuredData: null, metadata, isPlainText: true };
-    }
-
-    // Validate steps if present
-    if (parsedResponse.steps !== undefined) {
-      if (!Array.isArray(parsedResponse.steps)) {
-        console.log('⚠️ Steps must be array if present')
-        return { structuredData: null, metadata, isPlainText: true };
-      }
-      console.log('✅ Steps section valid')
-    }
-
-    // Validate platforms if present
-    if (parsedResponse.platforms !== undefined) {
-      if (!Array.isArray(parsedResponse.platforms)) {
-        console.log('⚠️ Platforms must be array if present')
-        return { structuredData: null, metadata, isPlainText: true };
-      }
-      console.log('✅ Platforms section valid')
-    }
-
-    // Validate other optional sections
-    if (parsedResponse.clarification_questions !== undefined && !Array.isArray(parsedResponse.clarification_questions)) {
-      console.log('⚠️ Clarification questions must be array if present')
-      return { structuredData: null, metadata, isPlainText: true };
-    }
-
-    if (parsedResponse.agents !== undefined && !Array.isArray(parsedResponse.agents)) {
-      console.log('⚠️ Agents must be array if present')
-      return { structuredData: null, metadata, isPlainText: true };
-    }
-
-    if (parsedResponse.test_payloads !== undefined && typeof parsedResponse.test_payloads !== 'object') {
-      console.log('⚠️ Test payloads must be object if present')
-      return { structuredData: null, metadata, isPlainText: true };
-    }
+    // Ensure all arrays exist (empty arrays are fine)
+    if (!parsedResponse.steps) parsedResponse.steps = [];
+    if (!parsedResponse.platforms) parsedResponse.platforms = [];
+    if (!parsedResponse.clarification_questions) parsedResponse.clarification_questions = [];
+    if (!parsedResponse.agents) parsedResponse.agents = [];
+    if (!parsedResponse.test_payloads) parsedResponse.test_payloads = {};
+    if (!parsedResponse.execution_blueprint) parsedResponse.execution_blueprint = null;
 
     console.log('✅ YusrAI structured response validation successful')
     metadata.seven_sections_validated = true;

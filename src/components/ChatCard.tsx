@@ -153,21 +153,34 @@ const ChatCard = ({
   };
 
   const checkReadyForExecution = () => {
-    const latestBotMessage = messages.filter(msg => msg.isBot && msg.yusrai_powered).pop();
-    if (!latestBotMessage?.structuredData?.platforms) return false;
+    const latestBotMessage = messages.filter(msg => msg.isBot && msg.yusrai_powered && msg.seven_sections_validated).pop();
+    if (!latestBotMessage?.structuredData) return false;
 
-    const platforms = latestBotMessage.structuredData.platforms;
-    const allPlatformsConfigured = platforms.every(platform => 
+    const structuredData = latestBotMessage.structuredData;
+    const platforms = structuredData.platforms || [];
+    const agents = structuredData.agents || [];
+    
+    // Check if all platforms have credentials saved/tested
+    const allPlatformsConfigured = platforms.length === 0 || platforms.every(platform => 
       platformCredentialStatus[platform.name] === 'saved' || 
       platformCredentialStatus[platform.name] === 'tested'
     );
 
-    const agents = latestBotMessage.structuredData.agents || [];
-    const allAgentsHandled = agents.every(agent => 
+    // Check if all agents are handled (dismissed or added)
+    const allAgentsHandled = agents.length === 0 || agents.every(agent => 
       dismissedAgents.has(agent.name)
     );
 
-    return allPlatformsConfigured && allAgentsHandled && platforms.length > 0;
+    console.log('🔍 Execution readiness check:', {
+      hasStructuredData: !!structuredData,
+      platformsCount: platforms.length,
+      agentsCount: agents.length,
+      allPlatformsConfigured,
+      allAgentsHandled,
+      isReady: allPlatformsConfigured && allAgentsHandled
+    });
+
+    return allPlatformsConfigured && allAgentsHandled;
   };
 
   const handleExecuteAutomation = async () => {
@@ -408,7 +421,7 @@ const ChatCard = ({
                           onPlatformCredentialClick={handlePlatformCredentialClick}
                           platformCredentialStatus={platformCredentialStatus}
                           onTestCredentials={testPlatformCredentials}
-                          onExecuteAutomation={onExecuteAutomation || handleExecuteAutomation}
+                          onExecuteAutomation={handleExecuteAutomation}
                           isReadyForExecution={checkReadyForExecution()}
                         />
                       </div>

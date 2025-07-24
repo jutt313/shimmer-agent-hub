@@ -107,8 +107,9 @@ const Index = () => {
           console.log('✅ YusrAI structured data available from service');
         } else if (result.response) {
           // Try to parse structured data from response text
-          structuredData = parseYusrAIStructuredResponse(result.response);
-          console.log('✅ Parsed YusrAI structured data from response text');
+          const parseResult = parseYusrAIStructuredResponse(result.response);
+          structuredData = parseResult.structuredData;
+          console.log('✅ Parsed YusrAI structured data from response text:', !!structuredData);
         }
 
         errorHelpAvailable = result.error_help_available || false;
@@ -154,7 +155,8 @@ const Index = () => {
         });
         
         // Parse the fallback as structured data
-        structuredData = parseYusrAIStructuredResponse(responseText);
+        const fallbackParseResult = parseYusrAIStructuredResponse(responseText);
+        structuredData = fallbackParseResult.structuredData;
       }
       
       const botResponse = {
@@ -220,7 +222,8 @@ const Index = () => {
       };
       
       // Parse the error response as structured data
-      errorResponse.structuredData = parseYusrAIStructuredResponse(errorResponse.text);
+      const errorParseResult = parseYusrAIStructuredResponse(errorResponse.text);
+      errorResponse.structuredData = errorParseResult.structuredData;
       setMessages(prev => [...prev, errorResponse]);
       
     } finally {

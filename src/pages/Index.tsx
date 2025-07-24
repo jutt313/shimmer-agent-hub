@@ -22,7 +22,11 @@ const Index = () => {
     id: 1,
     text: "I am YusrAI, your AI assistant powered by OpenAI. I'll help you create comprehensive automations with specific platform integrations. How can I help you today?",
     isBot: true,
-    timestamp: new Date()
+    timestamp: new Date(),
+    structuredData: null,
+    yusrai_powered: true,
+    seven_sections_validated: false,
+    error_help_available: false
   }]);
   
   const { toast } = useToast();
@@ -50,7 +54,11 @@ const Index = () => {
       id: Date.now(),
       text: message.trim(),
       isBot: false,
-      timestamp: new Date()
+      timestamp: new Date(),
+      structuredData: null,
+      yusrai_powered: false,
+      seven_sections_validated: false,
+      error_help_available: false
     };
     
     setMessages(prev => [...prev, newMessage]);
@@ -165,7 +173,9 @@ const Index = () => {
         isBot: true,
         timestamp: new Date(),
         structuredData: structuredData,
-        error_help_available: errorHelpAvailable
+        error_help_available: errorHelpAvailable,
+        yusrai_powered: !!structuredData,
+        seven_sections_validated: !!structuredData
       };
       
       console.log('📤 Adding YusrAI bot response:', {
@@ -218,7 +228,9 @@ const Index = () => {
         isBot: true,
         timestamp: new Date(),
         structuredData: null,
-        error_help_available: true
+        error_help_available: true,
+        yusrai_powered: true,
+        seven_sections_validated: false
       };
       
       // Parse the error response as structured data

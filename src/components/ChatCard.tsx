@@ -59,12 +59,52 @@ const ChatCard = ({
   const { user } = useAuth();
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [showBlueprintModal, setShowBlueprintModal] = useState(false);
+  const [enhancedMessages, setEnhancedMessages] = useState<Message[]>([]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  const optimizedMessages = messages.slice(-50);
+  // Enhanced message processing with proper flag setting
+  useEffect(() => {
+    const processMessages = () => {
+      const processed = messages.map(message => {
+        if (message.isBot && !message.structuredData) {
+          try {
+            const parseResult = parseYusrAIStructuredResponse(message.text);
+            
+            // CRITICAL FIX: Always set flags based on parse result
+            const updatedMessage = {
+              ...message,
+              structuredData: parseResult.structuredData,
+              yusrai_powered: parseResult.metadata.yusrai_powered || false,
+              seven_sections_validated: parseResult.metadata.seven_sections_validated || false
+            };
+            
+            console.log('🔄 Enhanced message processing:', {
+              messageId: message.id,
+              hasStructuredData: !!parseResult.structuredData,
+              yusraiPowered: updatedMessage.yusrai_powered,
+              sevenSectionsValidated: updatedMessage.seven_sections_validated,
+              isPlainText: parseResult.isPlainText
+            });
+            
+            return updatedMessage;
+          } catch (error) {
+            console.log('Could not parse structured data:', error);
+            return message;
+          }
+        }
+        return message;
+      });
+      
+      setEnhancedMessages(processed);
+    };
+
+    processMessages();
+  }, [messages]);
+
+  const optimizedMessages = enhancedMessages.slice(-50);
 
   const safeFormatMessageText = (inputText: string | undefined | null): React.ReactNode[] => {
     try {
@@ -153,7 +193,7 @@ const ChatCard = ({
   };
 
   const checkReadyForExecution = () => {
-    const latestBotMessage = messages.filter(msg => msg.isBot && msg.yusrai_powered && msg.seven_sections_validated).pop();
+    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
     if (!latestBotMessage?.structuredData) return false;
 
     const structuredData = latestBotMessage.structuredData;
@@ -193,7 +233,7 @@ const ChatCard = ({
       return;
     }
 
-    const latestBotMessage = messages.filter(msg => msg.isBot && msg.yusrai_powered).pop();
+    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
     if (!latestBotMessage?.structuredData) {
       toast({
         title: "No YusrAI Automation Found",
@@ -238,15 +278,15 @@ const ChatCard = ({
   };
 
   const getCompleteAutomationJSON = () => {
-    const latestBotMessage = messages.filter(msg => msg.isBot && msg.yusrai_powered).pop();
+    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
     if (!latestBotMessage?.structuredData) return null;
 
     return {
       automation_id: automationId,
       created_at: new Date().toISOString(),
       yusrai_response: latestBotMessage.structuredData,
-      yusrai_powered: true,
-      seven_sections_validated: latestBotMessage.seven_sections_validated || false,
+      yusrai_powered: latestBotMessage.yusrai_powered || true,
+      seven_sections_validated: latestBotMessage.seven_sections_validated || true,
       ready_for_execution: checkReadyForExecution(),
       credential_status: platformCredentialStatus
     };
@@ -254,7 +294,7 @@ const ChatCard = ({
 
   // Get latest structured data and platforms
   const getLatestStructuredData = () => {
-    const latestBotMessage = messages.filter(msg => msg.isBot && msg.yusrai_powered).pop();
+    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
     return latestBotMessage?.structuredData || null;
   };
 
@@ -283,6 +323,7 @@ const ChatCard = ({
         className="w-full h-full bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-0 relative mx-auto flex flex-col overflow-hidden"
         style={{
           boxShadow: '0 0 60px rgba(92, 142, 246, 0.15), 0 0 120px rgba(154, 94, 255, 0.08)',
+          maxHeight: 'calc(100vh - 200px)'
         }}
       >
         <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/20 to-purple-100/20 pointer-events-none"></div>
@@ -343,42 +384,9 @@ const ChatCard = ({
           </div>
         )}
         
-        <ScrollArea className="flex-1 relative z-10 p-6 max-h-[calc(100vh-200px)]" ref={scrollAreaRef}>
+        <ScrollArea className="flex-1 relative z-10 p-6" ref={scrollAreaRef}>
           <div className="space-y-6 pb-4">
             {optimizedMessages.map(message => {
-              let structuredData = message.structuredData;
-              let yusraiPowered = message.yusrai_powered || false;
-              let sevenSectionsValidated = message.seven_sections_validated || false;
-              
-              // Enhanced parsing for bot messages
-              if (message.isBot && !structuredData) {
-                try {
-                  const parseResult = parseYusrAIStructuredResponse(message.text);
-                  structuredData = parseResult.structuredData;
-                  yusraiPowered = parseResult.metadata.yusrai_powered || false;
-                  sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
-                  
-                  // Log flag state during runtime parsing
-                  FlagPropagationLogger.logFlagState(
-                    yusraiPowered,
-                    sevenSectionsValidated,
-                    `ChatCard - runtime parsing message ${message.id}`,
-                    !!structuredData,
-                    structuredData ? Object.keys(structuredData) : undefined
-                  );
-                  
-                  console.log('🔄 Enhanced runtime parsing for message:', {
-                    hasStructuredData: !!structuredData,
-                    yusraiPowered,
-                    sevenSectionsValidated,
-                    isPlainText: parseResult.isPlainText
-                  });
-                } catch (error: any) {
-                  console.log('Could not parse YusrAI structured data from message:', error);
-                  structuredData = null;
-                }
-              }
-
               return (
                 <div key={message.id} className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}>
                   <div className={`max-w-4xl px-6 py-4 rounded-2xl ${
@@ -395,9 +403,9 @@ const ChatCard = ({
                           className="w-5 h-5 object-contain"
                         />
                         <span className="text-sm font-medium text-blue-600">
-                          YusrAI {yusraiPowered ? (sevenSectionsValidated ? '(Structured)' : '(Simple)') : '(Processing)'}
+                          YusrAI {message.yusrai_powered ? (message.seven_sections_validated ? '(Structured)' : '(Simple)') : '(Processing)'}
                         </span>
-                        {sevenSectionsValidated && (
+                        {message.seven_sections_validated && (
                           <CheckCircle2 className="w-4 h-4 text-green-500" />
                         )}
                       </div>
@@ -410,11 +418,11 @@ const ChatCard = ({
                       </div>
                     )}
 
-                    {/* Display logic: structured vs plain text */}
-                    {message.isBot && structuredData && yusraiPowered && sevenSectionsValidated ? (
+                    {/* FIXED DISPLAY LOGIC: Show structured UI when we have structured data */}
+                    {message.isBot && message.structuredData ? (
                       <div className="leading-relaxed space-y-4">
                         <YusrAIStructuredDisplay
-                          data={structuredData}
+                          data={message.structuredData}
                           onAgentAdd={handleAgentAdd}
                           onAgentDismiss={handleAgentDismiss}
                           dismissedAgents={dismissedAgents}

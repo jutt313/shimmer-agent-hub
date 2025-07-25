@@ -133,8 +133,10 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       metadata.yusrai_powered = true;
     }
 
-    // CRITICAL FIX: Check if this is a structured response with required sections
-    const hasStructuredSections = parsedResponse.summary && 
+    // CRITICAL FIX: Check if this is a structured response with automation sections
+    const hasStructuredSections = parsedResponse.error_handling || 
+      parsedResponse.performance_optimization || 
+      parsedResponse.summary ||
       (parsedResponse.steps || parsedResponse.platforms || parsedResponse.agents);
 
     if (!hasStructuredSections) {

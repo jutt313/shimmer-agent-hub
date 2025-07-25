@@ -104,7 +104,9 @@ const ExecutionBlueprintVisualizer: React.FC<ExecutionBlueprintVisualizerProps> 
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           <StepIcon className="w-4 h-4" />
-                          <h4 className="font-semibold">{step.action || `Step ${index + 1}`}</h4>
+                          <h4 className="font-semibold">
+                            {typeof step === 'string' ? step : (step.action || `Step ${index + 1}`)}
+                          </h4>
                           {step.platform && (
                             <Badge variant="secondary" className="text-xs">{step.platform}</Badge>
                           )}
@@ -113,29 +115,29 @@ const ExecutionBlueprintVisualizer: React.FC<ExecutionBlueprintVisualizerProps> 
                           )}
                         </div>
                         
-                        {step.description && (
-                          <p className="text-sm mb-2 opacity-90">{step.description}</p>
+                        {typeof step === 'object' && step.description && (
+                          <p className="text-sm mb-2 opacity-90">{String(step.description)}</p>
                         )}
                         
-                        {step.endpoint && (
+                        {typeof step === 'object' && step.endpoint && (
                           <div className="text-xs font-mono bg-white/50 p-2 rounded border">
-                            <span className="font-semibold">{step.method || 'GET'}</span> {step.endpoint}
+                            <span className="font-semibold">{step.method || 'GET'}</span> {String(step.endpoint)}
                           </div>
                         )}
                         
-                        {step.ai_agent_integration && (
+                        {typeof step === 'object' && step.ai_agent_integration && (
                           <div className="flex items-center gap-2 mt-2 p-2 bg-purple-50 rounded border border-purple-200">
                             <Bot className="w-4 h-4 text-purple-500" />
                             <span className="text-sm text-purple-700">
-                              AI Agent: {step.ai_agent_integration.agent_name || 'Dynamic Agent'}
+                              AI Agent: {String(step.ai_agent_integration.agent_name || 'Dynamic Agent')}
                             </span>
                           </div>
                         )}
                         
-                        {step.error_handling && (
+                        {typeof step === 'object' && step.error_handling && (
                           <div className="mt-2 text-xs text-gray-600 bg-white/50 p-2 rounded">
                             <span className="font-medium">Error Handling:</span> {step.error_handling.retry_attempts || 3} retries, 
-                            fallback: {step.error_handling.fallback_action || 'log and continue'}
+                            fallback: {String(step.error_handling.fallback_action || 'log and continue')}
                           </div>
                         )}
                       </div>

@@ -157,9 +157,31 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       };
     }
 
-    // CRITICAL FIX: Validate structured sections properly
-    console.log('🔍 Validating structured sections...')
+    // CRITICAL FIX: Validate and map database field names to frontend expected names
+    console.log('🔍 Validating and mapping structured sections...')
     
+    // Map database field names to frontend expected names
+    if (parsedResponse.step_by_step_explanation && !parsedResponse.steps) {
+      parsedResponse.steps = Array.isArray(parsedResponse.step_by_step_explanation) 
+        ? parsedResponse.step_by_step_explanation 
+        : [parsedResponse.step_by_step_explanation];
+      console.log('📋 Mapped step_by_step_explanation to steps:', parsedResponse.steps.length);
+    }
+
+    if (parsedResponse.platforms_and_credentials && !parsedResponse.platforms) {
+      parsedResponse.platforms = Array.isArray(parsedResponse.platforms_and_credentials) 
+        ? parsedResponse.platforms_and_credentials 
+        : [parsedResponse.platforms_and_credentials];
+      console.log('🔗 Mapped platforms_and_credentials to platforms:', parsedResponse.platforms.length);
+    }
+
+    if (parsedResponse.ai_agents_section?.agents && !parsedResponse.agents) {
+      parsedResponse.agents = Array.isArray(parsedResponse.ai_agents_section.agents) 
+        ? parsedResponse.ai_agents_section.agents 
+        : [parsedResponse.ai_agents_section.agents];
+      console.log('🤖 Mapped ai_agents_section.agents to agents:', parsedResponse.agents.length);
+    }
+
     // Ensure all arrays exist (empty arrays are fine)
     if (!parsedResponse.steps) parsedResponse.steps = [];
     if (!parsedResponse.platforms) parsedResponse.platforms = [];

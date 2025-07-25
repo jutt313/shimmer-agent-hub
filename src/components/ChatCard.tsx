@@ -320,10 +320,10 @@ const ChatCard = ({
   return (
     <div className="space-y-6">
       <div 
-        className="w-full h-full bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-0 relative mx-auto flex flex-col overflow-hidden"
+        className="w-full bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-0 relative mx-auto flex flex-col"
         style={{
           boxShadow: '0 0 60px rgba(92, 142, 246, 0.15), 0 0 120px rgba(154, 94, 255, 0.08)',
-          maxHeight: 'calc(100vh - 200px)'
+          height: '600px'
         }}
       >
         <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/20 to-purple-100/20 pointer-events-none"></div>
@@ -384,8 +384,8 @@ const ChatCard = ({
           </div>
         )}
         
-        <ScrollArea className="flex-1 relative z-10 p-6" ref={scrollAreaRef}>
-          <div className="space-y-6 pb-4">
+        <ScrollArea className="flex-1 relative z-10 p-6 overflow-y-auto" ref={scrollAreaRef}>
+          <div className="space-y-6 pb-4 min-h-full">
             {optimizedMessages.map(message => {
               return (
                 <div key={message.id} className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}>

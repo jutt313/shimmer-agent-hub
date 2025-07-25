@@ -305,13 +305,17 @@ const ChatCard = ({
 
   // Transform YusrAI platform format to PlatformButtons format
   const transformPlatformsForButtons = (yusraiPlatforms: any[]) => {
+    if (!yusraiPlatforms || !Array.isArray(yusraiPlatforms)) {
+      return [];
+    }
+    
     return yusraiPlatforms.map(platform => ({
-      name: platform.name,
-      credentials: platform.credentials.map((cred: any) => ({
-        field: cred.field,
-        placeholder: cred.example || `Enter ${cred.field}`,
+      name: platform.name || 'Unknown Platform',
+      credentials: (platform.credentials || []).map((cred: any) => ({
+        field: cred.field || 'unknown_field',
+        placeholder: cred.example || `Enter ${cred.field || 'credential'}`,
         link: cred.link || cred.where_to_get || '#',
-        why_needed: cred.why_needed
+        why_needed: cred.why_needed || 'Authentication required'
       })),
       test_payloads: platform.test_payloads || []
     }));

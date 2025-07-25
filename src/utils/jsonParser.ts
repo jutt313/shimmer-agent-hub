@@ -93,10 +93,19 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
     
     let parsedResponse: any;
     let metadata: YusrAIResponseMetadata = {};
+    let cleanResponseText = responseText;
+    
+    // CRITICAL FIX: Extract JSON from markdown code blocks
+    const markdownJsonMatch = responseText.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
+    if (markdownJsonMatch) {
+      console.log('🎯 Markdown code block detected, extracting JSON...');
+      cleanResponseText = markdownJsonMatch[1].trim();
+      console.log('✅ Extracted JSON from markdown:', cleanResponseText.substring(0, 200) + '...');
+    }
     
     // First try to parse the response
     try {
-      parsedResponse = JSON.parse(responseText);
+      parsedResponse = JSON.parse(cleanResponseText);
     } catch (e) {
       console.log('📄 Plain text response detected, no JSON found')
       return { 

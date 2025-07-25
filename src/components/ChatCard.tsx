@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import YusrAIStructuredDisplay from './YusrAIStructuredDisplay';
 import ExecutionBlueprintVisualizer from './ExecutionBlueprintVisualizer';
 import { FlagPropagationLogger } from '@/utils/flagPropagationLogger';
-import PlatformButtons from './PlatformButtons';
+import FixedPlatformButtons from './FixedPlatformButtons';
 
 interface Message {
   id: number;
@@ -303,22 +303,35 @@ const ChatCard = ({
     return structuredData?.platforms || [];
   };
 
-  // Transform YusrAI platform format to PlatformButtons format
+  // ENHANCED: Transform YusrAI platform format to PlatformButtons format with comprehensive data mapping
   const transformPlatformsForButtons = (yusraiPlatforms: any[]) => {
+    console.log('🔄 Transforming platforms for buttons:', yusraiPlatforms);
+    
     if (!yusraiPlatforms || !Array.isArray(yusraiPlatforms)) {
+      console.log('⚠️ No platforms array found, returning empty array');
       return [];
     }
     
-    return yusraiPlatforms.map(platform => ({
-      name: platform.name || 'Unknown Platform',
-      credentials: (platform.credentials || []).map((cred: any) => ({
-        field: cred.field || 'unknown_field',
-        placeholder: cred.example || `Enter ${cred.field || 'credential'}`,
-        link: cred.link || cred.where_to_get || '#',
-        why_needed: cred.why_needed || 'Authentication required'
-      })),
-      test_payloads: platform.test_payloads || []
-    }));
+    const transformedPlatforms = yusraiPlatforms.map((platform, index) => {
+      console.log(`🔄 Processing platform ${index + 1}:`, platform);
+      
+      const transformedPlatform = {
+        name: platform.name || platform.platform_name || 'Unknown Platform',
+        credentials: (platform.credentials || platform.required_credentials || []).map((cred: any) => ({
+          field: cred.field || cred.name || 'unknown_field',
+          placeholder: cred.example || cred.placeholder || `Enter ${cred.field || 'credential'}`,
+          link: cred.link || cred.where_to_get || cred.documentation_url || '#',
+          why_needed: cred.why_needed || cred.description || 'Authentication required'
+        })),
+        test_payloads: platform.test_payloads || platform.test_payload || []
+      };
+      
+      console.log(`✅ Transformed platform:`, transformedPlatform);
+      return transformedPlatform;
+    });
+    
+    console.log('🎯 Final transformed platforms:', transformedPlatforms);
+    return transformedPlatforms;
   };
 
   return (
@@ -486,11 +499,12 @@ const ChatCard = ({
         </ScrollArea>
       </div>
 
-      {/* Platform Buttons Outside Card */}
+      {/* Enhanced Platform Buttons Outside Card */}
       {getLatestPlatforms().length > 0 && (
         <div className="mt-4">
-          <PlatformButtons 
+          <FixedPlatformButtons
             platforms={transformPlatformsForButtons(getLatestPlatforms())}
+            automationId={automationId}
             onCredentialChange={onPlatformCredentialChange}
           />
         </div>

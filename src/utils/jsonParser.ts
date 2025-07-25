@@ -157,7 +157,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       };
     }
 
-    // CRITICAL FIX: Validate and map database field names to frontend expected names
+    // CRITICAL FIX: Comprehensive field name mapping from database to frontend
     console.log('🔍 Validating and mapping structured sections...')
     
     // Map database field names to frontend expected names
@@ -168,18 +168,48 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('📋 Mapped step_by_step_explanation to steps:', parsedResponse.steps.length);
     }
 
+    // ENHANCED PLATFORM MAPPING - Fix all platform field variations
     if (parsedResponse.platforms_and_credentials && !parsedResponse.platforms) {
       parsedResponse.platforms = Array.isArray(parsedResponse.platforms_and_credentials) 
         ? parsedResponse.platforms_and_credentials 
         : [parsedResponse.platforms_and_credentials];
       console.log('🔗 Mapped platforms_and_credentials to platforms:', parsedResponse.platforms.length);
     }
+    
+    // Also check for alternate field names
+    if (parsedResponse.platform_integrations && !parsedResponse.platforms) {
+      parsedResponse.platforms = Array.isArray(parsedResponse.platform_integrations) 
+        ? parsedResponse.platform_integrations 
+        : [parsedResponse.platform_integrations];
+      console.log('🔗 Mapped platform_integrations to platforms:', parsedResponse.platforms.length);
+    }
 
+    // ENHANCED AI AGENTS MAPPING - Fix all agent field variations
     if (parsedResponse.ai_agents_section?.agents && !parsedResponse.agents) {
       parsedResponse.agents = Array.isArray(parsedResponse.ai_agents_section.agents) 
         ? parsedResponse.ai_agents_section.agents 
         : [parsedResponse.ai_agents_section.agents];
       console.log('🤖 Mapped ai_agents_section.agents to agents:', parsedResponse.agents.length);
+    }
+    
+    // Also check for direct ai_agents field
+    if (parsedResponse.ai_agents && !parsedResponse.agents) {
+      parsedResponse.agents = Array.isArray(parsedResponse.ai_agents) 
+        ? parsedResponse.ai_agents 
+        : [parsedResponse.ai_agents];
+      console.log('🤖 Mapped ai_agents to agents:', parsedResponse.agents.length);
+    }
+
+    // FIX TEST PAYLOADS MAPPING
+    if (parsedResponse.platform_test_payloads && !parsedResponse.test_payloads) {
+      parsedResponse.test_payloads = parsedResponse.platform_test_payloads;
+      console.log('🧪 Mapped platform_test_payloads to test_payloads');
+    }
+
+    // FIX EXECUTION BLUEPRINT MAPPING
+    if (parsedResponse.blueprint && !parsedResponse.execution_blueprint) {
+      parsedResponse.execution_blueprint = parsedResponse.blueprint;
+      console.log('📋 Mapped blueprint to execution_blueprint');
     }
 
     // Ensure all arrays exist (empty arrays are fine)

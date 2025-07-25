@@ -134,20 +134,24 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
                   <div className="font-semibold text-purple-700 text-lg">
                     {platform.name}
                   </div>
-                  <div className="text-sm space-y-2">
-                    <div>
-                      <span className="font-medium text-gray-900">Credentials:</span>{' '}
-                      <span className="text-gray-600">
-                        {(platform.credentials || []).map(cred => cred.field).join(', ')}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-900">Why we need:</span>{' '}
-                      <span className="text-gray-600">
-                        {(platform.credentials || [])[0]?.why_needed || 'For platform authentication and API access'}
-                      </span>
-                    </div>
-                  </div>
+                   <div className="text-sm space-y-2">
+                     <div>
+                       <span className="font-medium text-gray-900">Required Credentials:</span>
+                       <div className="mt-1 space-y-1">
+                         {(platform.credentials || []).map((cred, credIndex) => (
+                           <div key={credIndex} className="text-xs bg-gray-50 p-2 rounded border">
+                             <div className="font-medium text-purple-700">{cred.field}</div>
+                             <div className="text-gray-600">{cred.why_needed || 'Authentication required'}</div>
+                             {cred.where_to_get && (
+                               <div className="text-blue-600 text-xs">
+                                 Get from: {cred.where_to_get}
+                               </div>
+                             )}
+                           </div>
+                         ))}
+                       </div>
+                     </div>
+                   </div>
                 </div>
               </div>
             ))}
@@ -226,20 +230,24 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
                   )}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-0 space-y-2">
-                <div className="text-xs">
-                  <span className="font-medium text-gray-700">Rule:</span>
-                  <p className="text-gray-600 mt-1">{agent.rule}</p>
-                </div>
-                <div className="text-xs">
-                  <span className="font-medium text-gray-700">Goal:</span>
-                  <p className="text-gray-600 mt-1">{agent.goal}</p>
-                </div>
-                <div className="text-xs">
-                  <span className="font-medium text-gray-700">Why Needed:</span>
-                  <p className="text-gray-600 mt-1">{agent.why_needed}</p>
-                </div>
-              </CardContent>
+               <CardContent className="pt-0 space-y-2">
+                 <div className="text-xs">
+                   <span className="font-medium text-gray-700">Rule:</span>
+                   <p className="text-gray-600 mt-1">{agent.rule || 'Custom agent behavior'}</p>
+                 </div>
+                 <div className="text-xs">
+                   <span className="font-medium text-gray-700">Goal:</span>
+                   <p className="text-gray-600 mt-1">{agent.goal || 'Process automation data'}</p>
+                 </div>
+                 <div className="text-xs">
+                   <span className="font-medium text-gray-700">Memory:</span>
+                   <p className="text-gray-600 mt-1">{agent.memory || 'Stores task context and results'}</p>
+                 </div>
+                 <div className="text-xs">
+                   <span className="font-medium text-gray-700">Why Needed:</span>
+                   <p className="text-gray-600 mt-1">{agent.why_needed || 'Enhances automation intelligence'}</p>
+                 </div>
+               </CardContent>
             </Card>
           ))}
         </div>

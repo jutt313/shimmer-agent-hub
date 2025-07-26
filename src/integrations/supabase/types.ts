@@ -455,6 +455,51 @@ export type Database = {
         }
         Relationships: []
       }
+      automation_responses: {
+        Row: {
+          automation_id: string
+          chat_message_id: number | null
+          created_at: string
+          error_help_available: boolean | null
+          id: string
+          is_ready_for_execution: boolean | null
+          response_text: string
+          seven_sections_validated: boolean | null
+          structured_data: Json | null
+          updated_at: string
+          user_id: string
+          yusrai_powered: boolean | null
+        }
+        Insert: {
+          automation_id: string
+          chat_message_id?: number | null
+          created_at?: string
+          error_help_available?: boolean | null
+          id?: string
+          is_ready_for_execution?: boolean | null
+          response_text: string
+          seven_sections_validated?: boolean | null
+          structured_data?: Json | null
+          updated_at?: string
+          user_id: string
+          yusrai_powered?: boolean | null
+        }
+        Update: {
+          automation_id?: string
+          chat_message_id?: number | null
+          created_at?: string
+          error_help_available?: boolean | null
+          id?: string
+          is_ready_for_execution?: boolean | null
+          response_text?: string
+          seven_sections_validated?: boolean | null
+          structured_data?: Json | null
+          updated_at?: string
+          user_id?: string
+          yusrai_powered?: boolean | null
+        }
+        Relationships: []
+      }
       automation_runs: {
         Row: {
           automation_id: string

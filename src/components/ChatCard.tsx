@@ -65,9 +65,9 @@ const ChatCard = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // Enhanced message processing with proper flag setting
+  // Enhanced message processing with data persistence and safe array handling
   useEffect(() => {
-    const processMessages = () => {
+    const processMessages = async () => {
       const processed = messages.map(message => {
         if (message.isBot && !message.structuredData) {
           try {
@@ -78,7 +78,8 @@ const ChatCard = ({
               ...message,
               structuredData: parseResult.structuredData,
               yusrai_powered: parseResult.metadata.yusrai_powered || false,
-              seven_sections_validated: parseResult.metadata.seven_sections_validated || false
+              seven_sections_validated: parseResult.metadata.seven_sections_validated || false,
+              error_help_available: parseResult.metadata.error_help_available || false
             };
             
             console.log('🔄 Enhanced message processing:', {
@@ -88,6 +89,11 @@ const ChatCard = ({
               sevenSectionsValidated: updatedMessage.seven_sections_validated,
               isPlainText: parseResult.isPlainText
             });
+            
+            // Save to database if we have structured data
+            if (parseResult.structuredData) {
+              saveAutomationResponse(updatedMessage);
+            }
             
             return updatedMessage;
           } catch (error) {
@@ -102,7 +108,7 @@ const ChatCard = ({
     };
 
     processMessages();
-  }, [messages]);
+  }, [messages, user?.id, automationId]);
 
   const optimizedMessages = enhancedMessages.slice(-50);
 
@@ -197,8 +203,10 @@ const ChatCard = ({
     if (!latestBotMessage?.structuredData) return false;
 
     const structuredData = latestBotMessage.structuredData;
-    const platforms = structuredData.platforms || [];
-    const agents = structuredData.agents || [];
+    
+    // CRITICAL FIX: Safe array handling to prevent "every is not a function" errors
+    const platforms = Array.isArray(structuredData.platforms) ? structuredData.platforms : [];
+    const agents = Array.isArray(structuredData.agents) ? structuredData.agents : [];
     
     // Check if all platforms have credentials saved/tested
     const allPlatformsConfigured = platforms.length === 0 || platforms.every(platform => 
@@ -292,7 +300,34 @@ const ChatCard = ({
     };
   };
 
-  // Get latest structured data and platforms
+  // CRITICAL FIX: Add data persistence for automation responses
+  const saveAutomationResponse = async (messageData: Message) => {
+    if (!user?.id || !messageData.isBot || !messageData.structuredData) return;
+    
+    try {
+        const { error } = await supabase.from('automation_responses').insert({
+          user_id: user.id,
+          automation_id: automationId,
+          chat_message_id: messageData.id,
+          response_text: messageData.text,
+          structured_data: messageData.structuredData as any,
+          yusrai_powered: messageData.yusrai_powered || false,
+          seven_sections_validated: messageData.seven_sections_validated || false,
+          error_help_available: messageData.error_help_available || false,
+          is_ready_for_execution: checkReadyForExecution()
+        });
+      
+      if (error) {
+        console.error('❌ Failed to save automation response:', error);
+      } else {
+        console.log('✅ Automation response saved successfully');
+      }
+    } catch (error) {
+      console.error('❌ Error saving automation response:', error);
+    }
+  };
+
+  // Get latest structured data and platforms with SAFE ARRAY HANDLING
   const getLatestStructuredData = () => {
     const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
     return latestBotMessage?.structuredData || null;
@@ -300,14 +335,17 @@ const ChatCard = ({
 
   const getLatestPlatforms = () => {
     const structuredData = getLatestStructuredData();
-    return structuredData?.platforms || [];
+    const platforms = structuredData?.platforms;
+    // CRITICAL FIX: Ensure we always return an array
+    return Array.isArray(platforms) ? platforms : [];
   };
 
   // ENHANCED: Transform YusrAI platform format to PlatformButtons format with comprehensive data mapping
   const transformPlatformsForButtons = (yusraiPlatforms: any[]) => {
     console.log('🔄 Transforming platforms for buttons:', yusraiPlatforms);
     
-    if (!yusraiPlatforms || !Array.isArray(yusraiPlatforms)) {
+    // CRITICAL FIX: Ensure safe array handling
+    if (!Array.isArray(yusraiPlatforms)) {
       console.log('⚠️ No platforms array found, returning empty array');
       return [];
     }
@@ -315,15 +353,22 @@ const ChatCard = ({
     const transformedPlatforms = yusraiPlatforms.map((platform, index) => {
       console.log(`🔄 Processing platform ${index + 1}:`, platform);
       
+      // ENHANCED: Handle multiple credential field name variations
+      const credentials = platform.credentials || 
+                         platform.required_credentials || 
+                         platform.credential_requirements ||
+                         platform.fields ||
+                         [];
+      
       const transformedPlatform = {
-        name: platform.name || platform.platform_name || 'Unknown Platform',
-        credentials: (platform.credentials || platform.required_credentials || []).map((cred: any) => ({
-          field: cred.field || cred.name || 'unknown_field',
-          placeholder: cred.example || cred.placeholder || `Enter ${cred.field || 'credential'}`,
-          link: cred.link || cred.where_to_get || cred.documentation_url || '#',
-          why_needed: cred.why_needed || cred.description || 'Authentication required'
-        })),
-        test_payloads: platform.test_payloads || platform.test_payload || []
+        name: platform.name || platform.platform_name || platform.platform || `Platform ${index + 1}`,
+        credentials: Array.isArray(credentials) ? credentials.map((cred: any) => ({
+          field: cred.field || cred.name || cred.key || 'api_key',
+          placeholder: cred.example || cred.placeholder || cred.description || `Enter ${cred.field || 'credential'}`,
+          link: cred.link || cred.where_to_get || cred.documentation_url || cred.url || '#',
+          why_needed: cred.why_needed || cred.description || cred.purpose || 'Authentication required'
+        })) : [],
+        test_payloads: platform.test_payloads || platform.test_payload || platform.test_data || []
       };
       
       console.log(`✅ Transformed platform:`, transformedPlatform);
@@ -499,16 +544,27 @@ const ChatCard = ({
         </ScrollArea>
       </div>
 
-      {/* Enhanced Platform Buttons Outside Card */}
-      {getLatestPlatforms().length > 0 && (
-        <div className="mt-4">
-          <FixedPlatformButtons
-            platforms={transformPlatformsForButtons(getLatestPlatforms())}
-            automationId={automationId}
-            onCredentialChange={onPlatformCredentialChange}
-          />
-        </div>
-      )}
+      {/* ENHANCED: Platform credentials display below chat with safe array handling */}
+      {(() => {
+        const platforms = getLatestPlatforms();
+        console.log('🔧 Rendering platform buttons section:', { platformsCount: platforms.length, platforms });
+        
+        if (platforms.length > 0) {
+          const transformedPlatforms = transformPlatformsForButtons(platforms);
+          console.log('🔧 Transformed platforms for rendering:', transformedPlatforms);
+          
+          return (
+            <div className="mt-6">
+              <FixedPlatformButtons
+                platforms={transformedPlatforms}
+                automationId={automationId}
+                onCredentialChange={onPlatformCredentialChange}
+              />
+            </div>
+          );
+        }
+        return null;
+      })()}
     </div>
   );
 };

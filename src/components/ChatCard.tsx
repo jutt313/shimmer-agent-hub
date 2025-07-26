@@ -65,58 +65,51 @@ const ChatCard = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // HEADQUARTERS INTEGRATION: Use central data hub for all processing
+  // SIMPLIFIED PARSING: Direct parsing without headquarters complexity
   useEffect(() => {
-    const processMessages = async () => {
-      const { automationDataHub } = await import('@/utils/automationDataHub');
-      
-      const processed = await Promise.all(messages.map(async (message) => {
-        if (message.isBot && !message.structuredData && user?.id) {
+    const processMessages = () => {
+      const processed = messages.map((message) => {
+        if (message.isBot && !message.structuredData) {
           try {
-            // Use headquarters for comprehensive processing
-            const result = await automationDataHub.processAutomationResponse(
-              message.text,
-              user.id,
-              automationId,
-              message.id
-            );
+            console.log('🔍 Processing bot message:', message.text.substring(0, 200));
             
-            if (result.success && result.data) {
+            // Use direct parsing instead of headquarters
+            const parseResult = parseYusrAIStructuredResponse(message.text);
+            
+            if (parseResult.structuredData) {
               const updatedMessage = {
                 ...message,
-                structuredData: result.data.structuredData,
-                yusrai_powered: result.data.metadata.yusrai_powered || false,
-                seven_sections_validated: result.data.metadata.seven_sections_validated || false,
-                error_help_available: result.data.metadata.error_help_available || false
+                structuredData: parseResult.structuredData,
+                yusrai_powered: parseResult.metadata.yusrai_powered || false,
+                seven_sections_validated: parseResult.metadata.seven_sections_validated || false,
+                error_help_available: parseResult.metadata.error_help_available || false
               };
               
-              console.log('🏢 Headquarters processing completed:', {
+              console.log('✅ Direct parsing successful:', {
                 messageId: message.id,
-                hasStructuredData: !!result.data.structuredData,
-                platformsCount: result.data.platformsForButtons.length,
-                hasBlueprintData: !!result.data.blueprintData
+                hasStructuredData: !!parseResult.structuredData,
+                hasSteps: !!parseResult.structuredData.steps?.length,
+                hasPlatforms: !!parseResult.structuredData.platforms?.length
               });
               
               return updatedMessage;
             } else {
-              console.log('❌ Headquarters processing failed:', result.error);
+              console.log('📄 Plain text message, no structured data');
               return message;
             }
           } catch (error) {
-            console.log('❌ Headquarters error:', error);
+            console.log('❌ Parsing error:', error);
             return message;
           }
         }
         return message;
-      }));
+      });
       
       setEnhancedMessages(processed);
     };
 
-    if (user?.id) {
-      processMessages();
-    }
-  }, [messages, user?.id, automationId]);
+    processMessages();
+  }, [messages]);
 
   const optimizedMessages = enhancedMessages.slice(-50);
 

@@ -43,7 +43,7 @@ const SimpleYusrAIDisplay: React.FC<SimpleYusrAIDisplayProps> = ({
           <div className="space-y-2">
             {data.steps.map((step, index) => (
               <p key={index} className="leading-relaxed">
-                {typeof step === 'string' ? step : `Step ${index + 1}`}
+                {step || `Step ${index + 1}: Details not available`}
               </p>
             ))}
           </div>
@@ -80,7 +80,7 @@ const SimpleYusrAIDisplay: React.FC<SimpleYusrAIDisplayProps> = ({
           <div className="space-y-2">
             {data.clarification_questions.map((question, index) => (
               <p key={index} className="leading-relaxed">
-                {typeof question === 'string' ? question : `Question ${index + 1}`}
+                {question || `Question ${index + 1}: Not specified`}
               </p>
             ))}
           </div>
@@ -95,7 +95,7 @@ const SimpleYusrAIDisplay: React.FC<SimpleYusrAIDisplayProps> = ({
             {data.agents.map((agent, index) => (
               <div key={index}>
                 <p className="font-medium text-pink-700 mb-1">
-                  {agent.name} ({agent.role})
+                  {agent.name || `Agent ${index + 1}`} ({agent.role || 'Custom'})
                 </p>
                 <div className="ml-4 space-y-1">
                   <p className="text-sm text-gray-600">

@@ -258,12 +258,25 @@ const AutomationDetail = () => {
         };
       });
 
-      // CRITICAL FIX: Extract platforms from all structured messages with enhanced logging
+      // SIMPLIFIED: Extract platforms from text for credential buttons
       const allPlatforms: any[] = [];
+      const commonPlatforms = ['Discord', 'OpenAI', 'Typeform', 'Slack', 'Gmail', 'Google Sheets', 'Zapier', 'Microsoft Teams', 'Notion', 'Airtable'];
+      
       formattedMessages.forEach(msg => {
-        if (msg.isBot && msg.structuredData?.platforms) {
-          console.log('🔗 Found platforms in message:', msg.structuredData.platforms.map((p: any) => p.name));
-          allPlatforms.push(...msg.structuredData.platforms);
+        if (msg.isBot) {
+          commonPlatforms.forEach(platform => {
+            if (msg.text.toLowerCase().includes(platform.toLowerCase())) {
+              allPlatforms.push({
+                name: platform,
+                credentials: [{ 
+                  field: 'api_key', 
+                  placeholder: 'Enter your API key',
+                  link: '#',
+                  why_needed: 'Authentication required' 
+                }]
+              });
+            }
+          });
         }
       });
       
@@ -272,10 +285,10 @@ const AutomationDetail = () => {
       );
       
       if (uniquePlatforms.length > 0) {
-        console.log('🔗 Setting unique platforms from chat history:', uniquePlatforms.map(p => p.name));
+        console.log('🔗 Setting platforms from text extraction:', uniquePlatforms.map(p => p.name));
         setCurrentPlatforms(uniquePlatforms);
       } else {
-        console.log('⚠️ No platforms found in chat history');
+        console.log('⚠️ No platforms found in messages');
       }
 
       if (formattedMessages.length === 0) {

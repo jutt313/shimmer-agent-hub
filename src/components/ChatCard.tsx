@@ -26,6 +26,15 @@ interface Message {
   error_help_available?: boolean;
   yusrai_powered?: boolean;
   seven_sections_validated?: boolean;
+  platformData?: Array<{
+    name: string;
+    credentials: Array<{
+      field: string;
+      placeholder: string;
+      link: string;
+      why_needed: string;
+    }>;
+  }>;
 }
 
 interface ChatCardProps {
@@ -66,42 +75,44 @@ const ChatCard = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // SIMPLIFIED MESSAGE PROCESSING: Direct parsing without GHQ for better reliability
+  // SIMPLIFIED MESSAGE PROCESSING: Extract platforms for credential buttons only
   useEffect(() => {
     const processMessages = () => {
       const processed = messages.map((message) => {
         if (message.isBot && !message.structuredData) {
           try {
-            console.log('🔍 Processing message with enhanced parser:', message.text.substring(0, 200));
+            console.log('🔍 Extracting platforms from message for credential buttons:', message.text.substring(0, 200));
             
-            // Use direct enhanced parser instead of GHQ
-            const parseResult = parseYusrAIStructuredResponse(message.text);
+            // Simple text extraction for platform names
+            const platformNames = [];
+            const commonPlatforms = ['Discord', 'OpenAI', 'Typeform', 'Slack', 'Gmail', 'Google Sheets', 'Zapier', 'Microsoft Teams', 'Notion', 'Airtable'];
             
-            if (parseResult.structuredData) {
+            commonPlatforms.forEach(platform => {
+              if (message.text.toLowerCase().includes(platform.toLowerCase())) {
+                platformNames.push({
+                  name: platform,
+                  credentials: [{ 
+                    field: 'api_key', 
+                    placeholder: 'Enter your API key',
+                    link: '#',
+                    why_needed: 'Authentication required' 
+                  }]
+                });
+              }
+            });
+            
+            // Only set basic platform data if found
+            if (platformNames.length > 0) {
               const updatedMessage = {
                 ...message,
-                structuredData: parseResult.structuredData,
-                yusrai_powered: parseResult.metadata.yusrai_powered,
-                seven_sections_validated: parseResult.metadata.seven_sections_validated,
-                error_help_available: parseResult.metadata.error_help_available
+                platformData: platformNames // Simple platform data for credential buttons
               };
               
-              console.log('✅ Enhanced parsing successful:', {
-                messageId: message.id,
-                hasStructuredData: !!parseResult.structuredData,
-                platformsCount: parseResult.structuredData.platforms.length,
-                agentsCount: parseResult.structuredData.agents.length,
-                platformNames: parseResult.structuredData.platforms.map(p => p.name)
-              });
-              
+              console.log('✅ Platforms extracted:', platformNames.map(p => p.name));
               return updatedMessage;
-            } else {
-              console.log('📄 Plain text message detected');
-              return message;
             }
           } catch (error) {
-            console.log('❌ Enhanced parsing error:', error);
-            return message;
+            console.log('❌ Platform extraction error:', error);
           }
         }
         return message;
@@ -282,17 +293,10 @@ const ChatCard = ({
     }
   };
 
-  // Get latest structured data and platforms with SAFE ARRAY HANDLING
-  const getLatestStructuredData = () => {
-    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
-    return latestBotMessage?.structuredData || null;
-  };
-
+  // Get latest platforms from text extraction
   const getLatestPlatforms = () => {
-    const structuredData = getLatestStructuredData();
-    const platforms = structuredData?.platforms;
-    // CRITICAL FIX: Ensure we always return an array
-    return Array.isArray(platforms) ? platforms : [];
+    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.platformData).pop();
+    return latestBotMessage?.platformData || [];
   };
 
   // ENHANCED: Transform YusrAI platform format to PlatformButtons format with comprehensive data mapping
@@ -345,61 +349,6 @@ const ChatCard = ({
       >
         <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/20 to-purple-100/20 pointer-events-none"></div>
         
-        {/* View Code and Blueprint buttons */}
-        {getCompleteAutomationJSON() && (
-          <div className="absolute top-4 right-4 z-20 flex gap-2">
-            <Dialog open={showBlueprintModal} onOpenChange={setShowBlueprintModal}>
-              <DialogTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="bg-white/90 backdrop-blur-sm border-purple-200 text-purple-600 hover:bg-purple-50 hover:text-purple-700 shadow-lg"
-                >
-                  Blueprint
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-6xl max-h-[80vh] overflow-hidden">
-                <DialogHeader>
-                  <DialogTitle className="text-lg font-semibold text-purple-600">
-                    YusrAI Execution Blueprint Visualizer
-                  </DialogTitle>
-                </DialogHeader>
-                <ScrollArea className="h-[60vh] w-full">
-                  <ExecutionBlueprintVisualizer 
-                    blueprint={getCompleteAutomationJSON()?.yusrai_response?.execution_blueprint} 
-                  />
-                </ScrollArea>
-              </DialogContent>
-            </Dialog>
-            
-            <Dialog open={showCodeModal} onOpenChange={setShowCodeModal}>
-              <DialogTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="bg-white/90 backdrop-blur-sm border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 shadow-lg"
-                >
-                  <Code className="w-4 h-4 mr-1" />
-                  View Code
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
-                <DialogHeader>
-                  <DialogTitle className="text-lg font-semibold text-blue-600">
-                    Complete YusrAI Automation JSON
-                  </DialogTitle>
-                </DialogHeader>
-                <ScrollArea className="h-[60vh] w-full">
-                  <pre className="bg-gray-900 text-green-400 p-4 rounded-lg text-xs overflow-x-auto">
-                    <code>
-                      {JSON.stringify(getCompleteAutomationJSON(), null, 2)}
-                    </code>
-                  </pre>
-                </ScrollArea>
-              </DialogContent>
-            </Dialog>
-          </div>
-        )}
         
         <ScrollArea className="flex-1 relative z-10 p-6 overflow-y-auto" ref={scrollAreaRef}>
           <div className="space-y-6 pb-4 min-h-full">
@@ -435,27 +384,37 @@ const ChatCard = ({
                       </div>
                     )}
 
-                    {/* SIMPLIFIED DISPLAY: Use simple text format as requested */}
-                     {message.isBot && message.structuredData ? (
-                        <div className="leading-relaxed space-y-4">
-                          <YusrAIStructuredDisplay 
-                            data={message.structuredData} 
-                            onAgentAdd={handleAgentAdd}
-                            onAgentDismiss={handleAgentDismiss}
-                            dismissedAgents={dismissedAgents}
-                          />
-                       </div>
-                     ) : (
-                      <div className="leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
-                        {safeFormatMessageText(message.text)}
-                        {message.isBot && message.error_help_available && (
-                          <ErrorHelpButton 
-                            errorMessage={message.text}
-                            onHelpRequest={() => handleErrorHelp(message.text)}
-                          />
-                        )}
-                      </div>
-                    )}
+                    {/* RAW TEXT DISPLAY: Show ChatAI responses as raw text only */}
+                    <div className="leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
+                      {safeFormatMessageText(message.text)}
+                      
+                      {/* Simple agent buttons inline */}
+                      {message.isBot && message.platformData && message.platformData.length > 0 && (
+                        <div className="mt-4 space-y-2">
+                          <div className="text-sm font-medium text-gray-600">Quick Actions:</div>
+                          <div className="flex flex-wrap gap-2">
+                            {message.platformData.map((platform: any, idx: number) => (
+                              <Button
+                                key={idx}
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handlePlatformCredentialClick(platform.name)}
+                                className="text-xs"
+                              >
+                                Setup {platform.name}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {message.isBot && message.error_help_available && (
+                        <ErrorHelpButton 
+                          errorMessage={message.text}
+                          onHelpRequest={() => handleErrorHelp(message.text)}
+                        />
+                      )}
+                    </div>
                     
                     <p className={`text-xs mt-3 ${message.isBot ? 'text-gray-500' : 'text-blue-100'}`}>
                       {message.timestamp.toLocaleTimeString([], {
@@ -494,22 +453,22 @@ const ChatCard = ({
         </ScrollArea>
       </div>
 
-      {/* ENHANCED: Platform credentials display below chat with safe array handling */}
+      {/* Platform credentials section */}
       {(() => {
         const platforms = getLatestPlatforms();
         console.log('🔧 Rendering platform buttons section:', { platformsCount: platforms.length, platforms });
         
         if (platforms.length > 0) {
-          const transformedPlatforms = transformPlatformsForButtons(platforms);
-          console.log('🔧 Transformed platforms for rendering:', transformedPlatforms);
-          
           return (
             <div className="mt-6">
-              <FixedPlatformButtons
-                platforms={transformedPlatforms}
-                automationId={automationId}
-                onCredentialChange={onPlatformCredentialChange}
-              />
+              <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-lg border p-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Platform Credentials Setup</h3>
+                <FixedPlatformButtons
+                  platforms={platforms}
+                  automationId={automationId}
+                  onCredentialChange={onPlatformCredentialChange}
+                />
+              </div>
             </div>
           );
         }

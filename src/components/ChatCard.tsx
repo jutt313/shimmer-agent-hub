@@ -11,10 +11,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { agentStateManager } from '@/utils/agentStateManager';
 import ErrorHelpButton from './ErrorHelpButton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import YusrAIStructuredDisplay from './YusrAIStructuredDisplay';
+import SimpleYusrAIDisplay from './SimpleYusrAIDisplay';
 import ExecutionBlueprintVisualizer from './ExecutionBlueprintVisualizer';
 import { FlagPropagationLogger } from '@/utils/flagPropagationLogger';
-import FixedPlatformButtons from './FixedPlatformButtons';
+import EnhancedPlatformButtons from './EnhancedPlatformButtons';
 
 interface Message {
   id: number;
@@ -65,49 +65,57 @@ const ChatCard = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // Enhanced message processing with data persistence and safe array handling
+  // HEADQUARTERS INTEGRATION: Use central data hub for all processing
   useEffect(() => {
     const processMessages = async () => {
-      const processed = messages.map(message => {
-        if (message.isBot && !message.structuredData) {
+      const { automationDataHub } = await import('@/utils/automationDataHub');
+      
+      const processed = await Promise.all(messages.map(async (message) => {
+        if (message.isBot && !message.structuredData && user?.id) {
           try {
-            const parseResult = parseYusrAIStructuredResponse(message.text);
+            // Use headquarters for comprehensive processing
+            const result = await automationDataHub.processAutomationResponse(
+              message.text,
+              user.id,
+              automationId,
+              message.id
+            );
             
-            // CRITICAL FIX: Always set flags based on parse result
-            const updatedMessage = {
-              ...message,
-              structuredData: parseResult.structuredData,
-              yusrai_powered: parseResult.metadata.yusrai_powered || false,
-              seven_sections_validated: parseResult.metadata.seven_sections_validated || false,
-              error_help_available: parseResult.metadata.error_help_available || false
-            };
-            
-            console.log('🔄 Enhanced message processing:', {
-              messageId: message.id,
-              hasStructuredData: !!parseResult.structuredData,
-              yusraiPowered: updatedMessage.yusrai_powered,
-              sevenSectionsValidated: updatedMessage.seven_sections_validated,
-              isPlainText: parseResult.isPlainText
-            });
-            
-            // Save to database if we have structured data
-            if (parseResult.structuredData) {
-              saveAutomationResponse(updatedMessage);
+            if (result.success && result.data) {
+              const updatedMessage = {
+                ...message,
+                structuredData: result.data.structuredData,
+                yusrai_powered: result.data.metadata.yusrai_powered || false,
+                seven_sections_validated: result.data.metadata.seven_sections_validated || false,
+                error_help_available: result.data.metadata.error_help_available || false
+              };
+              
+              console.log('🏢 Headquarters processing completed:', {
+                messageId: message.id,
+                hasStructuredData: !!result.data.structuredData,
+                platformsCount: result.data.platformsForButtons.length,
+                hasBlueprintData: !!result.data.blueprintData
+              });
+              
+              return updatedMessage;
+            } else {
+              console.log('❌ Headquarters processing failed:', result.error);
+              return message;
             }
-            
-            return updatedMessage;
           } catch (error) {
-            console.log('Could not parse structured data:', error);
+            console.log('❌ Headquarters error:', error);
             return message;
           }
         }
         return message;
-      });
+      }));
       
       setEnhancedMessages(processed);
     };
 
-    processMessages();
+    if (user?.id) {
+      processMessages();
+    }
   }, [messages, user?.id, automationId]);
 
   const optimizedMessages = enhancedMessages.slice(-50);
@@ -480,22 +488,12 @@ const ChatCard = ({
                       </div>
                     )}
 
-                    {/* FIXED DISPLAY LOGIC: Show structured UI when we have structured data */}
-                    {message.isBot && message.structuredData ? (
-                      <div className="leading-relaxed space-y-4">
-                        <YusrAIStructuredDisplay
-                          data={message.structuredData}
-                          onAgentAdd={handleAgentAdd}
-                          onAgentDismiss={handleAgentDismiss}
-                          dismissedAgents={dismissedAgents}
-                          onPlatformCredentialClick={handlePlatformCredentialClick}
-                          platformCredentialStatus={platformCredentialStatus}
-                          onTestCredentials={testPlatformCredentials}
-                          onExecuteAutomation={handleExecuteAutomation}
-                          isReadyForExecution={checkReadyForExecution()}
-                        />
-                      </div>
-                    ) : (
+                    {/* SIMPLIFIED DISPLAY: Use simple text format as requested */}
+                     {message.isBot && message.structuredData ? (
+                       <div className="leading-relaxed space-y-4">
+                         <SimpleYusrAIDisplay data={message.structuredData} />
+                       </div>
+                     ) : (
                       <div className="leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
                         {safeFormatMessageText(message.text)}
                         {message.isBot && message.error_help_available && (
@@ -555,9 +553,10 @@ const ChatCard = ({
           
           return (
             <div className="mt-6">
-              <FixedPlatformButtons
+              <EnhancedPlatformButtons
                 platforms={transformedPlatforms}
                 automationId={automationId}
+                userId={user?.id || ''}
                 onCredentialChange={onPlatformCredentialChange}
               />
             </div>

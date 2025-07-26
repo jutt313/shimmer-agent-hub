@@ -66,60 +66,52 @@ const ChatCard = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // GHQ INTEGRATION: Use headquarters for comprehensive processing
+  // SIMPLIFIED MESSAGE PROCESSING: Direct parsing without GHQ for better reliability
   useEffect(() => {
-    const processMessages = async () => {
-      if (!user?.id) return;
-
-      const processed = await Promise.all(messages.map(async (message) => {
+    const processMessages = () => {
+      const processed = messages.map((message) => {
         if (message.isBot && !message.structuredData) {
           try {
-            console.log('🏢 Processing message through GHQ:', message.text.substring(0, 200));
+            console.log('🔍 Processing message with enhanced parser:', message.text.substring(0, 200));
             
-            // Use GHQ for comprehensive processing
-            const result = await GHQ.processAutomationResponse(
-              message.text,
-              user.id,
-              automationId,
-              message.id
-            );
+            // Use direct enhanced parser instead of GHQ
+            const parseResult = parseYusrAIStructuredResponse(message.text);
             
-            if (result.success && result.data) {
+            if (parseResult.structuredData) {
               const updatedMessage = {
                 ...message,
-                structuredData: result.data.structuredData,
-                yusrai_powered: result.data.metadata.yusrai_powered,
-                seven_sections_validated: result.data.metadata.seven_sections_validated,
-                error_help_available: result.data.metadata.error_help_available
+                structuredData: parseResult.structuredData,
+                yusrai_powered: parseResult.metadata.yusrai_powered,
+                seven_sections_validated: parseResult.metadata.seven_sections_validated,
+                error_help_available: parseResult.metadata.error_help_available
               };
               
-              console.log('✅ GHQ processing successful:', {
+              console.log('✅ Enhanced parsing successful:', {
                 messageId: message.id,
-                hasStructuredData: !!result.data.structuredData,
-                platformsCount: result.data.platformsForButtons.length,
-                agentsCount: result.data.agentsForDecision.length
+                hasStructuredData: !!parseResult.structuredData,
+                platformsCount: parseResult.structuredData.platforms.length,
+                agentsCount: parseResult.structuredData.agents.length,
+                platformNames: parseResult.structuredData.platforms.map(p => p.name)
               });
               
               return updatedMessage;
             } else {
-              console.log('📄 Plain text message from GHQ');
+              console.log('📄 Plain text message detected');
               return message;
             }
           } catch (error) {
-            console.log('❌ GHQ processing error:', error);
+            console.log('❌ Enhanced parsing error:', error);
             return message;
           }
         }
         return message;
-      }));
+      });
       
       setEnhancedMessages(processed);
     };
 
-    if (user?.id) {
-      processMessages();
-    }
-  }, [messages, user?.id, automationId]);
+    processMessages();
+  }, [messages]);
 
   const optimizedMessages = enhancedMessages.slice(-50);
 
@@ -446,7 +438,12 @@ const ChatCard = ({
                     {/* SIMPLIFIED DISPLAY: Use simple text format as requested */}
                      {message.isBot && message.structuredData ? (
                         <div className="leading-relaxed space-y-4">
-                          <YusrAIStructuredDisplay data={message.structuredData} />
+                          <YusrAIStructuredDisplay 
+                            data={message.structuredData} 
+                            onAgentAdd={handleAgentAdd}
+                            onAgentDismiss={handleAgentDismiss}
+                            dismissedAgents={dismissedAgents}
+                          />
                        </div>
                      ) : (
                       <div className="leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">

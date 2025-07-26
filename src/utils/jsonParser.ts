@@ -184,6 +184,34 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('🔗 Mapped platform_integrations to platforms:', parsedResponse.platforms.length);
     }
 
+    // CRITICAL FIX: Ensure platform names are properly extracted and not generic
+    if (parsedResponse.platforms && Array.isArray(parsedResponse.platforms)) {
+      parsedResponse.platforms = parsedResponse.platforms.map((platform: any, index: number) => {
+        // Extract real platform names from various possible field names
+        const platformName = platform.name || 
+                            platform.platform_name || 
+                            platform.platform || 
+                            platform.service || 
+                            platform.integration ||
+                            platform.tool ||
+                            `Platform ${index + 1}`;
+        
+        console.log(`🔍 Processing platform ${index + 1}: extracted name "${platformName}"`);
+        
+        return {
+          ...platform,
+          name: platformName,
+          // Ensure credentials field exists and is properly mapped
+          credentials: platform.credentials || 
+                      platform.required_credentials || 
+                      platform.credential_requirements ||
+                      platform.fields ||
+                      []
+        };
+      });
+      console.log('✅ Enhanced platform name extraction completed');
+    }
+
     // ENHANCED AI AGENTS MAPPING - Fix all agent field variations
     if (parsedResponse.ai_agents_section?.agents && !parsedResponse.agents) {
       parsedResponse.agents = Array.isArray(parsedResponse.ai_agents_section.agents) 

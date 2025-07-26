@@ -19,7 +19,7 @@ import { agentStateManager } from '@/utils/agentStateManager';
 import { extractBlueprintFromStructuredData, validateBlueprintForDiagram, ensureBlueprintHasSteps } from '@/utils/blueprintExtractor';
 import { FlagPropagationLogger } from '@/utils/flagPropagationLogger';
 import { GHQ } from '@/utils/GHQ';
-import GHQAutomationExecuteButton from '@/components/GHQAutomationExecuteButton';
+import SimpleExecuteButton from '@/components/SimpleExecuteButton';
 
 interface Automation {
   id: string;
@@ -224,8 +224,9 @@ const AutomationDetail = () => {
 
       if (chatError) throw chatError;
 
+      // CRITICAL FIX: Map database field names correctly to avoid crashes
       const formattedMessages = chatData.map((chat: ChatMessage, index: number) => {
-        console.log('🔄 PHASE 1: Processing stored chat message:', chat.message_content.substring(0, 100));
+        console.log('🔄 Processing stored chat message:', chat.message_content.substring(0, 100));
         
         let structuredData = null;
         let yusraiPowered = false;
@@ -237,16 +238,10 @@ const AutomationDetail = () => {
           yusraiPowered = parseResult.metadata.yusrai_powered || false;
           sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
           
-          FlagPropagationLogger.logFlagState(
-            yusraiPowered,
-            sevenSectionsValidated,
-            `fetchAutomationAndChats - message ${index + 1}`,
-            !!structuredData,
-            structuredData ? Object.keys(structuredData) : undefined
-          );
-          
-          console.log('📦 PHASE 1: Enhanced parsing result:', {
+          console.log('📦 Enhanced parsing result:', {
             hasStructuredData: !!structuredData,
+            platformsCount: structuredData?.platforms?.length || 0,
+            platformNames: structuredData?.platforms?.map((p: any) => p.name) || [],
             yusraiPowered,
             sevenSectionsValidated
           });
@@ -254,18 +249,20 @@ const AutomationDetail = () => {
 
         return {
           id: index + 1,
-          text: chat.message_content,
-          isBot: chat.sender === 'ai',
-          timestamp: new Date(chat.timestamp),
+          text: chat.message_content, // Correct field mapping
+          isBot: chat.sender === 'ai', // Correct field mapping
+          timestamp: new Date(chat.timestamp), // Correct field mapping
           structuredData,
           yusrai_powered: yusraiPowered,
           seven_sections_validated: sevenSectionsValidated
         };
       });
 
+      // CRITICAL FIX: Extract platforms from all structured messages with enhanced logging
       const allPlatforms: any[] = [];
       formattedMessages.forEach(msg => {
         if (msg.isBot && msg.structuredData?.platforms) {
+          console.log('🔗 Found platforms in message:', msg.structuredData.platforms.map((p: any) => p.name));
           allPlatforms.push(...msg.structuredData.platforms);
         }
       });
@@ -275,8 +272,10 @@ const AutomationDetail = () => {
       );
       
       if (uniquePlatforms.length > 0) {
-        console.log('🔗 PHASE 1: Setting platforms from chat history:', uniquePlatforms);
+        console.log('🔗 Setting unique platforms from chat history:', uniquePlatforms.map(p => p.name));
         setCurrentPlatforms(uniquePlatforms);
+      } else {
+        console.log('⚠️ No platforms found in chat history');
       }
 
       if (formattedMessages.length === 0) {
@@ -674,11 +673,8 @@ const AutomationDetail = () => {
 
       {!showDashboard && !showDiagram && automation?.automation_blueprint && (
         <div className="px-6 pb-4">
-          <GHQAutomationExecuteButton
+          <SimpleExecuteButton
             automationId={automation.id}
-            onExecutionComplete={(result) => {
-              console.log('🎉 Execution completed via GHQ:', result);
-            }}
           />
         </div>
       )}

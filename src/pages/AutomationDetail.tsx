@@ -18,6 +18,8 @@ import { parseStructuredResponse, parseYusrAIStructuredResponse, cleanDisplayTex
 import { agentStateManager } from '@/utils/agentStateManager';
 import { extractBlueprintFromStructuredData, validateBlueprintForDiagram, ensureBlueprintHasSteps } from '@/utils/blueprintExtractor';
 import { FlagPropagationLogger } from '@/utils/flagPropagationLogger';
+import { GHQ } from '@/utils/GHQ';
+import GHQAutomationExecuteButton from '@/components/GHQAutomationExecuteButton';
 
 interface Automation {
   id: string;
@@ -196,7 +198,11 @@ const AutomationDetail = () => {
       if (automationError) throw automationError;
 
       const automationData: Automation = {
-        ...data,
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        status: data.status,
+        created_at: data.created_at,
         automation_blueprint: data.automation_blueprint as AutomationBlueprint | null,
         automation_diagram_data: data.automation_diagram_data as { nodes: any[]; edges: any[] } | null
       };
@@ -667,11 +673,14 @@ const AutomationDetail = () => {
       )}
 
       {!showDashboard && !showDiagram && automation?.automation_blueprint && (
-        <AutomationExecutionPanel
-          automationId={automation.id}
-          blueprint={automation.automation_blueprint}
-          title={automation.title}
-        />
+        <div className="px-6 pb-4">
+          <GHQAutomationExecuteButton
+            automationId={automation.id}
+            onExecutionComplete={(result) => {
+              console.log('🎉 Execution completed via GHQ:', result);
+            }}
+          />
+        </div>
       )}
       
       {!showDashboard && !showDiagram && (

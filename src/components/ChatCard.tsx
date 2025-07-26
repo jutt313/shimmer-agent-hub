@@ -11,10 +11,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { agentStateManager } from '@/utils/agentStateManager';
 import ErrorHelpButton from './ErrorHelpButton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import SimpleYusrAIDisplay from './SimpleYusrAIDisplay';
+import YusrAIStructuredDisplay from './YusrAIStructuredDisplay';
 import ExecutionBlueprintVisualizer from './ExecutionBlueprintVisualizer';
 import { FlagPropagationLogger } from '@/utils/flagPropagationLogger';
-import EnhancedPlatformButtons from './EnhancedPlatformButtons';
+import FixedPlatformButtons from './FixedPlatformButtons';
+import { GHQ } from '@/utils/GHQ';
 
 interface Message {
   id: number;
@@ -65,51 +66,60 @@ const ChatCard = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // SIMPLIFIED PARSING: Direct parsing without headquarters complexity
+  // GHQ INTEGRATION: Use headquarters for comprehensive processing
   useEffect(() => {
-    const processMessages = () => {
-      const processed = messages.map((message) => {
+    const processMessages = async () => {
+      if (!user?.id) return;
+
+      const processed = await Promise.all(messages.map(async (message) => {
         if (message.isBot && !message.structuredData) {
           try {
-            console.log('🔍 Processing bot message:', message.text.substring(0, 200));
+            console.log('🏢 Processing message through GHQ:', message.text.substring(0, 200));
             
-            // Use direct parsing instead of headquarters
-            const parseResult = parseYusrAIStructuredResponse(message.text);
+            // Use GHQ for comprehensive processing
+            const result = await GHQ.processAutomationResponse(
+              message.text,
+              user.id,
+              automationId,
+              message.id
+            );
             
-            if (parseResult.structuredData) {
+            if (result.success && result.data) {
               const updatedMessage = {
                 ...message,
-                structuredData: parseResult.structuredData,
-                yusrai_powered: parseResult.metadata.yusrai_powered || false,
-                seven_sections_validated: parseResult.metadata.seven_sections_validated || false,
-                error_help_available: parseResult.metadata.error_help_available || false
+                structuredData: result.data.structuredData,
+                yusrai_powered: result.data.metadata.yusrai_powered,
+                seven_sections_validated: result.data.metadata.seven_sections_validated,
+                error_help_available: result.data.metadata.error_help_available
               };
               
-              console.log('✅ Direct parsing successful:', {
+              console.log('✅ GHQ processing successful:', {
                 messageId: message.id,
-                hasStructuredData: !!parseResult.structuredData,
-                hasSteps: !!parseResult.structuredData.steps?.length,
-                hasPlatforms: !!parseResult.structuredData.platforms?.length
+                hasStructuredData: !!result.data.structuredData,
+                platformsCount: result.data.platformsForButtons.length,
+                agentsCount: result.data.agentsForDecision.length
               });
               
               return updatedMessage;
             } else {
-              console.log('📄 Plain text message, no structured data');
+              console.log('📄 Plain text message from GHQ');
               return message;
             }
           } catch (error) {
-            console.log('❌ Parsing error:', error);
+            console.log('❌ GHQ processing error:', error);
             return message;
           }
         }
         return message;
-      });
+      }));
       
       setEnhancedMessages(processed);
     };
 
-    processMessages();
-  }, [messages]);
+    if (user?.id) {
+      processMessages();
+    }
+  }, [messages, user?.id, automationId]);
 
   const optimizedMessages = enhancedMessages.slice(-50);
 
@@ -233,57 +243,9 @@ const ChatCard = ({
   };
 
   const handleExecuteAutomation = async () => {
-    if (!user?.id) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to execute YusrAI automations",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
-    if (!latestBotMessage?.structuredData) {
-      toast({
-        title: "No YusrAI Automation Found",
-        description: "Please create a YusrAI automation first",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      console.log('🚀 Executing YusrAI automation');
-      
-      const { data, error } = await supabase.functions.invoke('execute-automation', {
-        body: {
-          automation_id: automationId,
-          automation_data: latestBotMessage.structuredData,
-          trigger_data: {
-            executed_at: new Date().toISOString(),
-            trigger_type: 'manual',
-            triggered_by: user.id
-          }
-        }
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      toast({
-        title: "🎉 YusrAI Automation Executed!",
-        description: `YusrAI automation completed successfully. Run ID: ${data.run_id}`,
-      });
-
-    } catch (error: any) {
-      console.error('💥 YusrAI execution error:', error);
-      toast({
-        title: "YusrAI Execution Error",
-        description: "An unexpected error occurred during YusrAI automation execution",
-        variant: "destructive",
-      });
-    }
+    console.log('🚀 GHQ execution will be handled by GHQAutomationExecuteButton');
+    // This method is now handled by GHQAutomationExecuteButton
+    // which includes proper readiness validation
   };
 
   const getCompleteAutomationJSON = () => {
@@ -483,8 +445,8 @@ const ChatCard = ({
 
                     {/* SIMPLIFIED DISPLAY: Use simple text format as requested */}
                      {message.isBot && message.structuredData ? (
-                       <div className="leading-relaxed space-y-4">
-                         <SimpleYusrAIDisplay data={message.structuredData} />
+                        <div className="leading-relaxed space-y-4">
+                          <YusrAIStructuredDisplay data={message.structuredData} />
                        </div>
                      ) : (
                       <div className="leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
@@ -546,10 +508,9 @@ const ChatCard = ({
           
           return (
             <div className="mt-6">
-              <EnhancedPlatformButtons
+              <FixedPlatformButtons
                 platforms={transformedPlatforms}
                 automationId={automationId}
-                userId={user?.id || ''}
                 onCredentialChange={onPlatformCredentialChange}
               />
             </div>

@@ -543,7 +543,7 @@ const ChatCard = ({
                               <DialogTitle>Automation Workflow Diagram</DialogTitle>
                             </DialogHeader>
                             <ExecutionBlueprintVisualizer 
-                              automationId={automationId}
+                              blueprint={message.structuredData.execution_blueprint}
                             />
                           </DialogContent>
                         </Dialog>

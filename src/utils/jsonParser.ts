@@ -87,6 +87,82 @@ export interface YusrAIParseResult {
   isPlainText: boolean;
 }
 
+// CRITICAL FIX: Enhanced platform name extraction with intelligent parsing
+const extractPlatformName = (platform: any, index: number): string => {
+  console.log(`🔍 Extracting platform name for index ${index}:`, platform);
+  
+  // Try direct name fields first
+  let platformName = platform.name || 
+                    platform.platform_name || 
+                    platform.platform || 
+                    platform.service || 
+                    platform.integration ||
+                    platform.tool;
+  
+  // If no direct name, analyze content for platform identification
+  if (!platformName || platformName === 'Platform 1' || platformName.includes('Platform ')) {
+    const description = platform.description || platform.why_needed || platform.usage || '';
+    const credentials = platform.credentials || platform.required_credentials || [];
+    
+    // Create searchable text from all available content
+    const searchableText = (description + ' ' + 
+                           credentials.map((c: any) => c.field + ' ' + c.why_needed).join(' ')).toLowerCase();
+    
+    console.log(`🔍 Analyzing content for platform detection: "${searchableText}"`);
+    
+    // Enhanced platform detection patterns
+    const platformPatterns = [
+      { pattern: 'typeform', name: 'Typeform' },
+      { pattern: 'openai', name: 'OpenAI' },
+      { pattern: 'gpt', name: 'OpenAI' },
+      { pattern: 'slack', name: 'Slack' },
+      { pattern: 'gmail', name: 'Gmail' },
+      { pattern: 'google mail', name: 'Gmail' },
+      { pattern: 'notion', name: 'Notion' },
+      { pattern: 'discord', name: 'Discord' },
+      { pattern: 'github', name: 'GitHub' },
+      { pattern: 'trello', name: 'Trello' },
+      { pattern: 'asana', name: 'Asana' },
+      { pattern: 'monday', name: 'Monday.com' },
+      { pattern: 'clickup', name: 'ClickUp' },
+      { pattern: 'zoom', name: 'Zoom' },
+      { pattern: 'teams', name: 'Microsoft Teams' },
+      { pattern: 'hubspot', name: 'HubSpot' },
+      { pattern: 'salesforce', name: 'Salesforce' },
+      { pattern: 'stripe', name: 'Stripe' },
+      { pattern: 'paypal', name: 'PayPal' },
+      { pattern: 'shopify', name: 'Shopify' },
+      { pattern: 'woocommerce', name: 'WooCommerce' },
+      { pattern: 'zapier', name: 'Zapier' },
+      { pattern: 'airtable', name: 'Airtable' },
+      { pattern: 'sheets', name: 'Google Sheets' },
+      { pattern: 'excel', name: 'Microsoft Excel' },
+      { pattern: 'dropbox', name: 'Dropbox' },
+      { pattern: 'drive', name: 'Google Drive' },
+      { pattern: 'api key', name: 'API Service' },
+      { pattern: 'webhook', name: 'Webhook Service' },
+      { pattern: 'database', name: 'Database' },
+      { pattern: 'email', name: 'Email Service' }
+    ];
+    
+    for (const { pattern, name } of platformPatterns) {
+      if (searchableText.includes(pattern)) {
+        console.log(`✅ Platform detected: "${name}" via pattern "${pattern}"`);
+        platformName = name;
+        break;
+      }
+    }
+  }
+  
+  // Final fallback with meaningful default
+  if (!platformName || platformName === 'Platform 1') {
+    platformName = `Service ${index + 1}`;
+  }
+  
+  console.log(`🎯 Final platform name: "${platformName}"`);
+  return platformName;
+};
+
 export function parseYusrAIStructuredResponse(responseText: string): YusrAIParseResult {
   try {
     console.log('🔍 YusrAI Parser - Processing response:', responseText.substring(0, 200) + '...')
@@ -160,9 +236,10 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       };
     }
 
-    // Map database field names to frontend expected names
+    // CRITICAL FIX: Enhanced field mapping with intelligent detection
     console.log('🔍 Validating and mapping structured sections...')
     
+    // Steps mapping
     if (parsedResponse.step_by_step_explanation && !parsedResponse.steps) {
       parsedResponse.steps = Array.isArray(parsedResponse.step_by_step_explanation) 
         ? parsedResponse.step_by_step_explanation 
@@ -170,7 +247,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('📋 Mapped step_by_step_explanation to steps:', parsedResponse.steps.length);
     }
 
-    // ENHANCED PLATFORM MAPPING - Fix platform names
+    // CRITICAL FIX: Enhanced platform mapping with intelligent name extraction
     if (parsedResponse.platforms_and_credentials && !parsedResponse.platforms) {
       parsedResponse.platforms = Array.isArray(parsedResponse.platforms_and_credentials) 
         ? parsedResponse.platforms_and_credentials 
@@ -185,57 +262,34 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('🔗 Mapped platform_integrations to platforms:', parsedResponse.platforms.length);
     }
 
-    // CRITICAL FIX: Extract real platform names from various possible field names
+    // CRITICAL FIX: Intelligent platform name extraction and credential mapping
     if (parsedResponse.platforms && Array.isArray(parsedResponse.platforms)) {
       parsedResponse.platforms = parsedResponse.platforms.map((platform: any, index: number) => {
-        // Try to extract platform name from text or structured data
-        let platformName = platform.name || 
-                          platform.platform_name || 
-                          platform.platform || 
-                          platform.service || 
-                          platform.integration ||
-                          platform.tool;
+        const platformName = extractPlatformName(platform, index);
         
-        // If no name found, try to extract from description or other fields
-        if (!platformName || platformName === 'Platform 1' || platformName.includes('Platform ')) {
-          // Look for platform names in description or other fields
-          const description = platform.description || platform.why_needed || '';
-          const lowerDesc = description.toLowerCase();
-          
-          // Common platform name patterns
-          const platformPatterns = [
-            'typeform', 'openai', 'slack', 'gmail', 'notion', 'discord', 'github',
-            'trello', 'asana', 'monday', 'clickup', 'zoom', 'teams', 'hubspot',
-            'salesforce', 'stripe', 'paypal', 'shopify', 'woocommerce', 'zapier',
-            'airtable', 'google sheets', 'microsoft excel', 'dropbox', 'drive'
-          ];
-          
-          for (const pattern of platformPatterns) {
-            if (lowerDesc.includes(pattern)) {
-              platformName = pattern.charAt(0).toUpperCase() + pattern.slice(1);
-              break;
-            }
-          }
-        }
+        // Enhanced credential mapping
+        const credentials = platform.credentials || 
+                           platform.required_credentials || 
+                           platform.credential_requirements ||
+                           platform.fields ||
+                           [];
         
-        // Final fallback
-        if (!platformName) {
-          platformName = `Platform ${index + 1}`;
-        }
-        
-        console.log(`🔍 Processing platform ${index + 1}: extracted name "${platformName}"`);
+        const mappedCredentials = Array.isArray(credentials) ? credentials.map((cred: any) => ({
+          field: cred.field || cred.name || cred.key || 'api_key',
+          why_needed: cred.why_needed || cred.description || cred.purpose || 'Authentication required',
+          where_to_get: cred.where_to_get || cred.link || cred.documentation_url || cred.url || '#',
+          link: cred.link || cred.where_to_get || cred.documentation_url || cred.url || '#',
+          example: cred.example || cred.placeholder || `Enter ${cred.field || 'credential'}`,
+          options: cred.options || cred.choices || []
+        })) : [];
         
         return {
           ...platform,
           name: platformName,
-          credentials: platform.credentials || 
-                      platform.required_credentials || 
-                      platform.credential_requirements ||
-                      platform.fields ||
-                      []
+          credentials: mappedCredentials
         };
       });
-      console.log('✅ Enhanced platform name extraction completed');
+      console.log('✅ Enhanced platform processing completed');
     }
 
     // AI AGENTS MAPPING
@@ -265,13 +319,27 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('📋 Mapped blueprint to execution_blueprint');
     }
 
-    // Ensure all arrays exist
+    // Ensure all arrays exist with proper defaults
     if (!parsedResponse.steps) parsedResponse.steps = [];
     if (!parsedResponse.platforms) parsedResponse.platforms = [];
     if (!parsedResponse.clarification_questions) parsedResponse.clarification_questions = [];
     if (!parsedResponse.agents) parsedResponse.agents = [];
     if (!parsedResponse.test_payloads) parsedResponse.test_payloads = {};
-    if (!parsedResponse.execution_blueprint) parsedResponse.execution_blueprint = null;
+    if (!parsedResponse.execution_blueprint) parsedResponse.execution_blueprint = {
+      trigger: { type: 'manual', configuration: {} },
+      workflow: [],
+      error_handling: {
+        retry_attempts: 3,
+        fallback_actions: ['log and continue'],
+        notification_rules: [],
+        critical_failure_actions: ['stop execution']
+      },
+      performance_optimization: {
+        rate_limit_handling: 'automatic',
+        concurrency_limit: 5,
+        timeout_seconds_per_step: 30
+      }
+    };
 
     console.log('✅ YusrAI structured response validation successful')
     metadata.seven_sections_validated = true;

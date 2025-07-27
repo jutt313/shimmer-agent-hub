@@ -1,118 +1,121 @@
-import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Play, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
-import { toast } from 'sonner';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+
+import React, { useState } from 'react';
+import { Button } from "@/components/ui/button";
+import { Play, Loader2, CheckCircle2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SimpleExecuteButtonProps {
   automationId: string;
-  className?: string;
+  isReady: boolean;
+  onExecutionStart?: () => void;
+  onExecutionComplete?: (success: boolean) => void;
 }
 
-const SimpleExecuteButton = ({ 
+const SimpleExecuteButton: React.FC<SimpleExecuteButtonProps> = ({
   automationId,
-  className = ""
-}: SimpleExecuteButtonProps) => {
+  isReady,
+  onExecutionStart,
+  onExecutionComplete
+}) => {
   const [isExecuting, setIsExecuting] = useState(false);
-  const [hasCredentials, setHasCredentials] = useState(false);
-  const { user } = useAuth();
-
-  useEffect(() => {
-    checkCredentialStatus();
-  }, [automationId, user?.id]);
-
-  const checkCredentialStatus = async () => {
-    if (!user?.id || !automationId) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('automation_platform_credentials')
-        .select('platform_name')
-        .eq('automation_id', automationId)
-        .eq('user_id', user.id)
-        .eq('is_active', true);
-
-      if (error) throw error;
-      setHasCredentials(data && data.length > 0);
-    } catch (error) {
-      console.error('Failed to check credentials:', error);
-      setHasCredentials(false);
-    }
-  };
+  const [lastExecutionSuccess, setLastExecutionSuccess] = useState<boolean | null>(null);
+  const { toast } = useToast();
 
   const handleExecute = async () => {
-    if (!user?.id || isExecuting) return;
+    if (!isReady) {
+      toast({
+        title: "Not Ready",
+        description: "Please configure all required credentials first.",
+        variant: "destructive",
+      });
+      return; // CRITICAL FIX: Added missing return statement
+    }
 
     setIsExecuting(true);
-    toast.info('🚀 Starting automation execution...');
+    setLastExecutionSuccess(null);
+    onExecutionStart?.();
 
     try {
+      console.log('🚀 Executing automation:', automationId);
+      
       const { data, error } = await supabase.functions.invoke('execute-automation', {
-        body: {
-          automation_id: automationId,
-          trigger_data: {
-            trigger_type: 'manual',
-            triggered_by: user.id,
-            timestamp: new Date().toISOString()
-          }
-        }
+        body: { automationId }
       });
 
       if (error) throw error;
 
-      toast.success('🎉 Automation executed successfully!', {
-        description: `Run ID: ${data.run_id}`
+      const success = data?.success || false;
+      setLastExecutionSuccess(success);
+      
+      toast({
+        title: success ? "✅ Execution Successful" : "❌ Execution Failed",
+        description: data?.message || `Automation ${success ? 'completed' : 'failed'}`,
+        variant: success ? "default" : "destructive",
       });
 
+      onExecutionComplete?.(success);
     } catch (error: any) {
-      console.error('Execution error:', error);
-      toast.error('❌ Execution failed', {
-        description: error.message
+      console.error('❌ Execution error:', error);
+      setLastExecutionSuccess(false);
+      
+      toast({
+        title: "Execution Error",
+        description: error.message || "Failed to execute automation",
+        variant: "destructive",
       });
+
+      onExecutionComplete?.(false);
     } finally {
       setIsExecuting(false);
     }
   };
 
-  const getButtonText = () => {
-    if (isExecuting) return 'Executing...';
-    if (!hasCredentials) return 'Setup Credentials First';
-    return 'Execute Automation';
+  const getButtonStyle = () => {
+    if (lastExecutionSuccess === true) {
+      return "bg-green-500 hover:bg-green-600 text-white";
+    } else if (lastExecutionSuccess === false) {
+      return "bg-red-500 hover:bg-red-600 text-white";
+    } else if (isReady) {
+      return "bg-blue-500 hover:bg-blue-600 text-white";
+    } else {
+      return "bg-gray-400 cursor-not-allowed text-white";
+    }
   };
 
   const getButtonIcon = () => {
-    if (isExecuting) return <Loader2 className="w-4 h-4 mr-2 animate-spin" />;
-    if (!hasCredentials) return <AlertCircle className="w-4 h-4 mr-2" />;
-    return <Play className="w-4 h-4 mr-2" />;
+    if (isExecuting) {
+      return <Loader2 className="w-4 h-4 animate-spin" />;
+    } else if (lastExecutionSuccess === true) {
+      return <CheckCircle2 className="w-4 h-4" />;
+    } else {
+      return <Play className="w-4 h-4" />;
+    }
+  };
+
+  const getButtonText = () => {
+    if (isExecuting) {
+      return "Executing...";
+    } else if (lastExecutionSuccess === true) {
+      return "Executed Successfully";
+    } else if (lastExecutionSuccess === false) {
+      return "Execution Failed - Retry";
+    } else if (isReady) {
+      return "Execute Automation";
+    } else {
+      return "Setup Required";
+    }
   };
 
   return (
-    <div className={`space-y-2 ${className}`}>
-      <Button
-        onClick={handleExecute}
-        disabled={isExecuting || !hasCredentials}
-        variant={hasCredentials ? 'default' : 'destructive'}
-        className="w-full"
-      >
-        {getButtonIcon()}
-        {getButtonText()}
-      </Button>
-      
-      <div className="flex items-center justify-center gap-2 text-xs">
-        {hasCredentials ? (
-          <div className="flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3 text-green-500" />
-            <span className="text-green-600">Credentials Ready</span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1">
-            <AlertCircle className="w-3 h-3 text-red-500" />
-            <span className="text-red-600">Configure platform credentials above</span>
-          </div>
-        )}
-      </div>
-    </div>
+    <Button
+      onClick={handleExecute}
+      disabled={isExecuting || (!isReady && lastExecutionSuccess !== false)}
+      className={`${getButtonStyle()} transition-all duration-200 flex items-center gap-2`}
+    >
+      {getButtonIcon()}
+      {getButtonText()}
+    </Button>
   );
 };
 

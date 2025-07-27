@@ -70,6 +70,7 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
   const handleCredentialSaved = () => {
     checkCredentialStatus();
     onCredentialChange?.();
+    setSelectedPlatform(null); // CRITICAL FIX: Close form after saving
   };
 
   const handlePlatformClick = (platform: Platform) => {
@@ -89,11 +90,24 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
     }
   };
 
+  const getButtonStyle = (platform: Platform) => {
+    const status = credentialStatus[platform.name] || 'missing';
+    switch (status) {
+      case 'tested':
+        return "rounded-full bg-green-500 hover:bg-green-600 text-white border-0 px-4 py-2";
+      case 'saved':
+        return "rounded-full bg-yellow-500 hover:bg-yellow-600 text-white border-0 px-4 py-2";
+      default:
+        return "rounded-full bg-blue-500 hover:bg-blue-600 text-white border-0 px-4 py-2";
+    }
+  };
+
   if (platforms.length === 0) {
     console.log('⚠️ No platforms to display');
     return null;
   }
 
+  // CRITICAL FIX: Show credential form when platform is selected
   if (selectedPlatform) {
     return (
       <div className="space-y-4">
@@ -132,7 +146,7 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
           key={`${platform.name}-${index}`}
           onClick={() => handlePlatformClick(platform)}
           size="sm"
-          className="rounded-full bg-blue-500 hover:bg-blue-600 text-white border-0 px-4 py-2"
+          className={getButtonStyle(platform)}
         >
           {getStatusIcon(platform)}
           Setup {platform.name}

@@ -72,8 +72,9 @@ export class AutomationExecutionValidator {
 
   /**
    * Extract required platforms from automation blueprint with AI-powered analysis
+   * Made public so it can be used by other components
    */
-  private static extractRequiredPlatforms(blueprint: AutomationBlueprint): string[] {
+  static extractRequiredPlatforms(blueprint: AutomationBlueprint): string[] {
     const platforms = new Set<string>();
 
     // Extract from action steps

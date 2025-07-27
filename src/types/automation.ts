@@ -88,6 +88,21 @@ export type AutomationBlueprint = {
   }>;
 };
 
+// Add the missing types that are referenced in AutomationDetail.tsx
+export type AutomationStep = AutomationBlueprint['steps'][0];
+
+export interface Automation {
+  id: string;
+  title: string;
+  description: string;
+  automation_blueprint: any;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  // Add other properties as needed
+}
+
 export interface AutomationDiagramData {
   nodes: any[];
   edges: any[];

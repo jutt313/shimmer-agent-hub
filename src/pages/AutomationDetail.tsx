@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -52,34 +53,25 @@ import {
 } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { Copy, Edit, Plus, Trash2, ChevronDown, CheckCircle, AlertTriangle, Loader2, Play } from "lucide-react"
-import { useUser } from "@clerk/clerk-react";
 import { supabase } from "@/integrations/supabase/client";
-import { AutomationBlueprint, Automation } from '@/types/automation';
-import { ActionStepForm } from '@/components/ActionStepForm';
-import { AIStepForm } from '@/components/AIStepForm';
-import { DelayStepForm } from '@/components/DelayStepForm';
-import { ConditionStepForm } from '@/components/ConditionStepForm';
-import { AutomationStep } from '@/types/automation';
-import { arrayMove } from '@dnd-kit/sortable';
-import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { SortableItem } from '@/components/SortableItem';
-import { SimpleExecuteButton } from '@/components/SimpleExecuteButton';
+import { AutomationBlueprint, Automation, AutomationStep } from '@/types/automation';
+import SimpleExecuteButton from '@/components/SimpleExecuteButton';
 import { AutomationExecutionValidator } from '@/utils/automationExecutionValidator';
 import { AutomationCredentialManager } from '@/utils/automationCredentialManager';
 import { AutomationAgentManager } from '@/utils/automationAgentManager';
 import { agentStateManager } from '@/utils/agentStateManager';
 import { AgentDecision } from '@/utils/automationAgentManager';
-import { AgentCard } from '@/components/AgentCard';
-import { CreateAgentDialog } from '@/components/CreateAgentDialog';
 
 const AutomationDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useUser();
 
-  const [automation, setAutomation] = useState<Automation | null>(null);
-  const [blueprint, setBlueprint] = useState<AutomationBlueprint>({ steps: [] });
+  const [automation, setAutomation] = useState<any | null>(null);
+  const [blueprint, setBlueprint] = useState<AutomationBlueprint>({
+    version: '1.0',
+    trigger: { type: 'manual' },
+    steps: []
+  });
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isPublic, setIsPublic] = useState(false);
@@ -92,14 +84,6 @@ const AutomationDetail: React.FC = () => {
   const [isReady, setIsReady] = useState(false);
   const [agentDecisions, setAgentDecisions] = useState<AgentDecision[]>([]);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 10,
-      },
-    })
-  );
-
   useEffect(() => {
     if (id) {
       fetchAutomation(id);
@@ -110,7 +94,7 @@ const AutomationDetail: React.FC = () => {
 
   useEffect(() => {
     const checkReadiness = async () => {
-      if (!automation?.id || !user?.id) {
+      if (!automation?.id) {
         setIsReady(false);
         return;
       }
@@ -119,8 +103,8 @@ const AutomationDetail: React.FC = () => {
         // Use existing validation logic from AutomationExecutionValidator
         const validation = await AutomationExecutionValidator.validateAutomation(
           automation.id,
-          automation.blueprint,
-          user.id
+          blueprint,
+          automation.user_id
         );
         
         setIsReady(validation.canExecute);
@@ -131,7 +115,7 @@ const AutomationDetail: React.FC = () => {
     };
 
     checkReadiness();
-  }, [automation?.id, automation?.blueprint, user?.id]);
+  }, [automation?.id, blueprint, automation?.user_id]);
 
   const fetchAutomation = async (automationId: string) => {
     setIsLoading(true);
@@ -153,20 +137,23 @@ const AutomationDetail: React.FC = () => {
       }
 
       setAutomation(data);
-      setBlueprint(JSON.parse(data.blueprint));
-      setName(data.name);
-      setDescription(data.description);
-      setIsPublic(data.is_public);
+      // Fix property names to match database schema
+      setBlueprint(data.automation_blueprint ? JSON.parse(data.automation_blueprint as string) : {
+        version: '1.0',
+        trigger: { type: 'manual' },
+        steps: []
+      });
+      setName(data.title || '');
+      setDescription(data.description || '');
+      setIsPublic(data.is_public || false);
     } finally {
       setIsLoading(false);
     }
   };
 
   const fetchAgentDecisions = async (automationId: string) => {
-    if (!user?.id) return;
-
     try {
-      const decisions = await AutomationAgentManager.getAgentDecisions(automationId, user.id);
+      const decisions = await AutomationAgentManager.getAgentDecisions(automationId, automation?.user_id || '');
       setAgentDecisions(decisions);
     } catch (error) {
       console.error('Failed to fetch agent decisions:', error);
@@ -179,15 +166,6 @@ const AutomationDetail: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (!user) {
-      toast({
-        title: "Not signed in",
-        description: "You must be signed in to save automations.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (!name) {
       toast({
         title: "Missing Name",
@@ -202,12 +180,11 @@ const AutomationDetail: React.FC = () => {
       const { error } = await supabase
         .from('automations')
         .update({
-          name: name,
+          title: name,
           description: description,
-          blueprint: JSON.stringify(blueprint),
+          automation_blueprint: JSON.stringify(blueprint),
           is_public: isPublic,
-          updated_at: new Date(),
-          user_id: user.id
+          updated_at: new Date().toISOString()
         })
         .eq('id', id);
 
@@ -231,15 +208,6 @@ const AutomationDetail: React.FC = () => {
   };
 
   const handleDelete = async () => {
-    if (!user) {
-      toast({
-        title: "Not signed in",
-        description: "You must be signed in to delete automations.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsDeleting(true);
     try {
       const { error } = await supabase
@@ -275,10 +243,11 @@ const AutomationDetail: React.FC = () => {
       case 'action':
         newStep = {
           id: crypto.randomUUID(),
+          name: 'Action Step',
           type: 'action',
           action: {
             integration: '',
-            operation: '',
+            method: '',
             parameters: {}
           }
         };
@@ -286,30 +255,33 @@ const AutomationDetail: React.FC = () => {
       case 'ai_agent_call':
         newStep = {
           id: crypto.randomUUID(),
+          name: 'AI Agent Step',
           type: 'ai_agent_call',
           ai_agent_call: {
-            prompt: '',
-            agent_id: null
+            agent_id: '',
+            input_prompt: '',
+            output_variable: ''
           }
         };
         break;
       case 'delay':
         newStep = {
           id: crypto.randomUUID(),
+          name: 'Delay Step',
           type: 'delay',
           delay: {
-            duration: 5
+            duration_seconds: 5
           }
         };
         break;
       case 'condition':
         newStep = {
           id: crypto.randomUUID(),
+          name: 'Condition Step',
           type: 'condition',
           condition: {
-            left: '',
-            operator: 'eq',
-            right: ''
+            cases: [],
+            default_steps: []
           }
         };
         break;
@@ -340,92 +312,69 @@ const AutomationDetail: React.FC = () => {
     }));
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-
-    if (!over) return;
-
-    if (active.id !== over.id) {
-      setBlueprint(prev => {
-        if (!prev.steps) return prev;
-        const oldIndex = prev.steps.findIndex(step => step.id === active.id);
-        const newIndex = prev.steps.findIndex(step => step.id === over.id);
-
-        const newSteps = arrayMove(prev.steps, oldIndex, newIndex);
-
-        return {
-          ...prev,
-          steps: newSteps,
-        };
-      });
-    }
-  };
-
   const renderStepForm = (step: AutomationStep) => {
-    switch (step.type) {
-      case 'action':
-        return (
-          <ActionStepForm
-            step={step}
-            onChange={(updatedStep) => handleStepChange(step.id, updatedStep)}
-            onDelete={() => handleStepDelete(step.id)}
-          />
-        );
-      case 'ai_agent_call':
-        return (
-          <AIStepForm
-            step={step}
-            onChange={(updatedStep) => handleStepChange(step.id, updatedStep)}
-            onDelete={() => handleStepDelete(step.id)}
-            automationId={id || ''}
-            onAgentDecision={(agentName: string, decision: 'added' | 'dismissed') => {
-              if (!user?.id) return;
-              AutomationAgentManager.updateAgentDecision(id || '', agentName, decision, user.id)
-                .then(() => {
-                  fetchAgentDecisions(id || '');
-                  agentStateManager.clearDecisions();
-                  toast({
-                    title: "Agent Decision Updated",
-                    description: `Agent ${agentName} ${decision}.`,
-                  });
-                })
-                .catch(error => {
-                  console.error('Failed to update agent decision:', error);
-                  toast({
-                    title: "Error",
-                    description: "Failed to update agent decision.",
-                    variant: "destructive",
-                  });
-                });
-            }}
-          />
-        );
-      case 'delay':
-        return (
-          <DelayStepForm
-            step={step}
-            onChange={(updatedStep) => handleStepChange(step.id, updatedStep)}
-            onDelete={() => handleStepDelete(step.id)}
-          />
-        );
-      case 'condition':
-        return (
-          <ConditionStepForm
-            step={step}
-            onChange={(updatedStep) => handleStepChange(step.id, updatedStep)}
-            onDelete={() => handleStepDelete(step.id)}
-          />
-        );
-      default:
-        return <div>Unknown step type</div>;
-    }
+    // For now, render a simple card for each step type
+    return (
+      <Card key={step.id} className="mb-4">
+        <CardHeader>
+          <CardTitle className="flex justify-between items-center">
+            <span>{step.name} ({step.type})</span>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => handleStepDelete(step.id)}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor={`step-name-${step.id}`}>Step Name</Label>
+              <Input
+                id={`step-name-${step.id}`}
+                value={step.name}
+                onChange={(e) => handleStepChange(step.id, { ...step, name: e.target.value })}
+              />
+            </div>
+            {step.type === 'action' && (
+              <div className="space-y-2">
+                <Label>Integration</Label>
+                <Input
+                  value={step.action?.integration || ''}
+                  onChange={(e) => handleStepChange(step.id, {
+                    ...step,
+                    action: { ...step.action, integration: e.target.value, method: step.action?.method || '', parameters: step.action?.parameters || {} }
+                  })}
+                  placeholder="Enter integration name"
+                />
+              </div>
+            )}
+            {step.type === 'delay' && (
+              <div>
+                <Label>Duration (seconds)</Label>
+                <Input
+                  type="number"
+                  value={step.delay?.duration_seconds || 5}
+                  onChange={(e) => handleStepChange(step.id, {
+                    ...step,
+                    delay: { duration_seconds: parseInt(e.target.value) || 5 }
+                  })}
+                />
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
   };
 
   const handleTestCredentials = async () => {
-    if (!user?.id || !automation?.id) {
+    if (!automation?.id) {
       toast({
         title: "Error",
-        description: "User or automation ID not found.",
+        description: "Automation ID not found.",
         variant: "destructive",
       });
       return;
@@ -433,14 +382,15 @@ const AutomationDetail: React.FC = () => {
 
     setIsTestingCredentials(true);
     try {
-      const requiredPlatforms = AutomationExecutionValidator.extractRequiredPlatforms(blueprint);
-      const allCredentials = await AutomationCredentialManager.getAllCredentials(automation.id, user.id);
+      // Extract required platforms from blueprint
+      const requiredPlatforms = extractRequiredPlatforms(blueprint);
+      const allCredentials = await AutomationCredentialManager.getAllCredentials(automation.id, automation.user_id);
 
       const testPromises = requiredPlatforms.map(async (platform) => {
         const credential = allCredentials.find(c => c.platform_name.toLowerCase() === platform.toLowerCase());
         if (credential) {
           const credentials = JSON.parse(credential.credentials);
-          return AutomationCredentialManager.testCredentials(user.id, automation.id, platform, credentials);
+          return AutomationCredentialManager.testCredentials(automation.user_id, automation.id, platform, credentials);
         } else {
           return { success: false, message: `No credentials found for ${platform}` };
         }
@@ -473,6 +423,20 @@ const AutomationDetail: React.FC = () => {
     } finally {
       setIsTestingCredentials(false);
     }
+  };
+
+  // Helper function to extract required platforms from blueprint
+  const extractRequiredPlatforms = (blueprint: AutomationBlueprint): string[] => {
+    const platforms = new Set<string>();
+
+    // Extract from action steps
+    blueprint.steps?.forEach(step => {
+      if (step.type === 'action' && step.action?.integration) {
+        platforms.add(step.action.integration.toLowerCase());
+      }
+    });
+
+    return Array.from(platforms);
   };
 
   const renderTestResults = () => {
@@ -547,7 +511,7 @@ const AutomationDetail: React.FC = () => {
             )}
           </Button>
           <Button
-            variant="primary"
+            variant="default"
             onClick={handleSave}
             disabled={isSaving}
           >
@@ -606,11 +570,9 @@ const AutomationDetail: React.FC = () => {
             automationId={automation.id}
             isReady={isReady}
             onExecutionStart={() => {
-              // Optional: Add any execution start logic
               console.log('Automation execution started');
             }}
             onExecutionComplete={(success) => {
-              // Optional: Add any execution completion logic
               console.log('Automation execution completed:', success);
             }}
           />
@@ -624,24 +586,9 @@ const AutomationDetail: React.FC = () => {
           <CardDescription>Define the steps for your automation.</CardDescription>
         </CardHeader>
         <CardContent>
-          <DndContext
-            sensors={sensors}
-            collisionDetection
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={blueprint.steps?.map(step => step.id) || []}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="grid gap-4">
-                {blueprint.steps?.map((step) => (
-                  <SortableItem key={step.id} id={step.id}>
-                    {renderStepForm(step)}
-                  </SortableItem>
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
+          <div className="grid gap-4">
+            {blueprint.steps?.map((step) => renderStepForm(step))}
+          </div>
 
           <div className="mt-4 flex justify-around">
             <Button variant="outline" onClick={() => handleAddStep('action')}>
@@ -675,33 +622,67 @@ const AutomationDetail: React.FC = () => {
           ) : (
             <div className="grid gap-4">
               {agentDecisions.map(agent => (
-                <AgentCard
-                  key={agent.agent_name}
-                  agent={agent}
-                  onDecisionChange={(decision: 'added' | 'dismissed') => {
-                    if (!user?.id) return;
-                    AutomationAgentManager.updateAgentDecision(id || '', agent.agent_name, decision, user.id)
-                      .then(() => {
-                        fetchAgentDecisions(id || '');
-                        toast({
-                          title: "Agent Decision Updated",
-                          description: `Agent ${agent.agent_name} ${decision}.`,
-                        });
-                      })
-                      .catch(error => {
-                        console.error('Failed to update agent decision:', error);
-                        toast({
-                          title: "Error",
-                          description: "Failed to update agent decision.",
-                          variant: "destructive",
-                        });
-                      });
-                  }}
-                />
+                <Card key={agent.agent_name}>
+                  <CardHeader>
+                    <CardTitle>{agent.agent_name}</CardTitle>
+                    <CardDescription>Decision: {agent.decision}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          if (!automation?.user_id) return;
+                          AutomationAgentManager.updateAgentDecision(id || '', agent.agent_name, 'added', automation.user_id)
+                            .then(() => {
+                              fetchAgentDecisions(id || '');
+                              toast({
+                                title: "Agent Decision Updated",
+                                description: `Agent ${agent.agent_name} added.`,
+                              });
+                            })
+                            .catch(error => {
+                              console.error('Failed to update agent decision:', error);
+                              toast({
+                                title: "Error",
+                                description: "Failed to update agent decision.",
+                                variant: "destructive",
+                              });
+                            });
+                        }}
+                      >
+                        Add Agent
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          if (!automation?.user_id) return;
+                          AutomationAgentManager.updateAgentDecision(id || '', agent.agent_name, 'dismissed', automation.user_id)
+                            .then(() => {
+                              fetchAgentDecisions(id || '');
+                              toast({
+                                title: "Agent Decision Updated",
+                                description: `Agent ${agent.agent_name} dismissed.`,
+                              });
+                            })
+                            .catch(error => {
+                              console.error('Failed to update agent decision:', error);
+                              toast({
+                                title: "Error",
+                                description: "Failed to update agent decision.",
+                                variant: "destructive",
+                              });
+                            });
+                        }}
+                      >
+                        Dismiss Agent
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           )}
-          <CreateAgentDialog automationId={id || ''} />
         </CardContent>
       </Card>
 

@@ -444,6 +444,42 @@ const AutomationDetail = () => {
 
       setMessages(prev => [...prev, aiMessage]);
 
+      // PHASE 4: Generate diagram automatically when structured data is available
+      if (structuredData && structuredData.workflow && structuredData.workflow.length > 0) {
+        console.log('🔄 PHASE 4: Auto-generating diagram from ChatAI structured response');
+        try {
+          // Create a proper blueprint from the structured data
+          const blueprintData: AutomationBlueprint = {
+            version: '1.0',
+            description: structuredData.summary || 'AI-generated automation workflow',
+            trigger: {
+              type: 'manual'
+            },
+            steps: structuredData.workflow.map((step: any, index: number) => ({
+              id: `step-${index + 1}`,
+              name: step.action || step.step || `Step ${index + 1}`,
+              type: 'action' as const,
+              action: {
+                integration: step.platform || 'system',
+                method: step.action || 'execute',
+                parameters: step.parameters || {}
+              },
+              platform: step.platform,
+              originalWorkflowData: step
+            })),
+            platforms: structuredData.platforms || []
+          };
+          
+          // Generate diagram after a short delay to show "Blueprint Generated" message
+          setTimeout(() => {
+            generateAndSaveDiagram(automation.id, blueprintData);
+          }, 2000);
+          
+        } catch (error) {
+          console.error('❌ PHASE 4: Error generating diagram from ChatAI response:', error);
+        }
+      }
+
       const responseToSave = data.response || (typeof data === 'string' ? data : JSON.stringify(data));
       await supabase
         .from('automation_chats')

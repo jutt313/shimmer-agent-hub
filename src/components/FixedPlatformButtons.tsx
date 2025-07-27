@@ -148,46 +148,18 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
   }
 
   return (
-    <div className="space-y-4">
-      <Card className="border-2 border-blue-200 bg-blue-50">
-        <CardHeader>
-          <CardTitle className="text-blue-700 text-lg">Platform Credentials</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3">
-            {platforms.map((platform, index) => (
-              <Button
-                key={`${platform.name}-${index}`}
-                onClick={() => setSelectedPlatform(platform)}
-                variant="outline"
-                className={`w-full h-auto p-4 ${getButtonStyle(platform)}`}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-3">
-                    {getStatusIcon(platform)}
-                    <div className="text-left">
-                      <div className="font-semibold">{platform.name}</div>
-                      <div className="text-xs opacity-75">
-                        {platform.credentials.length} credential{platform.credentials.length !== 1 ? 's' : ''} required
-                      </div>
-                    </div>
-                  </div>
-                  <Badge variant="outline" className="text-xs">
-                    {getStatusText(platform)}
-                  </Badge>
-                </div>
-              </Button>
-            ))}
-          </div>
-          
-          <div className="mt-4 p-3 bg-blue-100 rounded-lg border border-blue-300">
-            <p className="text-sm text-blue-800">
-              <strong>🔒 Secure Setup:</strong> Your credentials are encrypted and stored securely. 
-              Click each platform to configure required API keys and authentication details.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="flex flex-wrap gap-2">
+      {platforms.map((platform, index) => (
+        <Button
+          key={`${platform.name}-${index}`}
+          onClick={() => setSelectedPlatform(platform)}
+          size="sm"
+          className="bg-red-500 hover:bg-red-600 text-white border-0"
+        >
+          {getStatusIcon(platform)}
+          Setup {platform.name}
+        </Button>
+      ))}
     </div>
   );
 };

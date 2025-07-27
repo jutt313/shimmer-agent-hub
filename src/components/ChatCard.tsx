@@ -83,20 +83,88 @@ const ChatCard = ({
           try {
             console.log('🔍 Extracting platforms from message for credential buttons:', message.text.substring(0, 200));
             
-            // Simple text extraction for platform names
+            // PHASE 2: Enhanced credential field extraction from ChatAI text
             const platformNames = [];
-            const commonPlatforms = ['Discord', 'OpenAI', 'Typeform', 'Slack', 'Gmail', 'Google Sheets', 'Zapier', 'Microsoft Teams', 'Notion', 'Airtable'];
+            const text = message.text.toLowerCase();
             
-            commonPlatforms.forEach(platform => {
-              if (message.text.toLowerCase().includes(platform.toLowerCase())) {
+            // Platform detection with better credential extraction
+            const platformConfigs = {
+              'discord': { 
+                name: 'Discord', 
+                credentials: [
+                  { field: 'bot_token', placeholder: 'Bot Token', link: 'https://discord.com/developers/applications', why_needed: 'Bot authentication' },
+                  { field: 'guild_id', placeholder: 'Server ID', link: '#', why_needed: 'Target server identification' }
+                ]
+              },
+              'openai': { 
+                name: 'OpenAI', 
+                credentials: [
+                  { field: 'api_key', placeholder: 'API Key', link: 'https://platform.openai.com/api-keys', why_needed: 'API access authentication' }
+                ]
+              },
+              'typeform': { 
+                name: 'Typeform', 
+                credentials: [
+                  { field: 'api_token', placeholder: 'Personal Access Token', link: 'https://admin.typeform.com/account#/section/tokens', why_needed: 'Access forms and responses' }
+                ]
+              },
+              'slack': { 
+                name: 'Slack', 
+                credentials: [
+                  { field: 'bot_token', placeholder: 'Bot User OAuth Token', link: 'https://api.slack.com/apps', why_needed: 'Bot authentication' },
+                  { field: 'channel_id', placeholder: 'Channel ID', link: '#', why_needed: 'Target channel identification' }
+                ]
+              },
+              'gmail': { 
+                name: 'Gmail', 
+                credentials: [
+                  { field: 'client_id', placeholder: 'OAuth Client ID', link: 'https://console.cloud.google.com/', why_needed: 'OAuth authentication' },
+                  { field: 'client_secret', placeholder: 'OAuth Client Secret', link: 'https://console.cloud.google.com/', why_needed: 'OAuth authentication' }
+                ]
+              },
+              'google sheets': { 
+                name: 'Google Sheets', 
+                credentials: [
+                  { field: 'service_account_key', placeholder: 'Service Account JSON', link: 'https://console.cloud.google.com/', why_needed: 'API access authentication' }
+                ]
+              }
+            };
+            
+            // Check for each platform and extract credentials mentioned in the text
+            Object.entries(platformConfigs).forEach(([key, config]) => {
+              if (text.includes(key)) {
+                // Try to extract specific credentials mentioned in the text
+                let extractedCredentials = [...config.credentials];
+                
+                // Look for additional credentials mentioned in the text
+                const credentialPatterns = [
+                  /(\w+_token|token)/gi,
+                  /(\w+_key|key)/gi,
+                  /(\w+_id|id)/gi,
+                  /(\w+_secret|secret)/gi,
+                  /(\w+_code|code)/gi
+                ];
+                
+                credentialPatterns.forEach(pattern => {
+                  const matches = message.text.match(pattern);
+                  if (matches) {
+                    matches.forEach(match => {
+                      const field = match.toLowerCase();
+                      if (!extractedCredentials.some(cred => cred.field === field)) {
+                        extractedCredentials.push({
+                          field: field,
+                          placeholder: `Enter your ${field}`,
+                          link: config.credentials[0]?.link || '#',
+                          why_needed: `${field} authentication`
+                        });
+                      }
+                    });
+                  }
+                });
+                
                 platformNames.push({
-                  name: platform,
-                  credentials: [{ 
-                    field: 'api_key', 
-                    placeholder: 'Enter your API key',
-                    link: '#',
-                    why_needed: 'Authentication required' 
-                  }]
+                  name: config.name,
+                  credentials: extractedCredentials
                 });
               }
             });
@@ -132,16 +200,65 @@ const ChatCard = ({
         return [<span key="fallback-input-error">Message content unavailable.</span>];
       }
 
-      // For plain text, format it nicely
-      const processedText = inputText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-      const lines = processedText.split('\n');
+      // PHASE 1: Structure the response as Summary → Steps → Platforms → Questions → Agents
+      const structuredSections = [];
       
-      return lines.map((line, index) => (
-        <span key={`line-${index}`}>
-          <span dangerouslySetInnerHTML={{ __html: String(line || '') }} />
-          {index < lines.length - 1 && <br />}
-        </span>
-      ));
+      // Split response into sections for better readability
+      const text = inputText.trim();
+      
+      // Look for summary section
+      if (text.includes('## Summary') || text.includes('**Summary**') || text.toLowerCase().includes('summary:')) {
+        const summaryMatch = text.match(/(## Summary|Summary:|\*\*Summary\*\*)(.*?)(?=##|\*\*[A-Z]|$)/s);
+        if (summaryMatch) {
+          structuredSections.push(
+            <div key="summary" className="mb-4">
+              <div className="font-semibold text-blue-600 mb-2">📋 Summary</div>
+              <div className="text-gray-700 leading-relaxed">{summaryMatch[2].trim()}</div>
+            </div>
+          );
+        }
+      }
+      
+      // Look for steps section
+      if (text.includes('## Steps') || text.includes('**Steps**') || text.toLowerCase().includes('steps:')) {
+        const stepsMatch = text.match(/(## Steps|Steps:|\*\*Steps\*\*)(.*?)(?=##|\*\*[A-Z]|$)/s);
+        if (stepsMatch) {
+          structuredSections.push(
+            <div key="steps" className="mb-4">
+              <div className="font-semibold text-green-600 mb-2">🔧 Steps</div>
+              <div className="text-gray-700 leading-relaxed">{stepsMatch[2].trim()}</div>
+            </div>
+          );
+        }
+      }
+      
+      // Look for platforms section
+      if (text.includes('## Platforms') || text.includes('**Platforms**') || text.toLowerCase().includes('platforms:')) {
+        const platformsMatch = text.match(/(## Platforms|Platforms:|\*\*Platforms\*\*)(.*?)(?=##|\*\*[A-Z]|$)/s);
+        if (platformsMatch) {
+          structuredSections.push(
+            <div key="platforms" className="mb-4">
+              <div className="font-semibold text-purple-600 mb-2">🔗 Platforms</div>
+              <div className="text-gray-700 leading-relaxed">{platformsMatch[2].trim()}</div>
+            </div>
+          );
+        }
+      }
+      
+      // If no structured sections found, show raw text with basic formatting
+      if (structuredSections.length === 0) {
+        const processedText = inputText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        const lines = processedText.split('\n');
+        
+        return lines.map((line, index) => (
+          <span key={`line-${index}`}>
+            <span dangerouslySetInnerHTML={{ __html: String(line || '') }} />
+            {index < lines.length - 1 && <br />}
+          </span>
+        ));
+      }
+      
+      return structuredSections;
 
     } catch (error: any) {
       handleError(error, 'Text formatting in ChatCard');
@@ -453,27 +570,7 @@ const ChatCard = ({
         </ScrollArea>
       </div>
 
-      {/* Platform credentials section */}
-      {(() => {
-        const platforms = getLatestPlatforms();
-        console.log('🔧 Rendering platform buttons section:', { platformsCount: platforms.length, platforms });
-        
-        if (platforms.length > 0) {
-          return (
-            <div className="mt-6">
-              <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-lg border p-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Platform Credentials Setup</h3>
-                <FixedPlatformButtons
-                  platforms={platforms}
-                  automationId={automationId}
-                  onCredentialChange={onPlatformCredentialChange}
-                />
-              </div>
-            </div>
-          );
-        }
-        return null;
-      })()}
+      {/* PHASE 3: Removed duplicate platform credentials section - keeping only inline buttons */}
     </div>
   );
 };

@@ -213,22 +213,23 @@ const SimpleCredentialForm = ({
     return { isValid: true };
   };
 
-  // FIXED: Map credentials to proper field names for backend
+  // PHASE 6: SAFE Map credentials to proper field names for backend
   const mapCredentialsForPlatform = (platformName: string, rawCredentials: Record<string, string>): Record<string, string> => {
     const mappedCredentials: Record<string, string> = {};
     const fieldMapping = PLATFORM_FIELD_MAPPINGS[platformName] || {};
     
+    // PHASE 6: SAFE object handling with String conversion
     Object.entries(rawCredentials).forEach(([key, value]) => {
-      const mappedKey = fieldMapping[key] || key;
-      mappedCredentials[mappedKey] = value;
+      const mappedKey = String(fieldMapping[key] || key);
+      mappedCredentials[mappedKey] = String(value || '');
     });
 
-    // Add AI configuration if available
+    // PHASE 6: Add AI configuration with SAFE string conversion
     if (aiConfig.model) {
-      mappedCredentials.ai_model = aiConfig.model;
+      mappedCredentials.ai_model = String(aiConfig.model);
     }
     if (aiConfig.system_prompt) {
-      mappedCredentials.system_prompt = aiConfig.system_prompt;
+      mappedCredentials.system_prompt = String(aiConfig.system_prompt);
     }
 
     return mappedCredentials;

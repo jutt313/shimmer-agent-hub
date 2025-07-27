@@ -444,26 +444,28 @@ const AutomationDetail = () => {
 
       setMessages(prev => [...prev, aiMessage]);
 
-      // PHASE 3: Generate diagram automatically when structured data with execution_blueprint is available
+      // PHASE 5: Generate diagram automatically when structured data with execution_blueprint is available
       if (structuredData && structuredData.execution_blueprint) {
-        console.log('🔄 PHASE 3: Auto-generating diagram from execution_blueprint');
+        console.log('🔄 PHASE 5: Auto-generating diagram from execution_blueprint with SAFE object handling');
         try {
-          // Extract blueprint from structured data
+          // PHASE 5: Extract blueprint from structured data with SAFE serialization
           const blueprintData: AutomationBlueprint = {
             version: '1.0',
-            description: structuredData.summary || 'AI-generated automation workflow',
+            description: String(structuredData.summary || 'AI-generated automation workflow'),
             trigger: structuredData.execution_blueprint.trigger || { type: 'manual' },
-            steps: structuredData.execution_blueprint.workflow?.map((step: any, index: number) => ({
-              id: `step-${step.step || index + 1}`,
-              name: step.action || `Step ${index + 1}`,
-              type: 'action' as const,
-              action: {
-                integration: step.platform || 'system',
-                method: step.method || step.action || 'execute',
-                parameters: step.data_mapping || step.parameters || {}
+            steps: Array.isArray(structuredData.execution_blueprint.workflow) ? 
+              structuredData.execution_blueprint.workflow.map((step: any, index: number) => ({
+                id: `step-${step?.step || index + 1}`,
+                name: String(step?.action || `Step ${index + 1}`),
+                type: 'action' as const,
+                action: {
+                  integration: String(step?.platform || 'system'),
+                  method: String(step?.method || step?.action || 'execute'),
+                  parameters: (step?.data_mapping && typeof step.data_mapping === 'object') ? step.data_mapping : 
+                            (step?.parameters && typeof step.parameters === 'object') ? step.parameters : {}
               },
               originalWorkflowData: step
-            })) || []
+            })) : []
           };
           
           // Save blueprint to automation

@@ -75,41 +75,43 @@ const ChatCard = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // SIMPLIFIED MESSAGE PROCESSING: Extract platforms for credential buttons only
+  // PHASE 4: SIMPLIFIED MESSAGE PROCESSING with safe state handling
   useEffect(() => {
     const processMessages = () => {
-      const processed = messages.map((message) => {
-        if (message.isBot && !message.structuredData) {
-          try {
-            console.log('🔍 Extracting platforms from message for credential buttons:', message.text.substring(0, 200));
-            
-            // PHASE 2: Extract platforms and credentials from structured JSON data
-            const platformNames = [];
-            
-            // First try to parse structured JSON response
+      try {
+        const processed = messages.map((message) => {
+          if (message.isBot && !message.structuredData) {
             try {
-              const parseResult = parseYusrAIStructuredResponse(message.text);
-              if (parseResult.structuredData && parseResult.structuredData.platforms) {
-                // Extract platforms from structured data
-                parseResult.structuredData.platforms.forEach(platform => {
-                  if (platform.name && platform.credentials) {
-                    platformNames.push({
-                      name: platform.name,
-                      credentials: platform.credentials.map(cred => ({
-                        field: cred.field,
-                        placeholder: cred.field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-                        link: cred.link || cred.where_to_get || '#',
-                        why_needed: cred.why_needed || `Required for ${platform.name} integration`
-                      }))
-                    });
-                  }
-                });
-                
-                console.log('✅ Extracted platforms from structured data:', platformNames.map(p => p.name));
+              console.log('🔍 Extracting platforms from message for credential buttons:', message.text.substring(0, 200));
+              
+              // PHASE 3: Extract platforms with SAFE object handling
+              const platformNames: any[] = [];
+              
+              // First try to parse structured JSON response
+              try {
+                const parseResult = parseYusrAIStructuredResponse(message.text);
+                if (parseResult.structuredData && parseResult.structuredData.platforms && Array.isArray(parseResult.structuredData.platforms)) {
+                  // Extract platforms from structured data with SAFE serialization
+                  parseResult.structuredData.platforms.forEach(platform => {
+                    if (platform && typeof platform === 'object' && platform.name) {
+                      const safePlatform = {
+                        name: String(platform.name || 'Unknown Platform'),
+                        credentials: Array.isArray(platform.credentials) ? platform.credentials.map(cred => ({
+                          field: String(cred?.field || 'api_key'),
+                          placeholder: String(cred?.field || 'api_key').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                          link: String(cred?.link || cred?.where_to_get || '#'),
+                          why_needed: String(cred?.why_needed || `Required for ${platform.name} integration`)
+                        })) : []
+                      };
+                      platformNames.push(safePlatform);
+                    }
+                  });
+                  
+                  console.log('✅ Extracted platforms from structured data:', platformNames.map(p => p.name));
+                }
+              } catch (e) {
+                console.log('📝 No structured data found, using text-based extraction');
               }
-            } catch (e) {
-              console.log('📝 No structured data found, using text-based extraction');
-            }
             
             // Fallback: text-based platform detection for non-structured responses
             if (platformNames.length === 0) {
@@ -179,14 +181,18 @@ const ChatCard = ({
               console.log('✅ Platforms extracted:', platformNames.map(p => p.name));
               return updatedMessage;
             }
-          } catch (error) {
-            console.log('❌ Platform extraction error:', error);
+            } catch (error) {
+              console.log('❌ Platform extraction error:', error);
+            }
           }
-        }
-        return message;
-      });
-      
-      setEnhancedMessages(processed);
+          return message;
+        });
+        
+        setEnhancedMessages(processed);
+      } catch (error) {
+        console.log('❌ Message processing error:', error);
+        setEnhancedMessages(messages);
+      }
     };
 
     processMessages();
@@ -200,7 +206,7 @@ const ChatCard = ({
         return [<span key="fallback-input-error">Message content unavailable.</span>];
       }
 
-      // PHASE 1: Extract structured data from JSON and display as clean sections
+      // PHASE 1: CRITICAL FIX - Ensure all values are serialized before rendering
       let structuredData = null;
       
       // Try to parse JSON first
@@ -211,12 +217,12 @@ const ChatCard = ({
         // Not JSON, continue with text processing
       }
 
-      // If we have structured data, display it properly
+      // If we have structured data, display it properly with SAFE SERIALIZATION
       if (structuredData) {
         const sections = [];
         
-        // Summary section
-        if (structuredData.summary) {
+        // Summary section - SAFE STRING RENDERING
+        if (structuredData.summary && typeof structuredData.summary === 'string') {
           sections.push(
             <div key="summary" className="mb-4">
               <div className="font-semibold text-blue-600 mb-2">📋 Summary</div>
@@ -225,32 +231,32 @@ const ChatCard = ({
           );
         }
         
-        // Steps section
-        if (structuredData.steps && structuredData.steps.length > 0) {
+        // Steps section - SAFE ARRAY RENDERING
+        if (structuredData.steps && Array.isArray(structuredData.steps) && structuredData.steps.length > 0) {
           sections.push(
             <div key="steps" className="mb-4">
               <div className="font-semibold text-green-600 mb-2">🔧 Steps</div>
               <div className="text-gray-700 leading-relaxed space-y-1">
                 {structuredData.steps.map((step, index) => (
-                  <div key={index}>{index + 1}. {step}</div>
+                  <div key={index}>{index + 1}. {String(step || '')}</div>
                 ))}
               </div>
             </div>
           );
         }
         
-        // Platforms section
-        if (structuredData.platforms && structuredData.platforms.length > 0) {
+        // Platforms section - SAFE OBJECT RENDERING
+        if (structuredData.platforms && Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
           sections.push(
             <div key="platforms" className="mb-4">
               <div className="font-semibold text-purple-600 mb-2">🔗 Platforms</div>
               <div className="text-gray-700 leading-relaxed">
                 {structuredData.platforms.map((platform, index) => (
                   <div key={index} className="mb-2">
-                    <strong>{platform.name}</strong>
-                    {platform.credentials && platform.credentials.length > 0 && (
+                    <strong>{String(platform?.name || `Platform ${index + 1}`)}</strong>
+                    {platform?.credentials && Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
                       <div className="ml-4 text-sm text-gray-600">
-                        Required: {platform.credentials.map(c => c.field).join(', ')}
+                        Required: {platform.credentials.map(c => String(c?.field || 'credential')).join(', ')}
                       </div>
                     )}
                   </div>
@@ -260,30 +266,33 @@ const ChatCard = ({
           );
         }
         
-        // Clarification Questions section
-        if (structuredData.clarification_questions && structuredData.clarification_questions.length > 0) {
+        // Clarification Questions section - SAFE ARRAY RENDERING
+        if (structuredData.clarification_questions && Array.isArray(structuredData.clarification_questions) && structuredData.clarification_questions.length > 0) {
           sections.push(
             <div key="questions" className="mb-4">
               <div className="font-semibold text-orange-600 mb-2">❓ Clarification Questions</div>
               <div className="text-gray-700 leading-relaxed space-y-1">
                 {structuredData.clarification_questions.map((question, index) => (
-                  <div key={index}>{index + 1}. {question}</div>
+                  <div key={index}>{index + 1}. {String(question || '')}</div>
                 ))}
               </div>
             </div>
           );
         }
         
-        // AI Agents section
-        if (structuredData.agents && structuredData.agents.length > 0) {
+        // AI Agents section - SAFE OBJECT RENDERING
+        if (structuredData.agents && Array.isArray(structuredData.agents) && structuredData.agents.length > 0) {
           sections.push(
             <div key="agents" className="mb-4">
               <div className="font-semibold text-red-600 mb-2">🤖 AI Agents</div>
               <div className="text-gray-700 leading-relaxed space-y-2">
                 {structuredData.agents.map((agent, index) => (
                   <div key={index} className="border-l-2 border-red-200 pl-3">
-                    <strong>{agent.name}</strong> ({agent.role})
-                    <div className="text-sm text-gray-600">{agent.why_needed}</div>
+                    <strong>{String(agent?.name || `Agent ${index + 1}`)}</strong> 
+                    {agent?.role && <span> ({String(agent.role)})</span>}
+                    {agent?.why_needed && (
+                      <div className="text-sm text-gray-600">{String(agent.why_needed)}</div>
+                    )}
                   </div>
                 ))}
               </div>

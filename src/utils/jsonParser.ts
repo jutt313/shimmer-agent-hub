@@ -95,7 +95,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
     let metadata: YusrAIResponseMetadata = {};
     let cleanResponseText = responseText;
     
-    // CRITICAL FIX: Extract JSON from markdown code blocks
+    // PHASE 2: CRITICAL FIX - Extract JSON from markdown code blocks with better validation
     const markdownJsonMatch = responseText.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
     if (markdownJsonMatch) {
       console.log('🎯 Markdown code block detected, extracting JSON...');
@@ -103,9 +103,13 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('✅ Extracted JSON from markdown:', cleanResponseText.substring(0, 200) + '...');
     }
     
-    // First try to parse the response
+    // PHASE 2: First try to parse the response with enhanced error handling
     try {
       parsedResponse = JSON.parse(cleanResponseText);
+      // PHASE 2: Validate parsed object is serializable
+      if (typeof parsedResponse !== 'object' || parsedResponse === null) {
+        throw new Error('Invalid JSON structure');
+      }
     } catch (e) {
       console.log('📄 Plain text response detected, no JSON found')
       return { 

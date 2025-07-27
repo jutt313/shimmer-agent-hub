@@ -1,737 +1,848 @@
-
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { toast } from "@/hooks/use-toast"
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion"
-import { Switch } from "@/components/ui/switch"
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer"
-import { Separator } from "@/components/ui/separator"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Slider } from "@/components/ui/slider"
-import { Copy, Edit, Plus, Trash2, ChevronDown, CheckCircle, AlertTriangle, Loader2, Play } from "lucide-react"
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { AutomationBlueprint, Automation, AutomationStep } from '@/types/automation';
-import SimpleExecuteButton from '@/components/SimpleExecuteButton';
-import { AutomationExecutionValidator } from '@/utils/automationExecutionValidator';
-import { AutomationCredentialManager } from '@/utils/automationCredentialManager';
-import { AutomationAgentManager } from '@/utils/automationAgentManager';
+import { Send, ArrowLeft, Bot, BarChart3, Code2 } from "lucide-react";
+import ChatCard from "@/components/ChatCard";
+import AutomationDashboard from "@/components/AutomationDashboard";
+import AIAgentForm from "@/components/AIAgentForm";
+import PlatformButtons from "@/components/PlatformButtons";
+import BlueprintCard from "@/components/BlueprintCard";
+import AutomationDiagramDisplay from "@/components/AutomationDiagramDisplay";
+import AutomationExecutionPanel from "@/components/AutomationExecutionPanel";
+import { AutomationBlueprint } from "@/types/automation";
+import { parseStructuredResponse, parseYusrAIStructuredResponse, cleanDisplayText } from "@/utils/jsonParser";
 import { agentStateManager } from '@/utils/agentStateManager';
-import { AgentDecision } from '@/utils/automationAgentManager';
+import { extractBlueprintFromStructuredData, validateBlueprintForDiagram, ensureBlueprintHasSteps } from '@/utils/blueprintExtractor';
+import { FlagPropagationLogger } from '@/utils/flagPropagationLogger';
+import { GHQ } from '@/utils/GHQ';
+import SimpleExecuteButton from '@/components/SimpleExecuteButton';
 
-const AutomationDetail: React.FC = () => {
+interface Automation {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  created_at: string;
+  automation_blueprint: AutomationBlueprint | null;
+  automation_diagram_data: { nodes: any[]; edges: any[] } | null;
+}
+
+interface ChatMessage {
+  id: string;
+  sender: string;
+  message_content: string;
+  timestamp: string;
+}
+
+const AutomationDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-
-  const [automation, setAutomation] = useState<any | null>(null);
-  const [blueprint, setBlueprint] = useState<AutomationBlueprint>({
-    version: '1.0',
-    trigger: { type: 'manual' },
-    steps: []
-  });
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [isPublic, setIsPublic] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
-  const [isTestingCredentials, setIsTestingCredentials] = useState(false);
-  const [testResults, setTestResults] = useState<any | null>(null);
-  const [isReady, setIsReady] = useState(false);
-  const [agentDecisions, setAgentDecisions] = useState<AgentDecision[]>([]);
+  const { user } = useAuth();
+  const { toast } = useToast();
+  
+  const [automation, setAutomation] = useState<Automation | null>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [showAIAgentForm, setShowAIAgentForm] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState<any>(null);
+  const [dismissedAgents, setDismissedAgents] = useState<Set<string>>(new Set());
+  const [currentPlatforms, setCurrentPlatforms] = useState<any[]>([]);
+  const [showBlueprint, setShowBlueprint] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [showDiagram, setShowDiagram] = useState(false);
+  const [generatingDiagram, setGeneratingDiagram] = useState(false);
 
   useEffect(() => {
-    if (id) {
-      fetchAutomation(id);
-      fetchAgentDecisions(id);
-      agentStateManager.setAutomationId(id);
+    if (!user || !id) {
+      navigate("/auth");
+      return;
     }
-  }, [id]);
+    fetchAutomationAndChats();
+  }, [user, id, navigate]);
 
-  useEffect(() => {
-    const checkReadiness = async () => {
-      if (!automation?.id) {
-        setIsReady(false);
+  const generateAndSaveDiagram = async (automationId: string, blueprint: AutomationBlueprint, forceRegenerate = false, userFeedback?: string) => {
+    console.log('🚀 PHASE 1: Starting diagram generation with properly formatted blueprint');
+    
+    if (!validateBlueprintForDiagram(blueprint)) {
+      console.error('❌ PHASE 1: Blueprint validation failed for diagram generation');
+      FlagPropagationLogger.logFlagState(false, false, 'generateAndSaveDiagram - validation failed', false);
+      toast({
+        title: "Invalid Blueprint",
+        description: "Cannot generate diagram from invalid blueprint structure",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const validatedBlueprint = ensureBlueprintHasSteps(blueprint);
+    
+    setGeneratingDiagram(true);
+    
+    try {
+      console.log('📊 PHASE 1: Sending blueprint to diagram generator:', {
+        steps: validatedBlueprint.steps?.length || 0,
+        triggerType: validatedBlueprint.trigger?.type,
+        hasWorkflow: validatedBlueprint.steps?.some(step => step.originalWorkflowData),
+        forceRegenerate,
+        userFeedback: userFeedback ? 'provided' : 'none'
+      });
+      
+      const requestBody: any = { 
+        automation_blueprint: validatedBlueprint,
+        automation_id: automationId,
+        force_regenerate: forceRegenerate,
+        enhanced_processing: true
+      };
+      
+      if (userFeedback?.trim()) {
+        requestBody.user_feedback = userFeedback.trim();
+        requestBody.improvement_request = true;
+      }
+      
+      const { data, error } = await supabase.functions.invoke('diagram-generator', {
+        body: requestBody,
+      });
+
+      if (error) {
+        console.error('❌ PHASE 1: Diagram generation error:', error);
+        toast({
+          title: "Diagram Generation Failed",
+          description: `Error: ${error.message}`,
+          variant: "destructive",
+        });
         return;
       }
 
-      try {
-        // Use existing validation logic from AutomationExecutionValidator
-        const validation = await AutomationExecutionValidator.validateAutomation(
-          automation.id,
-          blueprint,
-          automation.user_id
-        );
-        
-        setIsReady(validation.canExecute);
-      } catch (error) {
-        console.error('Failed to validate automation readiness:', error);
-        setIsReady(false);
+      if (!data || !data.nodes || !Array.isArray(data.nodes) || data.nodes.length === 0) {
+        console.error('❌ PHASE 1: Invalid diagram data received:', data);
+        toast({
+          title: "Invalid Diagram Data",
+          description: "Received empty or invalid diagram structure",
+          variant: "destructive",
+        });
+        return;
       }
-    };
 
-    checkReadiness();
-  }, [automation?.id, blueprint, automation?.user_id]);
+      console.log('✅ PHASE 1: Valid diagram data received:', {
+        nodes: data.nodes.length,
+        edges: data.edges?.length || 0,
+        metadata: data.metadata
+      });
 
-  const fetchAutomation = async (automationId: string) => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
+      const diagramDataToSave = {
+        ...data,
+        metadata: {
+          ...data.metadata,
+          generatedAt: new Date().toISOString(),
+          source: 'phase1-ai-generator',
+          blueprintSteps: validatedBlueprint.steps?.length || 0
+        }
+      };
+
+      const { error: updateError } = await supabase
         .from('automations')
-        .select('*')
-        .eq('id', automationId)
+        .update({ automation_diagram_data: diagramDataToSave })
+        .eq('id', automationId);
+
+      if (!updateError) {
+        setAutomation(prev => ({
+          ...prev!,
+          automation_diagram_data: diagramDataToSave
+        }));
+
+        const successMessage = userFeedback 
+          ? `Enhanced diagram with ${data.nodes.length} nodes based on your feedback!`
+          : `Generated comprehensive diagram with ${data.nodes.length} nodes successfully!`;
+        
+        toast({
+          title: "✅ Diagram Generated",
+          description: successMessage,
+        });
+
+        console.log('🎯 PHASE 1: Diagram generation pipeline completed successfully');
+      } else {
+        console.error('❌ PHASE 1: Error saving diagram to database:', updateError);
+        toast({
+          title: "Save Failed", 
+          description: "Generated diagram but failed to save to database",
+          variant: "destructive",
+        });
+      }
+
+    } catch (err) {
+      console.error('💥 PHASE 1: Unexpected error in diagram generation:', err);
+      toast({
+        title: "Generation Error",
+        description: `Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingDiagram(false);
+    }
+  };
+
+  const fetchAutomationAndChats = async () => {
+    try {
+      const { data, error: automationError } = await supabase
+        .from('automations')
+        .select('*, automation_diagram_data')
+        .eq('id', id)
         .single();
 
-      if (error) {
-        console.error('Error fetching automation:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load automation details.",
-          variant: "destructive",
-        });
-        return;
+      if (automationError) throw automationError;
+
+      const automationData: Automation = {
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        status: data.status,
+        created_at: data.created_at,
+        automation_blueprint: data.automation_blueprint as AutomationBlueprint | null,
+        automation_diagram_data: data.automation_diagram_data as { nodes: any[]; edges: any[] } | null
+      };
+
+      setAutomation(automationData);
+
+      if (automationData.automation_blueprint && !automationData.automation_diagram_data) {
+        console.log('🔄 PHASE 1: No diagram data found, generating new diagram from blueprint...');
+        await generateAndSaveDiagram(automationData.id, automationData.automation_blueprint);
+      } else if (!automationData.automation_blueprint && !automationData.automation_diagram_data) {
+        console.log('⚠️ PHASE 1: No blueprint or diagram data found - waiting for AI response');
       }
 
-      setAutomation(data);
-      // Fix property names to match database schema
-      setBlueprint(data.automation_blueprint ? JSON.parse(data.automation_blueprint as string) : {
-        version: '1.0',
-        trigger: { type: 'manual' },
-        steps: []
-      });
-      setName(data.title || '');
-      setDescription(data.description || '');
-      setIsPublic(data.is_public || false);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      const { data: chatData, error: chatError } = await supabase
+        .from('automation_chats')
+        .select('*')
+        .eq('automation_id', id)
+        .order('timestamp', { ascending: true });
 
-  const fetchAgentDecisions = async (automationId: string) => {
-    try {
-      const decisions = await AutomationAgentManager.getAgentDecisions(automationId, automation?.user_id || '');
-      setAgentDecisions(decisions);
+      if (chatError) throw chatError;
+
+      // CRITICAL FIX: Map database field names correctly to avoid crashes
+      const formattedMessages = chatData.map((chat: ChatMessage, index: number) => {
+        console.log('🔄 Processing stored chat message:', chat.message_content.substring(0, 100));
+        
+        let structuredData = null;
+        let yusraiPowered = false;
+        let sevenSectionsValidated = false;
+        
+        if (chat.sender === 'ai') {
+          const parseResult = parseYusrAIStructuredResponse(chat.message_content);
+          structuredData = parseResult.structuredData;
+          yusraiPowered = parseResult.metadata.yusrai_powered || false;
+          sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
+          
+          console.log('📦 Enhanced parsing result:', {
+            hasStructuredData: !!structuredData,
+            platformsCount: structuredData?.platforms?.length || 0,
+            platformNames: structuredData?.platforms?.map((p: any) => p.name) || [],
+            yusraiPowered,
+            sevenSectionsValidated
+          });
+        }
+
+        return {
+          id: index + 1,
+          text: chat.message_content, // Correct field mapping
+          isBot: chat.sender === 'ai', // Correct field mapping
+          timestamp: new Date(chat.timestamp), // Correct field mapping
+          structuredData,
+          yusrai_powered: yusraiPowered,
+          seven_sections_validated: sevenSectionsValidated
+        };
+      });
+
+      // SIMPLIFIED: Extract platforms from text for credential buttons
+      const allPlatforms: any[] = [];
+      const commonPlatforms = ['Discord', 'OpenAI', 'Typeform', 'Slack', 'Gmail', 'Google Sheets', 'Zapier', 'Microsoft Teams', 'Notion', 'Airtable'];
+      
+      formattedMessages.forEach(msg => {
+        if (msg.isBot) {
+          commonPlatforms.forEach(platform => {
+            if (msg.text.toLowerCase().includes(platform.toLowerCase())) {
+              allPlatforms.push({
+                name: platform,
+                credentials: [{ 
+                  field: 'api_key', 
+                  placeholder: 'Enter your API key',
+                  link: '#',
+                  why_needed: 'Authentication required' 
+                }]
+              });
+            }
+          });
+        }
+      });
+      
+      const uniquePlatforms = allPlatforms.filter((platform, index, self) => 
+        index === self.findIndex(p => p.name === platform.name)
+      );
+      
+      if (uniquePlatforms.length > 0) {
+        console.log('🔗 Setting platforms from text extraction:', uniquePlatforms.map(p => p.name));
+        setCurrentPlatforms(uniquePlatforms);
+      } else {
+        console.log('⚠️ No platforms found in messages');
+      }
+
+      if (formattedMessages.length === 0) {
+        const welcomeMessage = {
+          id: 1,
+          text: `I am YusrAI, how can I help you to build "${automationData.title}"?`,
+          isBot: true,
+          timestamp: new Date()
+        };
+        setMessages([welcomeMessage]);
+      } else {
+        setMessages(formattedMessages);
+      }
     } catch (error) {
-      console.error('Failed to fetch agent decisions:', error);
+      console.error('Error fetching automation:', error);
       toast({
         title: "Error",
-        description: "Failed to load agent decisions.",
+        description: "Failed to load automation details",
         variant: "destructive",
-      });
-    }
-  };
-
-  const handleSave = async () => {
-    if (!name) {
-      toast({
-        title: "Missing Name",
-        description: "Please provide a name for the automation.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const { error } = await supabase
-        .from('automations')
-        .update({
-          title: name,
-          description: description,
-          automation_blueprint: JSON.stringify(blueprint),
-          is_public: isPublic,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id);
-
-      if (error) {
-        console.error('Error saving automation:', error);
-        toast({
-          title: "Error",
-          description: "Failed to save automation.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      toast({
-        title: "Success",
-        description: "Automation saved successfully.",
       });
     } finally {
-      setIsSaving(false);
+      setLoading(false);
     }
   };
 
-  const handleDelete = async () => {
-    setIsDeleting(true);
-    try {
-      const { error } = await supabase
-        .from('automations')
-        .delete()
-        .eq('id', id);
+  const handleSendMessage = async (messageText: string) => {
+    if (!messageText.trim() || sendingMessage || !automation) return;
 
-      if (error) {
-        console.error('Error deleting automation:', error);
-        toast({
-          title: "Error",
-          description: "Failed to delete automation.",
-          variant: "destructive",
+    const userMessage = {
+      id: Date.now(),
+      text: messageText,
+      isBot: false,
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setNewMessage("");
+    setSendingMessage(true);
+
+    try {
+      console.log('🚀 PHASE 1: Enhanced message sending with improved pipeline');
+
+      await supabase
+        .from('automation_chats')
+        .insert({
+          automation_id: automation.id,
+          sender: 'user',
+          message_content: messageText
         });
-        return;
-      }
 
-      toast({
-        title: "Success",
-        description: "Automation deleted successfully.",
-      });
-      navigate('/automations');
-    } finally {
-      setIsDeleting(false);
-      setShowDeleteAlert(false);
-    }
-  };
+      const automationContext = {
+        id: automation.id,
+        title: automation.title,
+        description: automation.description,
+        status: automation.status,
+        automation_blueprint: automation.automation_blueprint,
+        existing_diagram: automation.automation_diagram_data ? 'present' : 'missing'
+      };
 
-  const handleAddStep = (type: AutomationStep['type']) => {
-    let newStep: AutomationStep;
+      const agentStatusSummary = agentStateManager.getStatusSummary();
 
-    switch (type) {
-      case 'action':
-        newStep = {
-          id: crypto.randomUUID(),
-          name: 'Action Step',
-          type: 'action',
-          action: {
-            integration: '',
-            method: '',
-            parameters: {}
-          }
-        };
-        break;
-      case 'ai_agent_call':
-        newStep = {
-          id: crypto.randomUUID(),
-          name: 'AI Agent Step',
-          type: 'ai_agent_call',
-          ai_agent_call: {
-            agent_id: '',
-            input_prompt: '',
-            output_variable: ''
-          }
-        };
-        break;
-      case 'delay':
-        newStep = {
-          id: crypto.randomUUID(),
-          name: 'Delay Step',
-          type: 'delay',
-          delay: {
-            duration_seconds: 5
-          }
-        };
-        break;
-      case 'condition':
-        newStep = {
-          id: crypto.randomUUID(),
-          name: 'Condition Step',
-          type: 'condition',
-          condition: {
-            cases: [],
-            default_steps: []
-          }
-        };
-        break;
-      default:
-        console.warn('Unknown step type:', type);
-        return;
-    }
-
-    setBlueprint(prev => ({
-      ...prev,
-      steps: [...(prev.steps || []), newStep]
-    }));
-  };
-
-  const handleStepChange = (stepId: string, updatedStep: AutomationStep) => {
-    setBlueprint(prev => ({
-      ...prev,
-      steps: (prev.steps || []).map(step =>
-        step.id === stepId ? updatedStep : step
-      )
-    }));
-  };
-
-  const handleStepDelete = (stepId: string) => {
-    setBlueprint(prev => ({
-      ...prev,
-      steps: (prev.steps || []).filter(step => step.id !== stepId)
-    }));
-  };
-
-  const renderStepForm = (step: AutomationStep) => {
-    // For now, render a simple card for each step type
-    return (
-      <Card key={step.id} className="mb-4">
-        <CardHeader>
-          <CardTitle className="flex justify-between items-center">
-            <span>{step.name} ({step.type})</span>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => handleStepDelete(step.id)}
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor={`step-name-${step.id}`}>Step Name</Label>
-              <Input
-                id={`step-name-${step.id}`}
-                value={step.name}
-                onChange={(e) => handleStepChange(step.id, { ...step, name: e.target.value })}
-              />
-            </div>
-            {step.type === 'action' && (
-              <div className="space-y-2">
-                <Label>Integration</Label>
-                <Input
-                  value={step.action?.integration || ''}
-                  onChange={(e) => handleStepChange(step.id, {
-                    ...step,
-                    action: { ...step.action, integration: e.target.value, method: step.action?.method || '', parameters: step.action?.parameters || {} }
-                  })}
-                  placeholder="Enter integration name"
-                />
-              </div>
-            )}
-            {step.type === 'delay' && (
-              <div>
-                <Label>Duration (seconds)</Label>
-                <Input
-                  type="number"
-                  value={step.delay?.duration_seconds || 5}
-                  onChange={(e) => handleStepChange(step.id, {
-                    ...step,
-                    delay: { duration_seconds: parseInt(e.target.value) || 5 }
-                  })}
-                />
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
-
-  const handleTestCredentials = async () => {
-    if (!automation?.id) {
-      toast({
-        title: "Error",
-        description: "Automation ID not found.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsTestingCredentials(true);
-    try {
-      // Extract required platforms from blueprint
-      const requiredPlatforms = extractRequiredPlatforms(blueprint);
-      const allCredentials = await AutomationCredentialManager.getAllCredentials(automation.id, automation.user_id);
-
-      const testPromises = requiredPlatforms.map(async (platform) => {
-        const credential = allCredentials.find(c => c.platform_name.toLowerCase() === platform.toLowerCase());
-        if (credential) {
-          const credentials = JSON.parse(credential.credentials);
-          return AutomationCredentialManager.testCredentials(automation.user_id, automation.id, platform, credentials);
-        } else {
-          return { success: false, message: `No credentials found for ${platform}` };
+      const { data, error } = await supabase.functions.invoke('chat-ai', {
+        body: {
+          message: messageText,
+          messages: messages,
+          automationId: automation.id,
+          automationContext: automationContext,
+          agentStatusSummary: agentStatusSummary,
+          requestDiagramGeneration: true
         }
       });
 
-      const results = await Promise.all(testPromises);
-      setTestResults(results);
+      if (error) {
+        console.error('❌ PHASE 1: Chat AI error:', error);
+        throw error;
+      }
 
-      const allSuccessful = results.every(result => result.success);
-      if (allSuccessful) {
-        toast({
-          title: "Credentials Tested Successfully",
-          description: "All credentials passed the test.",
-        });
-      } else {
-        toast({
-          title: "Credential Test Failed",
-          description: "Some credentials failed the test. Check details below.",
-          variant: "destructive",
+      console.log('✅ PHASE 1: Enhanced AI response processing');
+
+      let structuredData = null;
+      let aiResponseText = "";
+      let yusraiPowered = false;
+      let sevenSectionsValidated = false;
+
+      if (data && (data.response || typeof data === 'string')) {
+        const responseText = data.response || (typeof data === 'string' ? data : JSON.stringify(data));
+        const parseResult = parseYusrAIStructuredResponse(responseText);
+        
+        structuredData = parseResult.structuredData;
+        yusraiPowered = parseResult.metadata.yusrai_powered || false;
+        sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
+        
+        FlagPropagationLogger.logFlagState(
+          yusraiPowered,
+          sevenSectionsValidated,
+          'handleSendMessage - AI response processing',
+          !!structuredData,
+          structuredData ? Object.keys(structuredData) : undefined
+        );
+        
+        console.log('📋 PHASE 1: Enhanced parsing result:', {
+          hasStructuredData: !!structuredData,
+          yusraiPowered,
+          sevenSectionsValidated,
+          hasWorkflow: !!(structuredData?.workflow),
+          workflowLength: structuredData?.workflow?.length || 0,
+          hasTestPayloads: !!(structuredData?.test_payloads),
+          hasPlatforms: !!(structuredData?.platforms)
         });
       }
 
-    } catch (error: any) {
-      console.error("Credential testing error:", error);
+      if (structuredData) {
+        if (structuredData.clarification_questions?.length > 0) {
+          aiResponseText = "I need clarification:\n\n" + 
+            structuredData.clarification_questions.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n');
+        } else if (structuredData.summary?.trim()) {
+          aiResponseText = structuredData.summary;
+          if (structuredData.workflow?.length > 0) {
+            aiResponseText += "\n\nWorkflow Steps:\n" + 
+              structuredData.workflow.map((item: any, i: number) => 
+                `${i + 1}. ${item.action || item.step} (${item.platform || 'System'})`
+              ).join('\n');
+          }
+        } else if (structuredData.workflow?.length > 0) {
+          aiResponseText = `Created automation with ${structuredData.workflow.length} workflow steps:\n\n` +
+            structuredData.workflow.map((item: any, i: number) => 
+              `${i + 1}. ${item.action || item.step} (${item.platform || 'System'})`
+            ).join('\n');
+        } else {
+          aiResponseText = "I'm creating a comprehensive automation solution for you.";
+        }
+      } else {
+        aiResponseText = typeof data === 'string' ? data : "I'm ready to help you build your automation.";
+      }
+
+      const aiMessage = {
+        id: Date.now() + 1,
+        text: aiResponseText,
+        isBot: true,
+        timestamp: new Date(),
+        structuredData: structuredData,
+        yusrai_powered: yusraiPowered,
+        seven_sections_validated: sevenSectionsValidated
+      };
+
+      FlagPropagationLogger.logFlagState(
+        yusraiPowered,
+        sevenSectionsValidated,
+        'handleSendMessage - final AI message creation',
+        !!structuredData,
+        structuredData ? Object.keys(structuredData) : undefined
+      );
+
+      setMessages(prev => [...prev, aiMessage]);
+
+      // PHASE 5: Generate diagram automatically when structured data with execution_blueprint is available
+      if (structuredData && structuredData.execution_blueprint) {
+        console.log('🔄 PHASE 5: Auto-generating diagram from execution_blueprint with SAFE object handling');
+        try {
+          // PHASE 5: Extract blueprint from structured data with SAFE serialization
+          const blueprintData: AutomationBlueprint = {
+            version: '1.0',
+            description: String(structuredData.summary || 'AI-generated automation workflow'),
+            trigger: structuredData.execution_blueprint.trigger || { type: 'manual' },
+            steps: Array.isArray(structuredData.execution_blueprint.workflow) ? 
+              structuredData.execution_blueprint.workflow.map((step: any, index: number) => ({
+                id: `step-${step?.step || index + 1}`,
+                name: String(step?.action || `Step ${index + 1}`),
+                type: 'action' as const,
+                action: {
+                  integration: String(step?.platform || 'system'),
+                  method: String(step?.method || step?.action || 'execute'),
+                  parameters: (step?.data_mapping && typeof step.data_mapping === 'object') ? step.data_mapping : 
+                            (step?.parameters && typeof step.parameters === 'object') ? step.parameters : {}
+              },
+              originalWorkflowData: step
+            })) : []
+          };
+          
+          // Save blueprint to automation
+          const { error: updateError } = await supabase
+            .from('automations')
+            .update({ automation_blueprint: blueprintData })
+            .eq('id', automation.id);
+            
+          if (!updateError) {
+            console.log('📋 Blueprint saved successfully');
+            setAutomation(prev => ({ ...prev!, automation_blueprint: blueprintData }));
+            
+            // Generate diagram after a short delay
+            setTimeout(() => {
+              generateAndSaveDiagram(automation.id, blueprintData);
+            }, 2000);
+          }
+        } catch (error) {
+          console.error('❌ Error processing execution blueprint:', error);
+        }
+      } 
+      // Fallback: If workflow exists but no execution_blueprint
+      else if (structuredData && structuredData.workflow && structuredData.workflow.length > 0) {
+        console.log('🔄 PHASE 3: Fallback - Auto-generating diagram from workflow data');
+        try {
+          // Create a proper blueprint from the workflow data
+          const blueprintData: AutomationBlueprint = {
+            version: '1.0',
+            description: structuredData.summary || 'AI-generated automation workflow',
+            trigger: {
+              type: 'manual'
+            },
+            steps: structuredData.workflow.map((step: any, index: number) => ({
+              id: `step-${index + 1}`,
+              name: step.action || step.step || `Step ${index + 1}`,
+              type: 'action' as const,
+              action: {
+                integration: step.platform || 'system',
+                method: step.action || 'execute',
+                parameters: step.parameters || {}
+              },
+              platform: step.platform,
+              originalWorkflowData: step
+            })),
+            platforms: structuredData.platforms || []
+          };
+          
+          // Generate diagram after a short delay to show "Blueprint Generated" message
+          setTimeout(() => {
+            generateAndSaveDiagram(automation.id, blueprintData);
+          }, 2000);
+          
+        } catch (error) {
+          console.error('❌ PHASE 4: Error generating diagram from ChatAI response:', error);
+        }
+      }
+
+      const responseToSave = data.response || (typeof data === 'string' ? data : JSON.stringify(data));
+      await supabase
+        .from('automation_chats')
+        .insert({
+          automation_id: automation.id,
+          sender: 'ai',
+          message_content: responseToSave
+        });
+
+    } catch (error) {
+      console.error('💥 PHASE 1: Error in enhanced message handling:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to test credentials.",
+        description: "Failed to process message. Please try again.",
         variant: "destructive",
       });
+      
+      const errorMessage = {
+        id: Date.now() + 1,
+        text: "I'm having trouble responding. Please try again.",
+        isBot: true,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
-      setIsTestingCredentials(false);
+      setSendingMessage(false);
     }
   };
 
-  // Helper function to extract required platforms from blueprint
-  const extractRequiredPlatforms = (blueprint: AutomationBlueprint): string[] => {
-    const platforms = new Set<string>();
-
-    // Extract from action steps
-    blueprint.steps?.forEach(step => {
-      if (step.type === 'action' && step.action?.integration) {
-        platforms.add(step.action.integration.toLowerCase());
-      }
-    });
-
-    return Array.from(platforms);
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !sendingMessage) {
+      handleSendMessage(newMessage);
+      setNewMessage("");
+    }
   };
 
-  const renderTestResults = () => {
-    if (!testResults) return null;
+  const handleAgentSaved = (agentName: string, agentId: string) => {
+    setShowAIAgentForm(false);
+    setSelectedAgent(null);
+    
+    agentStateManager.addAgent(agentName, { name: agentName, id: agentId });
+    
+    if (automation) {
+      const confirmationMessage = `I've successfully configured your new AI Agent: "${agentName}"!`;
+      
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        text: confirmationMessage,
+        isBot: false,
+        timestamp: new Date()
+      }]);
 
+      const agentStatusSummary = agentStateManager.getStatusSummary();
+      const enhancedMessage = `Please incorporate the newly configured AI Agent "${agentName}" (ID: ${agentId}) into this automation's blueprint. ${agentStatusSummary} Please update the blueprint and explain its role and impact on the workflow.`;
+
+      handleSendMessage(enhancedMessage).then(() => {
+        setNewMessage("");
+      });
+    }
+  };
+
+  const handleAgentAdd = (agent: any) => {
+    console.log('🤖 Adding agent from chat:', agent.name);
+    agentStateManager.addAgent(agent.name, agent);
+    setSelectedAgent(agent);
+    setShowAIAgentForm(true);
+  };
+
+  const handleAgentDismiss = (agentName: string) => {
+    console.log('❌ Dismissing agent from chat:', agentName);
+    agentStateManager.dismissAgent(agentName);
+    setDismissedAgents(prev => new Set([...prev, agentName]));
+  };
+
+  const handleRegenerateDiagram = (userFeedback?: string) => {
+    if (automation?.automation_blueprint) {
+      generateAndSaveDiagram(automation.id, automation.automation_blueprint, true, userFeedback);
+    }
+  };
+
+  if (loading) {
     return (
-      <div>
-        <h3>Test Results:</h3>
-        {testResults.map((result: any, index: number) => (
-          <Card key={index} className="mb-4">
-            <CardHeader>
-              <CardTitle>{result.details?.platform || 'Platform'}</CardTitle>
-              <CardDescription>
-                {result.success ? (
-                  <div className="text-green-500 flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4" />
-                    Success
-                  </div>
-                ) : (
-                  <div className="text-red-500 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4" />
-                    Failed
-                  </div>
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p>Message: {result.message}</p>
-              {result.details && (
-                <details>
-                  <summary>Details</summary>
-                  <pre>{JSON.stringify(result.details, null, 2)}</pre>
-                </details>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="text-lg text-gray-600">Loading automation...</div>
       </div>
     );
-  };
-
-  if (isLoading) {
-    return <div className="text-center mt-8">Loading...</div>;
   }
 
   if (!automation) {
-    return <div className="text-center mt-8">Automation not found.</div>;
-  }
-
-  return (
-    <div className="container mx-auto mt-8">
-      <div className="mb-4 flex justify-between items-center">
-        <Button variant="ghost" onClick={() => navigate('/automations')}>
-          ← Back to Automations
-        </Button>
-        <div>
-          <Button
-            variant="secondary"
-            onClick={handleTestCredentials}
-            disabled={isTestingCredentials}
-            className="mr-2"
-          >
-            {isTestingCredentials ? (
-              <>
-                Testing...
-                <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-              </>
-            ) : (
-              <>
-                Test Credentials
-              </>
-            )}
-          </Button>
-          <Button
-            variant="default"
-            onClick={handleSave}
-            disabled={isSaving}
-          >
-            {isSaving ? (
-              <>
-                Saving...
-                <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-              </>
-            ) : (
-              "Save Automation"
-            )}
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">Automation not found</h2>
+          <Button onClick={() => navigate("/automations")}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Automations
           </Button>
         </div>
       </div>
+    );
+  }
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Automation Details</CardTitle>
-          <CardDescription>Manage your automation settings.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          <div className="grid gap-2">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col relative overflow-hidden">
+      <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-blue-300/20 to-purple-300/20 rounded-full blur-3xl animate-pulse"></div>
+      <div className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-r from-purple-300/20 to-blue-300/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+      
+      <div className="sticky top-0 z-20 flex justify-between items-center mx-6 py-4 mb-4">
+        <div className="flex items-center gap-3">
+          <Button 
+            onClick={() => navigate("/automations")}
+            size="sm"
+            className="rounded-full bg-white/90 hover:bg-white text-gray-700 border border-gray-200/50 shadow-lg backdrop-blur-sm"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div className="text-left">
+            <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              {automation?.title}
+            </h1>
+            {automation?.description && (
+              <p className="text-xs text-gray-600 max-w-md truncate">{automation.description}</p>
+            )}
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="isPublic"
-              checked={isPublic}
-              onCheckedChange={(checked) => setIsPublic(checked)}
-            />
-            <Label htmlFor="isPublic">Public</Label>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      <Card className="mt-4">
-        <CardHeader>
-          <CardTitle>Execution</CardTitle>
-          <CardDescription>Execute and manage credentials.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4">
+        <div className="flex items-center bg-white/90 backdrop-blur-sm rounded-full shadow-lg border border-gray-200/50 p-1">
+          <Button
+            onClick={() => {
+              setShowDashboard(!showDashboard);
+              setShowDiagram(false);
+            }}
+            size="sm"
+            className={`rounded-full px-4 py-2 transition-all duration-300 ${
+              showDashboard 
+                ? 'bg-gradient-to-r from-purple-500 to-blue-600 text-white shadow-md' 
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+          </Button>
+          
+          <Button
+            onClick={() => {
+              setShowDashboard(false);
+              setShowDiagram(false);
+            }}
+            size="sm"
+            className={`rounded-full px-4 py-2 mx-1 transition-all duration-300 ${
+              !showDashboard && !showDiagram
+                ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md' 
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <Bot className="w-4 h-4" />
+          </Button>
+          
+          <Button
+            onClick={() => {
+              setShowDiagram(!showDiagram);
+              setShowDashboard(false);
+            }}
+            size="sm"
+            className={`rounded-full px-4 py-2 transition-all duration-300 ${
+              showDiagram 
+                ? 'bg-gradient-to-r from-purple-500 to-blue-600 text-white shadow-md' 
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+            disabled={generatingDiagram}
+          >
+            <Code2 className={`w-4 h-4 ${generatingDiagram ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
+
+        <div className="w-32"></div>
+      </div>
+      
+      <div className="flex-1 max-w-7xl mx-auto w-full px-6 relative pb-4">        
+        <div className="relative h-full">
+          <div className={`transition-transform duration-500 ease-in-out ${showDashboard || showDiagram ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'} ${showDashboard || showDiagram ? 'absolute' : 'relative'} w-full`}>
+            <div className="h-[calc(100vh-220px)]">
+              <ChatCard 
+                messages={messages} 
+                onAgentAdd={handleAgentAdd}
+                dismissedAgents={dismissedAgents}
+                onAgentDismiss={handleAgentDismiss}
+                automationId={automation.id}
+                isLoading={sendingMessage}
+                platformCredentialStatus={Object.fromEntries(
+                  currentPlatforms.map(p => [p.name, 'saved'])
+                )}
+                onPlatformCredentialChange={() => {
+                  console.log('🔄 PHASE 1: Credential change detected in AutomationDetail');
+                }}
+              />
+            </div>
+          </div>
+          
+          <div className={`transition-transform duration-500 ease-in-out ${showDashboard ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'} ${showDashboard ? 'relative' : 'absolute'} w-full`}>
+            {showDashboard && (
+              <div className="h-[calc(100vh-160px)]">
+                <AutomationDashboard
+                  automationId={automation.id}
+                  automationTitle={automation.title}
+                  automationBlueprint={automation.automation_blueprint}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className={`transition-transform duration-500 ease-in-out ${showDiagram ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} ${showDiagram ? 'relative' : 'absolute'} w-full`}>
+            {showDiagram && (
+              <div className="h-[calc(100vh-160px)]">
+                <AutomationDiagramDisplay
+                  automationBlueprint={automation?.automation_blueprint}
+                  automationDiagramData={automation?.automation_diagram_data}
+                  messages={messages}
+                  onAgentAdd={handleAgentAdd}
+                  onAgentDismiss={handleAgentDismiss}
+                  dismissedAgents={dismissedAgents}
+                  isGenerating={generatingDiagram}
+                  onRegenerateDiagram={handleRegenerateDiagram}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      
+      {!showDashboard && !showDiagram && currentPlatforms && currentPlatforms.length > 0 && (
+        <div className="px-6 pb-2">
+          <div className="flex flex-wrap gap-2">
+            {currentPlatforms.map((platform, index) => (
+              <Button
+                key={`${platform.name}-${index}`}
+                size="sm"
+                className="bg-red-500 hover:bg-red-600 text-white border-0"
+              >
+                Setup {platform.name}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!showDashboard && !showDiagram && automation?.automation_blueprint && (
+        <div className="px-6 pb-4">
           <SimpleExecuteButton
             automationId={automation.id}
-            isReady={isReady}
-            onExecutionStart={() => {
-              console.log('Automation execution started');
-            }}
-            onExecutionComplete={(success) => {
-              console.log('Automation execution completed:', success);
-            }}
           />
-          {renderTestResults()}
-        </CardContent>
-      </Card>
-
-      <Card className="mt-4">
-        <CardHeader>
-          <CardTitle>Steps Blueprint</CardTitle>
-          <CardDescription>Define the steps for your automation.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4">
-            {blueprint.steps?.map((step) => renderStepForm(step))}
-          </div>
-
-          <div className="mt-4 flex justify-around">
-            <Button variant="outline" onClick={() => handleAddStep('action')}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Action Step
-            </Button>
-            <Button variant="outline" onClick={() => handleAddStep('ai_agent_call')}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add AI Agent Step
-            </Button>
-            <Button variant="outline" onClick={() => handleAddStep('delay')}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Delay Step
-            </Button>
-            <Button variant="outline" onClick={() => handleAddStep('condition')}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Condition Step
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="mt-4">
-        <CardHeader>
-          <CardTitle>AI Agent Management</CardTitle>
-          <CardDescription>Manage AI agent decisions for this automation.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          {agentDecisions.length === 0 ? (
-            <div className="text-center">No agent decisions yet.</div>
-          ) : (
-            <div className="grid gap-4">
-              {agentDecisions.map(agent => (
-                <Card key={agent.agent_name}>
-                  <CardHeader>
-                    <CardTitle>{agent.agent_name}</CardTitle>
-                    <CardDescription>Decision: {agent.decision}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          if (!automation?.user_id) return;
-                          AutomationAgentManager.updateAgentDecision(id || '', agent.agent_name, 'added', automation.user_id)
-                            .then(() => {
-                              fetchAgentDecisions(id || '');
-                              toast({
-                                title: "Agent Decision Updated",
-                                description: `Agent ${agent.agent_name} added.`,
-                              });
-                            })
-                            .catch(error => {
-                              console.error('Failed to update agent decision:', error);
-                              toast({
-                                title: "Error",
-                                description: "Failed to update agent decision.",
-                                variant: "destructive",
-                              });
-                            });
-                        }}
-                      >
-                        Add Agent
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          if (!automation?.user_id) return;
-                          AutomationAgentManager.updateAgentDecision(id || '', agent.agent_name, 'dismissed', automation.user_id)
-                            .then(() => {
-                              fetchAgentDecisions(id || '');
-                              toast({
-                                title: "Agent Decision Updated",
-                                description: `Agent ${agent.agent_name} dismissed.`,
-                              });
-                            })
-                            .catch(error => {
-                              console.error('Failed to update agent decision:', error);
-                              toast({
-                                title: "Error",
-                                description: "Failed to update agent decision.",
-                                variant: "destructive",
-                              });
-                            });
-                        }}
-                      >
-                        Dismiss Agent
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the automation and all related data.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowDeleteAlert(false)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={isDeleting}
+        </div>
+      )}
+      
+      {!showDashboard && !showDiagram && (
+        <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent px-6 pt-2 pb-4">
+          <div className="flex gap-3 items-end">
+            <Button
+              onClick={() => setShowAIAgentForm(true)}
+              className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-5 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0 flex-shrink-0"
+              style={{
+                boxShadow: '0 0 25px rgba(147, 51, 234, 0.3)'
+              }}
             >
-              {isDeleting ? (
-                <>
-                  Deleting...
-                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                </>
-              ) : (
-                "Delete"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              <Bot className="w-4 h-4 mr-2" />
+              AI Agent
+            </Button>
+            
+            <div className="flex-1 relative min-w-0">
+              <textarea
+                value={newMessage} 
+                onChange={e => setNewMessage(e.target.value)} 
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && !sendingMessage) {
+                    e.preventDefault();
+                    handleSendMessage(newMessage);
+                    setNewMessage("");
+                  }
+                }}
+                placeholder={sendingMessage ? "YusrAI is thinking with full context..." : "Describe the automation you want to build..."} 
+                disabled={sendingMessage}
+                rows={Math.min(Math.max(newMessage.split('\n').length, 1), 4)}
+                className="w-full resize-none rounded-3xl bg-white/90 backdrop-blur-sm border-0 px-5 py-3 text-base focus:outline-none focus:ring-0 shadow-lg min-h-[48px] max-h-32 overflow-y-auto" 
+                style={{
+                  boxShadow: '0 0 25px rgba(154, 94, 255, 0.2)'
+                }} 
+              />
+            </div>
+            
+            <Button 
+              onClick={() => handleSendMessage(newMessage)}
+              disabled={sendingMessage || !newMessage.trim()}
+              className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0 disabled:opacity-50 flex-shrink-0" 
+              style={{
+                boxShadow: '0 0 30px rgba(92, 142, 246, 0.3)'
+              }}
+            >
+              <Send className={`w-5 h-5 ${sendingMessage ? 'animate-pulse' : ''}`} />
+            </Button>
+          </div>
+        </div>
+      )}
 
-      <div className="mt-8 text-right">
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="destructive">Delete Automation</Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the automation and all related data.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
+      {showBlueprint && automation?.automation_blueprint && (
+        <BlueprintCard
+          blueprint={automation.automation_blueprint}
+          onClose={() => setShowBlueprint(false)}
+        />
+      )}
+
+      {showAIAgentForm && automation && (
+        <AIAgentForm
+          automationId={automation.id}
+          onClose={() => {
+            setShowAIAgentForm(false);
+            setSelectedAgent(null);
+          }}
+          onAgentSaved={handleAgentSaved}
+          initialAgentData={selectedAgent}
+        />
+      )}
     </div>
   );
 };

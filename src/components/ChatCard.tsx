@@ -1,18 +1,20 @@
-
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { User, CheckCircle2 } from 'lucide-react';
+import { User, Code, CheckCircle2, AlertCircle } from 'lucide-react';
 import { parseYusrAIStructuredResponse, cleanDisplayText, YusrAIStructuredResponse } from "@/utils/jsonParser";
 import { useEffect, useRef, useState } from "react";
 import { useErrorRecovery } from "@/hooks/useErrorRecovery";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { agentStateManager } from '@/utils/agentStateManager';
 import ErrorHelpButton from './ErrorHelpButton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import YusrAIStructuredDisplay from './YusrAIStructuredDisplay';
 import ExecutionBlueprintVisualizer from './ExecutionBlueprintVisualizer';
 import { FlagPropagationLogger } from '@/utils/flagPropagationLogger';
 import FixedPlatformButtons from './FixedPlatformButtons';
+import { GHQ } from '@/utils/GHQ';
 
 interface Message {
   id: number;
@@ -64,6 +66,8 @@ const ChatCard = ({
   const { handleError } = useErrorRecovery();
   const { toast } = useToast();
   const { user } = useAuth();
+  const [showCodeModal, setShowCodeModal] = useState(false);
+  const [showBlueprintModal, setShowBlueprintModal] = useState(false);
   const [enhancedMessages, setEnhancedMessages] = useState<Message[]>([]);
 
   useEffect(() => {
@@ -122,14 +126,23 @@ const ChatCard = ({
 
   const optimizedMessages = enhancedMessages.slice(-50);
 
-  // CRITICAL FIX: Clean text display without cards or raw JSON
-  const safeFormatMessageText = (inputText: string | undefined | null, structuredData?: YusrAIStructuredResponse): React.ReactNode[] => {
+  const safeFormatMessageText = (inputText: string | undefined | null): React.ReactNode[] => {
     try {
       if (!inputText || typeof inputText !== 'string') {
         return [<span key="fallback-input-error">Message content unavailable.</span>];
       }
 
-      // If we have structured data, display it properly formatted
+      // Try to parse structured data first
+      let structuredData = null;
+      
+      try {
+        const parseResult = parseYusrAIStructuredResponse(inputText);
+        structuredData = parseResult.structuredData;
+      } catch (e) {
+        // Not structured data, continue with text processing
+      }
+
+      // If we have structured data, display it properly
       if (structuredData) {
         const sections = [];
         
@@ -169,6 +182,11 @@ const ChatCard = ({
                     {platform?.credentials && Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
                       <div className="ml-4 text-sm text-gray-600">
                         Required: {platform.credentials.map(c => String(c?.field || 'credential')).join(', ')}
+                        {platform.credentials.map((cred, credIndex) => (
+                          <div key={credIndex} className="text-xs mt-1">
+                            <strong>{cred.field}:</strong> {cred.why_needed}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -242,9 +260,8 @@ const ChatCard = ({
         return sections.length > 0 ? sections : [<span key="no-sections">AI response processed successfully.</span>];
       }
 
-      // For plain text, display clean formatted text
-      const cleanText = cleanDisplayText(inputText);
-      const lines = cleanText.split('\n');
+      // Fallback: Display raw text with basic formatting
+      const lines = inputText.split('\n');
       return lines.map((line, index) => (
         <span key={`line-${index}`}>
           {line}
@@ -284,6 +301,43 @@ const ChatCard = ({
     }
   };
 
+  const handlePlatformCredentialClick = (platformName: string) => {
+    if (onPlatformCredentialChange) {
+      console.log(`🔧 Opening YusrAI credential form for ${platformName}`);
+      onPlatformCredentialChange();
+    }
+  };
+
+  const testPlatformCredentials = async (platformName: string, testPayload: any) => {
+    try {
+      console.log(`🧪 Testing YusrAI credentials for ${platformName}`);
+      const { data, error } = await supabase.functions.invoke('test-credential', {
+        body: {
+          platform: platformName,
+          testConfig: testPayload
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: data.success ? "✅ YusrAI Test Successful" : "❌ YusrAI Test Failed",
+        description: data.message || `YusrAI credential test for ${platformName} completed`,
+        variant: data.success ? "default" : "destructive",
+      });
+
+      return data.success;
+    } catch (error: any) {
+      console.error('YusrAI test error:', error);
+      toast({
+        title: "YusrAI Test Error",
+        description: `Failed to test ${platformName} credentials`,
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
   const checkReadyForExecution = () => {
     const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
     if (!latestBotMessage?.structuredData) return false;
@@ -312,6 +366,25 @@ const ChatCard = ({
     });
 
     return allPlatformsConfigured && allAgentsHandled;
+  };
+
+  const handleExecuteAutomation = async () => {
+    console.log('🚀 GHQ execution will be handled by GHQAutomationExecuteButton');
+  };
+
+  const getCompleteAutomationJSON = () => {
+    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
+    if (!latestBotMessage?.structuredData) return null;
+
+    return {
+      automation_id: automationId,
+      created_at: new Date().toISOString(),
+      yusrai_response: latestBotMessage.structuredData,
+      yusrai_powered: latestBotMessage.yusrai_powered || true,
+      seven_sections_validated: latestBotMessage.seven_sections_validated || true,
+      ready_for_execution: checkReadyForExecution(),
+      credential_status: platformCredentialStatus
+    };
   };
 
   const saveAutomationResponse = async (messageData: Message) => {
@@ -345,10 +418,40 @@ const ChatCard = ({
     return latestBotMessage?.platformData || [];
   };
 
-  // CRITICAL FIX: Get latest execution blueprint for automatic diagram display
-  const getLatestExecutionBlueprint = () => {
-    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
-    return latestBotMessage?.structuredData?.execution_blueprint || null;
+  const transformPlatformsForButtons = (yusraiPlatforms: any[]) => {
+    console.log('🔄 Transforming platforms for buttons:', yusraiPlatforms);
+    
+    if (!Array.isArray(yusraiPlatforms)) {
+      console.log('⚠️ No platforms array found, returning empty array');
+      return [];
+    }
+    
+    const transformedPlatforms = yusraiPlatforms.map((platform, index) => {
+      console.log(`🔄 Processing platform ${index + 1}:`, platform);
+      
+      const credentials = platform.credentials || 
+                         platform.required_credentials || 
+                         platform.credential_requirements ||
+                         platform.fields ||
+                         [];
+      
+      const transformedPlatform = {
+        name: platform.name || platform.platform_name || platform.platform || `Platform ${index + 1}`,
+        credentials: Array.isArray(credentials) ? credentials.map((cred: any) => ({
+          field: cred.field || cred.name || cred.key || 'api_key',
+          placeholder: cred.example || cred.placeholder || cred.description || `Enter ${cred.field || 'credential'}`,
+          link: cred.link || cred.where_to_get || cred.documentation_url || cred.url || '#',
+          why_needed: cred.why_needed || cred.description || cred.purpose || 'Authentication required'
+        })) : [],
+        test_payloads: platform.test_payloads || platform.test_payload || platform.test_data || []
+      };
+      
+      console.log(`✅ Transformed platform:`, transformedPlatform);
+      return transformedPlatform;
+    });
+    
+    console.log('🎯 Final transformed platforms:', transformedPlatforms);
+    return transformedPlatforms;
   };
 
   return (
@@ -397,7 +500,21 @@ const ChatCard = ({
                     )}
 
                     <div className="leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
-                      {safeFormatMessageText(message.text, message.structuredData)}
+                      {message.isBot && message.structuredData ? (
+                        <YusrAIStructuredDisplay 
+                          data={message.structuredData}
+                          onAgentAdd={onAgentAdd}
+                          onAgentDismiss={onAgentDismiss}
+                          dismissedAgents={dismissedAgents}
+                          onPlatformCredentialClick={handlePlatformCredentialClick}
+                          platformCredentialStatus={platformCredentialStatus}
+                          onTestCredentials={testPlatformCredentials}
+                          onExecuteAutomation={onExecuteAutomation}
+                          isReadyForExecution={checkReadyForExecution()}
+                        />
+                      ) : (
+                        safeFormatMessageText(message.text)
+                      )}
                       
                       {message.isBot && message.error_help_available && (
                         <ErrorHelpButton 
@@ -406,6 +523,32 @@ const ChatCard = ({
                         />
                       )}
                     </div>
+                    
+                    {/* Show diagram button for structured responses */}
+                    {message.isBot && message.structuredData && (
+                      <div className="mt-4 flex gap-2">
+                        <Dialog open={showBlueprintModal} onOpenChange={setShowBlueprintModal}>
+                          <DialogTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              className="bg-blue-100 hover:bg-blue-200 text-blue-700 border-blue-300"
+                            >
+                              <Code className="w-4 h-4 mr-2" />
+                              View Diagram
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                            <DialogHeader>
+                              <DialogTitle>Automation Workflow Diagram</DialogTitle>
+                            </DialogHeader>
+                            <ExecutionBlueprintVisualizer 
+                              blueprint={message.structuredData.execution_blueprint}
+                            />
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    )}
                     
                     <p className={`text-xs mt-3 ${message.isBot ? 'text-gray-500' : 'text-blue-100'}`}>
                       {message.timestamp.toLocaleTimeString([], {
@@ -451,16 +594,6 @@ const ChatCard = ({
           onCredentialChange={onPlatformCredentialChange}
         />
       </div>
-
-      {/* CRITICAL FIX: Automatic diagram display */}
-      {getLatestExecutionBlueprint() && (
-        <div className="mt-6">
-          <ExecutionBlueprintVisualizer 
-            blueprint={getLatestExecutionBlueprint()}
-            isVisible={true}
-          />
-        </div>
-      )}
     </div>
   );
 };

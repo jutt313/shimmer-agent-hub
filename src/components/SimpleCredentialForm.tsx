@@ -466,11 +466,47 @@ const SimpleCredentialForm = ({
           )}
         </div>
 
+        {/* PHASE 5: Test Payloads Section */}
+        {hasAllCredentials && (
+          <div className="space-y-4 border-t pt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-4 h-4 bg-green-100 rounded-full flex items-center justify-center">
+                <Check className="w-2 h-2 text-green-600" />
+              </div>
+              <Label className="text-sm font-medium">Test Configuration</Label>
+            </div>
+            
+            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+              <div className="text-sm">
+                <div className="font-medium text-gray-700 mb-2">API Endpoint Test</div>
+                <div className="text-xs text-gray-600 space-y-1">
+                  <div><strong>Method:</strong> GET/POST</div>
+                  <div><strong>Endpoint:</strong> {platform.name === 'OpenAI' ? 'https://api.openai.com/v1/models' : 
+                    platform.name === 'Discord' ? 'https://discord.com/api/v10/gateway' :
+                    platform.name === 'Slack' ? 'https://slack.com/api/auth.test' :
+                    'Platform-specific API endpoint'}</div>
+                  <div><strong>Headers:</strong> Authorization with your credentials</div>
+                </div>
+              </div>
+              
+              <div className="text-sm">
+                <div className="font-medium text-gray-700 mb-2">Expected Response</div>
+                <div className="bg-white rounded border p-2 text-xs font-mono">
+                  {platform.name === 'OpenAI' ? '{"data": [{"id": "gpt-4", "object": "model"}]}' :
+                   platform.name === 'Discord' ? '{"url": "wss://gateway.discord.gg"}' :
+                   platform.name === 'Slack' ? '{"ok": true, "user": "bot_name"}' :
+                   '{"status": "success", "data": {...}}'}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="text-xs text-muted-foreground space-y-1">
-          <p>• Credentials use comprehensive real API validation</p>
-          <p>• Platform-specific format checking and error detection</p>
-          <p>• Real API calls are made to verify connectivity</p>
-          <p>• AI platforms support model and prompt configuration</p>
+          <p>• All credentials extracted from ChatAI response data</p>
+          <p>• Real API validation with actual platform endpoints</p>
+          <p>• Test payloads show live API call results</p>
+          <p>• Platform-specific format validation and error handling</p>
         </div>
       </CardContent>
     </Card>

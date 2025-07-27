@@ -83,91 +83,91 @@ const ChatCard = ({
           try {
             console.log('🔍 Extracting platforms from message for credential buttons:', message.text.substring(0, 200));
             
-            // PHASE 2: Enhanced credential field extraction from ChatAI text
+            // PHASE 2: Extract platforms and credentials from structured JSON data
             const platformNames = [];
-            const text = message.text.toLowerCase();
             
-            // Platform detection with better credential extraction
-            const platformConfigs = {
-              'discord': { 
-                name: 'Discord', 
-                credentials: [
-                  { field: 'bot_token', placeholder: 'Bot Token', link: 'https://discord.com/developers/applications', why_needed: 'Bot authentication' },
-                  { field: 'guild_id', placeholder: 'Server ID', link: '#', why_needed: 'Target server identification' }
-                ]
-              },
-              'openai': { 
-                name: 'OpenAI', 
-                credentials: [
-                  { field: 'api_key', placeholder: 'API Key', link: 'https://platform.openai.com/api-keys', why_needed: 'API access authentication' }
-                ]
-              },
-              'typeform': { 
-                name: 'Typeform', 
-                credentials: [
-                  { field: 'api_token', placeholder: 'Personal Access Token', link: 'https://admin.typeform.com/account#/section/tokens', why_needed: 'Access forms and responses' }
-                ]
-              },
-              'slack': { 
-                name: 'Slack', 
-                credentials: [
-                  { field: 'bot_token', placeholder: 'Bot User OAuth Token', link: 'https://api.slack.com/apps', why_needed: 'Bot authentication' },
-                  { field: 'channel_id', placeholder: 'Channel ID', link: '#', why_needed: 'Target channel identification' }
-                ]
-              },
-              'gmail': { 
-                name: 'Gmail', 
-                credentials: [
-                  { field: 'client_id', placeholder: 'OAuth Client ID', link: 'https://console.cloud.google.com/', why_needed: 'OAuth authentication' },
-                  { field: 'client_secret', placeholder: 'OAuth Client Secret', link: 'https://console.cloud.google.com/', why_needed: 'OAuth authentication' }
-                ]
-              },
-              'google sheets': { 
-                name: 'Google Sheets', 
-                credentials: [
-                  { field: 'service_account_key', placeholder: 'Service Account JSON', link: 'https://console.cloud.google.com/', why_needed: 'API access authentication' }
-                ]
-              }
-            };
-            
-            // Check for each platform and extract credentials mentioned in the text
-            Object.entries(platformConfigs).forEach(([key, config]) => {
-              if (text.includes(key)) {
-                // Try to extract specific credentials mentioned in the text
-                let extractedCredentials = [...config.credentials];
-                
-                // Look for additional credentials mentioned in the text
-                const credentialPatterns = [
-                  /(\w+_token|token)/gi,
-                  /(\w+_key|key)/gi,
-                  /(\w+_id|id)/gi,
-                  /(\w+_secret|secret)/gi,
-                  /(\w+_code|code)/gi
-                ];
-                
-                credentialPatterns.forEach(pattern => {
-                  const matches = message.text.match(pattern);
-                  if (matches) {
-                    matches.forEach(match => {
-                      const field = match.toLowerCase();
-                      if (!extractedCredentials.some(cred => cred.field === field)) {
-                        extractedCredentials.push({
-                          field: field,
-                          placeholder: `Enter your ${field}`,
-                          link: config.credentials[0]?.link || '#',
-                          why_needed: `${field} authentication`
-                        });
-                      }
+            // First try to parse structured JSON response
+            try {
+              const parseResult = parseYusrAIStructuredResponse(message.text);
+              if (parseResult.structuredData && parseResult.structuredData.platforms) {
+                // Extract platforms from structured data
+                parseResult.structuredData.platforms.forEach(platform => {
+                  if (platform.name && platform.credentials) {
+                    platformNames.push({
+                      name: platform.name,
+                      credentials: platform.credentials.map(cred => ({
+                        field: cred.field,
+                        placeholder: cred.field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                        link: cred.link || cred.where_to_get || '#',
+                        why_needed: cred.why_needed || `Required for ${platform.name} integration`
+                      }))
                     });
                   }
                 });
                 
-                platformNames.push({
-                  name: config.name,
-                  credentials: extractedCredentials
-                });
+                console.log('✅ Extracted platforms from structured data:', platformNames.map(p => p.name));
               }
-            });
+            } catch (e) {
+              console.log('📝 No structured data found, using text-based extraction');
+            }
+            
+            // Fallback: text-based platform detection for non-structured responses
+            if (platformNames.length === 0) {
+              const text = message.text.toLowerCase();
+              
+              // Platform detection with better credential extraction
+              const platformConfigs = {
+                'discord': { 
+                  name: 'Discord', 
+                  credentials: [
+                    { field: 'bot_token', placeholder: 'Bot Token', link: 'https://discord.com/developers/applications', why_needed: 'Bot authentication' },
+                    { field: 'guild_id', placeholder: 'Server ID', link: '#', why_needed: 'Target server identification' }
+                  ]
+                },
+                'openai': { 
+                  name: 'OpenAI', 
+                  credentials: [
+                    { field: 'api_key', placeholder: 'API Key', link: 'https://platform.openai.com/api-keys', why_needed: 'API access authentication' }
+                  ]
+                },
+                'typeform': { 
+                  name: 'Typeform', 
+                  credentials: [
+                    { field: 'api_token', placeholder: 'Personal Access Token', link: 'https://admin.typeform.com/account#/section/tokens', why_needed: 'Access forms and responses' }
+                  ]
+                },
+                'slack': { 
+                  name: 'Slack', 
+                  credentials: [
+                    { field: 'bot_token', placeholder: 'Bot User OAuth Token', link: 'https://api.slack.com/apps', why_needed: 'Bot authentication' },
+                    { field: 'channel_id', placeholder: 'Channel ID', link: '#', why_needed: 'Target channel identification' }
+                  ]
+                },
+                'gmail': { 
+                  name: 'Gmail', 
+                  credentials: [
+                    { field: 'client_id', placeholder: 'OAuth Client ID', link: 'https://console.cloud.google.com/', why_needed: 'OAuth authentication' },
+                    { field: 'client_secret', placeholder: 'OAuth Client Secret', link: 'https://console.cloud.google.com/', why_needed: 'OAuth authentication' }
+                  ]
+                },
+                'google sheets': { 
+                  name: 'Google Sheets', 
+                  credentials: [
+                    { field: 'service_account_key', placeholder: 'Service Account JSON', link: 'https://console.cloud.google.com/', why_needed: 'API access authentication' }
+                  ]
+                }
+              };
+              
+              // Check for each platform and extract credentials mentioned in the text
+              Object.entries(platformConfigs).forEach(([key, config]) => {
+                if (text.includes(key)) {
+                  platformNames.push({
+                    name: config.name,
+                    credentials: config.credentials
+                  });
+                }
+              });
+            }
             
             // Only set basic platform data if found
             if (platformNames.length > 0) {
@@ -200,10 +200,102 @@ const ChatCard = ({
         return [<span key="fallback-input-error">Message content unavailable.</span>];
       }
 
-      // PHASE 1: Structure the response as Summary → Steps → Platforms → Questions → Agents
-      const structuredSections = [];
+      // PHASE 1: Extract structured data from JSON and display as clean sections
+      let structuredData = null;
       
-      // Split response into sections for better readability
+      // Try to parse JSON first
+      try {
+        const parseResult = parseYusrAIStructuredResponse(inputText);
+        structuredData = parseResult.structuredData;
+      } catch (e) {
+        // Not JSON, continue with text processing
+      }
+
+      // If we have structured data, display it properly
+      if (structuredData) {
+        const sections = [];
+        
+        // Summary section
+        if (structuredData.summary) {
+          sections.push(
+            <div key="summary" className="mb-4">
+              <div className="font-semibold text-blue-600 mb-2">📋 Summary</div>
+              <div className="text-gray-700 leading-relaxed">{structuredData.summary}</div>
+            </div>
+          );
+        }
+        
+        // Steps section
+        if (structuredData.steps && structuredData.steps.length > 0) {
+          sections.push(
+            <div key="steps" className="mb-4">
+              <div className="font-semibold text-green-600 mb-2">🔧 Steps</div>
+              <div className="text-gray-700 leading-relaxed space-y-1">
+                {structuredData.steps.map((step, index) => (
+                  <div key={index}>{index + 1}. {step}</div>
+                ))}
+              </div>
+            </div>
+          );
+        }
+        
+        // Platforms section
+        if (structuredData.platforms && structuredData.platforms.length > 0) {
+          sections.push(
+            <div key="platforms" className="mb-4">
+              <div className="font-semibold text-purple-600 mb-2">🔗 Platforms</div>
+              <div className="text-gray-700 leading-relaxed">
+                {structuredData.platforms.map((platform, index) => (
+                  <div key={index} className="mb-2">
+                    <strong>{platform.name}</strong>
+                    {platform.credentials && platform.credentials.length > 0 && (
+                      <div className="ml-4 text-sm text-gray-600">
+                        Required: {platform.credentials.map(c => c.field).join(', ')}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        }
+        
+        // Clarification Questions section
+        if (structuredData.clarification_questions && structuredData.clarification_questions.length > 0) {
+          sections.push(
+            <div key="questions" className="mb-4">
+              <div className="font-semibold text-orange-600 mb-2">❓ Clarification Questions</div>
+              <div className="text-gray-700 leading-relaxed space-y-1">
+                {structuredData.clarification_questions.map((question, index) => (
+                  <div key={index}>{index + 1}. {question}</div>
+                ))}
+              </div>
+            </div>
+          );
+        }
+        
+        // AI Agents section
+        if (structuredData.agents && structuredData.agents.length > 0) {
+          sections.push(
+            <div key="agents" className="mb-4">
+              <div className="font-semibold text-red-600 mb-2">🤖 AI Agents</div>
+              <div className="text-gray-700 leading-relaxed space-y-2">
+                {structuredData.agents.map((agent, index) => (
+                  <div key={index} className="border-l-2 border-red-200 pl-3">
+                    <strong>{agent.name}</strong> ({agent.role})
+                    <div className="text-sm text-gray-600">{agent.why_needed}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        }
+        
+        return sections.length > 0 ? sections : [<span key="no-sections">AI response processed successfully.</span>];
+      }
+
+      // Fallback: Look for text-based structured sections
+      const structuredSections = [];
       const text = inputText.trim();
       
       // Look for summary section
@@ -227,19 +319,6 @@ const ChatCard = ({
             <div key="steps" className="mb-4">
               <div className="font-semibold text-green-600 mb-2">🔧 Steps</div>
               <div className="text-gray-700 leading-relaxed">{stepsMatch[2].trim()}</div>
-            </div>
-          );
-        }
-      }
-      
-      // Look for platforms section
-      if (text.includes('## Platforms') || text.includes('**Platforms**') || text.toLowerCase().includes('platforms:')) {
-        const platformsMatch = text.match(/(## Platforms|Platforms:|\*\*Platforms\*\*)(.*?)(?=##|\*\*[A-Z]|$)/s);
-        if (platformsMatch) {
-          structuredSections.push(
-            <div key="platforms" className="mb-4">
-              <div className="font-semibold text-purple-600 mb-2">🔗 Platforms</div>
-              <div className="text-gray-700 leading-relaxed">{platformsMatch[2].trim()}</div>
             </div>
           );
         }

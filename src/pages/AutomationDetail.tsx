@@ -444,11 +444,52 @@ const AutomationDetail = () => {
 
       setMessages(prev => [...prev, aiMessage]);
 
-      // PHASE 4: Generate diagram automatically when structured data is available
-      if (structuredData && structuredData.workflow && structuredData.workflow.length > 0) {
-        console.log('🔄 PHASE 4: Auto-generating diagram from ChatAI structured response');
+      // PHASE 3: Generate diagram automatically when structured data with execution_blueprint is available
+      if (structuredData && structuredData.execution_blueprint) {
+        console.log('🔄 PHASE 3: Auto-generating diagram from execution_blueprint');
         try {
-          // Create a proper blueprint from the structured data
+          // Extract blueprint from structured data
+          const blueprintData: AutomationBlueprint = {
+            version: '1.0',
+            description: structuredData.summary || 'AI-generated automation workflow',
+            trigger: structuredData.execution_blueprint.trigger || { type: 'manual' },
+            steps: structuredData.execution_blueprint.workflow?.map((step: any, index: number) => ({
+              id: `step-${step.step || index + 1}`,
+              name: step.action || `Step ${index + 1}`,
+              type: 'action' as const,
+              action: {
+                integration: step.platform || 'system',
+                method: step.method || step.action || 'execute',
+                parameters: step.data_mapping || step.parameters || {}
+              },
+              originalWorkflowData: step
+            })) || []
+          };
+          
+          // Save blueprint to automation
+          const { error: updateError } = await supabase
+            .from('automations')
+            .update({ automation_blueprint: blueprintData })
+            .eq('id', automation.id);
+            
+          if (!updateError) {
+            console.log('📋 Blueprint saved successfully');
+            setAutomation(prev => ({ ...prev!, automation_blueprint: blueprintData }));
+            
+            // Generate diagram after a short delay
+            setTimeout(() => {
+              generateAndSaveDiagram(automation.id, blueprintData);
+            }, 2000);
+          }
+        } catch (error) {
+          console.error('❌ Error processing execution blueprint:', error);
+        }
+      } 
+      // Fallback: If workflow exists but no execution_blueprint
+      else if (structuredData && structuredData.workflow && structuredData.workflow.length > 0) {
+        console.log('🔄 PHASE 3: Fallback - Auto-generating diagram from workflow data');
+        try {
+          // Create a proper blueprint from the workflow data
           const blueprintData: AutomationBlueprint = {
             version: '1.0',
             description: structuredData.summary || 'AI-generated automation workflow',
@@ -711,12 +752,17 @@ const AutomationDetail = () => {
       
       {!showDashboard && !showDiagram && currentPlatforms && currentPlatforms.length > 0 && (
         <div className="px-6 pb-2">
-          <PlatformButtons 
-            platforms={currentPlatforms} 
-            onCredentialChange={() => {
-              console.log('🔄 Credential change detected in AutomationDetail');
-            }}
-          />
+          <div className="flex flex-wrap gap-2">
+            {currentPlatforms.map((platform, index) => (
+              <Button
+                key={`${platform.name}-${index}`}
+                size="sm"
+                className="bg-red-500 hover:bg-red-600 text-white border-0"
+              >
+                Setup {platform.name}
+              </Button>
+            ))}
+          </div>
         </div>
       )}
 

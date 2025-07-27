@@ -373,8 +373,9 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({ 
                         <ChevronRight className="w-3 h-3" />
                       )}
                     </Badge>
-                </CardTitle>
-              </CardHeader>
+                  </CardTitle>
+                </CardHeader>
+              </CollapsibleTrigger>
               
               <CollapsibleContent>
                 <CardContent className="pt-0 pb-6">

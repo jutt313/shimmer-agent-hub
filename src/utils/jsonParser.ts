@@ -1,5 +1,5 @@
 
-interface YusrAIStructuredResponse {
+export interface YusrAIStructuredResponse {
   summary: string;
   steps: string[];
   platforms: Array<{
@@ -95,7 +95,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
     let metadata: YusrAIResponseMetadata = {};
     let cleanResponseText = responseText;
     
-    // PHASE 2: Extract JSON from markdown code blocks
+    // PHASE 2: CRITICAL FIX - Extract JSON from markdown code blocks with better validation
     const markdownJsonMatch = responseText.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
     if (markdownJsonMatch) {
       console.log('🎯 Markdown code block detected, extracting JSON...');
@@ -103,9 +103,10 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('✅ Extracted JSON from markdown:', cleanResponseText.substring(0, 200) + '...');
     }
     
-    // Parse the response
+    // PHASE 2: First try to parse the response with enhanced error handling
     try {
       parsedResponse = JSON.parse(cleanResponseText);
+      // PHASE 2: Validate parsed object is serializable
       if (typeof parsedResponse !== 'object' || parsedResponse === null) {
         throw new Error('Invalid JSON structure');
       }
@@ -118,7 +119,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       };
     }
 
-    // Check if this is a wrapped response from chat-AI function
+    // CRITICAL FIX: Check if this is a wrapped response from chat-AI function
     if (parsedResponse.response && typeof parsedResponse.response === 'string') {
       console.log('🎯 Wrapped YusrAI response detected from chat-AI function')
       
@@ -127,7 +128,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       metadata.seven_sections_validated = parsedResponse.seven_sections_validated || false;
       metadata.error_help_available = parsedResponse.error_help_available || false;
       
-      // Parse the inner JSON response
+      // CRITICAL FIX: Parse the inner JSON response
       try {
         const innerResponse = JSON.parse(parsedResponse.response);
         console.log('✅ Successfully extracted inner YusrAI JSON from wrapper:', innerResponse);
@@ -145,7 +146,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       metadata.yusrai_powered = true;
     }
 
-    // Check if this is a structured response
+    // CRITICAL FIX: Check if this is a structured response with automation sections
     const hasStructuredSections = parsedResponse.error_handling || 
       parsedResponse.performance_optimization || 
       parsedResponse.summary ||
@@ -160,7 +161,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       };
     }
 
-    // PHASE 2: CRITICAL FIX - Enhanced platform name extraction
+    // CRITICAL FIX: Comprehensive field name mapping from database to frontend
     console.log('🔍 Validating and mapping structured sections...')
     
     // Map database field names to frontend expected names
@@ -171,7 +172,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('📋 Mapped step_by_step_explanation to steps:', parsedResponse.steps.length);
     }
 
-    // PHASE 2: ENHANCED PLATFORM MAPPING - Extract REAL platform names
+    // ENHANCED PLATFORM MAPPING - Fix all platform field variations
     if (parsedResponse.platforms_and_credentials && !parsedResponse.platforms) {
       parsedResponse.platforms = Array.isArray(parsedResponse.platforms_and_credentials) 
         ? parsedResponse.platforms_and_credentials 
@@ -187,48 +188,24 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('🔗 Mapped platform_integrations to platforms:', parsedResponse.platforms.length);
     }
 
-    // PHASE 2: CRITICAL FIX - Extract REAL platform names, not generic ones
+    // CRITICAL FIX: Ensure platform names are properly extracted and not generic
     if (parsedResponse.platforms && Array.isArray(parsedResponse.platforms)) {
       parsedResponse.platforms = parsedResponse.platforms.map((platform: any, index: number) => {
-        // PHASE 7: Extract REAL platform names from various possible field names
-        let realPlatformName = platform.name || 
-                              platform.platform_name || 
-                              platform.platform || 
-                              platform.service || 
-                              platform.integration ||
-                              platform.tool;
+        // Extract real platform names from various possible field names
+        const platformName = platform.name || 
+                            platform.platform_name || 
+                            platform.platform || 
+                            platform.service || 
+                            platform.integration ||
+                            platform.tool ||
+                            `Platform ${index + 1}`;
         
-        // PHASE 7: If still no real name, try to extract from credentials or context
-        if (!realPlatformName || realPlatformName === 'Platform' || realPlatformName.includes('Platform ')) {
-          // Look for real platform names in credentials or fields
-          const credentials = platform.credentials || platform.required_credentials || platform.fields || [];
-          if (Array.isArray(credentials) && credentials.length > 0) {
-            const firstCred = credentials[0];
-            if (firstCred && typeof firstCred === 'object') {
-              // Try to extract platform name from credential context
-              if (firstCred.where_to_get && typeof firstCred.where_to_get === 'string') {
-                if (firstCred.where_to_get.includes('typeform')) realPlatformName = 'Typeform';
-                else if (firstCred.where_to_get.includes('openai')) realPlatformName = 'OpenAI';
-                else if (firstCred.where_to_get.includes('notion')) realPlatformName = 'Notion';
-                else if (firstCred.where_to_get.includes('gmail')) realPlatformName = 'Gmail';
-                else if (firstCred.where_to_get.includes('slack')) realPlatformName = 'Slack';
-                else if (firstCred.where_to_get.includes('discord')) realPlatformName = 'Discord';
-                else if (firstCred.where_to_get.includes('google')) realPlatformName = 'Google Sheets';
-              }
-            }
-          }
-        }
-        
-        // Final fallback only if absolutely no real name found
-        if (!realPlatformName) {
-          realPlatformName = `Platform ${index + 1}`;
-        }
-        
-        console.log(`🔍 Processing platform ${index + 1}: extracted REAL name "${realPlatformName}"`);
+        console.log(`🔍 Processing platform ${index + 1}: extracted name "${platformName}"`);
         
         return {
           ...platform,
-          name: realPlatformName,
+          name: platformName,
+          // Ensure credentials field exists and is properly mapped
           credentials: platform.credentials || 
                       platform.required_credentials || 
                       platform.credential_requirements ||
@@ -236,10 +213,10 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
                       []
         };
       });
-      console.log('✅ Enhanced REAL platform name extraction completed');
+      console.log('✅ Enhanced platform name extraction completed');
     }
 
-    // Enhanced AI agents mapping
+    // ENHANCED AI AGENTS MAPPING - Fix all agent field variations
     if (parsedResponse.ai_agents_section?.agents && !parsedResponse.agents) {
       parsedResponse.agents = Array.isArray(parsedResponse.ai_agents_section.agents) 
         ? parsedResponse.ai_agents_section.agents 
@@ -247,6 +224,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('🤖 Mapped ai_agents_section.agents to agents:', parsedResponse.agents.length);
     }
     
+    // Also check for direct ai_agents field
     if (parsedResponse.ai_agents && !parsedResponse.agents) {
       parsedResponse.agents = Array.isArray(parsedResponse.ai_agents) 
         ? parsedResponse.ai_agents 
@@ -254,19 +232,19 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('🤖 Mapped ai_agents to agents:', parsedResponse.agents.length);
     }
 
-    // Fix test payloads mapping
+    // FIX TEST PAYLOADS MAPPING
     if (parsedResponse.platform_test_payloads && !parsedResponse.test_payloads) {
       parsedResponse.test_payloads = parsedResponse.platform_test_payloads;
       console.log('🧪 Mapped platform_test_payloads to test_payloads');
     }
 
-    // Fix execution blueprint mapping
+    // FIX EXECUTION BLUEPRINT MAPPING
     if (parsedResponse.blueprint && !parsedResponse.execution_blueprint) {
       parsedResponse.execution_blueprint = parsedResponse.blueprint;
       console.log('📋 Mapped blueprint to execution_blueprint');
     }
 
-    // Ensure all arrays exist
+    // Ensure all arrays exist (empty arrays are fine)
     if (!parsedResponse.steps) parsedResponse.steps = [];
     if (!parsedResponse.platforms) parsedResponse.platforms = [];
     if (!parsedResponse.clarification_questions) parsedResponse.clarification_questions = [];

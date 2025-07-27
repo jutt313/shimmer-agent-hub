@@ -72,16 +72,9 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
     onCredentialChange?.();
   };
 
-  const getButtonStyle = (platform: Platform) => {
-    const status = credentialStatus[platform.name] || 'missing';
-    switch (status) {
-      case 'tested':
-        return 'bg-green-100 hover:bg-green-200 text-green-800 border-green-300';
-      case 'saved':
-        return 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border-yellow-300';
-      default:
-        return 'bg-red-100 hover:bg-red-200 text-red-800 border-red-300';
-    }
+  const handlePlatformClick = (platform: Platform) => {
+    console.log('🔧 Platform button clicked:', platform.name);
+    setSelectedPlatform(platform);
   };
 
   const getStatusIcon = (platform: Platform) => {
@@ -137,7 +130,7 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
       {platforms.map((platform, index) => (
         <Button
           key={`${platform.name}-${index}`}
-          onClick={() => setSelectedPlatform(platform)}
+          onClick={() => handlePlatformClick(platform)}
           size="sm"
           className="rounded-full bg-blue-500 hover:bg-blue-600 text-white border-0 px-4 py-2"
         >

@@ -81,48 +81,29 @@ const ChatCard = ({
         const processed = messages.map((message) => {
           if (message.isBot && !message.structuredData) {
             try {
-              console.log('🔍 Extracting platforms from message for credential buttons:', message.text.substring(0, 200));
+              console.log('🔍 Processing bot message for structured data:', message.text.substring(0, 200));
               
-              // Extract platforms from structured JSON response
-              const platformNames: any[] = [];
-              
-              try {
-                const parseResult = parseYusrAIStructuredResponse(message.text);
-                if (parseResult.structuredData && parseResult.structuredData.platforms && Array.isArray(parseResult.structuredData.platforms)) {
-                  // Extract platforms from structured data
-                  parseResult.structuredData.platforms.forEach(platform => {
-                    if (platform && typeof platform === 'object' && platform.name) {
-                      const safePlatform = {
-                        name: String(platform.name || 'Unknown Platform'),
-                        credentials: Array.isArray(platform.credentials) ? platform.credentials.map(cred => ({
-                          field: String(cred?.field || 'api_key'),
-                          placeholder: String(cred?.field || 'api_key').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-                          link: String(cred?.link || cred?.where_to_get || '#'),
-                          why_needed: String(cred?.why_needed || `Required for ${platform.name} integration`)
-                        })) : []
-                      };
-                      platformNames.push(safePlatform);
-                    }
-                  });
-                  
-                  console.log('✅ Extracted platforms from structured data:', platformNames.map(p => p.name));
-                }
-              } catch (e) {
-                console.log('📝 No structured data found');
+              // Parse structured data
+              const parseResult = parseYusrAIStructuredResponse(message.text);
+              if (parseResult.structuredData) {
+                console.log('✅ Structured data found:', parseResult.structuredData);
+                
+                // Extract platform data for buttons
+                const platformData = parseResult.structuredData.platforms?.map(platform => ({
+                  name: platform.name,
+                  credentials: platform.credentials || []
+                })) || [];
+                
+                return {
+                  ...message,
+                  structuredData: parseResult.structuredData,
+                  platformData: platformData,
+                  yusrai_powered: parseResult.metadata.yusrai_powered,
+                  seven_sections_validated: parseResult.metadata.seven_sections_validated
+                };
               }
-            
-            // Only set basic platform data if found
-            if (platformNames.length > 0) {
-              const updatedMessage = {
-                ...message,
-                platformData: platformNames
-              };
-              
-              console.log('✅ Platforms extracted:', platformNames.map(p => p.name));
-              return updatedMessage;
-            }
             } catch (error) {
-              console.log('❌ Platform extraction error:', error);
+              console.log('❌ Error processing message:', error);
             }
           }
           return message;
@@ -146,21 +127,21 @@ const ChatCard = ({
         return [<span key="fallback-input-error">Message content unavailable.</span>];
       }
 
-      // Try to parse JSON first
+      // Try to parse structured data first
       let structuredData = null;
       
       try {
         const parseResult = parseYusrAIStructuredResponse(inputText);
         structuredData = parseResult.structuredData;
       } catch (e) {
-        // Not JSON, continue with text processing
+        // Not structured data, continue with text processing
       }
 
       // If we have structured data, display it properly
       if (structuredData) {
         const sections = [];
         
-        // Summary section - NO EMOJIS
+        // Summary section
         if (structuredData.summary && typeof structuredData.summary === 'string') {
           sections.push(
             <div key="summary" className="mb-4">
@@ -170,7 +151,7 @@ const ChatCard = ({
           );
         }
         
-        // Steps section - NO EMOJIS
+        // Steps section
         if (structuredData.steps && Array.isArray(structuredData.steps) && structuredData.steps.length > 0) {
           sections.push(
             <div key="steps" className="mb-4">
@@ -184,7 +165,7 @@ const ChatCard = ({
           );
         }
         
-        // Platforms section - NO EMOJIS, REAL NAMES
+        // Platforms section
         if (structuredData.platforms && Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
           sections.push(
             <div key="platforms" className="mb-4">
@@ -196,6 +177,11 @@ const ChatCard = ({
                     {platform?.credentials && Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
                       <div className="ml-4 text-sm text-gray-600">
                         Required: {platform.credentials.map(c => String(c?.field || 'credential')).join(', ')}
+                        {platform.credentials.map((cred, credIndex) => (
+                          <div key={credIndex} className="text-xs mt-1">
+                            <strong>{cred.field}:</strong> {cred.why_needed}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -205,7 +191,7 @@ const ChatCard = ({
           );
         }
         
-        // Clarification Questions section - NO EMOJIS
+        // Clarification Questions section
         if (structuredData.clarification_questions && Array.isArray(structuredData.clarification_questions) && structuredData.clarification_questions.length > 0) {
           sections.push(
             <div key="questions" className="mb-4">
@@ -219,7 +205,7 @@ const ChatCard = ({
           );
         }
         
-        // AI Agents section - NO EMOJIS, WITH ADD/DISMISS BUTTONS
+        // AI Agents section with Add/Dismiss buttons
         if (structuredData.agents && Array.isArray(structuredData.agents) && structuredData.agents.length > 0) {
           sections.push(
             <div key="agents" className="mb-4">
@@ -229,11 +215,16 @@ const ChatCard = ({
                   <div key={index} className="border-l-2 border-red-200 pl-3 py-2">
                     <div className="flex items-center justify-between">
                       <div>
-                        <strong>{String(agent?.name || `Agent ${index + 1}`)}</strong> 
-                        {agent?.role && <span> ({String(agent.role)})</span>}
-                        {agent?.why_needed && (
-                          <div className="text-sm text-gray-600">{String(agent.why_needed)}</div>
-                        )}
+                        <strong>{String(agent?.name || `Agent ${index + 1}`)}</strong>
+                        <div className="text-sm text-gray-600">
+                          <div><strong>Role:</strong> {agent?.role || 'Assistant'}</div>
+                          <div><strong>Rule:</strong> {agent?.rule || 'No specific rules'}</div>
+                          <div><strong>Goal:</strong> {agent?.goal || 'General assistance'}</div>
+                          <div><strong>Memory:</strong> {agent?.memory || 'Standard memory'}</div>
+                          {agent?.why_needed && (
+                            <div><strong>Why Needed:</strong> {agent.why_needed}</div>
+                          )}
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <Button
@@ -264,50 +255,14 @@ const ChatCard = ({
         return sections.length > 0 ? sections : [<span key="no-sections">AI response processed successfully.</span>];
       }
 
-      // Fallback: Look for text-based structured sections
-      const structuredSections = [];
-      const text = inputText.trim();
-      
-      // Look for summary section
-      if (text.includes('## Summary') || text.includes('**Summary**') || text.toLowerCase().includes('summary:')) {
-        const summaryMatch = text.match(/(## Summary|Summary:|\*\*Summary\*\*)(.*?)(?=##|\*\*[A-Z]|$)/s);
-        if (summaryMatch) {
-          structuredSections.push(
-            <div key="summary" className="mb-4">
-              <div className="font-semibold text-blue-600 mb-2">Summary</div>
-              <div className="text-gray-700 leading-relaxed">{summaryMatch[2].trim()}</div>
-            </div>
-          );
-        }
-      }
-      
-      // Look for steps section
-      if (text.includes('## Steps') || text.includes('**Steps**') || text.toLowerCase().includes('steps:')) {
-        const stepsMatch = text.match(/(## Steps|Steps:|\*\*Steps\*\*)(.*?)(?=##|\*\*[A-Z]|$)/s);
-        if (stepsMatch) {
-          structuredSections.push(
-            <div key="steps" className="mb-4">
-              <div className="font-semibold text-green-600 mb-2">Steps</div>
-              <div className="text-gray-700 leading-relaxed">{stepsMatch[2].trim()}</div>
-            </div>
-          );
-        }
-      }
-      
-      // If no structured sections found, show raw text with basic formatting
-      if (structuredSections.length === 0) {
-        const processedText = inputText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        const lines = processedText.split('\n');
-        
-        return lines.map((line, index) => (
-          <span key={`line-${index}`}>
-            <span dangerouslySetInnerHTML={{ __html: String(line || '') }} />
-            {index < lines.length - 1 && <br />}
-          </span>
-        ));
-      }
-      
-      return structuredSections;
+      // Fallback: Display raw text with basic formatting
+      const lines = inputText.split('\n');
+      return lines.map((line, index) => (
+        <span key={`line-${index}`}>
+          {line}
+          {index < lines.length - 1 && <br />}
+        </span>
+      ));
 
     } catch (error: any) {
       handleError(error, 'Text formatting in ChatCard');
@@ -550,6 +505,33 @@ const ChatCard = ({
                       )}
                     </div>
                     
+                    {/* Show diagram button for structured responses */}
+                    {message.isBot && message.structuredData && (
+                      <div className="mt-4 flex gap-2">
+                        <Dialog open={showBlueprintModal} onOpenChange={setShowBlueprintModal}>
+                          <DialogTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              className="bg-blue-100 hover:bg-blue-200 text-blue-700 border-blue-300"
+                            >
+                              <Code className="w-4 h-4 mr-2" />
+                              View Diagram
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                            <DialogHeader>
+                              <DialogTitle>Automation Workflow Diagram</DialogTitle>
+                            </DialogHeader>
+                            <ExecutionBlueprintVisualizer 
+                              structuredData={message.structuredData} 
+                              automationId={automationId}
+                            />
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    )}
+                    
                     <p className={`text-xs mt-3 ${message.isBot ? 'text-gray-500' : 'text-blue-100'}`}>
                       {message.timestamp.toLocaleTimeString([], {
                         hour: '2-digit',
@@ -584,6 +566,15 @@ const ChatCard = ({
             <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
+      </div>
+
+      {/* Platform credential buttons */}
+      <div className="mt-4">
+        <FixedPlatformButtons
+          platforms={getLatestPlatforms()}
+          automationId={automationId}
+          onCredentialChange={onPlatformCredentialChange}
+        />
       </div>
     </div>
   );

@@ -88,10 +88,15 @@ const ChatCard = ({
               if (parseResult.structuredData) {
                 console.log('✅ Structured data found:', parseResult.structuredData);
                 
-                // Extract platform data for buttons
+                // Extract platform data for buttons with proper type mapping
                 const platformData = parseResult.structuredData.platforms?.map(platform => ({
                   name: platform.name,
-                  credentials: platform.credentials || []
+                  credentials: platform.credentials.map(cred => ({
+                    field: cred.field,
+                    placeholder: cred.example || cred.where_to_get || `Enter ${cred.field}`,
+                    link: cred.link || cred.where_to_get || '#',
+                    why_needed: cred.why_needed
+                  }))
                 })) || [];
                 
                 return {
@@ -495,7 +500,21 @@ const ChatCard = ({
                     )}
 
                     <div className="leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
-                      {safeFormatMessageText(message.text)}
+                      {message.isBot && message.structuredData ? (
+                        <YusrAIStructuredDisplay 
+                          data={message.structuredData}
+                          onAgentAdd={onAgentAdd}
+                          onAgentDismiss={onAgentDismiss}
+                          dismissedAgents={dismissedAgents}
+                          onPlatformCredentialClick={handlePlatformCredentialClick}
+                          platformCredentialStatus={platformCredentialStatus}
+                          onTestCredentials={testPlatformCredentials}
+                          onExecuteAutomation={onExecuteAutomation}
+                          isReadyForExecution={checkReadyForExecution()}
+                        />
+                      ) : (
+                        safeFormatMessageText(message.text)
+                      )}
                       
                       {message.isBot && message.error_help_available && (
                         <ErrorHelpButton 
@@ -524,7 +543,6 @@ const ChatCard = ({
                               <DialogTitle>Automation Workflow Diagram</DialogTitle>
                             </DialogHeader>
                             <ExecutionBlueprintVisualizer 
-                              structuredData={message.structuredData} 
                               automationId={automationId}
                             />
                           </DialogContent>

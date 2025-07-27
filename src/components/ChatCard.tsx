@@ -88,8 +88,9 @@ const ChatCard = ({
               if (parseResult.structuredData) {
                 console.log('✅ Structured data found:', parseResult.structuredData);
                 
-                // Extract platform data for buttons with proper type mapping
-                const platformData = parseResult.structuredData.platforms?.map(platform => ({
+                // Extract platform data - handle both platforms and platforms_credentials
+                const platformsSource = parseResult.structuredData.platforms_credentials || parseResult.structuredData.platforms || [];
+                const platformData = platformsSource.map(platform => ({
                   name: platform.name,
                   credentials: platform.credentials.map(cred => ({
                     field: cred.field,
@@ -97,7 +98,9 @@ const ChatCard = ({
                     link: cred.link || cred.where_to_get || '#',
                     why_needed: cred.why_needed
                   }))
-                })) || [];
+                }));
+                
+                console.log('🔗 Transformed platform data:', platformData);
                 
                 return {
                   ...message,

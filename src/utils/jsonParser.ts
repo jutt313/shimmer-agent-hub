@@ -13,6 +13,17 @@ export interface YusrAIStructuredResponse {
       example?: string;
     }>;
   }>;
+  platforms_credentials?: Array<{
+    name: string;
+    credentials: Array<{
+      field: string;
+      why_needed: string;
+      where_to_get?: string;
+      link?: string;
+      options?: string[];
+      example?: string;
+    }>;
+  }>;
   clarification_questions: string[];
   agents: Array<{
     name: string;
@@ -149,7 +160,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
     const hasStructuredSections = parsedResponse.error_handling || 
       parsedResponse.performance_optimization || 
       parsedResponse.summary ||
-      (parsedResponse.steps || parsedResponse.platforms || parsedResponse.agents);
+      (parsedResponse.steps || parsedResponse.platforms || parsedResponse.agents || parsedResponse.platforms_credentials);
 
     if (!hasStructuredSections) {
       console.log('📄 Not a structured response, treating as plain text')
@@ -168,6 +179,14 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
         ? parsedResponse.step_by_step_explanation 
         : [parsedResponse.step_by_step_explanation];
       console.log('📋 Mapped step_by_step_explanation to steps:', parsedResponse.steps.length);
+    }
+
+    // Handle platforms_credentials mapping
+    if (parsedResponse.platforms_credentials && !parsedResponse.platforms) {
+      parsedResponse.platforms = Array.isArray(parsedResponse.platforms_credentials) 
+        ? parsedResponse.platforms_credentials 
+        : [parsedResponse.platforms_credentials];
+      console.log('🔗 Mapped platforms_credentials to platforms:', parsedResponse.platforms.length);
     }
 
     // ENHANCED PLATFORM MAPPING - Fix platform names with better extraction

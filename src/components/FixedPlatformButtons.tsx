@@ -39,30 +39,22 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
     platforms: platforms.map(p => ({ 
       name: p.name, 
       credentialsCount: p.credentials.length,
-      firstCredentialField: p.credentials[0]?.field || 'none',
-      credentialFields: p.credentials.map(c => c.field)
+      firstCredentialField: p.credentials[0]?.field || 'none'
     })),
-    automationId,
-    selectedPlatform: selectedPlatform?.name || 'none'
+    automationId
   });
 
   useEffect(() => {
     if (platforms.length > 0) {
-      console.log('🔄 Platforms changed, checking credential status...');
       checkCredentialStatus();
     }
   }, [platforms, automationId]);
 
   const checkCredentialStatus = async () => {
-    if (!automationId || !user?.id) {
-      console.log('⚠️ Missing automationId or user.id, skipping credential status check');
-      return;
-    }
+    if (!automationId || !user?.id) return;
     
     try {
       const platformNames = platforms.map(p => p.name);
-      console.log('🔍 Checking credential status for platforms:', platformNames);
-      
       const statusResult = await SimpleCredentialManager.getCredentialStatus(
         automationId, 
         platformNames, 
@@ -88,39 +80,9 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
   };
 
   const handlePlatformClick = (platform: Platform) => {
-    console.log('🔧 Platform button clicked:', {
-      platformName: platform.name,
-      credentialsCount: platform.credentials.length,
-      credentials: platform.credentials.map(c => ({
-        field: c.field,
-        placeholder: c.placeholder,
-        hasLink: !!c.link
-      }))
-    });
-    
-    // Validate platform data before setting
-    if (!platform.name || !platform.credentials || platform.credentials.length === 0) {
-      console.error('❌ Invalid platform data:', platform);
-      return;
-    }
-    
-    // Validate credential fields
-    const validCredentials = platform.credentials.every(cred => 
-      cred.field && cred.placeholder && cred.why_needed !== undefined
-    );
-    
-    if (!validCredentials) {
-      console.error('❌ Invalid credential fields:', platform.credentials);
-      return;
-    }
-    
+    console.log('🔧 Platform button clicked:', platform.name);
+    console.log('🔧 Platform credentials:', platform.credentials);
     setSelectedPlatform(platform);
-    console.log('✅ Platform selected successfully');
-  };
-
-  const handleBackToList = () => {
-    console.log('🔙 Back to platform list');
-    setSelectedPlatform(null);
   };
 
   const getStatusIcon = (platform: Platform) => {
@@ -153,7 +115,6 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
   }
 
   if (selectedPlatform) {
-    console.log('🎯 Showing credential form for platform:', selectedPlatform.name);
     return (
       <div className="space-y-4">
         <Card className="border-2 border-purple-200 bg-purple-50">
@@ -171,7 +132,7 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
             />
             <div className="mt-4">
               <Button
-                onClick={handleBackToList}
+                onClick={() => setSelectedPlatform(null)}
                 variant="outline"
                 className="w-full"
               >
@@ -195,31 +156,27 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
       </div>
       
       <div className="flex flex-wrap gap-2">
-        {platforms.map((platform, index) => {
-          const status = credentialStatus[platform.name] || 'missing';
-          
-          return (
-            <Button
-              key={`${platform.name}-${index}`}
-              onClick={() => handlePlatformClick(platform)}
-              size="sm"
-              variant="outline"
-              className={`
-                flex items-center gap-2 px-3 py-2 rounded-full text-xs font-medium
-                transition-all duration-200 hover:scale-105 hover:shadow-sm cursor-pointer
-                ${status === 'tested' 
-                  ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' 
-                  : status === 'saved'
-                  ? 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100'
-                  : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
-                }
-              `}
-            >
-              {getStatusIcon(platform)}
-              <span>{getStatusText(platform)} {platform.name}</span>
-            </Button>
-          );
-        })}
+        {platforms.map((platform, index) => (
+          <Button
+            key={`${platform.name}-${index}`}
+            onClick={() => handlePlatformClick(platform)}
+            size="sm"
+            variant="outline"
+            className={`
+              flex items-center gap-2 px-3 py-2 rounded-full text-xs font-medium
+              transition-all duration-200 hover:scale-105 hover:shadow-sm
+              ${credentialStatus[platform.name] === 'tested' 
+                ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' 
+                : credentialStatus[platform.name] === 'saved'
+                ? 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100'
+                : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
+              }
+            `}
+          >
+            {getStatusIcon(platform)}
+            <span>{getStatusText(platform)} {platform.name}</span>
+          </Button>
+        ))}
       </div>
       
       <div className="text-xs text-gray-500">

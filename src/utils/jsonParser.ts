@@ -149,7 +149,6 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
     const hasStructuredSections = parsedResponse.error_handling || 
       parsedResponse.performance_optimization || 
       parsedResponse.summary ||
-      parsedResponse.platforms_credentials ||
       (parsedResponse.steps || parsedResponse.platforms || parsedResponse.agents);
 
     if (!hasStructuredSections) {
@@ -169,52 +168,6 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
         ? parsedResponse.step_by_step_explanation 
         : [parsedResponse.step_by_step_explanation];
       console.log('📋 Mapped step_by_step_explanation to steps:', parsedResponse.steps.length);
-    }
-
-    // ENHANCED: Handle platforms_credentials structure from ChatAI
-    if (parsedResponse.platforms_credentials && !parsedResponse.platforms) {
-      console.log('🔧 Processing platforms_credentials structure from ChatAI');
-      
-      // Convert platforms_credentials object to platforms array
-      if (typeof parsedResponse.platforms_credentials === 'object') {
-        parsedResponse.platforms = Object.entries(parsedResponse.platforms_credentials).map(([platformName, credentialData]: [string, any]) => {
-          console.log(`🔍 Processing platform: ${platformName}`, credentialData);
-          
-          // Extract credentials array from various possible structures
-          let credentials = [];
-          
-          if (Array.isArray(credentialData)) {
-            credentials = credentialData;
-          } else if (credentialData.credentials && Array.isArray(credentialData.credentials)) {
-            credentials = credentialData.credentials;
-          } else if (credentialData.required_credentials && Array.isArray(credentialData.required_credentials)) {
-            credentials = credentialData.required_credentials;
-          } else if (typeof credentialData === 'object') {
-            // Convert object properties to credentials array
-            credentials = Object.entries(credentialData).map(([field, details]: [string, any]) => ({
-              field,
-              placeholder: details.placeholder || `Enter your ${field}`,
-              link: details.link || details.where_to_get || '',
-              why_needed: details.why_needed || details.description || `Required for ${platformName} integration`
-            }));
-          }
-          
-          // Ensure each credential has required fields
-          credentials = credentials.map((cred: any) => ({
-            field: cred.field || cred.name || 'api_key',
-            placeholder: cred.placeholder || `Enter your ${cred.field || 'credential'}`,
-            link: cred.link || cred.where_to_get || '',
-            why_needed: cred.why_needed || cred.description || `Required for ${platformName} integration`
-          }));
-          
-          return {
-            name: platformName,
-            credentials: credentials
-          };
-        });
-        
-        console.log('✅ Converted platforms_credentials to platforms array:', parsedResponse.platforms.length);
-      }
     }
 
     // ENHANCED PLATFORM MAPPING - Fix platform names with better extraction

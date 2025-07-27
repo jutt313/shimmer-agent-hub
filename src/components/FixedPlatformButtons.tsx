@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,10 +48,7 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
     if (!automationId || !user?.id) return;
     
     try {
-      // Get all platform names
       const platformNames = platforms.map(p => p.name);
-      
-      // Call the getCredentialStatus method with correct parameters
       const statusResult = await SimpleCredentialManager.getCredentialStatus(
         automationId, 
         platformNames, 
@@ -61,7 +59,6 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
       setCredentialStatus(statusResult);
     } catch (error) {
       console.error('❌ Error checking credential status:', error);
-      // Set all platforms to missing if error occurs
       const fallbackStatus: Record<string, 'saved' | 'tested' | 'missing'> = {};
       platforms.forEach(platform => {
         fallbackStatus[platform.name] = 'missing';
@@ -99,18 +96,6 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
     }
   };
 
-  const getStatusText = (platform: Platform) => {
-    const status = credentialStatus[platform.name] || 'missing';
-    switch (status) {
-      case 'tested':
-        return 'Tested & Ready';
-      case 'saved':
-        return 'Saved, Test Needed';
-      default:
-        return 'Setup Required';
-    }
-  };
-
   if (platforms.length === 0) {
     console.log('⚠️ No platforms to display');
     return null;
@@ -136,7 +121,7 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
               <Button
                 onClick={() => setSelectedPlatform(null)}
                 variant="outline"
-                className="w-full"
+                className="w-full rounded-full"
               >
                 Back to Platforms
               </Button>
@@ -148,13 +133,13 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-3 justify-center">
       {platforms.map((platform, index) => (
         <Button
           key={`${platform.name}-${index}`}
           onClick={() => setSelectedPlatform(platform)}
           size="sm"
-          className="bg-red-500 hover:bg-red-600 text-white border-0"
+          className="bg-red-500 hover:bg-red-600 text-white border-0 rounded-full px-4 py-2"
         >
           {getStatusIcon(platform)}
           Setup {platform.name}

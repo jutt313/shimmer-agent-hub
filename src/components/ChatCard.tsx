@@ -1,4 +1,3 @@
-
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { User, Code, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -75,23 +74,22 @@ const ChatCard = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // PHASE 4: SIMPLIFIED MESSAGE PROCESSING with safe state handling
+  // PHASE 2: Enhanced message processing with real platform data extraction
   useEffect(() => {
     const processMessages = () => {
       try {
         const processed = messages.map((message) => {
           if (message.isBot && !message.structuredData) {
             try {
-              console.log('🔍 Extracting platforms from message for credential buttons:', message.text.substring(0, 200));
+              console.log('🔍 Processing message for platform extraction:', message.text.substring(0, 200));
               
-              // PHASE 3: Extract platforms with SAFE object handling
+              // Extract platforms from structured JSON response only
               const platformNames: any[] = [];
               
-              // First try to parse structured JSON response
               try {
                 const parseResult = parseYusrAIStructuredResponse(message.text);
                 if (parseResult.structuredData && parseResult.structuredData.platforms && Array.isArray(parseResult.structuredData.platforms)) {
-                  // Extract platforms from structured data with SAFE serialization
+                  // Extract REAL platforms from structured data
                   parseResult.structuredData.platforms.forEach(platform => {
                     if (platform && typeof platform === 'object' && platform.name) {
                       const safePlatform = {
@@ -107,78 +105,19 @@ const ChatCard = ({
                     }
                   });
                   
-                  console.log('✅ Extracted platforms from structured data:', platformNames.map(p => p.name));
+                  console.log('✅ Extracted REAL platforms from structured data:', platformNames.map(p => p.name));
                 }
               } catch (e) {
-                console.log('📝 No structured data found, using text-based extraction');
+                console.log('📝 No structured data found');
               }
             
-            // Fallback: text-based platform detection for non-structured responses
-            if (platformNames.length === 0) {
-              const text = message.text.toLowerCase();
-              
-              // Platform detection with better credential extraction
-              const platformConfigs = {
-                'discord': { 
-                  name: 'Discord', 
-                  credentials: [
-                    { field: 'bot_token', placeholder: 'Bot Token', link: 'https://discord.com/developers/applications', why_needed: 'Bot authentication' },
-                    { field: 'guild_id', placeholder: 'Server ID', link: '#', why_needed: 'Target server identification' }
-                  ]
-                },
-                'openai': { 
-                  name: 'OpenAI', 
-                  credentials: [
-                    { field: 'api_key', placeholder: 'API Key', link: 'https://platform.openai.com/api-keys', why_needed: 'API access authentication' }
-                  ]
-                },
-                'typeform': { 
-                  name: 'Typeform', 
-                  credentials: [
-                    { field: 'api_token', placeholder: 'Personal Access Token', link: 'https://admin.typeform.com/account#/section/tokens', why_needed: 'Access forms and responses' }
-                  ]
-                },
-                'slack': { 
-                  name: 'Slack', 
-                  credentials: [
-                    { field: 'bot_token', placeholder: 'Bot User OAuth Token', link: 'https://api.slack.com/apps', why_needed: 'Bot authentication' },
-                    { field: 'channel_id', placeholder: 'Channel ID', link: '#', why_needed: 'Target channel identification' }
-                  ]
-                },
-                'gmail': { 
-                  name: 'Gmail', 
-                  credentials: [
-                    { field: 'client_id', placeholder: 'OAuth Client ID', link: 'https://console.cloud.google.com/', why_needed: 'OAuth authentication' },
-                    { field: 'client_secret', placeholder: 'OAuth Client Secret', link: 'https://console.cloud.google.com/', why_needed: 'OAuth authentication' }
-                  ]
-                },
-                'google sheets': { 
-                  name: 'Google Sheets', 
-                  credentials: [
-                    { field: 'service_account_key', placeholder: 'Service Account JSON', link: 'https://console.cloud.google.com/', why_needed: 'API access authentication' }
-                  ]
-                }
-              };
-              
-              // Check for each platform and extract credentials mentioned in the text
-              Object.entries(platformConfigs).forEach(([key, config]) => {
-                if (text.includes(key)) {
-                  platformNames.push({
-                    name: config.name,
-                    credentials: config.credentials
-                  });
-                }
-              });
-            }
-            
-            // Only set basic platform data if found
+            // Only set platform data if found from structured response
             if (platformNames.length > 0) {
               const updatedMessage = {
                 ...message,
-                platformData: platformNames // Simple platform data for credential buttons
+                platformData: platformNames
               };
               
-              console.log('✅ Platforms extracted:', platformNames.map(p => p.name));
               return updatedMessage;
             }
             } catch (error) {
@@ -200,13 +139,13 @@ const ChatCard = ({
 
   const optimizedMessages = enhancedMessages.slice(-50);
 
+  // PHASE 1 & 3: Enhanced message formatting WITHOUT emojis and WITH steps
   const safeFormatMessageText = (inputText: string | undefined | null): React.ReactNode[] => {
     try {
       if (!inputText || typeof inputText !== 'string') {
         return [<span key="fallback-input-error">Message content unavailable.</span>];
       }
 
-      // PHASE 1: CRITICAL FIX - Ensure all values are serialized before rendering
       let structuredData = null;
       
       // Try to parse JSON first
@@ -217,39 +156,42 @@ const ChatCard = ({
         // Not JSON, continue with text processing
       }
 
-      // If we have structured data, display it properly with SAFE SERIALIZATION
+      // If we have structured data, display it properly with NO EMOJIS
       if (structuredData) {
         const sections = [];
         
-        // Summary section - SAFE STRING RENDERING
+        // PHASE 1: Summary section - NO EMOJIS
         if (structuredData.summary && typeof structuredData.summary === 'string') {
           sections.push(
             <div key="summary" className="mb-4">
-              <div className="font-semibold text-blue-600 mb-2">📋 Summary</div>
+              <div className="font-semibold text-blue-600 mb-2">Summary</div>
               <div className="text-gray-700 leading-relaxed">{structuredData.summary}</div>
             </div>
           );
         }
         
-        // Steps section - SAFE ARRAY RENDERING
+        // PHASE 3: Steps section - NO EMOJIS, PROPER DISPLAY
         if (structuredData.steps && Array.isArray(structuredData.steps) && structuredData.steps.length > 0) {
           sections.push(
             <div key="steps" className="mb-4">
-              <div className="font-semibold text-green-600 mb-2">🔧 Steps</div>
-              <div className="text-gray-700 leading-relaxed space-y-1">
+              <div className="font-semibold text-green-600 mb-2">Steps</div>
+              <div className="text-gray-700 leading-relaxed space-y-2">
                 {structuredData.steps.map((step, index) => (
-                  <div key={index}>{index + 1}. {String(step || '')}</div>
+                  <div key={index} className="flex gap-3">
+                    <span className="font-bold text-green-600 min-w-[24px]">{index + 1}.</span>
+                    <span className="flex-1">{String(step || '')}</span>
+                  </div>
                 ))}
               </div>
             </div>
           );
         }
         
-        // Platforms section - SAFE OBJECT RENDERING
+        // PHASE 2: Platforms section - NO EMOJIS, REAL NAMES
         if (structuredData.platforms && Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
           sections.push(
             <div key="platforms" className="mb-4">
-              <div className="font-semibold text-purple-600 mb-2">🔗 Platforms</div>
+              <div className="font-semibold text-purple-600 mb-2">Platforms</div>
               <div className="text-gray-700 leading-relaxed">
                 {structuredData.platforms.map((platform, index) => (
                   <div key={index} className="mb-2">
@@ -266,11 +208,11 @@ const ChatCard = ({
           );
         }
         
-        // Clarification Questions section - SAFE ARRAY RENDERING
+        // PHASE 1: Clarification Questions section - NO EMOJIS
         if (structuredData.clarification_questions && Array.isArray(structuredData.clarification_questions) && structuredData.clarification_questions.length > 0) {
           sections.push(
             <div key="questions" className="mb-4">
-              <div className="font-semibold text-orange-600 mb-2">❓ Clarification Questions</div>
+              <div className="font-semibold text-orange-600 mb-2">Clarification Questions</div>
               <div className="text-gray-700 leading-relaxed space-y-1">
                 {structuredData.clarification_questions.map((question, index) => (
                   <div key={index}>{index + 1}. {String(question || '')}</div>
@@ -280,18 +222,46 @@ const ChatCard = ({
           );
         }
         
-        // AI Agents section - SAFE OBJECT RENDERING
+        // PHASE 4: AI Agents section - NO EMOJIS, WITH BUTTONS
         if (structuredData.agents && Array.isArray(structuredData.agents) && structuredData.agents.length > 0) {
           sections.push(
             <div key="agents" className="mb-4">
-              <div className="font-semibold text-red-600 mb-2">🤖 AI Agents</div>
-              <div className="text-gray-700 leading-relaxed space-y-2">
+              <div className="font-semibold text-red-600 mb-2">AI Agents</div>
+              <div className="text-gray-700 leading-relaxed space-y-3">
                 {structuredData.agents.map((agent, index) => (
-                  <div key={index} className="border-l-2 border-red-200 pl-3">
-                    <strong>{String(agent?.name || `Agent ${index + 1}`)}</strong> 
-                    {agent?.role && <span> ({String(agent.role)})</span>}
+                  <div key={index} className="border-l-2 border-red-200 pl-3 bg-gray-50 p-3 rounded">
+                    <div className="flex items-center justify-between mb-2">
+                      <strong>{String(agent?.name || `Agent ${index + 1}`)}</strong>
+                      {agent?.role && <span className="text-sm text-gray-600">({String(agent.role)})</span>}
+                      <div className="flex gap-2">
+                        {!dismissedAgents.has(agent?.name || `Agent ${index + 1}`) ? (
+                          <>
+                            <Button
+                              onClick={() => handleAgentAdd(agent)}
+                              size="sm"
+                              className="bg-green-500 hover:bg-green-600 text-white text-xs px-3 py-1"
+                            >
+                              Add
+                            </Button>
+                            <Button
+                              onClick={() => handleAgentDismiss(agent?.name || `Agent ${index + 1}`)}
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600 border-red-300 text-xs px-3 py-1"
+                            >
+                              Dismiss
+                            </Button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-gray-500">Dismissed</span>
+                        )}
+                      </div>
+                    </div>
                     {agent?.why_needed && (
                       <div className="text-sm text-gray-600">{String(agent.why_needed)}</div>
+                    )}
+                    {agent?.rule && (
+                      <div className="text-xs text-gray-500 mt-1">Rule: {String(agent.rule)}</div>
                     )}
                   </div>
                 ))}
@@ -303,50 +273,16 @@ const ChatCard = ({
         return sections.length > 0 ? sections : [<span key="no-sections">AI response processed successfully.</span>];
       }
 
-      // Fallback: Look for text-based structured sections
-      const structuredSections = [];
-      const text = inputText.trim();
+      // Fallback: raw text processing
+      const processedText = inputText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      const lines = processedText.split('\n');
       
-      // Look for summary section
-      if (text.includes('## Summary') || text.includes('**Summary**') || text.toLowerCase().includes('summary:')) {
-        const summaryMatch = text.match(/(## Summary|Summary:|\*\*Summary\*\*)(.*?)(?=##|\*\*[A-Z]|$)/s);
-        if (summaryMatch) {
-          structuredSections.push(
-            <div key="summary" className="mb-4">
-              <div className="font-semibold text-blue-600 mb-2">📋 Summary</div>
-              <div className="text-gray-700 leading-relaxed">{summaryMatch[2].trim()}</div>
-            </div>
-          );
-        }
-      }
-      
-      // Look for steps section
-      if (text.includes('## Steps') || text.includes('**Steps**') || text.toLowerCase().includes('steps:')) {
-        const stepsMatch = text.match(/(## Steps|Steps:|\*\*Steps\*\*)(.*?)(?=##|\*\*[A-Z]|$)/s);
-        if (stepsMatch) {
-          structuredSections.push(
-            <div key="steps" className="mb-4">
-              <div className="font-semibold text-green-600 mb-2">🔧 Steps</div>
-              <div className="text-gray-700 leading-relaxed">{stepsMatch[2].trim()}</div>
-            </div>
-          );
-        }
-      }
-      
-      // If no structured sections found, show raw text with basic formatting
-      if (structuredSections.length === 0) {
-        const processedText = inputText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        const lines = processedText.split('\n');
-        
-        return lines.map((line, index) => (
-          <span key={`line-${index}`}>
-            <span dangerouslySetInnerHTML={{ __html: String(line || '') }} />
-            {index < lines.length - 1 && <br />}
-          </span>
-        ));
-      }
-      
-      return structuredSections;
+      return lines.map((line, index) => (
+        <span key={`line-${index}`}>
+          <span dangerouslySetInnerHTML={{ __html: String(line || '') }} />
+          {index < lines.length - 1 && <br />}
+        </span>
+      ));
 
     } catch (error: any) {
       handleError(error, 'Text formatting in ChatCard');
@@ -354,6 +290,7 @@ const ChatCard = ({
     }
   };
 
+  // PHASE 4: Enhanced agent handlers
   const handleAgentAdd = (agent: any) => {
     console.log(`🤖 User adding YusrAI agent: ${agent.name}`);
     agentStateManager.addAgent(agent.name, agent);
@@ -504,20 +441,16 @@ const ChatCard = ({
     return latestBotMessage?.platformData || [];
   };
 
-  // ENHANCED: Transform YusrAI platform format to PlatformButtons format with comprehensive data mapping
+  // Transform platforms for buttons
   const transformPlatformsForButtons = (yusraiPlatforms: any[]) => {
     console.log('🔄 Transforming platforms for buttons:', yusraiPlatforms);
     
-    // CRITICAL FIX: Ensure safe array handling
     if (!Array.isArray(yusraiPlatforms)) {
       console.log('⚠️ No platforms array found, returning empty array');
       return [];
     }
     
     const transformedPlatforms = yusraiPlatforms.map((platform, index) => {
-      console.log(`🔄 Processing platform ${index + 1}:`, platform);
-      
-      // ENHANCED: Handle multiple credential field name variations
       const credentials = platform.credentials || 
                          platform.required_credentials || 
                          platform.credential_requirements ||
@@ -535,11 +468,9 @@ const ChatCard = ({
         test_payloads: platform.test_payloads || platform.test_payload || platform.test_data || []
       };
       
-      console.log(`✅ Transformed platform:`, transformedPlatform);
       return transformedPlatform;
     });
     
-    console.log('🎯 Final transformed platforms:', transformedPlatforms);
     return transformedPlatforms;
   };
 
@@ -553,7 +484,6 @@ const ChatCard = ({
         }}
       >
         <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/20 to-purple-100/20 pointer-events-none"></div>
-        
         
         <ScrollArea className="flex-1 relative z-10 p-6 overflow-y-auto" ref={scrollAreaRef}>
           <div className="space-y-6 pb-4 min-h-full">
@@ -589,29 +519,8 @@ const ChatCard = ({
                       </div>
                     )}
 
-                    {/* RAW TEXT DISPLAY: Show ChatAI responses as raw text only */}
                     <div className="leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
                       {safeFormatMessageText(message.text)}
-                      
-                      {/* Simple agent buttons inline */}
-                      {message.isBot && message.platformData && message.platformData.length > 0 && (
-                        <div className="mt-4 space-y-2">
-                          <div className="text-sm font-medium text-gray-600">Quick Actions:</div>
-                          <div className="flex flex-wrap gap-2">
-                            {message.platformData.map((platform: any, idx: number) => (
-                              <Button
-                                key={idx}
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handlePlatformCredentialClick(platform.name)}
-                                className="text-xs"
-                              >
-                                Setup {platform.name}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                       
                       {message.isBot && message.error_help_available && (
                         <ErrorHelpButton 
@@ -632,7 +541,6 @@ const ChatCard = ({
               );
             })}
             
-            {/* Loading indicator */}
             {isLoading && (
               <div className="flex justify-start">
                 <div className="max-w-4xl px-6 py-4 rounded-2xl bg-white border border-blue-100/50 text-gray-800 shadow-lg backdrop-blur-sm">
@@ -658,7 +566,23 @@ const ChatCard = ({
         </ScrollArea>
       </div>
 
-      {/* PHASE 3: Removed duplicate platform credentials section - keeping only inline buttons */}
+      {/* PHASE 6: Rounded credential buttons positioned between input and chat */}
+      {getLatestPlatforms().length > 0 && (
+        <div className="flex justify-center">
+          <div className="flex flex-wrap gap-3 justify-center">
+            {transformPlatformsForButtons(getLatestPlatforms()).map((platform, index) => (
+              <Button
+                key={`${platform.name}-${index}`}
+                onClick={() => handlePlatformCredentialClick(platform.name)}
+                size="sm"
+                className="bg-red-500 hover:bg-red-600 text-white rounded-full px-4 py-2 text-sm font-medium"
+              >
+                Setup {platform.name}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

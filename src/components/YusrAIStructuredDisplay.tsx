@@ -114,7 +114,12 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({ 
       if (stepObj.action) return stepObj.action;
       if (stepObj.name) return stepObj.name;
       // Fallback to JSON stringify for debugging if no specific property is found
-      return JSON.stringify(stepObj);
+      try {
+        return JSON.stringify(stepObj, null, 2); // Pretty print JSON for readability
+      } catch (e) {
+        console.error('Error stringifying step object:', e);
+        return `[Unrenderable Step Object ${index + 1}]`;
+      }
     }
     return `Step ${index + 1}`;
   };
@@ -131,7 +136,12 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({ 
       if (questionObj.text) return questionObj.text;
       if (questionObj.description) return questionObj.description;
       // Fallback to JSON stringify for debugging if no specific property is found
-      return JSON.stringify(questionObj);
+      try {
+        return JSON.stringify(questionObj, null, 2); // Pretty print JSON for readability
+      } catch (e) {
+        console.error('Error stringifying question object:', e);
+        return `[Unrenderable Question Object ${index + 1}]`;
+      }
     }
     return `Question ${index + 1}`;
   };
@@ -168,7 +178,7 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({ 
             {(Array.isArray(data.steps) ? data.steps : []).map((step, index) => (
               <div key={index} className="flex gap-3 text-sm">
                 <span className="font-bold text-green-600 text-lg min-w-[24px]">{index + 1}.</span>
-                <span className="flex-1">{getStepDisplayText(step, index)}</span>
+                <span className="flex-1 whitespace-pre-wrap">{getStepDisplayText(step, index)}</span>
               </div>
             ))}
           </div>
@@ -209,7 +219,9 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({ 
                              </div>
                              {(cred.where_to_get || cred.link || cred.documentation_url || cred.url) && (
                                <div className="text-blue-600 text-xs">
-                                 Get from: {cred.where_to_get || cred.link || cred.documentation_url || cred.url}
+                                 <a href={cred.where_to_get || cred.link || cred.documentation_url || cred.url} target="_blank" rel="noopener noreferrer">
+                                      Get from here
+                                   </a>
                                </div>
                              )}
                            </div>
@@ -223,6 +235,7 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({ 
                          )}
                        </div>
                      </div>
+                   </div>
                 </div>
               </div>
             ))}
@@ -249,10 +262,9 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({ 
             {(Array.isArray(data.clarification_questions) ? data.clarification_questions : []).map((question, index) => (
               <div key={index} className="flex gap-3 text-sm">
                 <span className="font-medium text-orange-600 text-lg">❓</span>
-                <span className="flex-1">{getQuestionDisplayText(question, index)}</span>
+                <span className="flex-1 whitespace-pre-wrap">{getQuestionDisplayText(question, index)}</span>
               </div>
             ))}
-            
           </div>
         </div>
       )
@@ -361,9 +373,8 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({ 
                         <ChevronRight className="w-3 h-3" />
                       )}
                     </Badge>
-                  </CardTitle>
-                </CardHeader>
-              </CollapsibleTrigger>
+                </CardTitle>
+              </CardHeader>
               
               <CollapsibleContent>
                 <CardContent className="pt-0 pb-6">

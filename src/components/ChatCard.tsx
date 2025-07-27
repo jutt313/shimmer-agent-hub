@@ -126,23 +126,13 @@ const ChatCard = ({
 
   const optimizedMessages = enhancedMessages.slice(-50);
 
-  const safeFormatMessageText = (inputText: string | undefined | null): React.ReactNode[] => {
+  const safeFormatMessageText = (inputText: string | undefined | null, structuredData?: YusrAIStructuredResponse): React.ReactNode[] => {
     try {
       if (!inputText || typeof inputText !== 'string') {
         return [<span key="fallback-input-error">Message content unavailable.</span>];
       }
 
-      // Try to parse structured data first
-      let structuredData = null;
-      
-      try {
-        const parseResult = parseYusrAIStructuredResponse(inputText);
-        structuredData = parseResult.structuredData;
-      } catch (e) {
-        // Not structured data, continue with text processing
-      }
-
-      // If we have structured data, display it properly
+      // If we have structured data, display it as clean plain text
       if (structuredData) {
         const sections = [];
         
@@ -150,7 +140,7 @@ const ChatCard = ({
         if (structuredData.summary && typeof structuredData.summary === 'string') {
           sections.push(
             <div key="summary" className="mb-4">
-              <div className="font-semibold text-blue-600 mb-2">Summary</div>
+              <div className="font-semibold text-gray-800 mb-2">Summary:</div>
               <div className="text-gray-700 leading-relaxed">{structuredData.summary}</div>
             </div>
           );
@@ -160,10 +150,10 @@ const ChatCard = ({
         if (structuredData.steps && Array.isArray(structuredData.steps) && structuredData.steps.length > 0) {
           sections.push(
             <div key="steps" className="mb-4">
-              <div className="font-semibold text-green-600 mb-2">Steps</div>
-              <div className="text-gray-700 leading-relaxed space-y-1">
+              <div className="font-semibold text-gray-800 mb-2">Steps:</div>
+              <div className="text-gray-700 leading-relaxed">
                 {structuredData.steps.map((step, index) => (
-                  <div key={index}>{index + 1}. {String(step || '')}</div>
+                  <div key={index} className="mb-1">{index + 1}. {String(step || '')}</div>
                 ))}
               </div>
             </div>
@@ -174,17 +164,17 @@ const ChatCard = ({
         if (structuredData.platforms && Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
           sections.push(
             <div key="platforms" className="mb-4">
-              <div className="font-semibold text-purple-600 mb-2">Platforms</div>
+              <div className="font-semibold text-gray-800 mb-2">Platforms:</div>
               <div className="text-gray-700 leading-relaxed">
                 {structuredData.platforms.map((platform, index) => (
                   <div key={index} className="mb-2">
-                    <strong>{String(platform?.name || `Platform ${index + 1}`)}</strong>
+                    <div className="font-medium">{String(platform?.name || `Platform ${index + 1}`)}</div>
                     {platform?.credentials && Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
                       <div className="ml-4 text-sm text-gray-600">
-                        Required: {platform.credentials.map(c => String(c?.field || 'credential')).join(', ')}
+                        <div className="text-xs font-medium mb-1">Required credentials:</div>
                         {platform.credentials.map((cred, credIndex) => (
-                          <div key={credIndex} className="text-xs mt-1">
-                            <strong>{cred.field}:</strong> {cred.why_needed}
+                          <div key={credIndex} className="text-xs mb-1">
+                            • <strong>{cred.field}:</strong> {cred.why_needed}
                           </div>
                         ))}
                       </div>
@@ -200,10 +190,10 @@ const ChatCard = ({
         if (structuredData.clarification_questions && Array.isArray(structuredData.clarification_questions) && structuredData.clarification_questions.length > 0) {
           sections.push(
             <div key="questions" className="mb-4">
-              <div className="font-semibold text-orange-600 mb-2">Clarification Questions</div>
-              <div className="text-gray-700 leading-relaxed space-y-1">
+              <div className="font-semibold text-gray-800 mb-2">Clarification Questions:</div>
+              <div className="text-gray-700 leading-relaxed">
                 {structuredData.clarification_questions.map((question, index) => (
-                  <div key={index}>{index + 1}. {String(question || '')}</div>
+                  <div key={index} className="mb-1">{index + 1}. {String(question || '')}</div>
                 ))}
               </div>
             </div>
@@ -214,23 +204,12 @@ const ChatCard = ({
         if (structuredData.agents && Array.isArray(structuredData.agents) && structuredData.agents.length > 0) {
           sections.push(
             <div key="agents" className="mb-4">
-              <div className="font-semibold text-red-600 mb-2">AI Agents</div>
-              <div className="text-gray-700 leading-relaxed space-y-2">
+              <div className="font-semibold text-gray-800 mb-2">AI Agents:</div>
+              <div className="text-gray-700 leading-relaxed">
                 {structuredData.agents.map((agent, index) => (
-                  <div key={index} className="border-l-2 border-red-200 pl-3 py-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <strong>{String(agent?.name || `Agent ${index + 1}`)}</strong>
-                        <div className="text-sm text-gray-600">
-                          <div><strong>Role:</strong> {agent?.role || 'Assistant'}</div>
-                          <div><strong>Rule:</strong> {agent?.rule || 'No specific rules'}</div>
-                          <div><strong>Goal:</strong> {agent?.goal || 'General assistance'}</div>
-                          <div><strong>Memory:</strong> {agent?.memory || 'Standard memory'}</div>
-                          {agent?.why_needed && (
-                            <div><strong>Why Needed:</strong> {agent.why_needed}</div>
-                          )}
-                        </div>
-                      </div>
+                  <div key={index} className="mb-3 p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="font-medium text-gray-800">{String(agent?.name || `Agent ${index + 1}`)}</div>
                       <div className="flex gap-2">
                         <Button
                           size="sm"
@@ -249,6 +228,11 @@ const ChatCard = ({
                           Dismiss
                         </Button>
                       </div>
+                    </div>
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <div><strong>Role:</strong> {agent?.role || 'Assistant'}</div>
+                      <div><strong>Goal:</strong> {agent?.goal || 'General assistance'}</div>
+                      {agent?.why_needed && <div><strong>Why needed:</strong> {agent.why_needed}</div>}
                     </div>
                   </div>
                 ))}
@@ -500,21 +484,7 @@ const ChatCard = ({
                     )}
 
                     <div className="leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
-                      {message.isBot && message.structuredData ? (
-                        <YusrAIStructuredDisplay 
-                          data={message.structuredData}
-                          onAgentAdd={onAgentAdd}
-                          onAgentDismiss={onAgentDismiss}
-                          dismissedAgents={dismissedAgents}
-                          onPlatformCredentialClick={handlePlatformCredentialClick}
-                          platformCredentialStatus={platformCredentialStatus}
-                          onTestCredentials={testPlatformCredentials}
-                          onExecuteAutomation={onExecuteAutomation}
-                          isReadyForExecution={checkReadyForExecution()}
-                        />
-                      ) : (
-                        safeFormatMessageText(message.text)
-                      )}
+                      {safeFormatMessageText(message.text, message.structuredData)}
                       
                       {message.isBot && message.error_help_available && (
                         <ErrorHelpButton 
@@ -523,32 +493,6 @@ const ChatCard = ({
                         />
                       )}
                     </div>
-                    
-                    {/* Show diagram button for structured responses */}
-                    {message.isBot && message.structuredData && (
-                      <div className="mt-4 flex gap-2">
-                        <Dialog open={showBlueprintModal} onOpenChange={setShowBlueprintModal}>
-                          <DialogTrigger asChild>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              className="bg-blue-100 hover:bg-blue-200 text-blue-700 border-blue-300"
-                            >
-                              <Code className="w-4 h-4 mr-2" />
-                              View Diagram
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                            <DialogHeader>
-                              <DialogTitle>Automation Workflow Diagram</DialogTitle>
-                            </DialogHeader>
-                            <ExecutionBlueprintVisualizer 
-                              blueprint={message.structuredData.execution_blueprint}
-                            />
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                    )}
                     
                     <p className={`text-xs mt-3 ${message.isBot ? 'text-gray-500' : 'text-blue-100'}`}>
                       {message.timestamp.toLocaleTimeString([], {

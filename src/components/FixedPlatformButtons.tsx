@@ -36,12 +36,18 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
 
   console.log('🔧 FixedPlatformButtons rendered with:', {
     platformsCount: platforms.length,
-    platforms: platforms.map(p => ({ name: p.name, credentialsCount: p.credentials.length })),
+    platforms: platforms.map(p => ({ 
+      name: p.name, 
+      credentialsCount: p.credentials.length,
+      firstCredentialField: p.credentials[0]?.field || 'none'
+    })),
     automationId
   });
 
   useEffect(() => {
-    checkCredentialStatus();
+    if (platforms.length > 0) {
+      checkCredentialStatus();
+    }
   }, [platforms, automationId]);
 
   const checkCredentialStatus = async () => {
@@ -68,12 +74,14 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
   };
 
   const handleCredentialSaved = () => {
+    console.log('💾 Credential saved, updating status...');
     checkCredentialStatus();
     onCredentialChange?.();
   };
 
   const handlePlatformClick = (platform: Platform) => {
     console.log('🔧 Platform button clicked:', platform.name);
+    console.log('🔧 Platform credentials:', platform.credentials);
     setSelectedPlatform(platform);
   };
 
@@ -81,11 +89,23 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
     const status = credentialStatus[platform.name] || 'missing';
     switch (status) {
       case 'tested':
-        return <CheckCircle2 className="w-4 h-4" />;
+        return <CheckCircle2 className="w-4 h-4 text-green-500" />;
       case 'saved':
-        return <Clock className="w-4 h-4" />;
+        return <Clock className="w-4 h-4 text-yellow-500" />;
       default:
-        return <AlertCircle className="w-4 h-4" />;
+        return <AlertCircle className="w-4 h-4 text-red-500" />;
+    }
+  };
+
+  const getStatusText = (platform: Platform) => {
+    const status = credentialStatus[platform.name] || 'missing';
+    switch (status) {
+      case 'tested':
+        return 'Tested';
+      case 'saved':
+        return 'Saved';
+      default:
+        return 'Setup';
     }
   };
 
@@ -126,18 +146,42 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
-      {platforms.map((platform, index) => (
-        <Button
-          key={`${platform.name}-${index}`}
-          onClick={() => handlePlatformClick(platform)}
-          size="sm"
-          className="rounded-full bg-blue-500 hover:bg-blue-600 text-white border-0 px-4 py-2"
-        >
-          {getStatusIcon(platform)}
-          Setup {platform.name}
-        </Button>
-      ))}
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Settings className="w-4 h-4 text-gray-600" />
+        <h3 className="text-sm font-medium text-gray-900">Platform Credentials</h3>
+        <Badge variant="outline" className="text-xs">
+          {platforms.length} platform{platforms.length !== 1 ? 's' : ''}
+        </Badge>
+      </div>
+      
+      <div className="flex flex-wrap gap-2">
+        {platforms.map((platform, index) => (
+          <Button
+            key={`${platform.name}-${index}`}
+            onClick={() => handlePlatformClick(platform)}
+            size="sm"
+            variant="outline"
+            className={`
+              flex items-center gap-2 px-3 py-2 rounded-full text-xs font-medium
+              transition-all duration-200 hover:scale-105 hover:shadow-sm
+              ${credentialStatus[platform.name] === 'tested' 
+                ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' 
+                : credentialStatus[platform.name] === 'saved'
+                ? 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100'
+                : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
+              }
+            `}
+          >
+            {getStatusIcon(platform)}
+            <span>{getStatusText(platform)} {platform.name}</span>
+          </Button>
+        ))}
+      </div>
+      
+      <div className="text-xs text-gray-500">
+        Click on a platform to configure its credentials
+      </div>
     </div>
   );
 };

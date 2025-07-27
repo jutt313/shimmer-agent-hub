@@ -170,7 +170,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('📋 Mapped step_by_step_explanation to steps:', parsedResponse.steps.length);
     }
 
-    // ENHANCED PLATFORM MAPPING - Fix platform names
+    // ENHANCED PLATFORM MAPPING - Fix platform names with better extraction
     if (parsedResponse.platforms_and_credentials && !parsedResponse.platforms) {
       parsedResponse.platforms = Array.isArray(parsedResponse.platforms_and_credentials) 
         ? parsedResponse.platforms_and_credentials 
@@ -185,10 +185,10 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('🔗 Mapped platform_integrations to platforms:', parsedResponse.platforms.length);
     }
 
-    // CRITICAL FIX: Extract real platform names from various possible field names
+    // ENHANCED PLATFORM NAME EXTRACTION - Extract real platform names
     if (parsedResponse.platforms && Array.isArray(parsedResponse.platforms)) {
       parsedResponse.platforms = parsedResponse.platforms.map((platform: any, index: number) => {
-        // Try to extract platform name from text or structured data
+        // First try to extract platform name from structured data
         let platformName = platform.name || 
                           platform.platform_name || 
                           platform.platform || 
@@ -196,30 +196,72 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
                           platform.integration ||
                           platform.tool;
         
-        // If no name found, try to extract from description or other fields
+        // If no name found or generic, try to extract from description or other fields
         if (!platformName || platformName === 'Platform 1' || platformName.includes('Platform ')) {
-          // Look for platform names in description or other fields
-          const description = platform.description || platform.why_needed || '';
+          const description = platform.description || platform.why_needed || platform.rule || '';
           const lowerDesc = description.toLowerCase();
           
-          // Common platform name patterns
+          // Enhanced platform name patterns with better detection
           const platformPatterns = [
-            'typeform', 'openai', 'slack', 'gmail', 'notion', 'discord', 'github',
-            'trello', 'asana', 'monday', 'clickup', 'zoom', 'teams', 'hubspot',
-            'salesforce', 'stripe', 'paypal', 'shopify', 'woocommerce', 'zapier',
-            'airtable', 'google sheets', 'microsoft excel', 'dropbox', 'drive'
+            { pattern: 'typeform', name: 'Typeform' },
+            { pattern: 'openai', name: 'OpenAI' },
+            { pattern: 'slack', name: 'Slack' },
+            { pattern: 'gmail', name: 'Gmail' },
+            { pattern: 'notion', name: 'Notion' },
+            { pattern: 'discord', name: 'Discord' },
+            { pattern: 'github', name: 'GitHub' },
+            { pattern: 'trello', name: 'Trello' },
+            { pattern: 'asana', name: 'Asana' },
+            { pattern: 'monday', name: 'Monday.com' },
+            { pattern: 'clickup', name: 'ClickUp' },
+            { pattern: 'zoom', name: 'Zoom' },
+            { pattern: 'teams', name: 'Microsoft Teams' },
+            { pattern: 'hubspot', name: 'HubSpot' },
+            { pattern: 'salesforce', name: 'Salesforce' },
+            { pattern: 'stripe', name: 'Stripe' },
+            { pattern: 'paypal', name: 'PayPal' },
+            { pattern: 'shopify', name: 'Shopify' },
+            { pattern: 'woocommerce', name: 'WooCommerce' },
+            { pattern: 'zapier', name: 'Zapier' },
+            { pattern: 'airtable', name: 'Airtable' },
+            { pattern: 'google sheets', name: 'Google Sheets' },
+            { pattern: 'microsoft excel', name: 'Microsoft Excel' },
+            { pattern: 'dropbox', name: 'Dropbox' },
+            { pattern: 'google drive', name: 'Google Drive' },
+            { pattern: 'drive', name: 'Google Drive' }
           ];
           
-          for (const pattern of platformPatterns) {
+          for (const { pattern, name } of platformPatterns) {
             if (lowerDesc.includes(pattern)) {
-              platformName = pattern.charAt(0).toUpperCase() + pattern.slice(1);
+              platformName = name;
+              break;
+            }
+          }
+        }
+        
+        // Final fallback - try to extract from field names or anywhere else
+        if (!platformName || platformName === 'Platform 1' || platformName.includes('Platform ')) {
+          const allText = JSON.stringify(platform).toLowerCase();
+          const platformPatterns = [
+            { pattern: 'typeform', name: 'Typeform' },
+            { pattern: 'openai', name: 'OpenAI' },
+            { pattern: 'slack', name: 'Slack' },
+            { pattern: 'gmail', name: 'Gmail' },
+            { pattern: 'notion', name: 'Notion' },
+            { pattern: 'discord', name: 'Discord' },
+            { pattern: 'github', name: 'GitHub' }
+          ];
+          
+          for (const { pattern, name } of platformPatterns) {
+            if (allText.includes(pattern)) {
+              platformName = name;
               break;
             }
           }
         }
         
         // Final fallback
-        if (!platformName) {
+        if (!platformName || platformName === 'Platform 1' || platformName.includes('Platform ')) {
           platformName = `Platform ${index + 1}`;
         }
         

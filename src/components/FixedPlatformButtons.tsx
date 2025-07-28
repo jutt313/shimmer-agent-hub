@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, AlertCircle, Clock, Settings } from "lucide-react";
-import { SimpleCredentialManager } from '@/utils/simpleCredentialManager';
+import { SecureCredentials } from '@/utils/secureCredentials';
 import { useAuth } from "@/contexts/AuthContext";
 import SimpleCredentialForm from './SimpleCredentialForm';
 
@@ -54,15 +54,20 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
     if (!automationId || !user?.id) return;
     
     try {
-      const platformNames = platforms.map(p => p.name);
-      const statusResult = await SimpleCredentialManager.getCredentialStatus(
-        automationId, 
-        platformNames, 
-        user.id
-      );
+      const status: Record<string, 'saved' | 'tested' | 'missing'> = {};
       
-      console.log('✅ Credential status result:', statusResult);
-      setCredentialStatus(statusResult);
+      for (const platform of platforms) {
+        const credentials = await SecureCredentials.getCredentials(
+          platform.name,
+          user.id,
+          automationId
+        );
+        
+        status[platform.name] = credentials ? 'saved' : 'missing';
+      }
+      
+      console.log('✅ Secure credential status result:', status);
+      setCredentialStatus(status);
     } catch (error) {
       console.error('❌ Error checking credential status:', error);
       const fallbackStatus: Record<string, 'saved' | 'tested' | 'missing'> = {};

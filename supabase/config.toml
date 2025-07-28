@@ -9,22 +9,22 @@ extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
 [functions.chat-ai]
-verify_jwt = false
+verify_jwt = true
 
 [functions.test-credential]
-verify_jwt = false
+verify_jwt = true
 
 [functions.execute-automation]
-verify_jwt = false
+verify_jwt = true
 
 [functions.diagram-generator]
-verify_jwt = false
+verify_jwt = true
 
 [functions.error-analyzer]
-verify_jwt = false
+verify_jwt = true
 
 [functions.knowledge-ai-chat]
-verify_jwt = false
+verify_jwt = true
 
 [functions.create-notification]
 verify_jwt = false
@@ -51,7 +51,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.yusrai-api]
-verify_jwt = false
+verify_jwt = true
 
 [functions.create-subscription]
 verify_jwt = false

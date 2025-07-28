@@ -85,6 +85,7 @@ const Automations = () => {
       
       const transformedData: Automation = {
         ...data,
+        status: data.status as 'draft' | 'active' | 'paused' | 'completed',
         agents: [],
         execution_count: 0,
         last_executed: null

@@ -1,5 +1,5 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/router';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ListTree } from "@hvdesain/react-list-tree";
 import {
   Accordion,
   AccordionContent,

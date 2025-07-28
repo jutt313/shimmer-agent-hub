@@ -40,7 +40,7 @@ interface Agent {
 
 interface Automation {
   id: string;
-  name: string;
+  title: string;
   description: string;
   status: 'draft' | 'active' | 'paused' | 'completed';
   created_at: string;
@@ -83,12 +83,18 @@ const Automations = () => {
 
       if (error) throw error;
       
-      setAutomation(data);
+      const transformedData: Automation = {
+        ...data,
+        agents: [],
+        execution_count: 0,
+        last_executed: null
+      };
       
-      // Load initial messages if any
+      setAutomation(transformedData);
+      
       const initialMessage: Message = {
         id: 1,
-        text: `Welcome to your automation: ${data.name}\n\nDescription: ${data.description}\n\nStatus: ${data.status}`,
+        text: `Welcome to your automation: ${data.title}\n\nDescription: ${data.description}\n\nStatus: ${data.status}`,
         isBot: true,
         timestamp: new Date()
       };
@@ -209,7 +215,7 @@ const Automations = () => {
             
             <div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                {automation?.name || 'New Automation'}
+                {automation?.title || 'New Automation'}
               </h1>
               <p className="text-gray-600 mt-1">
                 {automation?.description || 'Configure your automation'}

@@ -1,4 +1,5 @@
 
+
 export interface YusrAIStructuredResponse {
   summary: string;
   steps: any[];
@@ -7,6 +8,12 @@ export interface YusrAIStructuredResponse {
   agents: any[];
   test_payloads: any;
   execution_blueprint: any;
+  structuredData?: any; // Add missing property
+  metadata?: {
+    yusrai_powered: boolean;
+    seven_sections_validated: boolean;
+    error_help_available: boolean;
+  };
 }
 
 export interface Platform {
@@ -21,10 +28,6 @@ export interface Credential {
   link: string;
   why_needed: string;
 }
-
-// Add missing exports as aliases to existing functions
-export const parseStructuredResponse = parseYusrAIResponse;
-export const parseYusrAIStructuredResponse = parseYusrAIResponse;
 
 // Add missing cleanDisplayText function
 export const cleanDisplayText = (text: string): string => {
@@ -403,7 +406,13 @@ export const parseYusrAIResponse = (response: string): YusrAIStructuredResponse 
       clarification_questions: Array.isArray(jsonData.clarification_questions) ? jsonData.clarification_questions : [],
       agents: Array.isArray(jsonData.agents) ? jsonData.agents : [],
       test_payloads: jsonData.test_payloads || {},
-      execution_blueprint: jsonData.execution_blueprint || null
+      execution_blueprint: jsonData.execution_blueprint || null,
+      structuredData: jsonData, // Add the structured data
+      metadata: {
+        yusrai_powered: true,
+        seven_sections_validated: true,
+        error_help_available: false
+      }
     };
 
     console.log('✅ Successfully parsed YusrAI structured response:', structuredResponse);
@@ -414,3 +423,7 @@ export const parseYusrAIResponse = (response: string): YusrAIStructuredResponse 
     return null;
   }
 };
+
+// Add missing exports as aliases to existing functions (moved after function declaration)
+export const parseStructuredResponse = parseYusrAIResponse;
+export const parseYusrAIStructuredResponse = parseYusrAIResponse;

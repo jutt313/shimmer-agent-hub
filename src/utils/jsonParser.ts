@@ -204,83 +204,35 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('🔗 Mapped platform_integrations to platforms:', parsedResponse.platforms.length);
     }
 
-    // ENHANCED PLATFORM NAME EXTRACTION - Extract real platform names
+    // PURE AI-DRIVEN PLATFORM NAME EXTRACTION - No hardcoded patterns
     if (parsedResponse.platforms && Array.isArray(parsedResponse.platforms)) {
       parsedResponse.platforms = parsedResponse.platforms.map((platform: any, index: number) => {
-        // First try to extract platform name from structured data
+        // Extract platform name from AI response directly - no hardcoded patterns
         let platformName = platform.name || 
                           platform.platform_name || 
                           platform.platform || 
                           platform.service || 
                           platform.integration ||
-                          platform.tool;
+                          platform.tool ||
+                          platform.api_name ||
+                          platform.service_name;
         
-        // If no name found or generic, try to extract from description or other fields
-        if (!platformName || platformName === 'Platform 1' || platformName.includes('Platform ')) {
-          const description = platform.description || platform.why_needed || platform.rule || '';
-          const lowerDesc = description.toLowerCase();
+        // Clean up the platform name if it exists
+        if (platformName && typeof platformName === 'string') {
+          platformName = platformName.trim();
           
-          // Enhanced platform name patterns with better detection
-          const platformPatterns = [
-            { pattern: 'typeform', name: 'Typeform' },
-            { pattern: 'openai', name: 'OpenAI' },
-            { pattern: 'slack', name: 'Slack' },
-            { pattern: 'gmail', name: 'Gmail' },
-            { pattern: 'notion', name: 'Notion' },
-            { pattern: 'discord', name: 'Discord' },
-            { pattern: 'github', name: 'GitHub' },
-            { pattern: 'trello', name: 'Trello' },
-            { pattern: 'asana', name: 'Asana' },
-            { pattern: 'monday', name: 'Monday.com' },
-            { pattern: 'clickup', name: 'ClickUp' },
-            { pattern: 'zoom', name: 'Zoom' },
-            { pattern: 'teams', name: 'Microsoft Teams' },
-            { pattern: 'hubspot', name: 'HubSpot' },
-            { pattern: 'salesforce', name: 'Salesforce' },
-            { pattern: 'stripe', name: 'Stripe' },
-            { pattern: 'paypal', name: 'PayPal' },
-            { pattern: 'shopify', name: 'Shopify' },
-            { pattern: 'woocommerce', name: 'WooCommerce' },
-            { pattern: 'zapier', name: 'Zapier' },
-            { pattern: 'airtable', name: 'Airtable' },
-            { pattern: 'google sheets', name: 'Google Sheets' },
-            { pattern: 'microsoft excel', name: 'Microsoft Excel' },
-            { pattern: 'dropbox', name: 'Dropbox' },
-            { pattern: 'google drive', name: 'Google Drive' },
-            { pattern: 'drive', name: 'Google Drive' }
-          ];
+          // Only clean up obvious formatting issues, no pattern matching
+          platformName = platformName.replace(/^(Platform|Service|API|Tool)[\s\d]*:?\s*/i, '');
+          platformName = platformName.replace(/\s+(API|Service|Platform|Tool)$/i, '');
           
-          for (const { pattern, name } of platformPatterns) {
-            if (lowerDesc.includes(pattern)) {
-              platformName = name;
-              break;
-            }
+          // Capitalize first letter if needed
+          if (platformName.length > 0) {
+            platformName = platformName.charAt(0).toUpperCase() + platformName.slice(1);
           }
         }
         
-        // Final fallback - try to extract from field names or anywhere else
-        if (!platformName || platformName === 'Platform 1' || platformName.includes('Platform ')) {
-          const allText = JSON.stringify(platform).toLowerCase();
-          const platformPatterns = [
-            { pattern: 'typeform', name: 'Typeform' },
-            { pattern: 'openai', name: 'OpenAI' },
-            { pattern: 'slack', name: 'Slack' },
-            { pattern: 'gmail', name: 'Gmail' },
-            { pattern: 'notion', name: 'Notion' },
-            { pattern: 'discord', name: 'Discord' },
-            { pattern: 'github', name: 'GitHub' }
-          ];
-          
-          for (const { pattern, name } of platformPatterns) {
-            if (allText.includes(pattern)) {
-              platformName = name;
-              break;
-            }
-          }
-        }
-        
-        // Final fallback
-        if (!platformName || platformName === 'Platform 1' || platformName.includes('Platform ')) {
+        // If no name found, use a simple index-based fallback
+        if (!platformName || platformName.length === 0) {
           platformName = `Platform ${index + 1}`;
         }
         
@@ -296,7 +248,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
                       []
         };
       });
-      console.log('✅ Enhanced platform name extraction completed');
+      console.log('✅ AI-driven platform name extraction completed');
     }
 
     // AI AGENTS MAPPING

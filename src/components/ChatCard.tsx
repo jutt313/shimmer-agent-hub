@@ -1,8 +1,7 @@
-
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { User, Code, CheckCircle2, AlertCircle } from 'lucide-react';
-import { parseYusrAIStructuredResponse, cleanDisplayText, YusrAIStructuredResponse } from "@/utils/jsonParserFixed";
+import { parseYusrAIStructuredResponse, cleanDisplayText, YusrAIStructuredResponse } from "@/utils/jsonParser";
 import { useEffect, useRef, useState } from "react";
 import { useErrorRecovery } from "@/hooks/useErrorRecovery";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,14 +15,16 @@ import ExecutionBlueprintVisualizer from './ExecutionBlueprintVisualizer';
 import { FlagPropagationLogger } from '@/utils/flagPropagationLogger';
 import FixedPlatformButtons from './FixedPlatformButtons';
 import { GHQ } from '@/utils/GHQ';
-import { useErrorHandler } from '@/hooks/useErrorHandler';
 
-interface ChatMessage {
+interface Message {
   id: number;
   text: string;
   isBot: boolean;
   timestamp: Date;
   structuredData?: YusrAIStructuredResponse;
+  error_help_available?: boolean;
+  yusrai_powered?: boolean;
+  seven_sections_validated?: boolean;
   platformData?: Array<{
     name: string;
     credentials: Array<{
@@ -33,22 +34,19 @@ interface ChatMessage {
       why_needed: string;
     }>;
   }>;
-  yusrai_powered?: boolean;
-  seven_sections_validated?: boolean;
-  error_help_available?: boolean;
 }
 
 interface ChatCardProps {
-  messages: ChatMessage[];
-  onAgentAdd: (agent: any) => void;
+  messages: Message[];
+  onAgentAdd?: (agent: any) => void;
   dismissedAgents?: Set<string>;
-  onAgentDismiss: (agentName: string) => void;
+  onAgentDismiss?: (agentName: string) => void;
   automationId?: string;
   isLoading?: boolean;
   onSendMessage?: (message: string) => void;
   onExecuteAutomation?: () => void;
-  platformCredentialStatus?: { [key: string]: boolean };
-  onPlatformCredentialChange?: (platformName: string, isConfigured: boolean) => void;
+  platformCredentialStatus?: { [key: string]: 'saved' | 'tested' | 'missing' };
+  onPlatformCredentialChange?: () => void;
 }
 
 const ChatCard = ({
@@ -63,35 +61,36 @@ const ChatCard = ({
   platformCredentialStatus = {},
   onPlatformCredentialChange
 }: ChatCardProps) => {
-  const [enhancedMessages, setEnhancedMessages] = useState<ChatMessage[]>([]);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { handleError } = useErrorHandler();
+  const { handleError } = useErrorRecovery();
   const { toast } = useToast();
   const { user } = useAuth();
+  const [showCodeModal, setShowCodeModal] = useState(false);
+  const [showBlueprintModal, setShowBlueprintModal] = useState(false);
+  const [enhancedMessages, setEnhancedMessages] = useState<Message[]>([]);
 
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [enhancedMessages, isLoading]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading]);
 
-  // Enhanced message processing with platform extraction and auto-save
+  // Enhanced message processing with platform extraction
   useEffect(() => {
-    const processMessages = async () => {
+    const processMessages = () => {
       try {
-        const processed = await Promise.all(messages.map(async (message) => {
+        const processed = messages.map((message) => {
           if (message.isBot && !message.structuredData) {
             try {
               console.log('🔍 Processing bot message for structured data:', message.text.substring(0, 200));
               
-              // Parse structured data using fixed parser
+              // Parse structured data
               const parseResult = parseYusrAIStructuredResponse(message.text);
               if (parseResult.structuredData) {
                 console.log('✅ Structured data found:', parseResult.structuredData);
                 
-                // Extract platform data
-                const platformData = parseResult.structuredData.platforms.map(platform => ({
+                // Extract platform data - handle both platforms and platforms_credentials
+                const platformsSource = parseResult.structuredData.platforms_credentials || parseResult.structuredData.platforms || [];
+                const platformData = platformsSource.map(platform => ({
                   name: platform.name,
                   credentials: platform.credentials.map(cred => ({
                     field: cred.field,
@@ -103,42 +102,20 @@ const ChatCard = ({
                 
                 console.log('🔗 Transformed platform data:', platformData);
                 
-                const processedMessage = {
+                return {
                   ...message,
                   structuredData: parseResult.structuredData,
                   platformData: platformData,
                   yusrai_powered: parseResult.metadata.yusrai_powered,
                   seven_sections_validated: parseResult.metadata.seven_sections_validated
                 };
-
-                // AUTO-SAVE: Save to automation_responses table
-                if (user?.id && parseResult.structuredData) {
-                  try {
-                    await supabase.from('automation_responses').insert({
-                      user_id: user.id,
-                      automation_id: automationId,
-                      chat_message_id: message.id,
-                      response_text: message.text,
-                      structured_data: parseResult.structuredData as any,
-                      yusrai_powered: parseResult.metadata.yusrai_powered || false,
-                      seven_sections_validated: parseResult.metadata.seven_sections_validated || false,
-                      error_help_available: parseResult.metadata.error_help_available || false,
-                      is_ready_for_execution: true
-                    });
-                    console.log('✅ Auto-saved structured response to automation_responses');
-                  } catch (saveError) {
-                    console.error('❌ Auto-save failed:', saveError);
-                  }
-                }
-                
-                return processedMessage;
               }
             } catch (error) {
               console.log('❌ Error processing message:', error);
             }
           }
           return message;
-        }));
+        });
         
         setEnhancedMessages(processed);
       } catch (error) {
@@ -148,7 +125,7 @@ const ChatCard = ({
     };
 
     processMessages();
-  }, [messages, user?.id, automationId]);
+  }, [messages]);
 
   const optimizedMessages = enhancedMessages.slice(-50);
 
@@ -158,7 +135,7 @@ const ChatCard = ({
         return [<span key="fallback-input-error">Message content unavailable.</span>];
       }
 
-      // If we have structured data, display it properly
+      // If we have structured data, display it as clean plain text
       if (structuredData) {
         const sections = [];
         
@@ -172,23 +149,21 @@ const ChatCard = ({
           );
         }
         
-        // FIXED: Steps section - display as numbered list with safe string conversion
+        // Steps section
         if (structuredData.steps && Array.isArray(structuredData.steps) && structuredData.steps.length > 0) {
           sections.push(
             <div key="steps" className="mb-4">
               <div className="font-semibold text-gray-800 mb-2">Steps:</div>
               <div className="text-gray-700 leading-relaxed">
                 {structuredData.steps.map((step, index) => (
-                  <div key={index} className="mb-1">
-                    {index + 1}. {typeof step === 'string' ? step : ((step as any)?.description || (step as any)?.action || JSON.stringify(step))}
-                  </div>
+                  <div key={index} className="mb-1">{index + 1}. {String(step || '')}</div>
                 ))}
               </div>
             </div>
           );
         }
         
-        // FIXED: Platforms section - display real platform names
+        // Platforms section
         if (structuredData.platforms && Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
           sections.push(
             <div key="platforms" className="mb-4">
@@ -196,8 +171,8 @@ const ChatCard = ({
               <div className="text-gray-700 leading-relaxed">
                 {structuredData.platforms.map((platform, index) => (
                   <div key={index} className="mb-2">
-                    <div className="font-medium">{platform.name}</div>
-                    {platform.credentials && Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
+                    <div className="font-medium">{String(platform?.name || `Platform ${index + 1}`)}</div>
+                    {platform?.credentials && Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
                       <div className="ml-4 text-sm text-gray-600">
                         <div className="text-xs font-medium mb-1">Required credentials:</div>
                         {platform.credentials.map((cred, credIndex) => (
@@ -214,23 +189,21 @@ const ChatCard = ({
           );
         }
         
-        // FIXED: Clarification Questions section - safely convert objects to strings
+        // Clarification Questions section
         if (structuredData.clarification_questions && Array.isArray(structuredData.clarification_questions) && structuredData.clarification_questions.length > 0) {
           sections.push(
             <div key="questions" className="mb-4">
               <div className="font-semibold text-gray-800 mb-2">Clarification Questions:</div>
               <div className="text-gray-700 leading-relaxed">
                 {structuredData.clarification_questions.map((question, index) => (
-                  <div key={index} className="mb-1">
-                    {index + 1}. {typeof question === 'string' ? question : ((question as any)?.question || JSON.stringify(question))}
-                  </div>
+                  <div key={index} className="mb-1">{index + 1}. {String(question || '')}</div>
                 ))}
               </div>
             </div>
           );
         }
         
-        // FIXED: AI Agents section - display real agent names and details
+        // AI Agents section with Add/Dismiss buttons
         if (structuredData.agents && Array.isArray(structuredData.agents) && structuredData.agents.length > 0) {
           sections.push(
             <div key="agents" className="mb-4">
@@ -239,7 +212,7 @@ const ChatCard = ({
                 {structuredData.agents.map((agent, index) => (
                   <div key={index} className="mb-3 p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="font-medium text-gray-800">{agent.name}</div>
+                      <div className="font-medium text-gray-800">{String(agent?.name || `Agent ${index + 1}`)}</div>
                       <div className="flex gap-2">
                         <Button
                           size="sm"
@@ -251,7 +224,7 @@ const ChatCard = ({
                         </Button>
                         <Button
                           size="sm"
-                          onClick={() => handleAgentDismiss(agent.name)}
+                          onClick={() => handleAgentDismiss(agent?.name || `Agent ${index + 1}`)}
                           className="bg-red-100 hover:bg-red-200 text-red-700 border-red-300 text-xs px-3 py-1"
                           variant="outline"
                         >
@@ -260,9 +233,9 @@ const ChatCard = ({
                       </div>
                     </div>
                     <div className="text-sm text-gray-600 space-y-1">
-                      <div><strong>Role:</strong> {agent.role}</div>
-                      <div><strong>Goal:</strong> {agent.goal}</div>
-                      <div><strong>Why needed:</strong> {agent.why_needed}</div>
+                      <div><strong>Role:</strong> {agent?.role || 'Assistant'}</div>
+                      <div><strong>Goal:</strong> {agent?.goal || 'General assistance'}</div>
+                      {agent?.why_needed && <div><strong>Why needed:</strong> {agent.why_needed}</div>}
                     </div>
                   </div>
                 ))}
@@ -284,36 +257,188 @@ const ChatCard = ({
       ));
 
     } catch (error: any) {
-      handleError(error, { fileName: 'ChatCard.tsx', userAction: 'Text formatting' });
+      handleError(error, 'Text formatting in ChatCard');
       return [<span key="processing-error">Processing your YusrAI automation request...</span>];
     }
   };
 
   const handleAgentAdd = (agent: any) => {
-    console.log('Adding agent:', agent);
-    onAgentAdd(agent);
+    console.log(`🤖 User adding YusrAI agent: ${agent.name}`);
+    agentStateManager.addAgent(agent.name, agent);
+    if (onAgentAdd) {
+      onAgentAdd(agent);
+    }
   };
 
   const handleAgentDismiss = (agentName: string) => {
-    console.log('Dismissing agent:', agentName);
-    onAgentDismiss(agentName);
+    console.log(`❌ User dismissing YusrAI agent: ${agentName}`);
+    agentStateManager.dismissAgent(agentName);
+    if (onAgentDismiss) {
+      onAgentDismiss(agentName);
+    }
   };
 
-  const handleErrorHelp = (errorMessage: string) => {
-    console.log('Error help requested for:', errorMessage);
-    toast({
-      title: "Error Help",
-      description: "Help request processed for this error.",
-      duration: 3000,
+  const handleErrorHelp = (errorMessage?: string) => {
+    const helpMessage = errorMessage ? 
+      `I encountered this error: "${errorMessage}". Can you help me resolve it and continue with my YusrAI automation?` :
+      "I need help with an error I encountered. Can you assist me?";
+    
+    if (onSendMessage) {
+      onSendMessage(helpMessage);
+    }
+  };
+
+  const handlePlatformCredentialClick = (platformName: string) => {
+    if (onPlatformCredentialChange) {
+      console.log(`🔧 Opening YusrAI credential form for ${platformName}`);
+      onPlatformCredentialChange();
+    }
+  };
+
+  const testPlatformCredentials = async (platformName: string, testPayload: any) => {
+    try {
+      console.log(`🧪 Testing YusrAI credentials for ${platformName}`);
+      const { data, error } = await supabase.functions.invoke('test-credential', {
+        body: {
+          platform: platformName,
+          testConfig: testPayload
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: data.success ? "✅ YusrAI Test Successful" : "❌ YusrAI Test Failed",
+        description: data.message || `YusrAI credential test for ${platformName} completed`,
+        variant: data.success ? "default" : "destructive",
+      });
+
+      return data.success;
+    } catch (error: any) {
+      console.error('YusrAI test error:', error);
+      toast({
+        title: "YusrAI Test Error",
+        description: `Failed to test ${platformName} credentials`,
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  const checkReadyForExecution = () => {
+    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
+    if (!latestBotMessage?.structuredData) return false;
+
+    const structuredData = latestBotMessage.structuredData;
+    
+    const platforms = Array.isArray(structuredData.platforms) ? structuredData.platforms : [];
+    const agents = Array.isArray(structuredData.agents) ? structuredData.agents : [];
+    
+    const allPlatformsConfigured = platforms.length === 0 || platforms.every(platform => 
+      platformCredentialStatus[platform.name] === 'saved' || 
+      platformCredentialStatus[platform.name] === 'tested'
+    );
+
+    const allAgentsHandled = agents.length === 0 || agents.every(agent => 
+      dismissedAgents.has(agent.name)
+    );
+
+    console.log('🔍 Execution readiness check:', {
+      hasStructuredData: !!structuredData,
+      platformsCount: platforms.length,
+      agentsCount: agents.length,
+      allPlatformsConfigured,
+      allAgentsHandled,
+      isReady: allPlatformsConfigured && allAgentsHandled
     });
+
+    return allPlatformsConfigured && allAgentsHandled;
+  };
+
+  const handleExecuteAutomation = async () => {
+    console.log('🚀 GHQ execution will be handled by GHQAutomationExecuteButton');
+  };
+
+  const getCompleteAutomationJSON = () => {
+    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
+    if (!latestBotMessage?.structuredData) return null;
+
+    return {
+      automation_id: automationId,
+      created_at: new Date().toISOString(),
+      yusrai_response: latestBotMessage.structuredData,
+      yusrai_powered: latestBotMessage.yusrai_powered || true,
+      seven_sections_validated: latestBotMessage.seven_sections_validated || true,
+      ready_for_execution: checkReadyForExecution(),
+      credential_status: platformCredentialStatus
+    };
+  };
+
+  const saveAutomationResponse = async (messageData: Message) => {
+    if (!user?.id || !messageData.isBot || !messageData.structuredData) return;
+    
+    try {
+        const { error } = await supabase.from('automation_responses').insert({
+          user_id: user.id,
+          automation_id: automationId,
+          chat_message_id: messageData.id,
+          response_text: messageData.text,
+          structured_data: messageData.structuredData as any,
+          yusrai_powered: messageData.yusrai_powered || false,
+          seven_sections_validated: messageData.seven_sections_validated || false,
+          error_help_available: messageData.error_help_available || false,
+          is_ready_for_execution: checkReadyForExecution()
+        });
+      
+      if (error) {
+        console.error('❌ Failed to save automation response:', error);
+      } else {
+        console.log('✅ Automation response saved successfully');
+      }
+    } catch (error) {
+      console.error('❌ Error saving automation response:', error);
+    }
   };
 
   const getLatestPlatforms = () => {
-    const latestMessage = optimizedMessages
-      .filter(msg => msg.isBot && msg.platformData)
-      .slice(-1)[0];
+    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.platformData).pop();
+    return latestBotMessage?.platformData || [];
+  };
+
+  const transformPlatformsForButtons = (yusraiPlatforms: any[]) => {
+    console.log('🔄 Transforming platforms for buttons:', yusraiPlatforms);
     
-    return latestMessage?.platformData || [];
+    if (!Array.isArray(yusraiPlatforms)) {
+      console.log('⚠️ No platforms array found, returning empty array');
+      return [];
+    }
+    
+    const transformedPlatforms = yusraiPlatforms.map((platform, index) => {
+      console.log(`🔄 Processing platform ${index + 1}:`, platform);
+      
+      const credentials = platform.credentials || 
+                         platform.required_credentials || 
+                         platform.credential_requirements ||
+                         platform.fields ||
+                         [];
+      
+      const transformedPlatform = {
+        name: platform.name || platform.platform_name || platform.platform || `Platform ${index + 1}`,
+        credentials: Array.isArray(credentials) ? credentials.map((cred: any) => ({
+          field: cred.field || cred.name || cred.key || 'api_key',
+          placeholder: cred.example || cred.placeholder || cred.description || `Enter ${cred.field || 'credential'}`,
+          link: cred.link || cred.where_to_get || cred.documentation_url || cred.url || '#',
+          why_needed: cred.why_needed || cred.description || cred.purpose || 'Authentication required'
+        })) : [],
+        test_payloads: platform.test_payloads || platform.test_payload || platform.test_data || []
+      };
+      
+      console.log(`✅ Transformed platform:`, transformedPlatform);
+      return transformedPlatform;
+    });
+    
+    console.log('🎯 Final transformed platforms:', transformedPlatforms);
+    return transformedPlatforms;
   };
 
   return (
@@ -408,12 +533,12 @@ const ChatCard = ({
         </ScrollArea>
       </div>
 
-      {/* FIXED: Platform credential buttons */}
+      {/* Platform credential buttons */}
       <div className="mt-4">
         <FixedPlatformButtons
           platforms={getLatestPlatforms()}
           automationId={automationId}
-          onCredentialChange={() => onPlatformCredentialChange && onPlatformCredentialChange('', true)}
+          onCredentialChange={onPlatformCredentialChange}
         />
       </div>
     </div>

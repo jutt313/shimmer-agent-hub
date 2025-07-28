@@ -1,152 +1,151 @@
 
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
 
-const supabaseUrl = 'https://zorwtyijosgdcckljmqd.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvcnd0eWlqb3NnZGNja2xqbXFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxMTA4NDksImV4cCI6MjA2NTY4Njg0OX0.R-HltFpAhGNf_U2WEAYurf9LQ1xLgdQyP7C4ez6zRP4';
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-// Generate a secure encryption key for the user
-async function generateUserEncryptionKey(userId: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(userId + 'yusrai-security-salt-v1');
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-// AES-GCM encryption
-async function encryptData(data: string, key: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const keyBuffer = new Uint8Array(key.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
-  
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    keyBuffer,
-    { name: 'AES-GCM' },
-    false,
-    ['encrypt']
-  );
-  
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encodedData = encoder.encode(data);
-  
-  const encryptedBuffer = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    cryptoKey,
-    encodedData
-  );
-  
-  const encryptedArray = Array.from(new Uint8Array(encryptedBuffer));
-  const ivArray = Array.from(iv);
-  
-  return JSON.stringify({
-    iv: ivArray,
-    data: encryptedArray
-  });
-}
-
-// AES-GCM decryption
-async function decryptData(encryptedData: string, key: string): Promise<string> {
-  const { iv, data } = JSON.parse(encryptedData);
-  const keyBuffer = new Uint8Array(key.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
-  
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    keyBuffer,
-    { name: 'AES-GCM' },
-    false,
-    ['decrypt']
-  );
-  
-  const decryptedBuffer = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: new Uint8Array(iv) },
-    cryptoKey,
-    new Uint8Array(data)
-  );
-  
-  const decoder = new TextDecoder();
-  return decoder.decode(decryptedBuffer);
-}
-
-export class SecureCredentials {
-  static async encrypt(credentials: Record<string, string>, userId: string): Promise<string> {
+export class SecureCredentialManager {
+  private static encryptCredentials(credentials: Record<string, string>): string {
     try {
-      const key = await generateUserEncryptionKey(userId);
-      const credentialsString = JSON.stringify(credentials);
-      return await encryptData(credentialsString, key);
+      // Simple base64 encoding for now - in production, use proper encryption
+      return btoa(JSON.stringify(credentials));
     } catch (error) {
-      console.error('Encryption failed:', error);
-      throw new Error('Failed to encrypt credentials');
+      console.error('❌ Encryption error:', error);
+      throw error;
     }
   }
 
-  static async decrypt(encryptedCredentials: string, userId: string): Promise<Record<string, string>> {
+  private static decryptCredentials(encryptedData: string): Record<string, string> {
     try {
-      const key = await generateUserEncryptionKey(userId);
-      const credentialsString = await decryptData(encryptedCredentials, key);
-      return JSON.parse(credentialsString);
+      // Handle both encrypted and plain text data for backward compatibility
+      if (!encryptedData) return {};
+      
+      // Try to parse as JSON first (unencrypted)
+      try {
+        const parsed = JSON.parse(encryptedData);
+        if (typeof parsed === 'object' && parsed !== null) {
+          return parsed;
+        }
+      } catch (e) {
+        // Not JSON, try base64 decode
+      }
+      
+      // Try base64 decode
+      try {
+        const decoded = atob(encryptedData);
+        return JSON.parse(decoded);
+      } catch (e) {
+        console.warn('⚠️ Could not decrypt credentials, returning empty object');
+        return {};
+      }
     } catch (error) {
-      console.error('Decryption failed:', error);
-      throw new Error('Failed to decrypt credentials');
+      console.error('❌ Decryption error:', error);
+      return {};
     }
   }
 
-  static async saveCredentials(
-    platformName: string,
-    credentials: Record<string, string>,
+  static async storeCredentials(
     userId: string,
-    automationId: string
+    platformName: string,
+    credentials: Record<string, string>
   ): Promise<boolean> {
     try {
-      const encryptedCredentials = await this.encrypt(credentials, userId);
+      console.log(`💾 Storing credentials for ${platformName}...`);
       
-      const { error } = await supabase
-        .from('automation_platform_credentials')
-        .upsert({
-          platform_name: platformName,
-          credentials: encryptedCredentials,
-          user_id: userId,
-          automation_id: automationId,
-          is_active: true,
-          updated_at: new Date().toISOString()
-        });
+      const encryptedCredentials = this.encryptCredentials(credentials);
+      
+      // Check if credentials already exist
+      const { data: existing } = await supabase
+        .from('platform_credentials')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('platform_name', platformName)
+        .single();
 
-      if (error) {
-        console.error('Database save error:', error);
-        return false;
+      if (existing) {
+        // Update existing
+        const { error } = await supabase
+          .from('platform_credentials')
+          .update({
+            credentials: encryptedCredentials,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id);
+
+        if (error) throw error;
+      } else {
+        // Insert new
+        const { error } = await supabase
+          .from('platform_credentials')
+          .insert({
+            user_id: userId,
+            platform_name: platformName,
+            credential_type: 'api_key',
+            credentials: encryptedCredentials
+          });
+
+        if (error) throw error;
       }
 
+      console.log(`✅ Successfully stored credentials for ${platformName}`);
       return true;
     } catch (error) {
-      console.error('Save credentials error:', error);
+      console.error(`❌ Failed to store credentials for ${platformName}:`, error);
       return false;
     }
   }
 
   static async getCredentials(
-    platformName: string,
     userId: string,
-    automationId: string
+    platformName: string
   ): Promise<Record<string, string> | null> {
     try {
+      console.log(`🔍 Fetching credentials for ${platformName}...`);
+      
       const { data, error } = await supabase
-        .from('automation_platform_credentials')
+        .from('platform_credentials')
         .select('credentials')
-        .eq('platform_name', platformName)
         .eq('user_id', userId)
-        .eq('automation_id', automationId)
+        .eq('platform_name', platformName)
         .eq('is_active', true)
         .single();
 
-      if (error || !data) {
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No records found
+          console.log(`❌ No credentials found for ${platformName}`);
+          return null;
+        }
+        throw error;
+      }
+
+      if (!data?.credentials) {
+        console.log(`❌ Empty credentials for ${platformName}`);
         return null;
       }
 
-      return await this.decrypt(data.credentials, userId);
+      const decryptedCredentials = this.decryptCredentials(data.credentials);
+      console.log(`✅ Found credentials for ${platformName}`);
+      return decryptedCredentials;
     } catch (error) {
-      console.error('Get credentials error:', error);
+      console.error(`❌ Error fetching credentials for ${platformName}:`, error);
       return null;
+    }
+  }
+
+  static async deleteCredentials(
+    userId: string,
+    platformName: string
+  ): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('platform_credentials')
+        .update({ is_active: false })
+        .eq('user_id', userId)
+        .eq('platform_name', platformName);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error(`❌ Error deleting credentials for ${platformName}:`, error);
+      return false;
     }
   }
 }

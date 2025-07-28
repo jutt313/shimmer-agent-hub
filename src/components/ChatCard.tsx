@@ -16,8 +16,40 @@ import ExecutionBlueprintVisualizer from './ExecutionBlueprintVisualizer';
 import { FlagPropagationLogger } from '@/utils/flagPropagationLogger';
 import FixedPlatformButtons from './FixedPlatformButtons';
 import { GHQ } from '@/utils/GHQ';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 
-// ... keep existing code (interface definitions and component props) the same ...
+interface ChatMessage {
+  id: string;
+  text: string;
+  isBot: boolean;
+  timestamp: Date;
+  structuredData?: YusrAIStructuredResponse;
+  platformData?: Array<{
+    name: string;
+    credentials: Array<{
+      field: string;
+      placeholder: string;
+      link: string;
+      why_needed: string;
+    }>;
+  }>;
+  yusrai_powered?: boolean;
+  seven_sections_validated?: boolean;
+  error_help_available?: boolean;
+}
+
+interface ChatCardProps {
+  messages: ChatMessage[];
+  onAgentAdd: (agent: any) => void;
+  dismissedAgents?: Set<string>;
+  onAgentDismiss: (agentName: string) => void;
+  automationId?: string;
+  isLoading?: boolean;
+  onSendMessage?: (message: string) => void;
+  onExecuteAutomation?: () => void;
+  platformCredentialStatus?: { [key: string]: boolean };
+  onPlatformCredentialChange?: (platformName: string, isConfigured: boolean) => void;
+}
 
 const ChatCard = ({
   messages,
@@ -31,9 +63,18 @@ const ChatCard = ({
   platformCredentialStatus = {},
   onPlatformCredentialChange
 }: ChatCardProps) => {
-  // ... keep existing code (state variables and refs) the same ...
+  const [enhancedMessages, setEnhancedMessages] = useState<ChatMessage[]>([]);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { handleError } = useErrorHandler();
+  const { toast } = useToast();
+  const { user } = useAuth();
 
-  // ... keep existing code (useEffect for scrolling) the same ...
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [enhancedMessages, isLoading]);
 
   // Enhanced message processing with platform extraction and auto-save
   useEffect(() => {
@@ -131,7 +172,7 @@ const ChatCard = ({
           );
         }
         
-        // FIXED: Steps section - display as numbered list
+        // FIXED: Steps section - display as numbered list with safe string conversion
         if (structuredData.steps && Array.isArray(structuredData.steps) && structuredData.steps.length > 0) {
           sections.push(
             <div key="steps" className="mb-4">
@@ -243,12 +284,37 @@ const ChatCard = ({
       ));
 
     } catch (error: any) {
-      handleError(error, 'Text formatting in ChatCard');
+      handleError(error, { fileName: 'ChatCard.tsx', userAction: 'Text formatting' });
       return [<span key="processing-error">Processing your YusrAI automation request...</span>];
     }
   };
 
-  // ... keep existing code (handler functions) the same ...
+  const handleAgentAdd = (agent: any) => {
+    console.log('Adding agent:', agent);
+    onAgentAdd(agent);
+  };
+
+  const handleAgentDismiss = (agentName: string) => {
+    console.log('Dismissing agent:', agentName);
+    onAgentDismiss(agentName);
+  };
+
+  const handleErrorHelp = (errorMessage: string) => {
+    console.log('Error help requested for:', errorMessage);
+    toast({
+      title: "Error Help",
+      description: "Help request processed for this error.",
+      duration: 3000,
+    });
+  };
+
+  const getLatestPlatforms = () => {
+    const latestMessage = optimizedMessages
+      .filter(msg => msg.isBot && msg.platformData)
+      .slice(-1)[0];
+    
+    return latestMessage?.platformData || [];
+  };
 
   return (
     <div className="space-y-6">

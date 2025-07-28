@@ -189,7 +189,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('🔗 Mapped platforms_credentials to platforms:', parsedResponse.platforms.length);
     }
 
-    // ENHANCED PLATFORM MAPPING - Fix platform names with better extraction
+    // AI-DRIVEN PLATFORM MAPPING - Trust OpenAI completely, no hardcoded patterns
     if (parsedResponse.platforms_and_credentials && !parsedResponse.platforms) {
       parsedResponse.platforms = Array.isArray(parsedResponse.platforms_and_credentials) 
         ? parsedResponse.platforms_and_credentials 
@@ -204,10 +204,10 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('🔗 Mapped platform_integrations to platforms:', parsedResponse.platforms.length);
     }
 
-    // ENHANCED PLATFORM NAME EXTRACTION - Extract real platform names
+    // 100% AI-DRIVEN PLATFORM NAME EXTRACTION - No hardcoded fallbacks
     if (parsedResponse.platforms && Array.isArray(parsedResponse.platforms)) {
       parsedResponse.platforms = parsedResponse.platforms.map((platform: any, index: number) => {
-        // First try to extract platform name from structured data
+        // Trust OpenAI completely - extract exactly what it provides
         let platformName = platform.name || 
                           platform.platform_name || 
                           platform.platform || 
@@ -215,76 +215,24 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
                           platform.integration ||
                           platform.tool;
         
-        // If no name found or generic, try to extract from description or other fields
-        if (!platformName || platformName === 'Platform 1' || platformName.includes('Platform ')) {
-          const description = platform.description || platform.why_needed || platform.rule || '';
-          const lowerDesc = description.toLowerCase();
+        // If OpenAI didn't provide a name, use the first credential field as indicator
+        if (!platformName && platform.credentials && platform.credentials.length > 0) {
+          const firstCred = platform.credentials[0];
+          const credField = firstCred.field || firstCred.name || firstCred.key || '';
           
-          // Enhanced platform name patterns with better detection
-          const platformPatterns = [
-            { pattern: 'typeform', name: 'Typeform' },
-            { pattern: 'openai', name: 'OpenAI' },
-            { pattern: 'slack', name: 'Slack' },
-            { pattern: 'gmail', name: 'Gmail' },
-            { pattern: 'notion', name: 'Notion' },
-            { pattern: 'discord', name: 'Discord' },
-            { pattern: 'github', name: 'GitHub' },
-            { pattern: 'trello', name: 'Trello' },
-            { pattern: 'asana', name: 'Asana' },
-            { pattern: 'monday', name: 'Monday.com' },
-            { pattern: 'clickup', name: 'ClickUp' },
-            { pattern: 'zoom', name: 'Zoom' },
-            { pattern: 'teams', name: 'Microsoft Teams' },
-            { pattern: 'hubspot', name: 'HubSpot' },
-            { pattern: 'salesforce', name: 'Salesforce' },
-            { pattern: 'stripe', name: 'Stripe' },
-            { pattern: 'paypal', name: 'PayPal' },
-            { pattern: 'shopify', name: 'Shopify' },
-            { pattern: 'woocommerce', name: 'WooCommerce' },
-            { pattern: 'zapier', name: 'Zapier' },
-            { pattern: 'airtable', name: 'Airtable' },
-            { pattern: 'google sheets', name: 'Google Sheets' },
-            { pattern: 'microsoft excel', name: 'Microsoft Excel' },
-            { pattern: 'dropbox', name: 'Dropbox' },
-            { pattern: 'google drive', name: 'Google Drive' },
-            { pattern: 'drive', name: 'Google Drive' }
-          ];
-          
-          for (const { pattern, name } of platformPatterns) {
-            if (lowerDesc.includes(pattern)) {
-              platformName = name;
-              break;
-            }
+          // Extract platform name from credential field (e.g., "gmail_api_key" -> "Gmail")
+          if (credField.includes('_')) {
+            platformName = credField.split('_')[0];
+            platformName = platformName.charAt(0).toUpperCase() + platformName.slice(1);
           }
         }
         
-        // Final fallback - try to extract from field names or anywhere else
-        if (!platformName || platformName === 'Platform 1' || platformName.includes('Platform ')) {
-          const allText = JSON.stringify(platform).toLowerCase();
-          const platformPatterns = [
-            { pattern: 'typeform', name: 'Typeform' },
-            { pattern: 'openai', name: 'OpenAI' },
-            { pattern: 'slack', name: 'Slack' },
-            { pattern: 'gmail', name: 'Gmail' },
-            { pattern: 'notion', name: 'Notion' },
-            { pattern: 'discord', name: 'Discord' },
-            { pattern: 'github', name: 'GitHub' }
-          ];
-          
-          for (const { pattern, name } of platformPatterns) {
-            if (allText.includes(pattern)) {
-              platformName = name;
-              break;
-            }
-          }
-        }
-        
-        // Final fallback
-        if (!platformName || platformName === 'Platform 1' || platformName.includes('Platform ')) {
+        // Final fallback - only if OpenAI provided absolutely nothing
+        if (!platformName) {
           platformName = `Platform ${index + 1}`;
         }
         
-        console.log(`🔍 Processing platform ${index + 1}: extracted name "${platformName}"`);
+        console.log(`🤖 AI-driven platform extraction: "${platformName}" (index: ${index})`);
         
         return {
           ...platform,
@@ -296,10 +244,10 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
                       []
         };
       });
-      console.log('✅ Enhanced platform name extraction completed');
+      console.log('✅ 100% AI-driven platform name extraction completed');
     }
 
-    // AI AGENTS MAPPING
+    // AI AGENTS MAPPING - Trust OpenAI responses completely
     if (parsedResponse.ai_agents_section?.agents && !parsedResponse.agents) {
       parsedResponse.agents = Array.isArray(parsedResponse.ai_agents_section.agents) 
         ? parsedResponse.ai_agents_section.agents 
@@ -334,7 +282,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
     if (!parsedResponse.test_payloads) parsedResponse.test_payloads = {};
     if (!parsedResponse.execution_blueprint) parsedResponse.execution_blueprint = null;
 
-    console.log('✅ YusrAI structured response validation successful')
+    console.log('✅ YusrAI structured response validation successful - 100% AI-driven')
     metadata.seven_sections_validated = true;
     
     return { 

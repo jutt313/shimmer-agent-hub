@@ -115,6 +115,7 @@ const ChatCard = ({
                 if (user?.id && parseResult.structuredData) {
                   try {
                     await supabase.from('automation_responses').insert({
+                      user_id: user.id,
                       automation_id: automationId,
                       chat_message_id: message.id,
                       response_text: message.text,

@@ -1,326 +1,424 @@
-import { useState, useEffect } from 'react';
-import { Plus, MessageCircle, Bot, Zap, Settings, Code, Book } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import ChatCard from '@/components/ChatCard';
-import HelpChatModal from '@/components/HelpChatModal';
-import NotificationDropdown from '@/components/NotificationDropdown';
-import SettingsDropdown from '@/components/SettingsDropdown';
-interface Agent {
-  name: string;
-  role: string;
-}
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import ChatCard from "@/components/ChatCard";
+import { 
+  Bot, 
+  Play, 
+  Pause, 
+  Settings, 
+  Calendar,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  ArrowLeft,
+  Users,
+  Zap
+} from "lucide-react";
+
 interface Message {
   id: number;
   text: string;
   isBot: boolean;
   timestamp: Date;
 }
+
+interface Agent {
+  id: string;
+  name: string;
+  role: string;
+  goal: string;
+  why_needed: string;
+  status: 'active' | 'inactive' | 'pending';
+}
+
 interface Automation {
   id: string;
-  title: string;
-  description: string | null;
-  status: string;
+  name: string;
+  description: string;
+  status: 'draft' | 'active' | 'paused' | 'completed';
   created_at: string;
-  is_pinned?: boolean;
+  updated_at: string;
+  user_id: string;
+  agents: Agent[];
+  execution_count: number;
+  last_executed: string | null;
 }
-const Automations = () => {
-  const {
-    toast
-  } = useToast();
-  const {
-    user
-  } = useAuth();
-  const navigate = useNavigate();
-  const [showChatCard, setShowChatCard] = useState(false);
-  const [newAutomationName, setNewAutomationName] = useState('');
-  const [newAutomationDescription, setNewAutomationDescription] = useState('');
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [creatingAutomation, setCreatingAutomation] = useState(false);
-  const [automations, setAutomations] = useState<Automation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [messages, setMessages] = useState<Message[]>([{
-    id: 1,
-    text: "Hey there! I'm Yusr AI, your personal automation assistant. How can I help you today?",
-    isBot: true,
-    timestamp: new Date()
-  }]);
-  const [dismissedAgents, setDismissedAgents] = useState<Set<string>>(new Set());
-  const [currentAutomationId, setCurrentAutomationId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [helpInitialMessage, setHelpInitialMessage] = useState<string>('');
-  const [helpInitialContext, setHelpInitialContext] = useState<string>('');
-  useEffect(() => {
-    if (user) {
-      fetchAutomations();
-    }
-  }, [user]);
-  const fetchAutomations = async () => {
-    try {
-      const {
-        data,
-        error
-      } = await supabase.from('automations').select('*').eq('user_id', user?.id).order('created_at', {
-        ascending: false
-      });
-      if (error) throw error;
-      setAutomations(data || []);
-    } catch (error) {
-      console.error('Error fetching automations:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load automations",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  const createNewAutomation = async () => {
-    if (!newAutomationName.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter an automation name",
-        variant: "destructive"
-      });
-      return;
-    }
-    setCreatingAutomation(true);
-    try {
-      const {
-        data,
-        error
-      } = await supabase.from('automations').insert({
-        title: newAutomationName.trim(),
-        description: newAutomationDescription.trim() || null,
-        status: 'draft',
-        user_id: user?.id
-      }).select().single();
-      if (error) throw error;
-      toast({
-        title: "Success",
-        description: "Automation created successfully"
-      });
-      setShowCreateDialog(false);
-      setNewAutomationName('');
-      setNewAutomationDescription('');
 
-      // Use setTimeout to ensure the dialog closes before navigation
-      setTimeout(() => {
-        navigate(`/automations/${data.id}`, {
-          replace: true
-        });
-      }, 100);
+const Automations = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  
+  const [automation, setAutomation] = useState<Automation | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [dismissedAgents, setDismissedAgents] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
+
+  const automationId = id || "temp-automation-id";
+
+  useEffect(() => {
+    if (id && user) {
+      loadAutomation();
+    }
+  }, [id, user]);
+
+  const loadAutomation = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('automations')
+        .select('*')
+        .eq('id', id)
+        .eq('user_id', user?.id)
+        .single();
+
+      if (error) throw error;
+      
+      setAutomation(data);
+      
+      // Load initial messages if any
+      const initialMessage: Message = {
+        id: 1,
+        text: `Welcome to your automation: ${data.name}\n\nDescription: ${data.description}\n\nStatus: ${data.status}`,
+        isBot: true,
+        timestamp: new Date()
+      };
+      
+      setMessages([initialMessage]);
     } catch (error) {
-      console.error('Error creating automation:', error);
+      console.error('Error loading automation:', error);
       toast({
         title: "Error",
-        description: "Failed to create automation",
-        variant: "destructive"
+        description: "Failed to load automation details",
+        variant: "destructive",
       });
-    } finally {
-      setCreatingAutomation(false);
     }
   };
+
   const handleAgentAdd = (agent: Agent) => {
-    toast({
-      title: "Agent Added",
-      description: `${agent.name} has been added to your automation.`
-    });
+    if (!dismissedAgents.has(agent.name)) {
+      setAgents(prev => {
+        const exists = prev.some(a => a.name === agent.name);
+        if (!exists) {
+          return [...prev, { ...agent, status: 'pending' as const }];
+        }
+        return prev;
+      });
+      
+      toast({
+        title: "Agent Added",
+        description: `${agent.name} has been added to your automation`,
+      });
+    }
   };
+
   const handleAgentDismiss = (agentName: string) => {
-    setDismissedAgents(prev => {
-      const newSet = new Set(prev);
-      newSet.add(agentName);
-      return newSet;
+    console.log('Dismissing agent:', agentName);
+    setDismissedAgents(prev => new Set([...prev, agentName]));
+    setAgents(prev => prev.filter(agent => agent.name !== agentName));
+    
+    toast({
+      title: "Agent Dismissed",
+      description: `${agentName} has been removed from your automation`,
     });
   };
+
+  const handleStatusChange = async (newStatus: 'active' | 'paused' | 'draft') => {
+    if (!automation || !user) return;
+
+    try {
+      const { error } = await supabase
+        .from('automations')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', automation.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setAutomation(prev => prev ? { ...prev, status: newStatus } : null);
+      
+      toast({
+        title: "Status Updated",
+        description: `Automation is now ${newStatus}`,
+      });
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update automation status",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'draft':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'paused':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'error':
-        return 'bg-red-100 text-red-800 border-red-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'active': return 'bg-green-100 text-green-800';
+      case 'paused': return 'bg-yellow-100 text-yellow-800';
+      case 'draft': return 'bg-gray-100 text-gray-800';
+      case 'completed': return 'bg-blue-100 text-blue-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
-  if (loading) {
-    return <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading automations...</p>
-        </div>
-      </div>;
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'active': return <CheckCircle className="w-4 h-4" />;
+      case 'paused': return <Pause className="w-4 h-4" />;
+      case 'draft': return <Settings className="w-4 h-4" />;
+      case 'completed': return <CheckCircle className="w-4 h-4" />;
+      default: return <AlertCircle className="w-4 h-4" />;
+    }
+  };
+
+  if (!automation && id) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
   }
-  return <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50" style={{
-    backgroundImage: `
-          radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
-          radial-gradient(circle at 80% 20%, rgba(147, 51, 234, 0.1) 0%, transparent 50%),
-          radial-gradient(circle at 40% 80%, rgba(59, 130, 246, 0.05) 0%, transparent 50%)
-        `
-  }}>
-      <div className="container mx-auto px-4 py-8">
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
+      <div className="container mx-auto px-4 py-8 space-y-6">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
-              Your Automations
-            </h1>
-            <p className="text-gray-600">Create, manage, and monitor your AI-powered workflows</p>
-          </div>
-          
-          <div className="flex items-center gap-3 mt-4 md:mt-0">
-            <NotificationDropdown />
-            <SettingsDropdown />
-            
-            <Button onClick={() => setIsHelpOpen(true)} variant="outline" className="rounded-xl border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-200">
-              <MessageCircle className="w-5 h-5 mr-2" />
-              Help
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/dashboard')}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Dashboard
             </Button>
-            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-              <DialogTrigger asChild>
-                <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200" style={{
-                boxShadow: '0 0 20px rgba(59, 130, 246, 0.3)'
-              }}>
-                  <Plus className="w-5 h-5 mr-2" />
-                  Create Automation
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md bg-gradient-to-br from-blue-50 via-white to-purple-50 border-0 shadow-2xl">
-                <DialogHeader>
-                  <DialogTitle className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    Create New Automation
-                  </DialogTitle>
-                  <DialogDescription className="text-gray-600">
-                    Enter details for your new automation to get started with AI-powered workflows.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Automation Name *
-                    </label>
-                    <Input placeholder="e.g., Email Marketing Campaign, Lead Generation..." value={newAutomationName} onChange={e => setNewAutomationName(e.target.value)} onKeyPress={e => e.key === 'Enter' && createNewAutomation()} className="rounded-xl border-blue-200 focus:border-purple-400 focus:ring-purple-400" />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Description (Optional)
-                    </label>
-                    <Textarea placeholder="Describe what this automation should do..." value={newAutomationDescription} onChange={e => setNewAutomationDescription(e.target.value)} className="rounded-xl border-blue-200 focus:border-purple-400 focus:ring-purple-400 min-h-[80px]" />
-                  </div>
-                  <div className="flex gap-3 justify-end pt-4">
-                    <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="rounded-xl">
-                      Cancel
-                    </Button>
-                    <Button onClick={createNewAutomation} disabled={creatingAutomation || !newAutomationName.trim()} className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl">
-                      {creatingAutomation ? 'Creating...' : 'Create Automation'}
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+            
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                {automation?.name || 'New Automation'}
+              </h1>
+              <p className="text-gray-600 mt-1">
+                {automation?.description || 'Configure your automation'}
+              </p>
+            </div>
           </div>
+
+          {automation && (
+            <div className="flex items-center gap-3">
+              <Badge className={`${getStatusColor(automation.status)} flex items-center gap-1`}>
+                {getStatusIcon(automation.status)}
+                {automation.status}
+              </Badge>
+              
+              <div className="flex gap-2">
+                {automation.status === 'draft' && (
+                  <Button
+                    onClick={() => handleStatusChange('active')}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <Play className="w-4 h-4 mr-2" />
+                    Activate
+                  </Button>
+                )}
+                
+                {automation.status === 'active' && (
+                  <Button
+                    onClick={() => handleStatusChange('paused')}
+                    variant="outline"
+                  >
+                    <Pause className="w-4 h-4 mr-2" />
+                    Pause
+                  </Button>
+                )}
+                
+                {automation.status === 'paused' && (
+                  <Button
+                    onClick={() => handleStatusChange('active')}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <Play className="w-4 h-4 mr-2" />
+                    Resume
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Automations List */}
-        {automations.length === 0 ? <div className="text-center py-16">
-            <Bot className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">No automations yet</h3>
-            <p className="text-gray-500 mb-6">Create your first automation to get started</p>
-            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-              <DialogTrigger asChild>
-                <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl">
-                  <Plus className="w-5 h-5 mr-2" />
-                  Create Your First Automation
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md bg-gradient-to-br from-blue-50 via-white to-purple-50 border-0 shadow-2xl">
-                <DialogHeader>
-                  <DialogTitle className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    Create New Automation
-                  </DialogTitle>
-                  <DialogDescription className="text-gray-600">
-                    Enter details for your new automation to get started with AI-powered workflows.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Automation Name *
-                    </label>
-                    <Input placeholder="e.g., Email Marketing Campaign, Lead Generation..." value={newAutomationName} onChange={e => setNewAutomationName(e.target.value)} onKeyPress={e => e.key === 'Enter' && createNewAutomation()} className="rounded-xl border-blue-200 focus:border-purple-400 focus:ring-purple-400" />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Description (Optional)
-                    </label>
-                    <Textarea placeholder="Describe what this automation should do..." value={newAutomationDescription} onChange={e => setNewAutomationDescription(e.target.value)} className="rounded-xl border-blue-200 focus:border-purple-400 focus:ring-purple-400 min-h-[80px]" />
-                  </div>
-                  <div className="flex gap-3 justify-end pt-4">
-                    <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="rounded-xl">
-                      Cancel
-                    </Button>
-                    <Button onClick={createNewAutomation} disabled={creatingAutomation || !newAutomationName.trim()} className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl">
-                      {creatingAutomation ? 'Creating...' : 'Create Automation'}
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div> : <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {automations.map(automation => <Card key={automation.id} className="bg-white/80 backdrop-blur-sm border border-blue-100 shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer rounded-xl overflow-hidden group" onClick={() => navigate(`/automations/${automation.id}`)}>
-                <CardHeader className="pb-4">
-                  <div className="flex items-start justify-between">
-                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-                      <Bot className="w-6 h-6 text-white" />
-                    </div>
-                    <Badge className={`text-xs ${getStatusColor(automation.status)}`}>
-                      {automation.status}
-                    </Badge>
-                  </div>
-                  <CardTitle className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                    {automation.title}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-4 bg-white/50 rounded-2xl p-1">
+            <TabsTrigger 
+              value="overview" 
+              className="flex items-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm"
+            >
+              <Bot className="w-4 h-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger 
+              value="chat" 
+              className="flex items-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm"
+            >
+              <Zap className="w-4 h-4" />
+              AI Assistant
+            </TabsTrigger>
+            <TabsTrigger 
+              value="agents" 
+              className="flex items-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm"
+            >
+              <Users className="w-4 h-4" />
+              Agents ({agents.length})
+            </TabsTrigger>
+            <TabsTrigger 
+              value="settings" 
+              className="flex items-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm"
+            >
+              <Settings className="w-4 h-4" />
+              Settings
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="rounded-3xl border shadow-lg">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5" />
+                    Created
                   </CardTitle>
-                  {automation.description && <CardDescription className="text-sm text-gray-600">
-                      {automation.description}
-                    </CardDescription>}
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center justify-between text-sm text-gray-500">
-                    <span>Created: {new Date(automation.created_at).toLocaleDateString()}</span>
-                    {automation.is_pinned && <Zap className="w-4 h-4 text-blue-600" />}
-                  </div>
+                  <p className="text-2xl font-bold">
+                    {automation ? new Date(automation.created_at).toLocaleDateString() : 'N/A'}
+                  </p>
                 </CardContent>
-              </Card>)}
-          </div>}
+              </Card>
 
-        {/* Chat Interface */}
-        {showChatCard && <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="relative w-full max-w-6xl">
-              <Button onClick={() => setShowChatCard(false)} variant="outline" className="absolute -top-12 right-0 rounded-xl bg-white/90 hover:bg-white border-0 shadow-lg z-10">
-                Close Chat
-              </Button>
-              <ChatCard messages={messages} onAgentAdd={handleAgentAdd} dismissedAgents={dismissedAgents} automationId={currentAutomationId} isLoading={isLoading} />
+              <Card className="rounded-3xl border shadow-lg">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Zap className="h-5 w-5" />
+                    Executions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">
+                    {automation?.execution_count || 0}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-3xl border shadow-lg">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    Last Run
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">
+                    {automation?.last_executed 
+                      ? new Date(automation.last_executed).toLocaleDateString()
+                      : 'Never'
+                    }
+                  </p>
+                </CardContent>
+              </Card>
             </div>
-          </div>}
+          </TabsContent>
 
-        {/* Help Chat Modal */}
-        <HelpChatModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} initialMessage={helpInitialMessage} initialContext={helpInitialContext} />
+          <TabsContent value="chat" className="mt-6">
+            <ChatCard
+              messages={messages}
+              onAgentAdd={handleAgentAdd}
+              onAgentDismiss={handleAgentDismiss}
+              dismissedAgents={dismissedAgents}
+              automationId={automationId}
+              isLoading={isLoading}
+            />
+          </TabsContent>
+
+          <TabsContent value="agents" className="mt-6">
+            <Card className="rounded-3xl border shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  AI Agents
+                </CardTitle>
+                <CardDescription>
+                  Manage the AI agents working on this automation
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {agents.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Users className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <p>No agents added yet</p>
+                    <p className="text-sm">Use the AI Assistant to add agents to your automation</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {agents.map((agent) => (
+                      <div key={agent.id} className="p-4 border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-semibold">{agent.name}</h3>
+                          <Badge className={getStatusColor(agent.status)}>
+                            {agent.status}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-1">
+                          <strong>Role:</strong> {agent.role}
+                        </p>
+                        <p className="text-sm text-gray-600 mb-1">
+                          <strong>Goal:</strong> {agent.goal}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          <strong>Why needed:</strong> {agent.why_needed}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="settings" className="mt-6">
+            <Card className="rounded-3xl border shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  Automation Settings
+                </CardTitle>
+                <CardDescription>
+                  Configure your automation preferences
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8 text-gray-500">
+                  <Settings className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <p>Settings panel coming soon...</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
-    </div>;
+    </div>
+  );
 };
+
 export default Automations;

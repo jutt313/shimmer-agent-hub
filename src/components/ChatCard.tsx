@@ -1,4 +1,3 @@
-
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { User, Code, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -118,7 +117,7 @@ const ChatCard = ({
                       automation_id: automationId,
                       chat_message_id: message.id,
                       response_text: message.text,
-                      structured_data: parseResult.structuredData,
+                      structured_data: parseResult.structuredData as any, // Cast to any to handle Json type
                       yusrai_powered: parseResult.metadata.yusrai_powered || false,
                       seven_sections_validated: parseResult.metadata.seven_sections_validated || false,
                       error_help_available: parseResult.metadata.error_help_available || false,

@@ -1,3 +1,4 @@
+
 export interface YusrAIStructuredResponse {
   summary: string;
   steps: any[];
@@ -20,6 +21,24 @@ export interface Credential {
   link: string;
   why_needed: string;
 }
+
+// Add missing exports as aliases to existing functions
+export const parseStructuredResponse = parseYusrAIResponse;
+export const parseYusrAIStructuredResponse = parseYusrAIResponse;
+
+// Add missing cleanDisplayText function
+export const cleanDisplayText = (text: string): string => {
+  if (!text) return '';
+  
+  // Remove any JSON-like structures that might be mixed in
+  const cleanedText = text
+    .replace(/\{[\s\S]*?\}/g, '') // Remove JSON objects
+    .replace(/\[[\s\S]*?\]/g, '') // Remove JSON arrays
+    .replace(/^\s*[\{\[][\s\S]*[\}\]]\s*$/g, '') // Remove if entire string is JSON
+    .trim();
+  
+  return cleanedText || text; // Return original if cleaning results in empty string
+};
 
 export const parseYusrAIResponse = (response: string): YusrAIStructuredResponse | null => {
   try {

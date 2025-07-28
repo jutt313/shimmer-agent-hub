@@ -1,3 +1,4 @@
+
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { User, Code, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -16,38 +17,7 @@ import { FlagPropagationLogger } from '@/utils/flagPropagationLogger';
 import FixedPlatformButtons from './FixedPlatformButtons';
 import { GHQ } from '@/utils/GHQ';
 
-interface Message {
-  id: number;
-  text: string;
-  isBot: boolean;
-  timestamp: Date;
-  structuredData?: YusrAIStructuredResponse;
-  error_help_available?: boolean;
-  yusrai_powered?: boolean;
-  seven_sections_validated?: boolean;
-  platformData?: Array<{
-    name: string;
-    credentials: Array<{
-      field: string;
-      placeholder: string;
-      link: string;
-      why_needed: string;
-    }>;
-  }>;
-}
-
-interface ChatCardProps {
-  messages: Message[];
-  onAgentAdd?: (agent: any) => void;
-  dismissedAgents?: Set<string>;
-  onAgentDismiss?: (agentName: string) => void;
-  automationId?: string;
-  isLoading?: boolean;
-  onSendMessage?: (message: string) => void;
-  onExecuteAutomation?: () => void;
-  platformCredentialStatus?: { [key: string]: 'saved' | 'tested' | 'missing' };
-  onPlatformCredentialChange?: () => void;
-}
+// ... keep existing code (interface definitions and component props) the same ...
 
 const ChatCard = ({
   messages,
@@ -61,18 +31,9 @@ const ChatCard = ({
   platformCredentialStatus = {},
   onPlatformCredentialChange
 }: ChatCardProps) => {
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { handleError } = useErrorRecovery();
-  const { toast } = useToast();
-  const { user } = useAuth();
-  const [showCodeModal, setShowCodeModal] = useState(false);
-  const [showBlueprintModal, setShowBlueprintModal] = useState(false);
-  const [enhancedMessages, setEnhancedMessages] = useState<Message[]>([]);
+  // ... keep existing code (state variables and refs) the same ...
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
+  // ... keep existing code (useEffect for scrolling) the same ...
 
   // Enhanced message processing with platform extraction and auto-save
   useEffect(() => {
@@ -117,7 +78,7 @@ const ChatCard = ({
                       automation_id: automationId,
                       chat_message_id: message.id,
                       response_text: message.text,
-                      structured_data: parseResult.structuredData as any, // Cast to any to handle Json type
+                      structured_data: parseResult.structuredData as any,
                       yusrai_powered: parseResult.metadata.yusrai_powered || false,
                       seven_sections_validated: parseResult.metadata.seven_sections_validated || false,
                       error_help_available: parseResult.metadata.error_help_available || false,
@@ -177,7 +138,9 @@ const ChatCard = ({
               <div className="font-semibold text-gray-800 mb-2">Steps:</div>
               <div className="text-gray-700 leading-relaxed">
                 {structuredData.steps.map((step, index) => (
-                  <div key={index} className="mb-1">{index + 1}. {step}</div>
+                  <div key={index} className="mb-1">
+                    {index + 1}. {typeof step === 'string' ? step : (step?.description || step?.action || JSON.stringify(step))}
+                  </div>
                 ))}
               </div>
             </div>
@@ -210,7 +173,7 @@ const ChatCard = ({
           );
         }
         
-        // FIXED: Clarification Questions section - properly extract question text
+        // FIXED: Clarification Questions section - safely convert objects to strings
         if (structuredData.clarification_questions && Array.isArray(structuredData.clarification_questions) && structuredData.clarification_questions.length > 0) {
           sections.push(
             <div key="questions" className="mb-4">
@@ -218,7 +181,7 @@ const ChatCard = ({
               <div className="text-gray-700 leading-relaxed">
                 {structuredData.clarification_questions.map((question, index) => (
                   <div key={index} className="mb-1">
-                    {index + 1}. {typeof question === 'string' ? question : question}
+                    {index + 1}. {typeof question === 'string' ? question : (question?.question || JSON.stringify(question))}
                   </div>
                 ))}
               </div>
@@ -285,107 +248,7 @@ const ChatCard = ({
     }
   };
 
-  const handleAgentAdd = (agent: any) => {
-    console.log(`🤖 User adding YusrAI agent: ${agent.name}`);
-    agentStateManager.addAgent(agent.name, agent);
-    if (onAgentAdd) {
-      onAgentAdd(agent);
-    }
-  };
-
-  const handleAgentDismiss = (agentName: string) => {
-    console.log(`❌ User dismissing YusrAI agent: ${agentName}`);
-    agentStateManager.dismissAgent(agentName);
-    if (onAgentDismiss) {
-      onAgentDismiss(agentName);
-    }
-  };
-
-  const handleErrorHelp = (errorMessage?: string) => {
-    const helpMessage = errorMessage ? 
-      `I encountered this error: "${errorMessage}". Can you help me resolve it and continue with my YusrAI automation?` :
-      "I need help with an error I encountered. Can you assist me?";
-    
-    if (onSendMessage) {
-      onSendMessage(helpMessage);
-    }
-  };
-
-  const handlePlatformCredentialClick = (platformName: string) => {
-    if (onPlatformCredentialChange) {
-      console.log(`🔧 Opening YusrAI credential form for ${platformName}`);
-      onPlatformCredentialChange();
-    }
-  };
-
-  const testPlatformCredentials = async (platformName: string, testPayload: any) => {
-    try {
-      console.log(`🧪 Testing YusrAI credentials for ${platformName}`);
-      const { data, error } = await supabase.functions.invoke('test-credential', {
-        body: {
-          platform: platformName,
-          testConfig: testPayload
-        }
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: data.success ? "✅ YusrAI Test Successful" : "❌ YusrAI Test Failed",
-        description: data.message || `YusrAI credential test for ${platformName} completed`,
-        variant: data.success ? "default" : "destructive",
-      });
-
-      return data.success;
-    } catch (error: any) {
-      console.error('YusrAI test error:', error);
-      toast({
-        title: "YusrAI Test Error",
-        description: `Failed to test ${platformName} credentials`,
-        variant: "destructive",
-      });
-      return false;
-    }
-  };
-
-  const checkReadyForExecution = () => {
-    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
-    if (!latestBotMessage?.structuredData) return false;
-
-    const structuredData = latestBotMessage.structuredData;
-    
-    const platforms = Array.isArray(structuredData.platforms) ? structuredData.platforms : [];
-    const agents = Array.isArray(structuredData.agents) ? structuredData.agents : [];
-    
-    const allPlatformsConfigured = platforms.length === 0 || platforms.every(platform => 
-      platformCredentialStatus[platform.name] === 'saved' || 
-      platformCredentialStatus[platform.name] === 'tested'
-    );
-
-    const allAgentsHandled = agents.length === 0 || agents.every(agent => 
-      dismissedAgents.has(agent.name)
-    );
-
-    console.log('🔍 Execution readiness check:', {
-      hasStructuredData: !!structuredData,
-      platformsCount: platforms.length,
-      agentsCount: agents.length,
-      allPlatformsConfigured,
-      allAgentsHandled,
-      isReady: allPlatformsConfigured && allAgentsHandled
-    });
-
-    return allPlatformsConfigured && allAgentsHandled;
-  };
-
-  const handleExecuteAutomation = async () => {
-    console.log('🚀 GHQ execution will be handled by GHQAutomationExecuteButton');
-  };
-
-  const getLatestPlatforms = () => {
-    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.platformData).pop();
-    return latestBotMessage?.platformData || [];
-  };
+  // ... keep existing code (handler functions) the same ...
 
   return (
     <div className="space-y-6">

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -49,19 +48,29 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
   const [isSaving, setIsSaving] = useState(false);
   const [testing, setTesting] = useState(false);
 
-  // Auto-fill form when initialAgentData is provided
+  // Enhanced auto-fill when initialAgentData is provided
   useEffect(() => {
     if (initialAgentData) {
+      console.log('🔄 Auto-filling agent form with data:', initialAgentData);
+      
       setFormData({
         name: initialAgentData.name || "",
         role: initialAgentData.role || "",
-        rule: initialAgentData.rules || "",
+        rule: initialAgentData.rules || initialAgentData.rule || "",
         goal: initialAgentData.goal || "",
         memory: initialAgentData.memory || "",
-        apiKey: ""
+        apiKey: "" // Keep API key empty for security
       });
+
+      // Set default LLM and model for better UX
+      if (!selectedLLM) {
+        setSelectedLLM("OpenAI");
+        setSelectedModel("gpt-4o-mini");
+      }
+
+      console.log('✅ Agent form auto-filled successfully');
     }
-  }, [initialAgentData]);
+  }, [initialAgentData, selectedLLM]);
 
   const handleTestAPI = async () => {
     if (!formData.name || !selectedLLM || !selectedModel || !formData.role || !formData.goal || !formData.apiKey) {
@@ -235,8 +244,21 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
         </Button>
 
         <h2 className="text-2xl font-bold text-gray-800 mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-          Configure AI Agent
+          {initialAgentData ? 'Add Recommended AI Agent' : 'Configure AI Agent'}
         </h2>
+
+        {/* Show agent recommendation info if auto-filling */}
+        {initialAgentData && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+            <div className="flex items-center gap-2 mb-2">
+              <Bot className="w-4 h-4 text-blue-600" />
+              <span className="text-sm font-medium text-blue-800">AI Agent Recommendation</span>
+            </div>
+            <p className="text-xs text-blue-700">
+              {initialAgentData.why_needed || 'This AI agent has been recommended to enhance your automation workflow.'}
+            </p>
+          </div>
+        )}
 
         <div className="space-y-6">
           {/* Name */}
@@ -377,7 +399,7 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
               className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0 text-lg font-medium disabled:opacity-50"
               style={{ boxShadow: '0 0 30px rgba(92, 142, 246, 0.3)' }}
             >
-              {isSaving ? "Saving..." : "Save Agent"}
+              {isSaving ? "Saving..." : (initialAgentData ? "Add Agent" : "Save Agent")}
             </Button>
           </div>
         </div>

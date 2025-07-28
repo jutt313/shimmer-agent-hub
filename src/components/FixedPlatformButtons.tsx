@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CheckCircle2, AlertCircle, Clock, Settings } from "lucide-react";
 import { SimpleCredentialManager } from '@/utils/simpleCredentialManager';
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,6 +32,7 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
   onCredentialChange
 }) => {
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [credentialStatus, setCredentialStatus] = useState<Record<string, 'saved' | 'tested' | 'missing'>>({});
   const { user } = useAuth();
 
@@ -83,6 +85,12 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
     console.log('🔧 Platform button clicked:', platform.name);
     console.log('🔧 Platform credentials:', platform.credentials);
     setSelectedPlatform(platform);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedPlatform(null);
   };
 
   const getStatusIcon = (platform: Platform) => {
@@ -112,37 +120,6 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
   if (platforms.length === 0) {
     console.log('⚠️ No platforms to display');
     return null;
-  }
-
-  if (selectedPlatform) {
-    return (
-      <div className="space-y-4">
-        <Card className="border-2 border-purple-200 bg-purple-50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-purple-700">
-              <Settings className="w-5 h-5" />
-              Configure {selectedPlatform.name} Credentials
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <SimpleCredentialForm
-              automationId={automationId}
-              platform={selectedPlatform}
-              onCredentialSaved={handleCredentialSaved}
-            />
-            <div className="mt-4">
-              <Button
-                onClick={() => setSelectedPlatform(null)}
-                variant="outline"
-                className="w-full"
-              >
-                Back to Platforms
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
   }
 
   return (
@@ -182,6 +159,29 @@ const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
       <div className="text-xs text-gray-500">
         Click on a platform to configure its credentials
       </div>
+
+      {/* Modal for credential form */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-purple-700">
+              <Settings className="w-5 h-5" />
+              Configure {selectedPlatform?.name} Credentials
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedPlatform && automationId && (
+            <SimpleCredentialForm
+              automationId={automationId}
+              platform={selectedPlatform}
+              onCredentialSaved={() => {
+                handleCredentialSaved();
+                handleCloseModal();
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

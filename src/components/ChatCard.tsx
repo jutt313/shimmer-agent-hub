@@ -19,7 +19,7 @@ import { GHQ } from '@/utils/GHQ';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 
 interface ChatMessage {
-  id: string;
+  id: number;
   text: string;
   isBot: boolean;
   timestamp: Date;
@@ -115,7 +115,6 @@ const ChatCard = ({
                 if (user?.id && parseResult.structuredData) {
                   try {
                     await supabase.from('automation_responses').insert({
-                      user_id: user.id,
                       automation_id: automationId,
                       chat_message_id: message.id,
                       response_text: message.text,
@@ -180,7 +179,7 @@ const ChatCard = ({
               <div className="text-gray-700 leading-relaxed">
                 {structuredData.steps.map((step, index) => (
                   <div key={index} className="mb-1">
-                    {index + 1}. {typeof step === 'string' ? step : (step?.description || step?.action || JSON.stringify(step))}
+                    {index + 1}. {typeof step === 'string' ? step : ((step as any)?.description || (step as any)?.action || JSON.stringify(step))}
                   </div>
                 ))}
               </div>
@@ -222,7 +221,7 @@ const ChatCard = ({
               <div className="text-gray-700 leading-relaxed">
                 {structuredData.clarification_questions.map((question, index) => (
                   <div key={index} className="mb-1">
-                    {index + 1}. {typeof question === 'string' ? question : (question?.question || JSON.stringify(question))}
+                    {index + 1}. {typeof question === 'string' ? question : ((question as any)?.question || JSON.stringify(question))}
                   </div>
                 ))}
               </div>
@@ -413,7 +412,7 @@ const ChatCard = ({
         <FixedPlatformButtons
           platforms={getLatestPlatforms()}
           automationId={automationId}
-          onCredentialChange={onPlatformCredentialChange}
+          onCredentialChange={() => onPlatformCredentialChange && onPlatformCredentialChange('', true)}
         />
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { X, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -56,7 +56,7 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
       setFormData({
         name: initialAgentData.name || "",
         role: initialAgentData.role || "",
-        rule: initialAgentData.rules || initialAgentData.rule || "",
+        rule: initialAgentData.rules || "",
         goal: initialAgentData.goal || "",
         memory: initialAgentData.memory || "",
         apiKey: "" // Keep API key empty for security

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -71,7 +70,15 @@ const ChatCard: React.FC<ChatCardProps> = ({ message, automationId, onCredential
       );
       
       console.log('🔍 Platform credential validation result:', validation);
-      setPlatformCredentialStatus(validation.status);
+      
+      // Convert 'unsaved' to 'missing' to match the type
+      const convertedStatus: { [key: string]: 'saved' | 'tested' | 'missing' } = {};
+      Object.keys(validation.status).forEach(key => {
+        const status = validation.status[key];
+        convertedStatus[key] = status === 'unsaved' ? 'missing' : status as 'saved' | 'tested' | 'missing';
+      });
+      
+      setPlatformCredentialStatus(convertedStatus);
     } catch (error) {
       console.error('❌ Error checking platform credentials:', error);
     }

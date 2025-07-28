@@ -1,429 +1,392 @@
 
-
 export interface YusrAIStructuredResponse {
   summary: string;
-  steps: any[];
-  platforms: Platform[];
-  clarification_questions: any[];
-  agents: any[];
-  test_payloads: any;
-  execution_blueprint: any;
-  structuredData?: any; // Add missing property
-  metadata?: {
-    yusrai_powered: boolean;
-    seven_sections_validated: boolean;
-    error_help_available: boolean;
+  steps: string[];
+  platforms: Array<{
+    name: string;
+    credentials: Array<{
+      field: string;
+      why_needed: string;
+      where_to_get?: string;
+      link?: string;
+      options?: string[];
+      example?: string;
+    }>;
+  }>;
+  platforms_credentials?: Array<{
+    name: string;
+    credentials: Array<{
+      field: string;
+      why_needed: string;
+      where_to_get?: string;
+      link?: string;
+      options?: string[];
+      example?: string;
+    }>;
+  }>;
+  clarification_questions: string[];
+  agents: Array<{
+    name: string;
+    role: 'Decision Maker' | 'Data Processor' | 'Monitor' | 'Validator' | 'Responder' | 'Custom';
+    rule: string;
+    goal: string;
+    memory: string;
+    why_needed: string;
+    custom_config?: any;
+    test_scenarios: string[];
+  }>;
+  test_payloads: {
+    [platform_name: string]: {
+      method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+      endpoint: string;
+      headers: Record<string, string>;
+      body?: any;
+      expected_response: Record<string, any>;
+      error_patterns: Record<string, string>;
+    };
+  };
+  execution_blueprint: {
+    trigger: {
+      type: 'webhook' | 'schedule' | 'manual' | 'event';
+      configuration: any;
+    };
+    workflow: Array<{
+      step: number;
+      action: string;
+      platform: string;
+      method?: string;
+      endpoint?: string;
+      headers?: Record<string, string>;
+      data_mapping?: Record<string, string>;
+      success_condition?: string;
+      error_handling?: {
+        retry_attempts: number;
+        fallback_action: string;
+        on_failure: string;
+      };
+      next_step?: number;
+      ai_agent_integration?: {
+        agent_name: string;
+        input_data: Record<string, any>;
+        output_mapping: Record<string, any>;
+      };
+      description?: string;
+    }>;
+    error_handling: {
+      retry_attempts: number;
+      fallback_actions: string[];
+      notification_rules: Array<any>;
+      critical_failure_actions: string[];
+    };
+    performance_optimization: {
+      rate_limit_handling: string;
+      concurrency_limit: number;
+      timeout_seconds_per_step: number;
+    };
   };
 }
 
-export interface Platform {
-  name: string;
-  credentials: Credential[];
-  test_payloads: any[];
+export interface YusrAIResponseMetadata {
+  yusrai_powered?: boolean;
+  seven_sections_validated?: boolean;
+  error_help_available?: boolean;
 }
 
-export interface Credential {
-  field: string;
-  placeholder: string;
-  link: string;
-  why_needed: string;
+export interface YusrAIParseResult {
+  structuredData: YusrAIStructuredResponse | null;
+  metadata: YusrAIResponseMetadata;
+  isPlainText: boolean;
 }
 
-// Add missing cleanDisplayText function
-export const cleanDisplayText = (text: string): string => {
-  if (!text) return '';
-  
-  // Remove any JSON-like structures that might be mixed in
-  const cleanedText = text
-    .replace(/\{[\s\S]*?\}/g, '') // Remove JSON objects
-    .replace(/\[[\s\S]*?\]/g, '') // Remove JSON arrays
-    .replace(/^\s*[\{\[][\s\S]*[\}\]]\s*$/g, '') // Remove if entire string is JSON
-    .trim();
-  
-  return cleanedText || text; // Return original if cleaning results in empty string
-};
-
-export const parseYusrAIResponse = (response: string): YusrAIStructuredResponse | null => {
+export function parseYusrAIStructuredResponse(responseText: string): YusrAIParseResult {
   try {
-    console.log('🔍 Parsing YusrAI response for 7 sections...');
+    console.log('🔍 YusrAI Parser - Processing response:', responseText.substring(0, 200) + '...')
     
-    let jsonData;
+    let parsedResponse: any;
+    let metadata: YusrAIResponseMetadata = {};
+    let cleanResponseText = responseText;
+    
+    // Extract JSON from markdown code blocks
+    const markdownJsonMatch = responseText.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
+    if (markdownJsonMatch) {
+      console.log('🎯 Markdown code block detected, extracting JSON...');
+      cleanResponseText = markdownJsonMatch[1].trim();
+      console.log('✅ Extracted JSON from markdown:', cleanResponseText.substring(0, 200) + '...');
+    }
+    
+    // Try to parse the response
     try {
-      jsonData = JSON.parse(response);
-    } catch (error) {
-      console.log('⚠️ Direct JSON parse failed, attempting regex extraction...');
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        jsonData = JSON.parse(jsonMatch[0]);
-      } else {
-        console.error('❌ No valid JSON found in response');
-        return null;
+      parsedResponse = JSON.parse(cleanResponseText);
+      if (typeof parsedResponse !== 'object' || parsedResponse === null) {
+        throw new Error('Invalid JSON structure');
       }
+    } catch (e) {
+      console.log('📄 Plain text response detected, no JSON found')
+      return { 
+        structuredData: null, 
+        metadata: { yusrai_powered: true }, 
+        isPlainText: true 
+      };
     }
 
-    console.log('📊 Raw JSON data:', jsonData);
-
-    // Enhanced platform extraction with real platform name detection
-    const extractPlatforms = (data: any): Platform[] => {
-      const platforms: Platform[] = [];
+    // Check if this is a wrapped response from chat-AI function
+    if (parsedResponse.response && typeof parsedResponse.response === 'string') {
+      console.log('🎯 Wrapped YusrAI response detected from chat-AI function')
       
-      // Check various possible platform fields
-      const platformSources = [
-        data.platforms,
-        data.integrations,
-        data.tools,
-        data.services,
-        data.apis
-      ].filter(Boolean);
-
-      for (const source of platformSources) {
-        if (Array.isArray(source)) {
-          for (const item of source) {
-            if (typeof item === 'object' && item !== null) {
-              const platform = extractSinglePlatform(item);
-              if (platform) {
-                platforms.push(platform);
-              }
-            }
-          }
-        }
-      }
-
-      // If no platforms found, try to extract from text content
-      if (platforms.length === 0) {
-        const textContent = JSON.stringify(data);
-        const detectedPlatforms = detectPlatformsFromText(textContent);
-        platforms.push(...detectedPlatforms);
-      }
-
-      console.log('🔧 Extracted platforms:', platforms);
-      return platforms;
-    };
-
-    // Extract a single platform with enhanced name detection
-    const extractSinglePlatform = (item: any): Platform | null => {
-      const platformName = extractPlatformName(item);
-      if (!platformName) return null;
-
-      const credentials = extractCredentials(item, platformName);
-      const testPayloads = item.test_payloads || item.test_payload || item.testing || [];
-
-      return {
-        name: platformName,
-        credentials,
-        test_payloads: Array.isArray(testPayloads) ? testPayloads : []
-      };
-    };
-
-    // Enhanced platform name extraction with real-world platform detection
-    const extractPlatformName = (item: any): string | null => {
-      // Try direct name fields first
-      const directNames = [
-        item.name,
-        item.platform_name,
-        item.platform,
-        item.service,
-        item.tool,
-        item.api,
-        item.integration
-      ];
-
-      for (const name of directNames) {
-        if (name && typeof name === 'string') {
-          const normalizedName = normalizePlatformName(name);
-          if (normalizedName) return normalizedName;
-        }
-      }
-
-      // Try to extract from description or other fields
-      const textFields = [
-        item.description,
-        item.purpose,
-        item.why_needed,
-        item.endpoint,
-        item.url
-      ];
-
-      for (const field of textFields) {
-        if (field && typeof field === 'string') {
-          const detectedName = detectPlatformFromText(field);
-          if (detectedName) return detectedName;
-        }
-      }
-
-      return null;
-    };
-
-    // Normalize platform names to standard format
-    const normalizePlatformName = (name: string): string | null => {
-      const normalized = name.trim();
+      // Extract metadata from wrapper
+      metadata.yusrai_powered = parsedResponse.yusrai_powered || true;
+      metadata.seven_sections_validated = parsedResponse.seven_sections_validated || false;
+      metadata.error_help_available = parsedResponse.error_help_available || false;
       
-      // Known platform mappings
-      const platformMappings: { [key: string]: string } = {
-        'openai': 'OpenAI',
-        'open ai': 'OpenAI',
-        'gpt': 'OpenAI',
-        'chatgpt': 'OpenAI',
-        'slack': 'Slack',
-        'discord': 'Discord',
-        'typeform': 'Typeform',
-        'notion': 'Notion',
-        'google sheets': 'Google Sheets',
-        'gmail': 'Gmail',
-        'google': 'Google',
-        'github': 'GitHub',
-        'gitlab': 'GitLab',
-        'trello': 'Trello',
-        'asana': 'Asana',
-        'jira': 'Jira',
-        'stripe': 'Stripe',
-        'paypal': 'PayPal',
-        'zoom': 'Zoom',
-        'microsoft teams': 'Microsoft Teams',
-        'teams': 'Microsoft Teams',
-        'twitter': 'Twitter',
-        'facebook': 'Facebook',
-        'linkedin': 'LinkedIn',
-        'instagram': 'Instagram',
-        'youtube': 'YouTube',
-        'twilio': 'Twilio',
-        'sendgrid': 'SendGrid',
-        'mailchimp': 'Mailchimp',
-        'shopify': 'Shopify',
-        'salesforce': 'Salesforce',
-        'hubspot': 'HubSpot',
-        'airtable': 'Airtable',
-        'zapier': 'Zapier',
-        'webhooks': 'Webhooks',
-        'rest api': 'REST API',
-        'api': 'API'
+      // Parse the inner JSON response
+      try {
+        const innerResponse = JSON.parse(parsedResponse.response);
+        console.log('✅ Successfully extracted inner YusrAI JSON from wrapper:', innerResponse);
+        parsedResponse = innerResponse;
+      } catch (innerError) {
+        console.log('📄 Inner response is plain text, treating as such');
+        return { 
+          structuredData: null, 
+          metadata, 
+          isPlainText: true 
+        };
+      }
+    } else {
+      console.log('📄 Processing direct YusrAI JSON format')
+      metadata.yusrai_powered = true;
+    }
+
+    // Check if this is a structured response with automation sections
+    const hasStructuredSections = parsedResponse.error_handling || 
+      parsedResponse.performance_optimization || 
+      parsedResponse.summary ||
+      (parsedResponse.steps || parsedResponse.platforms || parsedResponse.agents || parsedResponse.platforms_credentials);
+
+    if (!hasStructuredSections) {
+      console.log('📄 Not a structured response, treating as plain text')
+      return { 
+        structuredData: null, 
+        metadata, 
+        isPlainText: true 
       };
+    }
 
-      const lowerName = normalized.toLowerCase();
-      return platformMappings[lowerName] || (normalized.length > 2 ? normalized : null);
-    };
-
-    // Detect platforms from text content
-    const detectPlatformsFromText = (text: string): Platform[] => {
-      const platforms: Platform[] = [];
-      const lowerText = text.toLowerCase();
-
-      // Platform detection patterns
-      const platformPatterns = [
-        { pattern: /openai|gpt|chatgpt|open ai/i, name: 'OpenAI' },
-        { pattern: /slack/i, name: 'Slack' },
-        { pattern: /discord/i, name: 'Discord' },
-        { pattern: /typeform/i, name: 'Typeform' },
-        { pattern: /notion/i, name: 'Notion' },
-        { pattern: /google sheets|googlesheets/i, name: 'Google Sheets' },
-        { pattern: /gmail/i, name: 'Gmail' },
-        { pattern: /github/i, name: 'GitHub' },
-        { pattern: /gitlab/i, name: 'GitLab' },
-        { pattern: /trello/i, name: 'Trello' },
-        { pattern: /asana/i, name: 'Asana' },
-        { pattern: /jira/i, name: 'Jira' },
-        { pattern: /stripe/i, name: 'Stripe' },
-        { pattern: /paypal/i, name: 'PayPal' },
-        { pattern: /zoom/i, name: 'Zoom' },
-        { pattern: /microsoft teams|teams/i, name: 'Microsoft Teams' },
-        { pattern: /twitter/i, name: 'Twitter' },
-        { pattern: /facebook/i, name: 'Facebook' },
-        { pattern: /linkedin/i, name: 'LinkedIn' },
-        { pattern: /instagram/i, name: 'Instagram' },
-        { pattern: /youtube/i, name: 'YouTube' },
-        { pattern: /twilio/i, name: 'Twilio' },
-        { pattern: /sendgrid/i, name: 'SendGrid' },
-        { pattern: /mailchimp/i, name: 'Mailchimp' },
-        { pattern: /shopify/i, name: 'Shopify' },
-        { pattern: /salesforce/i, name: 'Salesforce' },
-        { pattern: /hubspot/i, name: 'HubSpot' },
-        { pattern: /airtable/i, name: 'Airtable' },
-        { pattern: /zapier/i, name: 'Zapier' },
-        { pattern: /webhook/i, name: 'Webhooks' }
-      ];
-
-      for (const { pattern, name } of platformPatterns) {
-        if (pattern.test(text)) {
-          platforms.push({
-            name,
-            credentials: generateDefaultCredentials(name),
-            test_payloads: []
-          });
-        }
-      }
-
-      return platforms;
-    };
-
-    // Detect single platform from text
-    const detectPlatformFromText = (text: string): string | null => {
-      const detectedPlatforms = detectPlatformsFromText(text);
-      return detectedPlatforms.length > 0 ? detectedPlatforms[0].name : null;
-    };
-
-    // Generate default credentials for known platforms
-    const generateDefaultCredentials = (platformName: string): Credential[] => {
-      const credentialMappings: { [key: string]: Credential[] } = {
-        'OpenAI': [
-          {
-            field: 'api_key',
-            placeholder: 'sk-...',
-            link: 'https://platform.openai.com/api-keys',
-            why_needed: 'Required for OpenAI API access'
-          }
-        ],
-        'Slack': [
-          {
-            field: 'bot_token',
-            placeholder: 'xoxb-...',
-            link: 'https://api.slack.com/apps',
-            why_needed: 'Required for Slack bot functionality'
-          }
-        ],
-        'Discord': [
-          {
-            field: 'bot_token',
-            placeholder: 'Your Discord bot token',
-            link: 'https://discord.com/developers/applications',
-            why_needed: 'Required for Discord bot functionality'
-          }
-        ],
-        'Typeform': [
-          {
-            field: 'personal_access_token',
-            placeholder: 'tfp_...',
-            link: 'https://admin.typeform.com/account#/section/tokens',
-            why_needed: 'Required for Typeform API access'
-          }
-        ],
-        'Notion': [
-          {
-            field: 'integration_token',
-            placeholder: 'secret_...',
-            link: 'https://www.notion.so/my-integrations',
-            why_needed: 'Required for Notion API access'
-          }
-        ],
-        'Google Sheets': [
-          {
-            field: 'access_token',
-            placeholder: 'Your Google access token',
-            link: 'https://console.cloud.google.com/apis/credentials',
-            why_needed: 'Required for Google Sheets API access'
-          }
-        ],
-        'GitHub': [
-          {
-            field: 'access_token',
-            placeholder: 'ghp_...',
-            link: 'https://github.com/settings/tokens',
-            why_needed: 'Required for GitHub API access'
-          }
-        ]
-      };
-
-      return credentialMappings[platformName] || [
-        {
-          field: 'api_key',
-          placeholder: `Your ${platformName} API key`,
-          link: `https://${platformName.toLowerCase()}.com/api`,
-          why_needed: `Required for ${platformName} API access`
-        }
-      ];
-    };
-
-    // Enhanced credential extraction
-    const extractCredentials = (item: any, platformName: string): Credential[] => {
-      const credentials: Credential[] = [];
-      
-      // Try to extract from various credential fields
-      const credentialSources = [
-        item.credentials,
-        item.required_credentials,
-        item.credential_requirements,
-        item.auth,
-        item.authentication,
-        item.config,
-        item.configuration
-      ];
-
-      for (const source of credentialSources) {
-        if (Array.isArray(source)) {
-          for (const cred of source) {
-            if (typeof cred === 'object' && cred !== null) {
-              const credential = extractSingleCredential(cred);
-              if (credential) {
-                credentials.push(credential);
-              }
-            }
-          }
-        }
-      }
-
-      // If no credentials found, use default for the platform
-      if (credentials.length === 0) {
-        credentials.push(...generateDefaultCredentials(platformName));
-      }
-
-      return credentials;
-    };
-
-    // Extract single credential
-    const extractSingleCredential = (cred: any): Credential | null => {
-      const field = cred.field || cred.name || cred.key || cred.parameter || 'api_key';
-      const placeholder = cred.placeholder || cred.example || cred.format || `Your ${field}`;
-      const link = cred.link || cred.url || cred.documentation || cred.where_to_get || '';
-      const why_needed = cred.why_needed || cred.description || cred.purpose || `Required for authentication`;
-
-      return {
-        field: String(field),
-        placeholder: String(placeholder),
-        link: String(link),
-        why_needed: String(why_needed)
-      };
-    };
-
-    const extractAgents = (data: any): any[] => {
-      if (!data.agents || !Array.isArray(data.agents)) {
-        return [];
-      }
+    // Map database field names to frontend expected names
+    console.log('🔍 Validating and mapping structured sections...')
     
-      return data.agents.map(agent => ({
-        name: agent.name || agent.agent_name || 'AI Agent',
-        role: agent.role || agent.agent_role || 'Assistant',
-        goal: agent.goal || agent.agent_goal || agent.objective || 'Process automation data',
-        rules: agent.rules || agent.rule || agent.agent_rules || agent.instruction || 'Follow automation requirements',
-        memory: agent.memory || agent.agent_memory || agent.context || 'Store task context and results',
-        why_needed: agent.why_needed || agent.purpose || agent.description || 'Enhances automation intelligence'
-      }));
-    };
+    if (parsedResponse.step_by_step_explanation && !parsedResponse.steps) {
+      parsedResponse.steps = Array.isArray(parsedResponse.step_by_step_explanation) 
+        ? parsedResponse.step_by_step_explanation 
+        : [parsedResponse.step_by_step_explanation];
+      console.log('📋 Mapped step_by_step_explanation to steps:', parsedResponse.steps.length);
+    }
 
-    // Build the final structured response
-    const structuredResponse: YusrAIStructuredResponse = {
-      summary: jsonData.summary || '',
-      steps: Array.isArray(jsonData.steps) ? jsonData.steps : [],
-      platforms: extractPlatforms(jsonData),
-      clarification_questions: Array.isArray(jsonData.clarification_questions) ? jsonData.clarification_questions : [],
-      agents: Array.isArray(jsonData.agents) ? jsonData.agents : [],
-      test_payloads: jsonData.test_payloads || {},
-      execution_blueprint: jsonData.execution_blueprint || null,
-      structuredData: jsonData, // Add the structured data
-      metadata: {
-        yusrai_powered: true,
-        seven_sections_validated: true,
-        error_help_available: false
-      }
-    };
+    // Handle platforms_credentials mapping
+    if (parsedResponse.platforms_credentials && !parsedResponse.platforms) {
+      parsedResponse.platforms = Array.isArray(parsedResponse.platforms_credentials) 
+        ? parsedResponse.platforms_credentials 
+        : [parsedResponse.platforms_credentials];
+      console.log('🔗 Mapped platforms_credentials to platforms:', parsedResponse.platforms.length);
+    }
 
-    console.log('✅ Successfully parsed YusrAI structured response:', structuredResponse);
-    return structuredResponse;
+    // ENHANCED PLATFORM MAPPING - Fix platform names with better extraction
+    if (parsedResponse.platforms_and_credentials && !parsedResponse.platforms) {
+      parsedResponse.platforms = Array.isArray(parsedResponse.platforms_and_credentials) 
+        ? parsedResponse.platforms_and_credentials 
+        : [parsedResponse.platforms_and_credentials];
+      console.log('🔗 Mapped platforms_and_credentials to platforms:', parsedResponse.platforms.length);
+    }
+    
+    if (parsedResponse.platform_integrations && !parsedResponse.platforms) {
+      parsedResponse.platforms = Array.isArray(parsedResponse.platform_integrations) 
+        ? parsedResponse.platform_integrations 
+        : [parsedResponse.platform_integrations];
+      console.log('🔗 Mapped platform_integrations to platforms:', parsedResponse.platforms.length);
+    }
+
+    // ENHANCED PLATFORM NAME EXTRACTION - Extract real platform names
+    if (parsedResponse.platforms && Array.isArray(parsedResponse.platforms)) {
+      parsedResponse.platforms = parsedResponse.platforms.map((platform: any, index: number) => {
+        // First try to extract platform name from structured data
+        let platformName = platform.name || 
+                          platform.platform_name || 
+                          platform.platform || 
+                          platform.service || 
+                          platform.integration ||
+                          platform.tool;
+        
+        // If no name found or generic, try to extract from description or other fields
+        if (!platformName || platformName === 'Platform 1' || platformName.includes('Platform ')) {
+          const description = platform.description || platform.why_needed || platform.rule || '';
+          const lowerDesc = description.toLowerCase();
+          
+          // Enhanced platform name patterns with better detection
+          const platformPatterns = [
+            { pattern: 'typeform', name: 'Typeform' },
+            { pattern: 'openai', name: 'OpenAI' },
+            { pattern: 'slack', name: 'Slack' },
+            { pattern: 'gmail', name: 'Gmail' },
+            { pattern: 'notion', name: 'Notion' },
+            { pattern: 'discord', name: 'Discord' },
+            { pattern: 'github', name: 'GitHub' },
+            { pattern: 'trello', name: 'Trello' },
+            { pattern: 'asana', name: 'Asana' },
+            { pattern: 'monday', name: 'Monday.com' },
+            { pattern: 'clickup', name: 'ClickUp' },
+            { pattern: 'zoom', name: 'Zoom' },
+            { pattern: 'teams', name: 'Microsoft Teams' },
+            { pattern: 'hubspot', name: 'HubSpot' },
+            { pattern: 'salesforce', name: 'Salesforce' },
+            { pattern: 'stripe', name: 'Stripe' },
+            { pattern: 'paypal', name: 'PayPal' },
+            { pattern: 'shopify', name: 'Shopify' },
+            { pattern: 'woocommerce', name: 'WooCommerce' },
+            { pattern: 'zapier', name: 'Zapier' },
+            { pattern: 'airtable', name: 'Airtable' },
+            { pattern: 'google sheets', name: 'Google Sheets' },
+            { pattern: 'microsoft excel', name: 'Microsoft Excel' },
+            { pattern: 'dropbox', name: 'Dropbox' },
+            { pattern: 'google drive', name: 'Google Drive' },
+            { pattern: 'drive', name: 'Google Drive' }
+          ];
+          
+          for (const { pattern, name } of platformPatterns) {
+            if (lowerDesc.includes(pattern)) {
+              platformName = name;
+              break;
+            }
+          }
+        }
+        
+        // Final fallback - try to extract from field names or anywhere else
+        if (!platformName || platformName === 'Platform 1' || platformName.includes('Platform ')) {
+          const allText = JSON.stringify(platform).toLowerCase();
+          const platformPatterns = [
+            { pattern: 'typeform', name: 'Typeform' },
+            { pattern: 'openai', name: 'OpenAI' },
+            { pattern: 'slack', name: 'Slack' },
+            { pattern: 'gmail', name: 'Gmail' },
+            { pattern: 'notion', name: 'Notion' },
+            { pattern: 'discord', name: 'Discord' },
+            { pattern: 'github', name: 'GitHub' }
+          ];
+          
+          for (const { pattern, name } of platformPatterns) {
+            if (allText.includes(pattern)) {
+              platformName = name;
+              break;
+            }
+          }
+        }
+        
+        // Final fallback
+        if (!platformName || platformName === 'Platform 1' || platformName.includes('Platform ')) {
+          platformName = `Platform ${index + 1}`;
+        }
+        
+        console.log(`🔍 Processing platform ${index + 1}: extracted name "${platformName}"`);
+        
+        return {
+          ...platform,
+          name: platformName,
+          credentials: platform.credentials || 
+                      platform.required_credentials || 
+                      platform.credential_requirements ||
+                      platform.fields ||
+                      []
+        };
+      });
+      console.log('✅ Enhanced platform name extraction completed');
+    }
+
+    // AI AGENTS MAPPING
+    if (parsedResponse.ai_agents_section?.agents && !parsedResponse.agents) {
+      parsedResponse.agents = Array.isArray(parsedResponse.ai_agents_section.agents) 
+        ? parsedResponse.ai_agents_section.agents 
+        : [parsedResponse.ai_agents_section.agents];
+      console.log('🤖 Mapped ai_agents_section.agents to agents:', parsedResponse.agents.length);
+    }
+    
+    if (parsedResponse.ai_agents && !parsedResponse.agents) {
+      parsedResponse.agents = Array.isArray(parsedResponse.ai_agents) 
+        ? parsedResponse.ai_agents 
+        : [parsedResponse.ai_agents];
+      console.log('🤖 Mapped ai_agents to agents:', parsedResponse.agents.length);
+    }
+
+    // TEST PAYLOADS MAPPING
+    if (parsedResponse.platform_test_payloads && !parsedResponse.test_payloads) {
+      parsedResponse.test_payloads = parsedResponse.platform_test_payloads;
+      console.log('🧪 Mapped platform_test_payloads to test_payloads');
+    }
+
+    // EXECUTION BLUEPRINT MAPPING
+    if (parsedResponse.blueprint && !parsedResponse.execution_blueprint) {
+      parsedResponse.execution_blueprint = parsedResponse.blueprint;
+      console.log('📋 Mapped blueprint to execution_blueprint');
+    }
+
+    // Ensure all arrays exist
+    if (!parsedResponse.steps) parsedResponse.steps = [];
+    if (!parsedResponse.platforms) parsedResponse.platforms = [];
+    if (!parsedResponse.clarification_questions) parsedResponse.clarification_questions = [];
+    if (!parsedResponse.agents) parsedResponse.agents = [];
+    if (!parsedResponse.test_payloads) parsedResponse.test_payloads = {};
+    if (!parsedResponse.execution_blueprint) parsedResponse.execution_blueprint = null;
+
+    console.log('✅ YusrAI structured response validation successful')
+    metadata.seven_sections_validated = true;
+    
+    return { 
+      structuredData: parsedResponse as YusrAIStructuredResponse, 
+      metadata,
+      isPlainText: false
+    };
 
   } catch (error) {
-    console.error('❌ Error parsing YusrAI response:', error);
-    return null;
+    console.error('❌ Error parsing YusrAI structured response:', error);
+    return { 
+      structuredData: null, 
+      metadata: { yusrai_powered: true }, 
+      isPlainText: true 
+    };
   }
-};
+}
 
-// Add missing exports as aliases to existing functions (moved after function declaration)
-export const parseStructuredResponse = parseYusrAIResponse;
-export const parseYusrAIStructuredResponse = parseYusrAIResponse;
+export function cleanDisplayText(text: string): string {
+  if (!text || typeof text !== 'string') {
+    return 'Processing YusrAI automation details...';
+  }
+
+  // For plain text responses, return as-is with basic formatting
+  let cleanText = text.replace(/\s+/g, ' ').trim();
+  
+  // If it looks like JSON, try to extract readable parts
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const jsonData = JSON.parse(jsonMatch[0]);
+      if (jsonData.summary) {
+        return jsonData.summary;
+      }
+    } catch (e) {
+      // If JSON parsing fails, remove JSON blocks from display
+      cleanText = text.replace(/\{[\s\S]*\}/g, '').trim();
+    }
+  }
+  
+  // If text is too short after cleaning, provide a default
+  if (cleanText.length < 20) {
+    return 'YusrAI has analyzed your request and provided a response.';
+  }
+  
+  return cleanText;
+}
+
+// Legacy support for backwards compatibility
+export interface StructuredResponse extends YusrAIStructuredResponse {}
+
+export const parseStructuredResponse = (responseText: string): YusrAIStructuredResponse | null => {
+  const result = parseYusrAIStructuredResponse(responseText);
+  return result.structuredData;
+};

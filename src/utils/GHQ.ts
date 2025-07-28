@@ -1,4 +1,3 @@
-
 /**
  * GHQ.ts - GLOBAL HEADQUARTERS
  * Central coordinator for ALL automation data processing
@@ -6,7 +5,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import { parseYusrAIResponse } from '@/utils/jsonParser';
+import { parseYusrAIStructuredResponse } from '@/utils/jsonParser';
 import { extractBlueprintFromStructuredData } from '@/utils/blueprintExtractor';
 import { agentStateManager } from '@/utils/agentStateManager';
 
@@ -59,9 +58,9 @@ class GHQHeadquarters {
       console.log('🏢 GHQ: Starting complete automation processing pipeline');
       
       // STEP 1: Parse the raw response
-      const parseResult = parseYusrAIResponse(rawText);
+      const parseResult = parseYusrAIStructuredResponse(rawText);
       
-      if (!parseResult) {
+      if (!parseResult.structuredData) {
         console.log('📄 GHQ: Plain text message, no structured data');
         return { success: true, data: undefined };
       }
@@ -69,25 +68,25 @@ class GHQHeadquarters {
       console.log('✅ GHQ: Parsed structured data successfully');
 
       // STEP 2: Extract and transform platform data
-      const platformsForButtons = this.extractPlatformData(parseResult);
+      const platformsForButtons = this.extractPlatformData(parseResult.structuredData);
       
       // STEP 3: Extract and process agent data
-      const agentsForDecision = this.extractAgentData(parseResult);
+      const agentsForDecision = this.extractAgentData(parseResult.structuredData);
       
       // STEP 4: Generate blueprint for execution
-      const blueprintData = this.generateBlueprint(parseResult);
+      const blueprintData = this.generateBlueprint(parseResult.structuredData);
       
       // STEP 5: Prepare diagram data
-      const diagramData = this.prepareDiagramData(parseResult, blueprintData);
+      const diagramData = this.prepareDiagramData(parseResult.structuredData, blueprintData);
       
       // STEP 6: Save to database
       await this.saveToDatabase(
         userId, 
         automationId, 
         rawText, 
-        parseResult,
+        parseResult.structuredData,
         messageId,
-        parseResult.metadata || {}
+        parseResult.metadata
       );
 
       console.log('🏢 GHQ: Complete processing pipeline finished successfully');
@@ -95,15 +94,15 @@ class GHQHeadquarters {
       return {
         success: true,
         data: {
-          structuredData: parseResult,
+          structuredData: parseResult.structuredData,
           platformsForButtons,
           agentsForDecision,
           blueprintData,
           diagramData,
           metadata: {
-            yusrai_powered: parseResult.metadata?.yusrai_powered || false,
-            seven_sections_validated: parseResult.metadata?.seven_sections_validated || false,
-            error_help_available: parseResult.metadata?.error_help_available || false
+            yusrai_powered: parseResult.metadata.yusrai_powered || false,
+            seven_sections_validated: parseResult.metadata.seven_sections_validated || false,
+            error_help_available: parseResult.metadata.error_help_available || false
           }
         }
       };

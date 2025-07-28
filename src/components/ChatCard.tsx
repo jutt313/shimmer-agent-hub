@@ -210,14 +210,16 @@ const ChatCard = ({
           );
         }
         
-        // FIXED: Clarification Questions section - display as readable text
+        // FIXED: Clarification Questions section - properly extract question text
         if (structuredData.clarification_questions && Array.isArray(structuredData.clarification_questions) && structuredData.clarification_questions.length > 0) {
           sections.push(
             <div key="questions" className="mb-4">
               <div className="font-semibold text-gray-800 mb-2">Clarification Questions:</div>
               <div className="text-gray-700 leading-relaxed">
                 {structuredData.clarification_questions.map((question, index) => (
-                  <div key={index} className="mb-1">{index + 1}. {question}</div>
+                  <div key={index} className="mb-1">
+                    {index + 1}. {typeof question === 'string' ? question : question}
+                  </div>
                 ))}
               </div>
             </div>

@@ -1,8 +1,6 @@
-
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Settings, CheckCircle, AlertCircle, ExternalLink } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Settings, CheckCircle, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -114,7 +112,7 @@ const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: F
     }
   };
 
-  // FIXED: Enhanced platform setup button click handler
+  // ENHANCED: Platform setup button click handler
   const handlePlatformSetup = (platformName: string) => {
     console.log(`🔧 Opening credential setup for platform: ${platformName}`);
     setSelectedPlatform(platformName);
@@ -162,62 +160,42 @@ const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: F
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* IMPLEMENTATION: Small credential buttons as requested */}
+      <div className="flex flex-wrap gap-3 justify-center">
         {platforms.map((platform, index) => (
-          <Card key={index} className="border-0 shadow-lg bg-white/90 backdrop-blur-md">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-medium text-gray-800">
-                  {platform.name}
-                </CardTitle>
-                {getStatusIcon(platform.name)}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Badge 
-                variant="outline" 
-                className={`${getStatusColor(platform.name)} border-0 text-xs`}
-              >
-                {getStatusText(platform.name)}
-              </Badge>
-              
-              <div className="text-sm text-gray-600">
-                <div className="font-medium mb-1">Required credentials:</div>
-                {platform.credentials.map((cred, credIndex) => (
-                  <div key={credIndex} className="text-xs mb-1">
-                    • {cred.field}
-                  </div>
-                ))}
-              </div>
-              
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => handlePlatformSetup(platform.name)}
-                  className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-0 rounded-xl shadow-md hover:shadow-lg transition-all duration-300"
-                  style={{ boxShadow: '0 0 15px rgba(92, 142, 246, 0.3)' }}
-                >
-                  <Settings className="w-4 h-4 mr-2" />
-                  Setup
-                </Button>
-                
-                {platform.credentials.length > 0 && platform.credentials[0].link && platform.credentials[0].link !== '#' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => window.open(platform.credentials[0].link, '_blank')}
-                    className="rounded-xl border-gray-300 hover:border-blue-400 hover:bg-blue-50 transition-all duration-300"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <Button
+            key={index}
+            onClick={() => handlePlatformSetup(platform.name)}
+            variant="outline"
+            size="sm"
+            className="bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20 hover:border-white/30 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+            style={{ 
+              boxShadow: '0 0 10px rgba(147, 197, 253, 0.3)',
+              backdropFilter: 'blur(10px)'
+            }}
+          >
+            <Settings className="w-4 h-4" />
+            <span className="font-medium">{platform.name}</span>
+            <div className="flex items-center">
+              {getStatusIcon(platform.name)}
+            </div>
+          </Button>
         ))}
       </div>
 
-      {/* FIXED: Enhanced credential form modal with correct props */}
+      {/* Status indicator */}
+      {platforms.length > 0 && (
+        <div className="text-center">
+          <Badge 
+            variant="outline" 
+            className="bg-white/10 border-white/20 text-white/80 text-xs backdrop-blur-sm"
+          >
+            Click to configure credentials for each platform
+          </Badge>
+        </div>
+      )}
+
+      {/* ENHANCED: Comprehensive credential form modal with glow effects */}
       {selectedPlatform && (
         <ModernCredentialForm
           automationId={automationId}

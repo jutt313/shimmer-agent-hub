@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -71,7 +72,7 @@ const AutomationDetail = () => {
       setIsLoading(true);
       try {
         const { data: messageData, error } = await supabase
-          .from('chat_messages')
+          .from('automation_chats')
           .select('*')
           .eq('automation_id', automationId)
           .order('timestamp', { ascending: true });
@@ -86,8 +87,10 @@ const AutomationDetail = () => {
           return;
         }
 
-        const formattedMessages = messageData.map(msg => ({
-          ...msg,
+        const formattedMessages: Message[] = messageData.map(msg => ({
+          id: msg.id,
+          text: msg.message_content,
+          isBot: msg.sender === 'bot',
           timestamp: new Date(msg.timestamp)
         }));
 
@@ -102,7 +105,7 @@ const AutomationDetail = () => {
   }, [automationId, toast]);
 
   // Enhanced platform extraction function
-  const extractPlatformsFromMessages = (messages: any[]) => {
+  const extractPlatformsFromMessages = (messages: Message[]) => {
     console.log('🔍 Extracting platforms from messages:', messages);
     
     const platforms: any[] = [];
@@ -116,7 +119,6 @@ const AutomationDetail = () => {
             
             const platformsSource = parseResult.structuredData.platforms_credentials || 
                                    parseResult.structuredData.platforms || 
-                                   parseResult.structuredData.required_platforms || 
                                    [];
             
             if (Array.isArray(platformsSource)) {
@@ -155,12 +157,14 @@ const AutomationDetail = () => {
       .channel('any')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'chat_messages' },
+        { event: '*', schema: 'public', table: 'automation_chats' },
         async (payload) => {
-          if (payload.new && payload.new.automation_id === automationId) {
-            const newMessage = {
-              ...payload.new,
-              timestamp: new Date(payload.new.timestamp)
+          if (payload.new && (payload.new as any).automation_id === automationId) {
+            const newMessage: Message = {
+              id: (payload.new as any).id,
+              text: (payload.new as any).message_content,
+              isBot: (payload.new as any).sender === 'bot',
+              timestamp: new Date((payload.new as any).timestamp)
             };
             setMessages((prevMessages) => [...prevMessages, newMessage]);
           }
@@ -179,13 +183,12 @@ const AutomationDetail = () => {
     setIsLoading(true);
     try {
       const { data: newMessage, error } = await supabase
-        .from('chat_messages')
+        .from('automation_chats')
         .insert([{
           automation_id: automationId,
-          text: inputMessage,
-          isBot: false,
-          timestamp: new Date(),
-          user_id: user?.id
+          message_content: inputMessage,
+          sender: 'user',
+          timestamp: new Date()
         }])
         .single();
 
@@ -363,12 +366,10 @@ const AutomationDetail = () => {
 
           {/* Super Small Execute Button */}
           <div className="flex justify-center">
-            <div className="scale-75 opacity-80">
+            <div className="scale-50 opacity-60">
               <SimpleExecuteButton 
                 automationId={automationId}
-                onExecutionStart={() => {}}
-                onExecutionComplete={() => {}}
-                isReady={Object.keys(platformCredentialStatus).length > 0}
+                className="text-xs"
               />
             </div>
           </div>

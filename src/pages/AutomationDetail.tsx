@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,7 +12,7 @@ import { agentStateManager } from '@/utils/agentStateManager';
 import SimpleExecuteButton from '@/components/SimpleExecuteButton';
 
 interface Message {
-  id: string; // Changed from number to string to match database
+  id: string;
   text: string;
   isBot: boolean;
   timestamp: Date;
@@ -88,7 +87,7 @@ const AutomationDetail = () => {
         }
 
         const formattedMessages: Message[] = messageData.map(msg => ({
-          id: msg.id, // This is already a string from the database
+          id: msg.id,
           text: msg.message_content,
           isBot: msg.sender === 'bot',
           timestamp: new Date(msg.timestamp)
@@ -104,7 +103,6 @@ const AutomationDetail = () => {
     loadMessages();
   }, [automationId, toast]);
 
-  // Enhanced platform extraction function
   const extractPlatformsFromMessages = (messages: Message[]) => {
     console.log('🔍 Extracting platforms from messages:', messages);
     
@@ -124,7 +122,7 @@ const AutomationDetail = () => {
             if (Array.isArray(platformsSource)) {
               platformsSource.forEach(platform => {
                 const transformedPlatform = {
-                  name: platform.name || platform.platform_name || platform.platform || 'Unknown Platform',
+                  name: platform.name || 'Unknown Platform',
                   credentials: Array.isArray(platform.credentials) ? platform.credentials.map((cred: any) => ({
                     field: cred.field || cred.name || cred.key || 'api_key',
                     placeholder: cred.example || cred.placeholder || cred.description || `Enter ${cred.field || 'credential'}`,
@@ -135,7 +133,6 @@ const AutomationDetail = () => {
                 
                 console.log(`🔗 Transformed platform: ${transformedPlatform.name}`, transformedPlatform);
                 
-                // Avoid duplicates
                 if (!platforms.find(p => p.name === transformedPlatform.name)) {
                   platforms.push(transformedPlatform);
                 }
@@ -287,7 +284,6 @@ const AutomationDetail = () => {
     );
   }
 
-  // Extract current platforms for credential buttons
   const currentPlatforms = extractPlatformsFromMessages(messages);
   console.log('🔗 Current platforms for credential buttons:', currentPlatforms);
 
@@ -320,7 +316,6 @@ const AutomationDetail = () => {
           <p className="text-gray-700 leading-relaxed">{automation.description}</p>
         </div>
 
-        {/* Chat Interface */}
         <div className="space-y-6">
           <ChatCard
             messages={messages}
@@ -336,7 +331,6 @@ const AutomationDetail = () => {
             currentPlatforms={currentPlatforms}
           />
 
-          {/* Input Section */}
           <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-0 p-6">
             <div className="flex gap-4 items-end">
               <div className="flex-1">
@@ -365,7 +359,6 @@ const AutomationDetail = () => {
             </div>
           </div>
 
-          {/* Super Small Execute Button */}
           <div className="flex justify-center">
             <div className="scale-50 opacity-60">
               <SimpleExecuteButton 

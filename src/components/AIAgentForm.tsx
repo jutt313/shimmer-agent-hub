@@ -17,8 +17,8 @@ interface AIAgentFormProps {
   initialAgentData?: {
     name: string;
     role: string;
+    rule?: string;
     goal: string;
-    rules?: string;
     memory?: string;
     why_needed?: string;
   };
@@ -49,13 +49,14 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
   const [isSaving, setIsSaving] = useState(false);
   const [testing, setTesting] = useState(false);
 
-  // Auto-fill form when initialAgentData is provided
+  // FIXED: Complete autofill functionality for all fields including name and goal
   useEffect(() => {
     if (initialAgentData) {
+      console.log('🔄 Autofilling agent form with complete data:', initialAgentData);
       setFormData({
         name: initialAgentData.name || "",
         role: initialAgentData.role || "",
-        rule: initialAgentData.rules || "",
+        rule: initialAgentData.rule || "",
         goal: initialAgentData.goal || "",
         memory: initialAgentData.memory || "",
         apiKey: ""

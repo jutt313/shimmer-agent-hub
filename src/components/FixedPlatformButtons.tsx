@@ -1,12 +1,13 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from "@/components/ui/button";
+import { Settings, CheckCircle, AlertCircle, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, AlertCircle, Clock, Settings } from "lucide-react";
-import { SimpleCredentialManager } from '@/utils/simpleCredentialManager';
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import SimpleCredentialForm from './SimpleCredentialForm';
+import { useToast } from "@/components/ui/use-toast";
+import ModernCredentialForm from './ModernCredentialForm';
 
 interface Platform {
   name: string;
@@ -21,167 +22,207 @@ interface Platform {
 
 interface FixedPlatformButtonsProps {
   platforms: Platform[];
-  automationId?: string;
+  automationId: string;
   onCredentialChange?: () => void;
 }
 
-const FixedPlatformButtons: React.FC<FixedPlatformButtonsProps> = ({
-  platforms,
-  automationId,
-  onCredentialChange
-}) => {
-  const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
-  const [credentialStatus, setCredentialStatus] = useState<Record<string, 'saved' | 'tested' | 'missing'>>({});
+const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: FixedPlatformButtonsProps) => {
+  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
+  const [credentialStatus, setCredentialStatus] = useState<{ [key: string]: 'saved' | 'tested' | 'missing' }>({});
   const { user } = useAuth();
+  const { toast } = useToast();
 
-  console.log('🔧 FixedPlatformButtons rendered with:', {
-    platformsCount: platforms.length,
-    platforms: platforms.map(p => ({ 
-      name: p.name, 
-      credentialsCount: p.credentials.length,
-      firstCredentialField: p.credentials[0]?.field || 'none'
-    })),
-    automationId
-  });
+  console.log('🔧 FixedPlatformButtons received platforms:', platforms);
 
-  useEffect(() => {
-    if (platforms.length > 0) {
-      checkCredentialStatus();
-    }
-  }, [platforms, automationId]);
-
-  const checkCredentialStatus = async () => {
-    if (!automationId || !user?.id) return;
-    
+  const handleCredentialSave = async (platformName: string, credentials: any) => {
     try {
-      const platformNames = platforms.map(p => p.name);
-      const statusResult = await SimpleCredentialManager.getCredentialStatus(
-        automationId, 
-        platformNames, 
-        user.id
-      );
+      console.log(`💾 Saving credentials for ${platformName}:`, credentials);
       
-      console.log('✅ Credential status result:', statusResult);
-      setCredentialStatus(statusResult);
-    } catch (error) {
-      console.error('❌ Error checking credential status:', error);
-      const fallbackStatus: Record<string, 'saved' | 'tested' | 'missing'> = {};
-      platforms.forEach(platform => {
-        fallbackStatus[platform.name] = 'missing';
+      const { error } = await supabase
+        .from('platform_credentials')
+        .upsert({
+          user_id: user?.id,
+          platform_name: platformName,
+          credentials: credentials,
+          automation_id: automationId
+        });
+
+      if (error) throw error;
+
+      setCredentialStatus(prev => ({
+        ...prev,
+        [platformName]: 'saved'
+      }));
+
+      toast({
+        title: "✅ Credentials Saved",
+        description: `${platformName} credentials saved successfully`,
       });
-      setCredentialStatus(fallbackStatus);
+
+      onCredentialChange?.();
+    } catch (error: any) {
+      console.error('❌ Error saving credentials:', error);
+      toast({
+        title: "❌ Save Failed",
+        description: `Failed to save ${platformName} credentials`,
+        variant: "destructive",
+      });
     }
   };
 
-  const handleCredentialSaved = () => {
-    console.log('💾 Credential saved, updating status...');
-    checkCredentialStatus();
-    onCredentialChange?.();
+  const handleCredentialTest = async (platformName: string, credentials: any) => {
+    try {
+      console.log(`🧪 Testing credentials for ${platformName}`);
+      
+      const { data, error } = await supabase.functions.invoke('test-credential', {
+        body: {
+          platform: platformName,
+          credentials: credentials
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        setCredentialStatus(prev => ({
+          ...prev,
+          [platformName]: 'tested'
+        }));
+        
+        toast({
+          title: "✅ Test Successful",
+          description: `${platformName} credentials are working correctly`,
+        });
+      } else {
+        toast({
+          title: "❌ Test Failed",
+          description: data.message || `${platformName} credentials test failed`,
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('❌ Error testing credentials:', error);
+      toast({
+        title: "❌ Test Error",
+        description: `Failed to test ${platformName} credentials`,
+        variant: "destructive",
+      });
+    }
   };
 
-  const handlePlatformClick = (platform: Platform) => {
-    console.log('🔧 Platform button clicked:', platform.name);
-    console.log('🔧 Platform credentials:', platform.credentials);
-    setSelectedPlatform(platform);
+  // FIXED: Enhanced platform setup button click handler
+  const handlePlatformSetup = (platformName: string) => {
+    console.log(`🔧 Opening credential setup for platform: ${platformName}`);
+    setSelectedPlatform(platformName);
   };
 
-  const getStatusIcon = (platform: Platform) => {
-    const status = credentialStatus[platform.name] || 'missing';
+  const getStatusIcon = (platformName: string) => {
+    const status = credentialStatus[platformName];
     switch (status) {
       case 'tested':
-        return <CheckCircle2 className="w-4 h-4 text-green-500" />;
+        return <CheckCircle className="w-4 h-4 text-green-500" />;
       case 'saved':
-        return <Clock className="w-4 h-4 text-yellow-500" />;
+        return <CheckCircle className="w-4 h-4 text-blue-500" />;
       default:
-        return <AlertCircle className="w-4 h-4 text-red-500" />;
+        return <AlertCircle className="w-4 h-4 text-yellow-500" />;
     }
   };
 
-  const getStatusText = (platform: Platform) => {
-    const status = credentialStatus[platform.name] || 'missing';
+  const getStatusText = (platformName: string) => {
+    const status = credentialStatus[platformName];
     switch (status) {
       case 'tested':
-        return 'Tested';
+        return 'Tested & Working';
       case 'saved':
         return 'Saved';
       default:
-        return 'Setup';
+        return 'Setup Required';
     }
   };
 
-  if (platforms.length === 0) {
-    console.log('⚠️ No platforms to display');
-    return null;
-  }
+  const getStatusColor = (platformName: string) => {
+    const status = credentialStatus[platformName];
+    switch (status) {
+      case 'tested':
+        return 'bg-green-100 text-green-800';
+      case 'saved':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-yellow-100 text-yellow-800';
+    }
+  };
 
-  if (selectedPlatform) {
-    return (
-      <div className="space-y-4">
-        <Card className="border-2 border-purple-200 bg-purple-50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-purple-700">
-              <Settings className="w-5 h-5" />
-              Configure {selectedPlatform.name} Credentials
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <SimpleCredentialForm
-              automationId={automationId}
-              platform={selectedPlatform}
-              onCredentialSaved={handleCredentialSaved}
-            />
-            <div className="mt-4">
-              <Button
-                onClick={() => setSelectedPlatform(null)}
-                variant="outline"
-                className="w-full"
-              >
-                Back to Platforms
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+  if (!platforms || platforms.length === 0) {
+    return null;
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Settings className="w-4 h-4 text-gray-600" />
-        <h3 className="text-sm font-medium text-gray-900">Platform Credentials</h3>
-        <Badge variant="outline" className="text-xs">
-          {platforms.length} platform{platforms.length !== 1 ? 's' : ''}
-        </Badge>
-      </div>
-      
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {platforms.map((platform, index) => (
-          <Button
-            key={`${platform.name}-${index}`}
-            onClick={() => handlePlatformClick(platform)}
-            size="sm"
-            variant="outline"
-            className={`
-              flex items-center gap-2 px-3 py-2 rounded-full text-xs font-medium
-              transition-all duration-200 hover:scale-105 hover:shadow-sm
-              ${credentialStatus[platform.name] === 'tested' 
-                ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' 
-                : credentialStatus[platform.name] === 'saved'
-                ? 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100'
-                : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
-              }
-            `}
-          >
-            {getStatusIcon(platform)}
-            <span>{getStatusText(platform)} {platform.name}</span>
-          </Button>
+          <Card key={index} className="border-0 shadow-lg bg-white/90 backdrop-blur-md">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-medium text-gray-800">
+                  {platform.name}
+                </CardTitle>
+                {getStatusIcon(platform.name)}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Badge 
+                variant="outline" 
+                className={`${getStatusColor(platform.name)} border-0 text-xs`}
+              >
+                {getStatusText(platform.name)}
+              </Badge>
+              
+              <div className="text-sm text-gray-600">
+                <div className="font-medium mb-1">Required credentials:</div>
+                {platform.credentials.map((cred, credIndex) => (
+                  <div key={credIndex} className="text-xs mb-1">
+                    • {cred.field}
+                  </div>
+                ))}
+              </div>
+              
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => handlePlatformSetup(platform.name)}
+                  className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-0 rounded-xl shadow-md hover:shadow-lg transition-all duration-300"
+                  style={{ boxShadow: '0 0 15px rgba(92, 142, 246, 0.3)' }}
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Setup
+                </Button>
+                
+                {platform.credentials.length > 0 && platform.credentials[0].link && platform.credentials[0].link !== '#' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => window.open(platform.credentials[0].link, '_blank')}
+                    className="rounded-xl border-gray-300 hover:border-blue-400 hover:bg-blue-50 transition-all duration-300"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
-      
-      <div className="text-xs text-gray-500">
-        Click on a platform to configure its credentials
-      </div>
+
+      {/* FIXED: Enhanced credential form modal with proper popup functionality */}
+      {selectedPlatform && (
+        <ModernCredentialForm
+          platformName={selectedPlatform}
+          credentials={platforms.find(p => p.name === selectedPlatform)?.credentials || []}
+          onSave={(credentials) => handleCredentialSave(selectedPlatform, credentials)}
+          onTest={(credentials) => handleCredentialTest(selectedPlatform, credentials)}
+          onClose={() => setSelectedPlatform(null)}
+        />
+      )}
     </div>
   );
 };

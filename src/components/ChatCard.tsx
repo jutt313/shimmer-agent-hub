@@ -137,6 +137,35 @@ const ChatCard = ({
 
   const optimizedMessages = enhancedMessages.slice(-50);
 
+  const extractStepText = (step: any): string => {
+    if (typeof step === 'string') {
+      return step.replace(/^\d+\.\s*/, '').trim();
+    }
+    
+    if (typeof step === 'object' && step !== null) {
+      const stepText = step.description || 
+                     step.action || 
+                     step.step || 
+                     step.instruction || 
+                     step.text ||
+                     step.summary ||
+                     step.task ||
+                     step.name;
+      
+      if (stepText && typeof stepText === 'string') {
+        return stepText.replace(/^\d+\.\s*/, '').trim();
+      }
+      
+      if (step.platform && step.method) {
+        return `${step.method} request to ${step.platform}`;
+      }
+      
+      return 'Processing automation step...';
+    }
+    
+    return 'Step information unavailable';
+  };
+
   const safeFormatMessageText = (inputText: string | undefined | null, structuredData?: YusrAIStructuredResponse): React.ReactNode[] => {
     try {
       if (!inputText || typeof inputText !== 'string') {
@@ -161,7 +190,9 @@ const ChatCard = ({
               <div className="font-semibold text-gray-800 mb-2">Steps:</div>
               <div className="text-gray-700 leading-relaxed">
                 {structuredData.steps.map((step, index) => (
-                  <div key={index} className="mb-1">Step {index + 1}: {String(step || '')}</div>
+                  <div key={index} className="mb-1">
+                    Step {index + 1}: {extractStepText(step)}
+                  </div>
                 ))}
               </div>
             </div>
@@ -174,14 +205,22 @@ const ChatCard = ({
               <div className="font-semibold text-gray-800 mb-2">Platforms:</div>
               <div className="text-gray-700 leading-relaxed">
                 {structuredData.platforms.map((platform, index) => (
-                  <div key={index} className="mb-2">
-                    <div className="font-medium">{String(platform?.name || `Platform ${index + 1}`)}</div>
+                  <div key={index} className="mb-3 p-3 bg-gray-50 rounded-lg">
+                    <div className="font-medium text-gray-800 mb-2">{String(platform?.name || `Platform ${index + 1}`)}</div>
                     {platform?.credentials && Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
-                      <div className="ml-4 text-sm text-gray-600">
-                        <div className="text-xs font-medium mb-1">Required credentials:</div>
+                      <div className="space-y-2">
+                        <div className="text-sm font-medium text-gray-600">Required credentials:</div>
                         {platform.credentials.map((cred, credIndex) => (
-                          <div key={credIndex} className="text-xs mb-1">
-                            • <strong>{cred.field}:</strong> {cred.why_needed}
+                          <div key={credIndex} className="text-sm bg-white p-2 rounded border-l-4 border-blue-200">
+                            <div className="font-medium text-gray-800">{cred.field}</div>
+                            <div className="text-gray-600 text-xs mt-1">{cred.why_needed}</div>
+                            {cred.where_to_get && (
+                              <div className="text-blue-600 text-xs mt-1">
+                                <a href={cred.link || '#'} target="_blank" rel="noopener noreferrer">
+                                  Get it from: {cred.where_to_get}
+                                </a>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -237,7 +276,9 @@ const ChatCard = ({
                     <div className="text-sm text-gray-600 space-y-1">
                       <div><strong>Role:</strong> {agent?.role || 'Assistant'}</div>
                       <div><strong>Goal:</strong> {agent?.goal || 'General assistance'}</div>
+                      {agent?.rule && <div><strong>Rule:</strong> {agent.rule}</div>}
                       {agent?.why_needed && <div><strong>Why needed:</strong> {agent.why_needed}</div>}
+                      {agent?.memory && <div><strong>Memory:</strong> {agent.memory}</div>}
                     </div>
                   </div>
                 ))}
@@ -264,10 +305,21 @@ const ChatCard = ({
   };
 
   const handleAgentAdd = (agent: any) => {
-    console.log(`🤖 User adding YusrAI agent: ${agent.name}`);
-    agentStateManager.addAgent(agent.name, agent);
+    console.log(`🤖 User adding YusrAI agent with complete data:`, agent);
+    
+    const completeAgentData = {
+      name: agent.name || 'Unnamed Agent',
+      role: agent.role || 'Assistant',
+      rule: agent.rule || agent.rules || '',
+      goal: agent.goal || 'General assistance',
+      memory: agent.memory || '',
+      why_needed: agent.why_needed || ''
+    };
+    
+    agentStateManager.addAgent(agent.name, completeAgentData);
+    
     if (onAgentAdd) {
-      onAgentAdd(agent);
+      onAgentAdd(completeAgentData);
     }
   };
 

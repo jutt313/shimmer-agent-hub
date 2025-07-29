@@ -38,13 +38,17 @@ const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: F
     try {
       console.log(`💾 Saving credentials for ${platformName}:`, credentials);
       
+      // Use the correct table: automation_platform_credentials (not platform_credentials)
       const { error } = await supabase
-        .from('platform_credentials')
+        .from('automation_platform_credentials')
         .upsert({
           user_id: user?.id,
           platform_name: platformName,
-          credentials: credentials,
-          automation_id: automationId
+          credentials: JSON.stringify(credentials), // credentials field expects string in this table
+          automation_id: automationId,
+          credential_type: 'api_key',
+          is_active: true,
+          is_tested: false
         });
 
       if (error) throw error;
@@ -213,14 +217,17 @@ const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: F
         ))}
       </div>
 
-      {/* FIXED: Enhanced credential form modal with proper popup functionality */}
+      {/* FIXED: Enhanced credential form modal with correct props */}
       {selectedPlatform && (
         <ModernCredentialForm
-          platformName={selectedPlatform}
-          credentials={platforms.find(p => p.name === selectedPlatform)?.credentials || []}
-          onSave={(credentials) => handleCredentialSave(selectedPlatform, credentials)}
-          onTest={(credentials) => handleCredentialTest(selectedPlatform, credentials)}
+          automationId={automationId}
+          platform={{
+            name: selectedPlatform,
+            credentials: platforms.find(p => p.name === selectedPlatform)?.credentials || []
+          }}
+          onCredentialSaved={onCredentialChange}
           onClose={() => setSelectedPlatform(null)}
+          isOpen={true}
         />
       )}
     </div>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,6 +20,8 @@ const AutomationDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [executionBlueprint, setExecutionBlueprint] = useState<any>(null);
+  const [automationBlueprint, setAutomationBlueprint] = useState<any>(null);
+  const [automationDiagramData, setAutomationDiagramData] = useState<any>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -51,6 +52,7 @@ const AutomationDetail = () => {
             try {
               const parsedResponse = parseYusrAIStructuredResponse(JSON.stringify(data.automation_blueprint));
               setExecutionBlueprint(parsedResponse.structuredData?.execution_blueprint);
+              setAutomationBlueprint(parsedResponse.structuredData);
             } catch (parseError: any) {
               console.error("Error parsing automation blueprint:", parseError);
               toast({
@@ -59,6 +61,11 @@ const AutomationDetail = () => {
                 variant: "destructive",
               });
             }
+          }
+          
+          // Set automation diagram data if available
+          if (data.automation_diagram_data) {
+            setAutomationDiagramData(data.automation_diagram_data);
           }
         } else {
           setError('Automation not found.');
@@ -144,7 +151,10 @@ const AutomationDetail = () => {
               <p className="text-sm text-gray-500">Visual representation of the automation workflow.</p>
             </CardHeader>
             <CardContent>
-              <AutomationDiagramDisplay automation={automation} />
+              <AutomationDiagramDisplay 
+                automationBlueprint={automationBlueprint}
+                automationDiagramData={automationDiagramData}
+              />
             </CardContent>
           </Card>
         </TabsContent>

@@ -103,8 +103,10 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
     }));
   };
 
+  // FIXED: Step display function to show "Step 1:" format without duplication
   const getStepDisplayText = (step: unknown, index: number): string => {
     if (typeof step === 'string') {
+      // Return the clean step text (already processed in jsonParser to remove numbering)
       return step;
     }
     if (typeof step === 'object' && step !== null) {
@@ -176,7 +178,8 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
           <div className="text-gray-700 leading-relaxed space-y-3">
             {(Array.isArray(data.steps) ? data.steps : []).map((step, index) => (
               <div key={index} className="flex gap-3 text-sm">
-                <span className="font-bold text-green-600 text-lg min-w-[24px]">{index + 1}.</span>
+                {/* FIXED: Clean step numbering format "Step 1:" without duplication */}
+                <span className="font-bold text-green-600 text-lg min-w-[60px]">Step {index + 1}:</span>
                 <span className="flex-1 whitespace-pre-wrap">{getStepDisplayText(step, index)}</span>
               </div>
             ))}

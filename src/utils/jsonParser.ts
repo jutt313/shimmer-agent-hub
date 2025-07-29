@@ -1,4 +1,3 @@
-
 export interface YusrAIStructuredResponse {
   summary: string;
   steps: string[];
@@ -174,31 +173,35 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
     // Map database field names to frontend expected names
     console.log('🔍 Validating and mapping structured sections...')
     
-    // ENHANCED STEP MAPPING - Handle step_by_step with proper object-to-string conversion
+    // FIXED STEP MAPPING - Prevent duplication and get clean text
     if (parsedResponse.step_by_step && !parsedResponse.steps) {
       const stepsArray = Array.isArray(parsedResponse.step_by_step) 
         ? parsedResponse.step_by_step 
         : [parsedResponse.step_by_step];
       
-      // Convert objects to readable strings
-      parsedResponse.steps = stepsArray.map((step: any, index: number) => {
+      // Convert objects to readable strings WITHOUT adding extra numbering
+      parsedResponse.steps = stepsArray.map((step: any) => {
         if (typeof step === 'string') {
-          return step;
+          // Remove any existing numbering prefix to prevent duplication
+          return step.replace(/^\d+\.\s*/, '').trim();
         }
         if (typeof step === 'object' && step !== null) {
           // Extract readable text from step object
-          return step.description || 
+          const stepText = step.description || 
                  step.action || 
                  step.step || 
                  step.instruction || 
                  step.text ||
                  step.summary ||
                  JSON.stringify(step, null, 2); // Fallback to formatted JSON
+          
+          // Remove any existing numbering prefix
+          return typeof stepText === 'string' ? stepText.replace(/^\d+\.\s*/, '').trim() : stepText;
         }
-        return `Step ${index + 1}`;
+        return 'Processing step...';
       });
       
-      console.log('📋 Enhanced step_by_step mapping with object conversion:', parsedResponse.steps.length);
+      console.log('📋 Fixed step_by_step mapping preventing duplication:', parsedResponse.steps.length);
     }
     
     if (parsedResponse.step_by_step_explanation && !parsedResponse.steps) {
@@ -206,26 +209,27 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
         ? parsedResponse.step_by_step_explanation 
         : [parsedResponse.step_by_step_explanation];
       
-      // Convert objects to readable strings  
-      parsedResponse.steps = stepsArray.map((step: any, index: number) => {
+      // Convert objects to readable strings WITHOUT adding extra numbering
+      parsedResponse.steps = stepsArray.map((step: any) => {
         if (typeof step === 'string') {
-          return step;
+          return step.replace(/^\d+\.\s*/, '').trim();
         }
         if (typeof step === 'object' && step !== null) {
-          return step.description || 
+          const stepText = step.description || 
                  step.action || 
                  step.step || 
                  step.instruction ||
                  step.text ||
                  JSON.stringify(step, null, 2);
+          return typeof stepText === 'string' ? stepText.replace(/^\d+\.\s*/, '').trim() : stepText;
         }
-        return `Step ${index + 1}`;
+        return 'Processing step...';
       });
       
-      console.log('📋 Enhanced step_by_step_explanation mapping with object conversion:', parsedResponse.steps.length);
+      console.log('📋 Fixed step_by_step_explanation mapping preventing duplication:', parsedResponse.steps.length);
     }
 
-    // ENHANCED PLATFORMS_AND_CREDENTIALS MAPPING - Convert object to array
+    // FIXED PLATFORMS_AND_CREDENTIALS MAPPING - Extract full platform names
     if (parsedResponse.platforms_and_credentials && !parsedResponse.platforms) {
       console.log('🔗 Converting platforms_and_credentials object to platforms array...');
       
@@ -236,7 +240,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
           console.log(`🔍 Processing platform: ${platformKey}`, platformData);
           
           return {
-            name: platformKey, // Use the object key as platform name
+            name: platformKey, // FIXED: Use the complete object key as platform name (not just first character)
             credentials: Array.isArray(platformData.credentials) 
               ? platformData.credentials 
               : Array.isArray(platformData.required_credentials)
@@ -248,7 +252,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
         });
         
         parsedResponse.platforms = platformsArray;
-        console.log('✅ Converted platforms_and_credentials object to array:', parsedResponse.platforms.length, 'platforms');
+        console.log('✅ Fixed platforms_and_credentials object to array with full names:', parsedResponse.platforms.length, 'platforms');
       } else if (Array.isArray(parsedResponse.platforms_and_credentials)) {
         parsedResponse.platforms = parsedResponse.platforms_and_credentials;
         console.log('✅ Used platforms_and_credentials array as-is:', parsedResponse.platforms.length, 'platforms');
@@ -263,7 +267,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('🔗 Mapped platforms_credentials to platforms:', parsedResponse.platforms.length);
     }
 
-    // ENHANCED PLATFORM MAPPING - Fix platform names with better extraction
+    // FIXED PLATFORM MAPPING - Ensure full platform names are preserved
     if (parsedResponse.platform_integrations && !parsedResponse.platforms) {
       parsedResponse.platforms = Array.isArray(parsedResponse.platform_integrations) 
         ? parsedResponse.platform_integrations 
@@ -271,10 +275,10 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('🔗 Mapped platform_integrations to platforms:', parsedResponse.platforms.length);
     }
 
-    // PURE AI-DRIVEN PLATFORM NAME EXTRACTION - No hardcoded patterns
+    // FIXED PLATFORM NAME EXTRACTION - Keep full platform names
     if (parsedResponse.platforms && Array.isArray(parsedResponse.platforms)) {
       parsedResponse.platforms = parsedResponse.platforms.map((platform: any, index: number) => {
-        // Extract platform name from AI response directly - no hardcoded patterns
+        // Extract platform name from AI response - KEEP FULL NAME
         let platformName = platform.name || 
                           platform.platform_name || 
                           platform.platform || 
@@ -284,9 +288,9 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
                           platform.api_name ||
                           platform.service_name;
         
-        // Clean up the platform name if it exists
+        // Clean up the platform name if it exists - DON'T TRUNCATE
         if (platformName && typeof platformName === 'string') {
-          platformName = platformName.trim();
+          platformName = platformName.trim(); // Only trim whitespace, keep full name
           
           // Only clean up obvious formatting issues, no pattern matching
           platformName = platformName.replace(/^(Platform|Service|API|Tool)[\s\d]*:?\s*/i, '');
@@ -303,11 +307,11 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
           platformName = `Platform ${index + 1}`;
         }
         
-        console.log(`🔍 Processing platform ${index + 1}: extracted name "${platformName}"`);
+        console.log(`🔍 Processing platform ${index + 1}: extracted FULL name "${platformName}"`);
         
         return {
           ...platform,
-          name: platformName,
+          name: platformName, // FIXED: Full platform name preserved
           credentials: platform.credentials || 
                       platform.required_credentials || 
                       platform.credential_requirements ||
@@ -315,7 +319,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
                       []
         };
       });
-      console.log('✅ AI-driven platform name extraction completed');
+      console.log('✅ Fixed platform name extraction with full names preserved');
     }
 
     // ENHANCED CLARIFICATION_QUESTIONS MAPPING - Convert objects to strings

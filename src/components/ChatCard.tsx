@@ -34,6 +34,8 @@ interface Message {
       why_needed: string;
     }>;
   }>;
+  automationDiagramData?: any;
+  executionBlueprint?: any;
 }
 
 interface ChatCardProps {
@@ -74,7 +76,6 @@ const ChatCard = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // Enhanced message processing with platform extraction
   useEffect(() => {
     const processMessages = () => {
       try {
@@ -83,15 +84,13 @@ const ChatCard = ({
             try {
               console.log('🔍 Processing bot message for structured data:', message.text.substring(0, 200));
               
-              // Parse structured data
               const parseResult = parseYusrAIStructuredResponse(message.text);
               if (parseResult.structuredData) {
                 console.log('✅ Structured data found:', parseResult.structuredData);
                 
-                // FIXED: Extract platform data - handle both platforms and platforms_credentials with proper name extraction
                 const platformsSource = parseResult.structuredData.platforms_credentials || parseResult.structuredData.platforms || [];
                 const platformData = platformsSource.map(platform => ({
-                  name: platform.name || 'Unknown Platform', // Use the properly extracted name
+                  name: platform.name || 'Unknown Platform',
                   credentials: platform.credentials.map(cred => ({
                     field: cred.field,
                     placeholder: cred.example || cred.where_to_get || `Enter ${cred.field}`,
@@ -100,14 +99,23 @@ const ChatCard = ({
                   }))
                 }));
                 
-                console.log('🔗 Transformed platform data with proper names:', platformData);
+                console.log('🔗 Transformed platform data with full names:', platformData);
+                
+                const diagramData = parseResult.structuredData.execution_blueprint || 
+                                  parseResult.structuredData.blueprint ||
+                                  parseResult.structuredData.automation_diagram ||
+                                  parseResult.structuredData.workflow;
+                
+                console.log('📊 Extracted diagram data:', diagramData);
                 
                 return {
                   ...message,
                   structuredData: parseResult.structuredData,
                   platformData: platformData,
                   yusrai_powered: parseResult.metadata.yusrai_powered,
-                  seven_sections_validated: parseResult.metadata.seven_sections_validated
+                  seven_sections_validated: parseResult.metadata.seven_sections_validated,
+                  automationDiagramData: diagramData,
+                  executionBlueprint: parseResult.structuredData.execution_blueprint
                 };
               }
             } catch (error) {
@@ -135,11 +143,9 @@ const ChatCard = ({
         return [<span key="fallback-input-error">Message content unavailable.</span>];
       }
 
-      // If we have structured data, display it as clean plain text
       if (structuredData) {
         const sections = [];
         
-        // Summary section
         if (structuredData.summary && typeof structuredData.summary === 'string') {
           sections.push(
             <div key="summary" className="mb-4">
@@ -149,21 +155,19 @@ const ChatCard = ({
           );
         }
         
-        // FIXED: Steps section - now shows properly
         if (structuredData.steps && Array.isArray(structuredData.steps) && structuredData.steps.length > 0) {
           sections.push(
             <div key="steps" className="mb-4">
               <div className="font-semibold text-gray-800 mb-2">Steps:</div>
               <div className="text-gray-700 leading-relaxed">
                 {structuredData.steps.map((step, index) => (
-                  <div key={index} className="mb-1">{index + 1}. {String(step || '')}</div>
+                  <div key={index} className="mb-1">Step {index + 1}: {String(step || '')}</div>
                 ))}
               </div>
             </div>
           );
         }
         
-        // FIXED: Platforms section - now shows proper names instead of "Platform 1"
         if (structuredData.platforms && Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
           sections.push(
             <div key="platforms" className="mb-4">
@@ -189,7 +193,6 @@ const ChatCard = ({
           );
         }
         
-        // FIXED: Clarification Questions section - now shows readable text instead of "[object Object]"
         if (structuredData.clarification_questions && Array.isArray(structuredData.clarification_questions) && structuredData.clarification_questions.length > 0) {
           sections.push(
             <div key="questions" className="mb-4">
@@ -203,7 +206,6 @@ const ChatCard = ({
           );
         }
         
-        // AI Agents section with Add/Dismiss buttons
         if (structuredData.agents && Array.isArray(structuredData.agents) && structuredData.agents.length > 0) {
           sections.push(
             <div key="agents" className="mb-4">
@@ -247,7 +249,6 @@ const ChatCard = ({
         return sections.length > 0 ? sections : [<span key="no-sections">AI response processed successfully.</span>];
       }
 
-      // Fallback: Display raw text with basic formatting
       const lines = inputText.split('\n');
       return lines.map((line, index) => (
         <span key={`line-${index}`}>
@@ -405,6 +406,11 @@ const ChatCard = ({
     return latestBotMessage?.platformData || [];
   };
 
+  const getLatestDiagramData = () => {
+    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.automationDiagramData).pop();
+    return latestBotMessage?.automationDiagramData || null;
+  };
+
   const transformPlatformsForButtons = (yusraiPlatforms: any[]) => {
     console.log('🔄 Transforming platforms for buttons:', yusraiPlatforms);
     
@@ -476,6 +482,29 @@ const ChatCard = ({
                         {message.seven_sections_validated && (
                           <CheckCircle2 className="w-4 h-4 text-green-500" />
                         )}
+                        {message.automationDiagramData && (
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="ml-2 text-xs"
+                              >
+                                <Code className="w-3 h-3 mr-1" />
+                                Diagram
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-6xl max-h-[90vh] overflow-auto">
+                              <DialogHeader>
+                                <DialogTitle>Automation Diagram</DialogTitle>
+                              </DialogHeader>
+                              <ExecutionBlueprintVisualizer
+                                blueprint={message.automationDiagramData}
+                                className="w-full h-96"
+                              />
+                            </DialogContent>
+                          </Dialog>
+                        )}
                       </div>
                     )}
                     
@@ -533,7 +562,6 @@ const ChatCard = ({
         </ScrollArea>
       </div>
 
-      {/* Platform credential buttons */}
       <div className="mt-4">
         <FixedPlatformButtons
           platforms={getLatestPlatforms()}

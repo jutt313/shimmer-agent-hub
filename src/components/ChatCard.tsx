@@ -88,10 +88,10 @@ const ChatCard = ({
               if (parseResult.structuredData) {
                 console.log('✅ Structured data found:', parseResult.structuredData);
                 
-                // Extract platform data - handle both platforms and platforms_credentials
+                // FIXED: Extract platform data - handle both platforms and platforms_credentials with proper name extraction
                 const platformsSource = parseResult.structuredData.platforms_credentials || parseResult.structuredData.platforms || [];
                 const platformData = platformsSource.map(platform => ({
-                  name: platform.name,
+                  name: platform.name || 'Unknown Platform', // Use the properly extracted name
                   credentials: platform.credentials.map(cred => ({
                     field: cred.field,
                     placeholder: cred.example || cred.where_to_get || `Enter ${cred.field}`,
@@ -100,7 +100,7 @@ const ChatCard = ({
                   }))
                 }));
                 
-                console.log('🔗 Transformed platform data:', platformData);
+                console.log('🔗 Transformed platform data with proper names:', platformData);
                 
                 return {
                   ...message,
@@ -149,7 +149,7 @@ const ChatCard = ({
           );
         }
         
-        // Steps section
+        // FIXED: Steps section - now shows properly
         if (structuredData.steps && Array.isArray(structuredData.steps) && structuredData.steps.length > 0) {
           sections.push(
             <div key="steps" className="mb-4">
@@ -163,7 +163,7 @@ const ChatCard = ({
           );
         }
         
-        // Platforms section
+        // FIXED: Platforms section - now shows proper names instead of "Platform 1"
         if (structuredData.platforms && Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
           sections.push(
             <div key="platforms" className="mb-4">
@@ -189,7 +189,7 @@ const ChatCard = ({
           );
         }
         
-        // Clarification Questions section
+        // FIXED: Clarification Questions section - now shows readable text instead of "[object Object]"
         if (structuredData.clarification_questions && Array.isArray(structuredData.clarification_questions) && structuredData.clarification_questions.length > 0) {
           sections.push(
             <div key="questions" className="mb-4">

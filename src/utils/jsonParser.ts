@@ -1,4 +1,3 @@
-
 export interface YusrAIStructuredResponse {
   summary: string;
   steps: string[];
@@ -174,11 +173,47 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
     // Map database field names to frontend expected names
     console.log('🔍 Validating and mapping structured sections...')
     
+    // FIX 1: Handle step_by_step mapping to steps
+    if (parsedResponse.step_by_step && !parsedResponse.steps) {
+      parsedResponse.steps = Array.isArray(parsedResponse.step_by_step) 
+        ? parsedResponse.step_by_step 
+        : [parsedResponse.step_by_step];
+      console.log('📋 Mapped step_by_step to steps:', parsedResponse.steps.length);
+    }
+    
     if (parsedResponse.step_by_step_explanation && !parsedResponse.steps) {
       parsedResponse.steps = Array.isArray(parsedResponse.step_by_step_explanation) 
         ? parsedResponse.step_by_step_explanation 
         : [parsedResponse.step_by_step_explanation];
       console.log('📋 Mapped step_by_step_explanation to steps:', parsedResponse.steps.length);
+    }
+
+    // FIX 2: Handle platforms_and_credentials OBJECT to platforms ARRAY conversion
+    if (parsedResponse.platforms_and_credentials && !parsedResponse.platforms) {
+      console.log('🔗 Converting platforms_and_credentials object to platforms array...');
+      
+      // Check if it's an object (not array)
+      if (typeof parsedResponse.platforms_and_credentials === 'object' && !Array.isArray(parsedResponse.platforms_and_credentials)) {
+        const platformsArray = Object.keys(parsedResponse.platforms_and_credentials).map(platformKey => {
+          const platformData = parsedResponse.platforms_and_credentials[platformKey];
+          console.log(`🔍 Processing platform: ${platformKey}`, platformData);
+          
+          return {
+            name: platformKey, // Use the object key as platform name
+            credentials: Array.isArray(platformData.credentials) 
+              ? platformData.credentials 
+              : Array.isArray(platformData.required_credentials)
+              ? platformData.required_credentials
+              : []
+          };
+        });
+        
+        parsedResponse.platforms = platformsArray;
+        console.log('✅ Converted object to array:', parsedResponse.platforms.length, 'platforms');
+      } else if (Array.isArray(parsedResponse.platforms_and_credentials)) {
+        parsedResponse.platforms = parsedResponse.platforms_and_credentials;
+        console.log('✅ Used array as-is:', parsedResponse.platforms.length, 'platforms');
+      }
     }
 
     // Handle platforms_credentials mapping
@@ -190,13 +225,6 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
     }
 
     // ENHANCED PLATFORM MAPPING - Fix platform names with better extraction
-    if (parsedResponse.platforms_and_credentials && !parsedResponse.platforms) {
-      parsedResponse.platforms = Array.isArray(parsedResponse.platforms_and_credentials) 
-        ? parsedResponse.platforms_and_credentials 
-        : [parsedResponse.platforms_and_credentials];
-      console.log('🔗 Mapped platforms_and_credentials to platforms:', parsedResponse.platforms.length);
-    }
-    
     if (parsedResponse.platform_integrations && !parsedResponse.platforms) {
       parsedResponse.platforms = Array.isArray(parsedResponse.platform_integrations) 
         ? parsedResponse.platform_integrations 
@@ -251,6 +279,20 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('✅ AI-driven platform name extraction completed');
     }
 
+    // FIX 3: Handle clarification_questions object array to string array conversion
+    if (parsedResponse.clarification_questions && Array.isArray(parsedResponse.clarification_questions)) {
+      parsedResponse.clarification_questions = parsedResponse.clarification_questions.map((question: any, index: number) => {
+        if (typeof question === 'string') {
+          return question;
+        } else if (typeof question === 'object' && question !== null) {
+          // Extract question text from object
+          return question.question || question.text || question.description || `Question ${index + 1}`;
+        }
+        return `Question ${index + 1}`;
+      });
+      console.log('❓ Fixed clarification questions to string array:', parsedResponse.clarification_questions.length);
+    }
+
     // AI AGENTS MAPPING
     if (parsedResponse.ai_agents_section?.agents && !parsedResponse.agents) {
       parsedResponse.agents = Array.isArray(parsedResponse.ai_agents_section.agents) 
@@ -286,8 +328,21 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
     if (!parsedResponse.test_payloads) parsedResponse.test_payloads = {};
     if (!parsedResponse.execution_blueprint) parsedResponse.execution_blueprint = null;
 
+    // FIX 4: Make seven_sections_validated DYNAMIC based on actual content
+    const hasSummary = parsedResponse.summary && parsedResponse.summary.length > 0;
+    const hasSteps = Array.isArray(parsedResponse.steps) && parsedResponse.steps.length > 0;
+    const hasPlatforms = Array.isArray(parsedResponse.platforms) && parsedResponse.platforms.length > 0;
+    const hasQuestions = Array.isArray(parsedResponse.clarification_questions) && parsedResponse.clarification_questions.length > 0;
+    const hasAgents = Array.isArray(parsedResponse.agents) && parsedResponse.agents.length > 0;
+    const hasTestPayloads = parsedResponse.test_payloads && Object.keys(parsedResponse.test_payloads).length > 0;
+    const hasBlueprint = parsedResponse.execution_blueprint && parsedResponse.execution_blueprint.workflow;
+
+    const sectionsCount = [hasSummary, hasSteps, hasPlatforms, hasQuestions, hasAgents, hasTestPayloads, hasBlueprint].filter(Boolean).length;
+    
     console.log('✅ YusrAI structured response validation successful')
-    metadata.seven_sections_validated = true;
+    metadata.seven_sections_validated = sectionsCount >= 4; // At least 4 major sections for complex automation
+    
+    console.log(`📊 Section analysis: ${sectionsCount}/7 sections present - seven_sections_validated: ${metadata.seven_sections_validated}`);
     
     return { 
       structuredData: parsedResponse as YusrAIStructuredResponse, 

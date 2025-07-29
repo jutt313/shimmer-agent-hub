@@ -34,6 +34,16 @@ export interface YusrAIStructuredResponse {
         input: string;
         output: string;
       };
+      description?: string;
+      ai_agent_integration?: {
+        agent_name: string;
+        input_data: any;
+        output_mapping: any;
+      };
+      error_handling?: {
+        retry_attempts: number;
+        fallback_action: string;
+      };
     }>;
     error_handling: {
       retry_attempts: number;

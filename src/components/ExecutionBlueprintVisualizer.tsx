@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,15 +7,17 @@ import { YusrAIStructuredResponse } from "@/utils/jsonParser";
 interface ExecutionBlueprintVisualizerProps {
   blueprint: YusrAIStructuredResponse['execution_blueprint'];
   isVisible?: boolean;
+  className?: string;
 }
 
 const ExecutionBlueprintVisualizer: React.FC<ExecutionBlueprintVisualizerProps> = ({ 
   blueprint, 
-  isVisible = true 
+  isVisible = true,
+  className = ""
 }) => {
   if (!isVisible || !blueprint) {
     return (
-      <div className="flex items-center justify-center p-8 bg-gray-50 rounded-3xl border border-gray-200">
+      <div className={`flex items-center justify-center p-8 bg-gray-50 rounded-3xl border border-gray-200 ${className}`}>
         <div className="text-center space-y-4">
           <Zap className="w-12 h-12 mx-auto text-gray-400" />
           <p className="text-gray-500">Execution blueprint will appear here after AI processing</p>
@@ -44,7 +45,7 @@ const ExecutionBlueprintVisualizer: React.FC<ExecutionBlueprintVisualizerProps> 
   };
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${className}`}>
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-200/50">
         <h3 className="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-2">

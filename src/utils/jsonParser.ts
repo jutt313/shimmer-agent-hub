@@ -83,6 +83,9 @@ export interface YusrAIStructuredResponse {
       timeout_seconds_per_step: number;
     };
   };
+  blueprint?: any;
+  automation_diagram?: any;
+  workflow?: any;
 }
 
 export interface YusrAIResponseMetadata {

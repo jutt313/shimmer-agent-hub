@@ -500,7 +500,6 @@ const ChatCard = ({
                               </DialogHeader>
                               <ExecutionBlueprintVisualizer
                                 blueprint={message.automationDiagramData}
-                                className="w-full h-96"
                               />
                             </DialogContent>
                           </Dialog>

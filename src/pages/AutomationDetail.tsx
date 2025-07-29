@@ -13,7 +13,7 @@ import { agentStateManager } from '@/utils/agentStateManager';
 import SimpleExecuteButton from '@/components/SimpleExecuteButton';
 
 interface Message {
-  id: number;
+  id: string; // Changed from number to string to match database
   text: string;
   isBot: boolean;
   timestamp: Date;
@@ -88,7 +88,7 @@ const AutomationDetail = () => {
         }
 
         const formattedMessages: Message[] = messageData.map(msg => ({
-          id: msg.id,
+          id: msg.id, // This is already a string from the database
           text: msg.message_content,
           isBot: msg.sender === 'bot',
           timestamp: new Date(msg.timestamp)
@@ -184,12 +184,13 @@ const AutomationDetail = () => {
     try {
       const { data: newMessage, error } = await supabase
         .from('automation_chats')
-        .insert([{
+        .insert({
           automation_id: automationId,
           message_content: inputMessage,
           sender: 'user',
-          timestamp: new Date()
-        }])
+          timestamp: new Date().toISOString()
+        })
+        .select()
         .single();
 
       if (error) {

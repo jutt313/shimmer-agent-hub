@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,12 +15,8 @@ import PlatformCredentialManager from '@/components/PlatformCredentialManager';
 import ExecutionBlueprintVisualizer from '@/components/ExecutionBlueprintVisualizer';
 import { parseYusrAIStructuredResponse } from '@/utils/jsonParser';
 
-interface Params {
-  id: string;
-}
-
 const AutomationDetail = () => {
-  const { id } = useParams<Params>();
+  const { id } = useParams<{ id: string }>();
   const [automation, setAutomation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,15 +46,16 @@ const AutomationDetail = () => {
 
         if (data) {
           setAutomation(data);
-          if (data.ai_response) {
+          // Check if automation_blueprint contains the structured response
+          if (data.automation_blueprint) {
             try {
-              const parsedResponse = parseYusrAIStructuredResponse(data.ai_response);
+              const parsedResponse = parseYusrAIStructuredResponse(JSON.stringify(data.automation_blueprint));
               setExecutionBlueprint(parsedResponse.structuredData?.execution_blueprint);
             } catch (parseError: any) {
-              console.error("Error parsing AI response:", parseError);
+              console.error("Error parsing automation blueprint:", parseError);
               toast({
                 title: "Error",
-                description: "Failed to parse AI response. Please check the data format.",
+                description: "Failed to parse automation blueprint. Please check the data format.",
                 variant: "destructive",
               });
             }
@@ -146,7 +144,7 @@ const AutomationDetail = () => {
               <p className="text-sm text-gray-500">Visual representation of the automation workflow.</p>
             </CardHeader>
             <CardContent>
-              <AutomationDiagramDisplay automationId={id} />
+              <AutomationDiagramDisplay automation={automation} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -168,7 +166,9 @@ const AutomationDetail = () => {
               <p className="text-sm text-gray-500">Manage and configure platform credentials for this automation.</p>
             </CardHeader>
             <CardContent>
-              <PlatformCredentialManager automationId={id} />
+              <PlatformCredentialManager 
+                onSave={(data) => console.log('Saved platform data:', data)}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -179,7 +179,11 @@ const AutomationDetail = () => {
               <p className="text-sm text-gray-500">Execute and monitor the automation in real-time.</p>
             </CardHeader>
             <CardContent>
-              <AutomationExecutionPanel automationId={id} />
+              <AutomationExecutionPanel 
+                automationId={id || ''} 
+                blueprint={executionBlueprint}
+                title={automation.name}
+              />
             </CardContent>
           </Card>
         </TabsContent>

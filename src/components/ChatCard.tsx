@@ -49,15 +49,6 @@ interface ChatCardProps {
   onExecuteAutomation?: () => void;
   platformCredentialStatus?: { [key: string]: 'saved' | 'tested' | 'missing' };
   onPlatformCredentialChange?: () => void;
-  currentPlatforms?: Array<{
-    name: string;
-    credentials: Array<{
-      field: string;
-      placeholder: string;
-      link: string;
-      why_needed: string;
-    }>;
-  }>;
 }
 
 const ChatCard = ({
@@ -70,8 +61,7 @@ const ChatCard = ({
   onSendMessage,
   onExecuteAutomation,
   platformCredentialStatus = {},
-  onPlatformCredentialChange,
-  currentPlatforms = []
+  onPlatformCredentialChange
 }: ChatCardProps) => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -464,17 +454,8 @@ const ChatCard = ({
   };
 
   const getLatestPlatforms = () => {
-    console.log('🔗 Getting latest platforms from props:', currentPlatforms);
-    
-    if (currentPlatforms && currentPlatforms.length > 0) {
-      return currentPlatforms;
-    }
-    
-    // Fallback to message parsing if no platforms passed
     const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.platformData).pop();
-    const platforms = latestBotMessage?.platformData || [];
-    console.log('📤 Fallback platforms from messages:', platforms);
-    return platforms;
+    return latestBotMessage?.platformData || [];
   };
 
   const getLatestDiagramData = () => {

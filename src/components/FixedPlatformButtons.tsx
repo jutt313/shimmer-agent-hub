@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Settings, CheckCircle, AlertCircle, ExternalLink } from "lucide-react";
@@ -157,67 +156,28 @@ const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: F
   };
 
   if (!platforms || platforms.length === 0) {
+    console.log('⚠️ No platforms to display credential buttons for');
     return null;
   }
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Small Credential Buttons - As Requested */}
+      <div className="flex flex-wrap gap-3 justify-center">
         {platforms.map((platform, index) => (
-          <Card key={index} className="border-0 shadow-lg bg-white/90 backdrop-blur-md">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-medium text-gray-800">
-                  {platform.name}
-                </CardTitle>
-                {getStatusIcon(platform.name)}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Badge 
-                variant="outline" 
-                className={`${getStatusColor(platform.name)} border-0 text-xs`}
-              >
-                {getStatusText(platform.name)}
-              </Badge>
-              
-              <div className="text-sm text-gray-600">
-                <div className="font-medium mb-1">Required credentials:</div>
-                {platform.credentials.map((cred, credIndex) => (
-                  <div key={credIndex} className="text-xs mb-1">
-                    • {cred.field}
-                  </div>
-                ))}
-              </div>
-              
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => handlePlatformSetup(platform.name)}
-                  className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-0 rounded-xl shadow-md hover:shadow-lg transition-all duration-300"
-                  style={{ boxShadow: '0 0 15px rgba(92, 142, 246, 0.3)' }}
-                >
-                  <Settings className="w-4 h-4 mr-2" />
-                  Setup
-                </Button>
-                
-                {platform.credentials.length > 0 && platform.credentials[0].link && platform.credentials[0].link !== '#' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => window.open(platform.credentials[0].link, '_blank')}
-                    className="rounded-xl border-gray-300 hover:border-blue-400 hover:bg-blue-50 transition-all duration-300"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <Button
+            key={index}
+            onClick={() => handlePlatformSetup(platform.name)}
+            variant="outline"
+            size="sm"
+            className="rounded-full px-4 py-2 bg-white/90 backdrop-blur-sm border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all duration-300 text-sm font-medium text-gray-700 hover:text-blue-700 shadow-sm hover:shadow-md"
+          >
+            {platform.name}
+          </Button>
         ))}
       </div>
 
-      {/* FIXED: Enhanced credential form modal with correct props */}
+      {/* Enhanced credential form modal - Using existing ModernCredentialForm */}
       {selectedPlatform && (
         <ModernCredentialForm
           automationId={automationId}

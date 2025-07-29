@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 
@@ -346,110 +347,7 @@ Save: Persistently store effective API configurations for reuse across different
 
 Learn: Continuously adapt and refine internal knowledge based on user feedback, corrections, and evolving API landscapes.
 
-Update: Proactively update platform knowledge whenever APIs change, new features emerge, or best practices evolve.
-
-=== CRITICAL RESPONSE FORMAT REQUIREMENT ===
-You MUST respond with valid JSON in this exact structure. Do not include any text outside the JSON:
-
-{
-  "summary": "string - concise 2-3 line business explanation",
-  "steps": ["array of strings - numbered sequential steps"],
-  "platforms": [
-    {
-      "name": "string - exact platform name",
-      "credentials": [
-        {
-          "field": "string - exact credential field name",
-          "why_needed": "string - explanation of why this credential is needed"
-        }
-      ]
-    }
-  ],
-  "clarification_questions": ["array of strings - specific actionable questions"],
-  "agents": [
-    {
-      "name": "string - agent name",
-      "role": "string - agent role/type",
-      "rule": "string - agent behavior rules",
-      "goal": "string - agent objective"
-    }
-  ],
-  "test_payloads": {
-    "platform_name": {
-      "base_url": "string - platform base API URL",
-      "test_endpoint": {
-        "method": "string - HTTP method",
-        "path": "string - API endpoint path",
-        "headers": {
-          "Authorization": "string - auth header pattern",
-          "Content-Type": "application/json"
-        }
-      },
-      "expected_success_indicators": ["array of strings - success indicators"],
-      "expected_error_indicators": ["array of strings - error indicators"]
-    }
-  },
-  "execution_blueprint": {
-    "trigger": {
-      "type": "string - trigger type",
-      "configuration": {}
-    },
-    "workflow": [
-      {
-        "step": "number - step order",
-        "action": "string - action description",
-        "platform": "string - platform name",
-        "method": "string - HTTP method",
-        "base_url": "string - platform base URL",
-        "endpoint": "string - API endpoint path",
-        "headers": {
-          "Authorization": "string - auth pattern",
-          "Content-Type": "application/json"
-        },
-        "data_mapping": {
-          "input": "string - input data source",
-          "output": "string - output data destination"
-        }
-      }
-    ],
-    "error_handling": {
-      "retry_attempts": "number - max retry attempts",
-      "fallback_actions": ["array of strings - fallback actions"],
-      "critical_failure_actions": ["array of strings - critical failure actions"]
-    },
-    "performance_optimization": {
-      "rate_limit_handling": "string - rate limiting strategy",
-      "concurrency_limit": "number - max concurrent operations",
-      "timeout_seconds_per_step": "number - timeout per step"
-    }
-  }
-}`;
-
-// Helper function to ensure valid JSON response
-function createStandardResponse(summary: string, steps: string[] = [], platforms: any[] = [], clarification_questions: string[] = [], agents: any[] = [], test_payloads: any = {}, execution_blueprint: any = null) {
-  return {
-    summary,
-    steps,
-    platforms,
-    clarification_questions,
-    agents,
-    test_payloads,
-    execution_blueprint: execution_blueprint || {
-      trigger: { type: "manual", configuration: {} },
-      workflow: [],
-      error_handling: {
-        retry_attempts: 3,
-        fallback_actions: ["log_error"],
-        critical_failure_actions: ["pause_automation"]
-      },
-      performance_optimization: {
-        rate_limit_handling: "exponential_backoff",
-        concurrency_limit: 5,
-        timeout_seconds_per_step: 60
-      }
-    }
-  };
-}
+Update: Proactively update platform knowledge whenever APIs change, new features emerge, or best practices evolve.`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -518,7 +416,7 @@ serve(async (req) => {
         }
 
         const data = await response.json();
-        let aiResponse = data.choices[0]?.message?.content;
+        const aiResponse = data.choices[0]?.message?.content;
 
         if (!aiResponse) {
           throw new Error('Empty response from OpenAI');
@@ -526,74 +424,8 @@ serve(async (req) => {
 
         console.log('✅ YusrAI response generated successfully:', aiResponse.substring(0, 200) + '...')
 
-        // Parse and validate JSON response
-        let structuredData;
-        try {
-          // Try to parse as JSON first
-          structuredData = JSON.parse(aiResponse);
-        } catch (parseError) {
-          console.log('⚠️ Response not valid JSON, attempting to extract JSON...');
-          
-          // Extract JSON from response if it's wrapped in other text
-          const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            try {
-              structuredData = JSON.parse(jsonMatch[0]);
-            } catch (extractError) {
-              console.error('❌ Failed to extract JSON from response');
-              structuredData = null;
-            }
-          } else {
-            structuredData = null;
-          }
-        }
-
-        // If we couldn't parse JSON, create a fallback response
-        if (!structuredData) {
-          console.log('🔄 Creating fallback structured response...');
-          structuredData = createStandardResponse(
-            "I'm YusrAI, ready to help you create comprehensive automations. Please tell me what workflow you'd like to automate and I'll provide a complete solution.",
-            [
-              "Describe your automation requirements",
-              "I'll analyze and create a complete blueprint",
-              "Configure platform credentials with my guidance",
-              "Test integrations with real API calls",
-              "Execute your automation with full monitoring"
-            ],
-            [],
-            [
-              "What specific automation would you like me to create?",
-              "Which platforms should be involved in your workflow?"
-            ]
-          );
-        }
-
-        // Ensure all required fields exist with defaults
-        const finalResponse = {
-          summary: structuredData.summary || "YusrAI automation ready",
-          steps: Array.isArray(structuredData.steps) ? structuredData.steps : [],
-          platforms: Array.isArray(structuredData.platforms) ? structuredData.platforms : [],
-          clarification_questions: Array.isArray(structuredData.clarification_questions) ? structuredData.clarification_questions : [],
-          agents: Array.isArray(structuredData.agents) ? structuredData.agents : [],
-          test_payloads: structuredData.test_payloads || {},
-          execution_blueprint: structuredData.execution_blueprint || {
-            trigger: { type: "manual", configuration: {} },
-            workflow: [],
-            error_handling: {
-              retry_attempts: 3,
-              fallback_actions: ["log_error"],
-              critical_failure_actions: ["pause_automation"]
-            },
-            performance_optimization: {
-              rate_limit_handling: "exponential_backoff",
-              concurrency_limit: 5,
-              timeout_seconds_per_step: 60
-            }
-          }
-        };
-
         return new Response(JSON.stringify({ 
-          response: JSON.stringify(finalResponse),
+          response: aiResponse,
           yusrai_powered: true,
           seven_sections_validated: true,
           error_help_available: false,
@@ -619,25 +451,39 @@ serve(async (req) => {
   } catch (error: any) {
     console.error('💥 YusrAI Chat-AI Error:', error)
     
-    // Create fallback response with standard format
-    const fallbackResponse = createStandardResponse(
-      "I'm YusrAI, your automation specialist. I encountered a technical issue but I'm ready to help you create powerful automations. Please try asking me again about your automation needs.",
-      [
-        "Describe the automation you want to create",
-        "I'll analyze your requirements and suggest the best platforms",
-        "We'll configure the necessary credentials together",
-        "I'll create a complete execution blueprint for your automation",
-        "Test and deploy your automation with full monitoring"
-      ],
-      [],
-      [
-        "What specific automation would you like me to help you create?",
-        "Which platforms or services should be involved in your workflow?"
-      ]
-    );
-    
     return new Response(JSON.stringify({
-      response: JSON.stringify(fallbackResponse),
+      response: JSON.stringify({
+        summary: "I'm YusrAI, your automation specialist. I encountered a technical issue but I'm ready to help you create powerful automations. Please try asking me again about your automation needs.",
+        steps: [
+          "Describe the automation you want to create",
+          "I'll analyze your requirements and suggest the best platforms",
+          "We'll configure the necessary credentials together",
+          "I'll create a complete execution blueprint for your automation",
+          "Test and deploy your automation with full monitoring"
+        ],
+        platforms: [],
+        clarification_questions: [
+          "What specific automation would you like me to help you create?",
+          "Which platforms or services should be involved in your workflow?"
+        ],
+        agents: [],
+        test_payloads: {},
+        execution_blueprint: {
+          trigger: { type: "manual", configuration: {} },
+          workflow: [],
+          error_handling: {
+            retry_attempts: 3,
+            fallback_actions: ["log_error", "notify_admin"],
+            notification_rules: [],
+            critical_failure_actions: ["pause_automation"]
+          },
+          performance_optimization: {
+            rate_limit_handling: "exponential_backoff",
+            concurrency_limit: 5,
+            timeout_seconds_per_step: 60
+          }
+        }
+      }),
       yusrai_powered: true,
       seven_sections_validated: true,
       error_help_available: true,

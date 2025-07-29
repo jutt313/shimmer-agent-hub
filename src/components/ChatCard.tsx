@@ -1,16 +1,20 @@
-
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { User, CheckCircle2 } from 'lucide-react';
-import { parseYusrAIStructuredResponse, YusrAIStructuredResponse } from "@/utils/jsonParser";
-import { useEffect, useRef } from "react";
+import { User, Code, CheckCircle2, AlertCircle } from 'lucide-react';
+import { parseYusrAIStructuredResponse, cleanDisplayText, YusrAIStructuredResponse } from "@/utils/jsonParser";
+import { useEffect, useRef, useState } from "react";
 import { useErrorRecovery } from "@/hooks/useErrorRecovery";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { agentStateManager } from '@/utils/agentStateManager';
 import ErrorHelpButton from './ErrorHelpButton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import YusrAIStructuredDisplay from './YusrAIStructuredDisplay';
+import ExecutionBlueprintVisualizer from './ExecutionBlueprintVisualizer';
+import { FlagPropagationLogger } from '@/utils/flagPropagationLogger';
 import FixedPlatformButtons from './FixedPlatformButtons';
+import { GHQ } from '@/utils/GHQ';
 
 interface Message {
   id: number;
@@ -21,6 +25,15 @@ interface Message {
   error_help_available?: boolean;
   yusrai_powered?: boolean;
   seven_sections_validated?: boolean;
+  platformData?: Array<{
+    name: string;
+    credentials: Array<{
+      field: string;
+      placeholder: string;
+      link: string;
+      why_needed: string;
+    }>;
+  }>;
 }
 
 interface ChatCardProps {
@@ -53,66 +66,113 @@ const ChatCard = ({
   const { handleError } = useErrorRecovery();
   const { toast } = useToast();
   const { user } = useAuth();
+  const [showCodeModal, setShowCodeModal] = useState(false);
+  const [showBlueprintModal, setShowBlueprintModal] = useState(false);
+  const [enhancedMessages, setEnhancedMessages] = useState<Message[]>([]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  const processMessage = (message: Message): Message => {
-    if (message.isBot && !message.structuredData) {
+  // Enhanced message processing with platform extraction
+  useEffect(() => {
+    const processMessages = () => {
       try {
-        const parseResult = parseYusrAIStructuredResponse(message.text);
-        return {
-          ...message,
-          structuredData: parseResult.structuredData,
-          yusrai_powered: parseResult.metadata.yusrai_powered,
-          seven_sections_validated: parseResult.metadata.seven_sections_validated,
-          error_help_available: parseResult.metadata.error_help_available
-        };
+        const processed = messages.map((message) => {
+          if (message.isBot && !message.structuredData) {
+            try {
+              console.log('🔍 Processing bot message for structured data:', message.text.substring(0, 200));
+              
+              // Parse structured data
+              const parseResult = parseYusrAIStructuredResponse(message.text);
+              if (parseResult.structuredData) {
+                console.log('✅ Structured data found:', parseResult.structuredData);
+                
+                // Extract platform data - handle both platforms and platforms_credentials
+                const platformsSource = parseResult.structuredData.platforms_credentials || parseResult.structuredData.platforms || [];
+                const platformData = platformsSource.map(platform => ({
+                  name: platform.name,
+                  credentials: platform.credentials.map(cred => ({
+                    field: cred.field,
+                    placeholder: cred.example || cred.where_to_get || `Enter ${cred.field}`,
+                    link: cred.link || cred.where_to_get || '#',
+                    why_needed: cred.why_needed
+                  }))
+                }));
+                
+                console.log('🔗 Transformed platform data:', platformData);
+                
+                return {
+                  ...message,
+                  structuredData: parseResult.structuredData,
+                  platformData: platformData,
+                  yusrai_powered: parseResult.metadata.yusrai_powered,
+                  seven_sections_validated: parseResult.metadata.seven_sections_validated
+                };
+              }
+            } catch (error) {
+              console.log('❌ Error processing message:', error);
+            }
+          }
+          return message;
+        });
+        
+        setEnhancedMessages(processed);
       } catch (error) {
-        console.error('❌ Error processing message:', error);
+        console.log('❌ Message processing error:', error);
+        setEnhancedMessages(messages);
       }
-    }
-    return message;
-  };
+    };
 
-  const renderMessageContent = (message: Message): React.ReactNode => {
-    const processedMessage = processMessage(message);
-    
-    if (processedMessage.structuredData) {
-      const data = processedMessage.structuredData;
-      
-      return (
-        <div className="space-y-4">
-          {/* Summary */}
-          {data.summary && (
-            <div className="mb-4">
+    processMessages();
+  }, [messages]);
+
+  const optimizedMessages = enhancedMessages.slice(-50);
+
+  const safeFormatMessageText = (inputText: string | undefined | null, structuredData?: YusrAIStructuredResponse): React.ReactNode[] => {
+    try {
+      if (!inputText || typeof inputText !== 'string') {
+        return [<span key="fallback-input-error">Message content unavailable.</span>];
+      }
+
+      // If we have structured data, display it as clean plain text
+      if (structuredData) {
+        const sections = [];
+        
+        // Summary section
+        if (structuredData.summary && typeof structuredData.summary === 'string') {
+          sections.push(
+            <div key="summary" className="mb-4">
               <div className="font-semibold text-gray-800 mb-2">Summary:</div>
-              <div className="text-gray-700 leading-relaxed">{data.summary}</div>
+              <div className="text-gray-700 leading-relaxed">{structuredData.summary}</div>
             </div>
-          )}
-          
-          {/* Steps */}
-          {data.steps && data.steps.length > 0 && (
-            <div className="mb-4">
+          );
+        }
+        
+        // Steps section
+        if (structuredData.steps && Array.isArray(structuredData.steps) && structuredData.steps.length > 0) {
+          sections.push(
+            <div key="steps" className="mb-4">
               <div className="font-semibold text-gray-800 mb-2">Steps:</div>
               <div className="text-gray-700 leading-relaxed">
-                {data.steps.map((step, index) => (
-                  <div key={index} className="mb-1">{index + 1}. {step}</div>
+                {structuredData.steps.map((step, index) => (
+                  <div key={index} className="mb-1">{index + 1}. {String(step || '')}</div>
                 ))}
               </div>
             </div>
-          )}
-          
-          {/* Platforms */}
-          {data.platforms && data.platforms.length > 0 && (
-            <div className="mb-4">
+          );
+        }
+        
+        // Platforms section
+        if (structuredData.platforms && Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
+          sections.push(
+            <div key="platforms" className="mb-4">
               <div className="font-semibold text-gray-800 mb-2">Platforms:</div>
               <div className="text-gray-700 leading-relaxed">
-                {data.platforms.map((platform, index) => (
+                {structuredData.platforms.map((platform, index) => (
                   <div key={index} className="mb-2">
-                    <div className="font-medium">{platform.name}</div>
-                    {platform.credentials && platform.credentials.length > 0 && (
+                    <div className="font-medium">{String(platform?.name || `Platform ${index + 1}`)}</div>
+                    {platform?.credentials && Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
                       <div className="ml-4 text-sm text-gray-600">
                         <div className="text-xs font-medium mb-1">Required credentials:</div>
                         {platform.credentials.map((cred, credIndex) => (
@@ -126,29 +186,33 @@ const ChatCard = ({
                 ))}
               </div>
             </div>
-          )}
-          
-          {/* Clarification Questions */}
-          {data.clarification_questions && data.clarification_questions.length > 0 && (
-            <div className="mb-4">
+          );
+        }
+        
+        // Clarification Questions section
+        if (structuredData.clarification_questions && Array.isArray(structuredData.clarification_questions) && structuredData.clarification_questions.length > 0) {
+          sections.push(
+            <div key="questions" className="mb-4">
               <div className="font-semibold text-gray-800 mb-2">Clarification Questions:</div>
               <div className="text-gray-700 leading-relaxed">
-                {data.clarification_questions.map((question, index) => (
-                  <div key={index} className="mb-1">{index + 1}. {question}</div>
+                {structuredData.clarification_questions.map((question, index) => (
+                  <div key={index} className="mb-1">{index + 1}. {String(question || '')}</div>
                 ))}
               </div>
             </div>
-          )}
-          
-          {/* AI Agents */}
-          {data.agents && data.agents.length > 0 && (
-            <div className="mb-4">
+          );
+        }
+        
+        // AI Agents section with Add/Dismiss buttons
+        if (structuredData.agents && Array.isArray(structuredData.agents) && structuredData.agents.length > 0) {
+          sections.push(
+            <div key="agents" className="mb-4">
               <div className="font-semibold text-gray-800 mb-2">AI Agents:</div>
               <div className="text-gray-700 leading-relaxed">
-                {data.agents.map((agent, index) => (
+                {structuredData.agents.map((agent, index) => (
                   <div key={index} className="mb-3 p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="font-medium text-gray-800">{agent.name}</div>
+                      <div className="font-medium text-gray-800">{String(agent?.name || `Agent ${index + 1}`)}</div>
                       <div className="flex gap-2">
                         <Button
                           size="sm"
@@ -160,7 +224,7 @@ const ChatCard = ({
                         </Button>
                         <Button
                           size="sm"
-                          onClick={() => handleAgentDismiss(agent.name)}
+                          onClick={() => handleAgentDismiss(agent?.name || `Agent ${index + 1}`)}
                           className="bg-red-100 hover:bg-red-200 text-red-700 border-red-300 text-xs px-3 py-1"
                           variant="outline"
                         >
@@ -169,25 +233,33 @@ const ChatCard = ({
                       </div>
                     </div>
                     <div className="text-sm text-gray-600 space-y-1">
-                      <div><strong>Role:</strong> {agent.role}</div>
-                      <div><strong>Rule:</strong> {agent.rule}</div>
-                      <div><strong>Goal:</strong> {agent.goal}</div>
+                      <div><strong>Role:</strong> {agent?.role || 'Assistant'}</div>
+                      <div><strong>Goal:</strong> {agent?.goal || 'General assistance'}</div>
+                      {agent?.why_needed && <div><strong>Why needed:</strong> {agent.why_needed}</div>}
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-          )}
-        </div>
-      );
+          );
+        }
+        
+        return sections.length > 0 ? sections : [<span key="no-sections">AI response processed successfully.</span>];
+      }
+
+      // Fallback: Display raw text with basic formatting
+      const lines = inputText.split('\n');
+      return lines.map((line, index) => (
+        <span key={`line-${index}`}>
+          {line}
+          {index < lines.length - 1 && <br />}
+        </span>
+      ));
+
+    } catch (error: any) {
+      handleError(error, 'Text formatting in ChatCard');
+      return [<span key="processing-error">Processing your YusrAI automation request...</span>];
     }
-    
-    // Fallback to plain text display
-    return (
-      <div className="leading-relaxed whitespace-pre-wrap break-words">
-        {message.text}
-      </div>
-    );
   };
 
   const handleAgentAdd = (agent: any) => {
@@ -216,23 +288,157 @@ const ChatCard = ({
     }
   };
 
-  const getLatestPlatforms = () => {
-    const latestBotMessage = messages.filter(msg => msg.isBot).pop();
-    if (latestBotMessage) {
-      const processedMessage = processMessage(latestBotMessage);
-      if (processedMessage.structuredData?.platforms) {
-        return processedMessage.structuredData.platforms.map(platform => ({
-          name: platform.name,
-          credentials: platform.credentials.map(cred => ({
-            field: cred.field,
-            placeholder: `Enter ${cred.field}`,
-            link: '#',
-            why_needed: cred.why_needed
-          }))
-        }));
-      }
+  const handlePlatformCredentialClick = (platformName: string) => {
+    if (onPlatformCredentialChange) {
+      console.log(`🔧 Opening YusrAI credential form for ${platformName}`);
+      onPlatformCredentialChange();
     }
-    return [];
+  };
+
+  const testPlatformCredentials = async (platformName: string, testPayload: any) => {
+    try {
+      console.log(`🧪 Testing YusrAI credentials for ${platformName}`);
+      const { data, error } = await supabase.functions.invoke('test-credential', {
+        body: {
+          platform: platformName,
+          testConfig: testPayload
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: data.success ? "✅ YusrAI Test Successful" : "❌ YusrAI Test Failed",
+        description: data.message || `YusrAI credential test for ${platformName} completed`,
+        variant: data.success ? "default" : "destructive",
+      });
+
+      return data.success;
+    } catch (error: any) {
+      console.error('YusrAI test error:', error);
+      toast({
+        title: "YusrAI Test Error",
+        description: `Failed to test ${platformName} credentials`,
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  const checkReadyForExecution = () => {
+    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
+    if (!latestBotMessage?.structuredData) return false;
+
+    const structuredData = latestBotMessage.structuredData;
+    
+    const platforms = Array.isArray(structuredData.platforms) ? structuredData.platforms : [];
+    const agents = Array.isArray(structuredData.agents) ? structuredData.agents : [];
+    
+    const allPlatformsConfigured = platforms.length === 0 || platforms.every(platform => 
+      platformCredentialStatus[platform.name] === 'saved' || 
+      platformCredentialStatus[platform.name] === 'tested'
+    );
+
+    const allAgentsHandled = agents.length === 0 || agents.every(agent => 
+      dismissedAgents.has(agent.name)
+    );
+
+    console.log('🔍 Execution readiness check:', {
+      hasStructuredData: !!structuredData,
+      platformsCount: platforms.length,
+      agentsCount: agents.length,
+      allPlatformsConfigured,
+      allAgentsHandled,
+      isReady: allPlatformsConfigured && allAgentsHandled
+    });
+
+    return allPlatformsConfigured && allAgentsHandled;
+  };
+
+  const handleExecuteAutomation = async () => {
+    console.log('🚀 GHQ execution will be handled by GHQAutomationExecuteButton');
+  };
+
+  const getCompleteAutomationJSON = () => {
+    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
+    if (!latestBotMessage?.structuredData) return null;
+
+    return {
+      automation_id: automationId,
+      created_at: new Date().toISOString(),
+      yusrai_response: latestBotMessage.structuredData,
+      yusrai_powered: latestBotMessage.yusrai_powered || true,
+      seven_sections_validated: latestBotMessage.seven_sections_validated || true,
+      ready_for_execution: checkReadyForExecution(),
+      credential_status: platformCredentialStatus
+    };
+  };
+
+  const saveAutomationResponse = async (messageData: Message) => {
+    if (!user?.id || !messageData.isBot || !messageData.structuredData) return;
+    
+    try {
+        const { error } = await supabase.from('automation_responses').insert({
+          user_id: user.id,
+          automation_id: automationId,
+          chat_message_id: messageData.id,
+          response_text: messageData.text,
+          structured_data: messageData.structuredData as any,
+          yusrai_powered: messageData.yusrai_powered || false,
+          seven_sections_validated: messageData.seven_sections_validated || false,
+          error_help_available: messageData.error_help_available || false,
+          is_ready_for_execution: checkReadyForExecution()
+        });
+      
+      if (error) {
+        console.error('❌ Failed to save automation response:', error);
+      } else {
+        console.log('✅ Automation response saved successfully');
+      }
+    } catch (error) {
+      console.error('❌ Error saving automation response:', error);
+    }
+  };
+
+  const getLatestPlatforms = () => {
+    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.platformData).pop();
+    return latestBotMessage?.platformData || [];
+  };
+
+  const transformPlatformsForButtons = (yusraiPlatforms: any[]) => {
+    console.log('🔄 Transforming platforms for buttons:', yusraiPlatforms);
+    
+    if (!Array.isArray(yusraiPlatforms)) {
+      console.log('⚠️ No platforms array found, returning empty array');
+      return [];
+    }
+    
+    const transformedPlatforms = yusraiPlatforms.map((platform, index) => {
+      console.log(`🔄 Processing platform ${index + 1}:`, platform);
+      
+      const credentials = platform.credentials || 
+                         platform.required_credentials || 
+                         platform.credential_requirements ||
+                         platform.fields ||
+                         [];
+      
+      const transformedPlatform = {
+        name: platform.name || platform.platform_name || platform.platform || `Platform ${index + 1}`,
+        credentials: Array.isArray(credentials) ? credentials.map((cred: any) => ({
+          field: cred.field || cred.name || cred.key || 'api_key',
+          placeholder: cred.example || cred.placeholder || cred.description || `Enter ${cred.field || 'credential'}`,
+          link: cred.link || cred.where_to_get || cred.documentation_url || cred.url || '#',
+          why_needed: cred.why_needed || cred.description || cred.purpose || 'Authentication required'
+        })) : [],
+        test_payloads: platform.test_payloads || platform.test_payload || platform.test_data || []
+      };
+      
+      console.log(`✅ Transformed platform:`, transformedPlatform);
+      return transformedPlatform;
+    });
+    
+    console.log('🎯 Final transformed platforms:', transformedPlatforms);
+    return transformedPlatforms;
   };
 
   return (
@@ -248,55 +454,59 @@ const ChatCard = ({
         
         <ScrollArea className="flex-1 relative z-10 p-6 overflow-y-auto" ref={scrollAreaRef}>
           <div className="space-y-6 pb-4 min-h-full">
-            {messages.map(message => (
-              <div key={message.id} className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}>
-                <div className={`max-w-4xl px-6 py-4 rounded-2xl ${
-                  message.isBot 
-                    ? 'bg-white border border-blue-100/50 text-gray-800 shadow-lg backdrop-blur-sm' 
-                    : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
-                  } transition-all duration-300 overflow-hidden`}
-                >
-                  {message.isBot && (
-                    <div className="flex items-center gap-2 mb-3">
-                      <img 
-                        src="/lovable-uploads/cf9c8f76-d8e9-4790-b043-40ba7239140d.png" 
-                        alt="YusrAI" 
-                        className="w-5 h-5 object-contain"
-                      />
-                      <span className="text-sm font-medium text-blue-600">
-                        YusrAI {message.yusrai_powered ? (message.seven_sections_validated ? '(Structured)' : '(Simple)') : '(Processing)'}
-                      </span>
-                      {message.seven_sections_validated && (
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+            {optimizedMessages.map(message => {
+              return (
+                <div key={message.id} className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}>
+                  <div className={`max-w-4xl px-6 py-4 rounded-2xl ${
+                    message.isBot 
+                      ? 'bg-white border border-blue-100/50 text-gray-800 shadow-lg backdrop-blur-sm' 
+                      : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
+                    } transition-all duration-300 overflow-hidden`}
+                  >
+                    {message.isBot && (
+                      <div className="flex items-center gap-2 mb-3">
+                        <img 
+                          src="/lovable-uploads/cf9c8f76-d8e9-4790-b043-40ba7239140d.png" 
+                          alt="YusrAI" 
+                          className="w-5 h-5 object-contain"
+                        />
+                        <span className="text-sm font-medium text-blue-600">
+                          YusrAI {message.yusrai_powered ? (message.seven_sections_validated ? '(Structured)' : '(Simple)') : '(Processing)'}
+                        </span>
+                        {message.seven_sections_validated && (
+                          <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        )}
+                      </div>
+                    )}
+                    
+                    {!message.isBot && (
+                      <div className="flex items-start gap-2 mb-2">
+                        <User className="w-4 h-4 mt-1 flex-shrink-0" />
+                        <span className="text-sm">You</span>
+                      </div>
+                    )}
+
+                    <div className="leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
+                      {safeFormatMessageText(message.text, message.structuredData)}
+                      
+                      {message.isBot && message.error_help_available && (
+                        <ErrorHelpButton 
+                          errorMessage={message.text}
+                          onHelpRequest={() => handleErrorHelp(message.text)}
+                        />
                       )}
                     </div>
-                  )}
-                  
-                  {!message.isBot && (
-                    <div className="flex items-start gap-2 mb-2">
-                      <User className="w-4 h-4 mt-1 flex-shrink-0" />
-                      <span className="text-sm">You</span>
-                    </div>
-                  )}
-
-                  {renderMessageContent(message)}
-                  
-                  {message.isBot && message.error_help_available && (
-                    <ErrorHelpButton 
-                      errorMessage={message.text}
-                      onHelpRequest={() => handleErrorHelp(message.text)}
-                    />
-                  )}
-                  
-                  <p className={`text-xs mt-3 ${message.isBot ? 'text-gray-500' : 'text-blue-100'}`}>
-                    {message.timestamp.toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </p>
+                    
+                    <p className={`text-xs mt-3 ${message.isBot ? 'text-gray-500' : 'text-blue-100'}`}>
+                      {message.timestamp.toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             
             {isLoading && (
               <div className="flex justify-start">

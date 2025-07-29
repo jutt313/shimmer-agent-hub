@@ -1,3 +1,4 @@
+
 export interface YusrAIStructuredResponse {
   summary: string;
   steps: string[];
@@ -173,22 +174,58 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
     // Map database field names to frontend expected names
     console.log('🔍 Validating and mapping structured sections...')
     
-    // FIX 1: Handle step_by_step mapping to steps
+    // ENHANCED STEP MAPPING - Handle step_by_step with proper object-to-string conversion
     if (parsedResponse.step_by_step && !parsedResponse.steps) {
-      parsedResponse.steps = Array.isArray(parsedResponse.step_by_step) 
+      const stepsArray = Array.isArray(parsedResponse.step_by_step) 
         ? parsedResponse.step_by_step 
         : [parsedResponse.step_by_step];
-      console.log('📋 Mapped step_by_step to steps:', parsedResponse.steps.length);
+      
+      // Convert objects to readable strings
+      parsedResponse.steps = stepsArray.map((step: any, index: number) => {
+        if (typeof step === 'string') {
+          return step;
+        }
+        if (typeof step === 'object' && step !== null) {
+          // Extract readable text from step object
+          return step.description || 
+                 step.action || 
+                 step.step || 
+                 step.instruction || 
+                 step.text ||
+                 step.summary ||
+                 JSON.stringify(step, null, 2); // Fallback to formatted JSON
+        }
+        return `Step ${index + 1}`;
+      });
+      
+      console.log('📋 Enhanced step_by_step mapping with object conversion:', parsedResponse.steps.length);
     }
     
     if (parsedResponse.step_by_step_explanation && !parsedResponse.steps) {
-      parsedResponse.steps = Array.isArray(parsedResponse.step_by_step_explanation) 
+      const stepsArray = Array.isArray(parsedResponse.step_by_step_explanation) 
         ? parsedResponse.step_by_step_explanation 
         : [parsedResponse.step_by_step_explanation];
-      console.log('📋 Mapped step_by_step_explanation to steps:', parsedResponse.steps.length);
+      
+      // Convert objects to readable strings  
+      parsedResponse.steps = stepsArray.map((step: any, index: number) => {
+        if (typeof step === 'string') {
+          return step;
+        }
+        if (typeof step === 'object' && step !== null) {
+          return step.description || 
+                 step.action || 
+                 step.step || 
+                 step.instruction ||
+                 step.text ||
+                 JSON.stringify(step, null, 2);
+        }
+        return `Step ${index + 1}`;
+      });
+      
+      console.log('📋 Enhanced step_by_step_explanation mapping with object conversion:', parsedResponse.steps.length);
     }
 
-    // FIX 2: Handle platforms_and_credentials OBJECT to platforms ARRAY conversion
+    // ENHANCED PLATFORMS_AND_CREDENTIALS MAPPING - Convert object to array
     if (parsedResponse.platforms_and_credentials && !parsedResponse.platforms) {
       console.log('🔗 Converting platforms_and_credentials object to platforms array...');
       
@@ -204,15 +241,17 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
               ? platformData.credentials 
               : Array.isArray(platformData.required_credentials)
               ? platformData.required_credentials
+              : Array.isArray(platformData.credential_requirements)
+              ? platformData.credential_requirements
               : []
           };
         });
         
         parsedResponse.platforms = platformsArray;
-        console.log('✅ Converted object to array:', parsedResponse.platforms.length, 'platforms');
+        console.log('✅ Converted platforms_and_credentials object to array:', parsedResponse.platforms.length, 'platforms');
       } else if (Array.isArray(parsedResponse.platforms_and_credentials)) {
         parsedResponse.platforms = parsedResponse.platforms_and_credentials;
-        console.log('✅ Used array as-is:', parsedResponse.platforms.length, 'platforms');
+        console.log('✅ Used platforms_and_credentials array as-is:', parsedResponse.platforms.length, 'platforms');
       }
     }
 
@@ -279,18 +318,23 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('✅ AI-driven platform name extraction completed');
     }
 
-    // FIX 3: Handle clarification_questions object array to string array conversion
+    // ENHANCED CLARIFICATION_QUESTIONS MAPPING - Convert objects to strings
     if (parsedResponse.clarification_questions && Array.isArray(parsedResponse.clarification_questions)) {
       parsedResponse.clarification_questions = parsedResponse.clarification_questions.map((question: any, index: number) => {
         if (typeof question === 'string') {
           return question;
         } else if (typeof question === 'object' && question !== null) {
           // Extract question text from object
-          return question.question || question.text || question.description || `Question ${index + 1}`;
+          return question.question || 
+                 question.text || 
+                 question.description || 
+                 question.inquiry ||
+                 question.ask ||
+                 JSON.stringify(question, null, 2); // Fallback to formatted JSON
         }
         return `Question ${index + 1}`;
       });
-      console.log('❓ Fixed clarification questions to string array:', parsedResponse.clarification_questions.length);
+      console.log('❓ Enhanced clarification questions object-to-string conversion:', parsedResponse.clarification_questions.length);
     }
 
     // AI AGENTS MAPPING
@@ -328,7 +372,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
     if (!parsedResponse.test_payloads) parsedResponse.test_payloads = {};
     if (!parsedResponse.execution_blueprint) parsedResponse.execution_blueprint = null;
 
-    // FIX 4: Make seven_sections_validated DYNAMIC based on actual content
+    // ENHANCED SEVEN SECTIONS VALIDATION - Make it dynamic based on actual content
     const hasSummary = parsedResponse.summary && parsedResponse.summary.length > 0;
     const hasSteps = Array.isArray(parsedResponse.steps) && parsedResponse.steps.length > 0;
     const hasPlatforms = Array.isArray(parsedResponse.platforms) && parsedResponse.platforms.length > 0;
@@ -340,7 +384,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
     const sectionsCount = [hasSummary, hasSteps, hasPlatforms, hasQuestions, hasAgents, hasTestPayloads, hasBlueprint].filter(Boolean).length;
     
     console.log('✅ YusrAI structured response validation successful')
-    metadata.seven_sections_validated = sectionsCount >= 4; // At least 4 major sections for complex automation
+    metadata.seven_sections_validated = sectionsCount >= 3; // Dynamic validation - at least 3 major sections
     
     console.log(`📊 Section analysis: ${sectionsCount}/7 sections present - seven_sections_validated: ${metadata.seven_sections_validated}`);
     

@@ -1,3 +1,4 @@
+
 export interface YusrAIStructuredResponse {
   summary: string;
   steps: string[];
@@ -23,6 +24,12 @@ export interface YusrAIStructuredResponse {
       example?: string;
     }>;
   }>;
+  platforms_and_credentials?: {
+    platforms: Array<{
+      name: string;
+      credentials: any;
+    }>;
+  };
   clarification_questions: string[];
   agents: Array<{
     name: string;
@@ -162,7 +169,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
     const hasStructuredSections = parsedResponse.error_handling || 
       parsedResponse.performance_optimization || 
       parsedResponse.summary ||
-      (parsedResponse.steps || parsedResponse.platforms || parsedResponse.agents || parsedResponse.platforms_credentials);
+      (parsedResponse.steps || parsedResponse.platforms || parsedResponse.agents || parsedResponse.platforms_credentials || parsedResponse.platforms_and_credentials);
 
     if (!hasStructuredSections) {
       console.log('📄 Not a structured response, treating as plain text')
@@ -232,18 +239,48 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('📋 Fixed step_by_step_explanation mapping preventing duplication:', parsedResponse.steps.length);
     }
 
-    // FIXED PLATFORMS_AND_CREDENTIALS MAPPING - Extract full platform names
+    // FIXED PLATFORMS_AND_CREDENTIALS MAPPING - Handle nested structure properly
     if (parsedResponse.platforms_and_credentials && !parsedResponse.platforms) {
-      console.log('🔗 Converting platforms_and_credentials object to platforms array...');
+      console.log('🔗 Processing platforms_and_credentials with nested structure...');
       
-      // Check if it's an object (not array)
-      if (typeof parsedResponse.platforms_and_credentials === 'object' && !Array.isArray(parsedResponse.platforms_and_credentials)) {
+      // Handle nested structure: platforms_and_credentials.platforms
+      if (parsedResponse.platforms_and_credentials.platforms && Array.isArray(parsedResponse.platforms_and_credentials.platforms)) {
+        const platformsArray = parsedResponse.platforms_and_credentials.platforms.map((platform: any) => {
+          console.log(`🔍 Processing nested platform:`, platform);
+          
+          let credentials = [];
+          if (platform.credentials) {
+            if (Array.isArray(platform.credentials)) {
+              credentials = platform.credentials;
+            } else if (typeof platform.credentials === 'object') {
+              // Transform credential object (like {api_key: {description, link}}) to array format
+              credentials = Object.entries(platform.credentials).map(([key, value]: [string, any]) => ({
+                field: key,
+                why_needed: value.description || value.why_needed || `Required for ${key}`,
+                where_to_get: value.where_to_get || value.link || `Get ${key} credentials`,
+                link: value.link || value.url || '#',
+                example: value.example || value.placeholder || `Enter your ${key}`
+              }));
+            }
+          }
+          
+          return {
+            name: platform.name || 'Unknown Platform',
+            credentials: credentials
+          };
+        });
+        
+        parsedResponse.platforms = platformsArray;
+        console.log('✅ Fixed platforms_and_credentials nested structure with full names:', parsedResponse.platforms.length, 'platforms');
+      } 
+      // Handle object format: platforms_and_credentials as direct object
+      else if (typeof parsedResponse.platforms_and_credentials === 'object' && !Array.isArray(parsedResponse.platforms_and_credentials)) {
         const platformsArray = Object.keys(parsedResponse.platforms_and_credentials).map(platformKey => {
           const platformData = parsedResponse.platforms_and_credentials[platformKey];
           console.log(`🔍 Processing platform: ${platformKey}`, platformData);
           
           return {
-            name: platformKey, // FIXED: Use the complete object key as platform name (not just first character)
+            name: platformKey, // Use the complete object key as platform name
             credentials: Array.isArray(platformData.credentials) 
               ? platformData.credentials 
               : Array.isArray(platformData.required_credentials)

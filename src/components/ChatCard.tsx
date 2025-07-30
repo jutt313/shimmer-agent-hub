@@ -49,6 +49,7 @@ interface ChatCardProps {
   onExecuteAutomation?: () => void;
   platformCredentialStatus?: { [key: string]: 'saved' | 'tested' | 'missing' };
   onPlatformCredentialChange?: () => void;
+  automationDiagramData?: any;
 }
 
 const ChatCard = ({
@@ -61,7 +62,8 @@ const ChatCard = ({
   onSendMessage,
   onExecuteAutomation,
   platformCredentialStatus = {},
-  onPlatformCredentialChange
+  onPlatformCredentialChange,
+  automationDiagramData
 }: ChatCardProps) => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -88,20 +90,42 @@ const ChatCard = ({
               if (parseResult.structuredData) {
                 console.log('✅ Structured data found:', parseResult.structuredData);
                 
-                const platformsSource = parseResult.structuredData.platforms_credentials || parseResult.structuredData.platforms || [];
-                const platformData = platformsSource.map(platform => ({
-                  name: platform.name || 'Unknown Platform',
-                  credentials: platform.credentials.map(cred => ({
-                    field: cred.field,
-                    placeholder: cred.example || cred.where_to_get || `Enter ${cred.field}`,
-                    link: cred.link || cred.where_to_get || '#',
-                    why_needed: cred.why_needed
-                  }))
-                }));
+                const platformsSource = parseResult.structuredData.platforms_and_credentials?.platforms || 
+                                       parseResult.structuredData.platforms_credentials || 
+                                       parseResult.structuredData.platforms || [];
+                
+                const platformData = platformsSource.map(platform => {
+                  console.log('🔍 Processing individual platform:', platform);
+                  
+                  let credentials = [];
+                  if (platform.credentials) {
+                    if (Array.isArray(platform.credentials)) {
+                      credentials = platform.credentials;
+                    } else if (typeof platform.credentials === 'object') {
+                      credentials = Object.entries(platform.credentials).map(([key, value]: [string, any]) => ({
+                        field: key,
+                        placeholder: value.example || value.placeholder || `Enter ${key}`,
+                        link: value.link || value.url || '#',
+                        why_needed: value.description || value.why_needed || `Required for ${key}`
+                      }));
+                    }
+                  }
+                  
+                  return {
+                    name: platform.name || 'Unknown Platform',
+                    credentials: credentials.map(cred => ({
+                      field: cred.field || cred.name || 'api_key',
+                      placeholder: cred.example || cred.placeholder || `Enter ${cred.field}`,
+                      link: cred.link || cred.where_to_get || '#',
+                      why_needed: cred.why_needed || cred.description || 'Authentication required'
+                    }))
+                  };
+                });
                 
                 console.log('🔗 Transformed platform data with full names:', platformData);
                 
-                const diagramData = parseResult.structuredData.execution_blueprint || 
+                const diagramData = automationDiagramData ||
+                                  parseResult.structuredData.execution_blueprint || 
                                   parseResult.structuredData.blueprint ||
                                   parseResult.structuredData.automation_diagram ||
                                   parseResult.structuredData.workflow;
@@ -133,7 +157,7 @@ const ChatCard = ({
     };
 
     processMessages();
-  }, [messages]);
+  }, [messages, automationDiagramData]);
 
   const optimizedMessages = enhancedMessages.slice(-50);
 
@@ -460,7 +484,7 @@ const ChatCard = ({
 
   const getLatestDiagramData = () => {
     const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.automationDiagramData).pop();
-    return latestBotMessage?.automationDiagramData || null;
+    return latestBotMessage?.automationDiagramData || automationDiagramData || null;
   };
 
   const transformPlatformsForButtons = (yusraiPlatforms: any[]) => {

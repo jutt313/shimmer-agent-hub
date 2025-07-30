@@ -19,7 +19,6 @@ import { agentStateManager } from '@/utils/agentStateManager';
 import { extractBlueprintFromStructuredData, validateBlueprintForDiagram, ensureBlueprintHasSteps } from '@/utils/blueprintExtractor';
 import { FlagPropagationLogger } from '@/utils/flagPropagationLogger';
 import { GHQ } from '@/utils/GHQ';
-import SimpleExecuteButton from '@/components/SimpleExecuteButton';
 
 interface Automation {
   id: string;
@@ -224,7 +223,6 @@ const AutomationDetail = () => {
 
       if (chatError) throw chatError;
 
-      // SURGICAL FIX: Include AI messages with structured data processing
       const formattedMessages = chatData.map((chat: ChatMessage, index: number) => {
         console.log('🔄 Processing stored chat message:', chat.message_content.substring(0, 100));
         
@@ -239,7 +237,6 @@ const AutomationDetail = () => {
           yusraiPowered = parseResult.metadata.yusrai_powered || false;
           sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
           
-          // SURGICAL FIX: Extract platform data for credential buttons
           if (structuredData) {
             const platformsSource = structuredData.platforms_and_credentials?.platforms || 
                                    structuredData.platforms_credentials || 
@@ -297,7 +294,6 @@ const AutomationDetail = () => {
         };
       });
 
-      // SURGICAL FIX: Extract platforms from AI messages for credential buttons
       const allPlatforms: any[] = [];
       formattedMessages.forEach(msg => {
         if (msg.isBot && msg.platformData && Array.isArray(msg.platformData)) {
@@ -465,11 +461,9 @@ const AutomationDetail = () => {
 
       setMessages(prev => [...prev, aiMessage]);
 
-      // PHASE 5: Generate diagram automatically when structured data with execution_blueprint is available
       if (structuredData && structuredData.execution_blueprint) {
         console.log('🔄 PHASE 5: Auto-generating diagram from execution_blueprint with SAFE object handling');
         try {
-          // PHASE 5: Extract blueprint from structured data with SAFE serialization
           const blueprintData: AutomationBlueprint = {
             version: '1.0',
             description: String(structuredData.summary || 'AI-generated automation workflow'),
@@ -489,7 +483,6 @@ const AutomationDetail = () => {
             })) : []
           };
           
-          // Save blueprint to automation
           const { error: updateError } = await supabase
             .from('automations')
             .update({ automation_blueprint: blueprintData })
@@ -499,7 +492,6 @@ const AutomationDetail = () => {
             console.log('📋 Blueprint saved successfully');
             setAutomation(prev => ({ ...prev!, automation_blueprint: blueprintData }));
             
-            // Generate diagram after a short delay
             setTimeout(() => {
               generateAndSaveDiagram(automation.id, blueprintData);
             }, 2000);
@@ -507,12 +499,9 @@ const AutomationDetail = () => {
         } catch (error) {
           console.error('❌ Error processing execution blueprint:', error);
         }
-      } 
-      // Fallback: If workflow exists but no execution_blueprint
-      else if (structuredData && structuredData.workflow && structuredData.workflow.length > 0) {
+      } else if (structuredData && structuredData.workflow && structuredData.workflow.length > 0) {
         console.log('🔄 PHASE 3: Fallback - Auto-generating diagram from workflow data');
         try {
-          // Create a proper blueprint from the workflow data
           const blueprintData: AutomationBlueprint = {
             version: '1.0',
             description: structuredData.summary || 'AI-generated automation workflow',
@@ -534,7 +523,6 @@ const AutomationDetail = () => {
             platforms: structuredData.platforms || []
           };
           
-          // Generate diagram after a short delay to show "Blueprint Generated" message
           setTimeout(() => {
             generateAndSaveDiagram(automation.id, blueprintData);
           }, 2000);
@@ -773,78 +761,52 @@ const AutomationDetail = () => {
         </div>
       </div>
       
-      {!showDashboard && !showDiagram && currentPlatforms && currentPlatforms.length > 0 && (
-        <div className="px-6 pb-2">
-          <div className="flex flex-wrap gap-2">
-            {currentPlatforms.map((platform, index) => (
-              <Button
-                key={`${platform.name}-${index}`}
-                size="sm"
-                className="bg-red-500 hover:bg-red-600 text-white border-0"
-              >
-                Setup {platform.name}
-              </Button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {!showDashboard && !showDiagram && automation?.automation_blueprint && (
-        <div className="px-6 pb-4">
-          <SimpleExecuteButton
-            automationId={automation.id}
-          />
-        </div>
-      )}
-      
-      {!showDashboard && !showDiagram && (
-        <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent px-6 pt-2 pb-4">
-          <div className="flex gap-3 items-end">
-            <Button
-              onClick={() => setShowAIAgentForm(true)}
-              className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-5 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0 flex-shrink-0"
-              style={{
-                boxShadow: '0 0 25px rgba(147, 51, 234, 0.3)'
+      <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent px-6 pt-2 pb-4">
+        <div className="flex gap-3 items-end">
+          <Button
+            onClick={() => setShowAIAgentForm(true)}
+            className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-5 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0 flex-shrink-0"
+            style={{
+              boxShadow: '0 0 25px rgba(147, 51, 234, 0.3)'
+            }}
+          >
+            <Bot className="w-4 h-4 mr-2" />
+            AI Agent
+          </Button>
+          
+          <div className="flex-1 relative min-w-0">
+            <textarea
+              value={newMessage} 
+              onChange={e => setNewMessage(e.target.value)} 
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !sendingMessage) {
+                  e.preventDefault();
+                  handleSendMessage(newMessage);
+                  setNewMessage("");
+                }
               }}
-            >
-              <Bot className="w-4 h-4 mr-2" />
-              AI Agent
-            </Button>
-            
-            <div className="flex-1 relative min-w-0">
-              <textarea
-                value={newMessage} 
-                onChange={e => setNewMessage(e.target.value)} 
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey && !sendingMessage) {
-                    e.preventDefault();
-                    handleSendMessage(newMessage);
-                    setNewMessage("");
-                  }
-                }}
-                placeholder={sendingMessage ? "YusrAI is thinking with full context..." : "Describe the automation you want to build..."} 
-                disabled={sendingMessage}
-                rows={Math.min(Math.max(newMessage.split('\n').length, 1), 4)}
-                className="w-full resize-none rounded-3xl bg-white/90 backdrop-blur-sm border-0 px-5 py-3 text-base focus:outline-none focus:ring-0 shadow-lg min-h-[48px] max-h-32 overflow-y-auto" 
-                style={{
-                  boxShadow: '0 0 25px rgba(154, 94, 255, 0.2)'
-                }} 
-              />
-            </div>
-            
-            <Button 
-              onClick={() => handleSendMessage(newMessage)}
-              disabled={sendingMessage || !newMessage.trim()}
-              className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0 disabled:opacity-50 flex-shrink-0" 
+              placeholder={sendingMessage ? "YusrAI is thinking with full context..." : "Describe the automation you want to build..."} 
+              disabled={sendingMessage}
+              rows={Math.min(Math.max(newMessage.split('\n').length, 1), 4)}
+              className="w-full resize-none rounded-3xl bg-white/90 backdrop-blur-sm border-0 px-5 py-3 text-base focus:outline-none focus:ring-0 shadow-lg min-h-[48px] max-h-32 overflow-y-auto" 
               style={{
-                boxShadow: '0 0 30px rgba(92, 142, 246, 0.3)'
-              }}
-            >
-              <Send className={`w-5 h-5 ${sendingMessage ? 'animate-pulse' : ''}`} />
-            </Button>
+                boxShadow: '0 0 25px rgba(154, 94, 255, 0.2)'
+              }} 
+            />
           </div>
+          
+          <Button 
+            onClick={() => handleSendMessage(newMessage)}
+            disabled={sendingMessage || !newMessage.trim()}
+            className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0 disabled:opacity-50 flex-shrink-0" 
+            style={{
+              boxShadow: '0 0 30px rgba(92, 142, 246, 0.3)'
+            }}
+          >
+            <Send className={`w-5 h-5 ${sendingMessage ? 'animate-pulse' : ''}`} />
+          </Button>
         </div>
-      )}
+      </div>
 
       {showBlueprint && automation?.automation_blueprint && (
         <BlueprintCard

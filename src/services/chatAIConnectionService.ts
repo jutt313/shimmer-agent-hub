@@ -26,7 +26,7 @@ export interface ChatAIResponse {
 class ChatAIConnectionService {
   async processConnectionRequest(request: ChatAIRequest): Promise<ChatAIResponse> {
     try {
-      console.log('🚀 Processing YusrAI 7-section request:', request.message);
+      console.log('🚀 Processing YusrAI request:', request.message);
       
       const { data, error } = await supabase.functions.invoke('chat-ai', {
         body: {
@@ -43,7 +43,7 @@ class ChatAIConnectionService {
         throw new Error(`YusrAI Chat AI service error: ${error.message}`);
       }
 
-      console.log('✅ YusrAI 7-section response received:', data);
+      console.log('✅ YusrAI response received:', data);
 
       if (!data || !data.response) {
         console.warn('⚠️ Empty response from YusrAI, using fallback');
@@ -53,10 +53,7 @@ class ChatAIConnectionService {
             steps: [
               "Tell me what automation you'd like to create",
               "I'll provide a complete blueprint with platforms and AI agents",
-              "Configure your platform credentials using my guidance",
-              "Test your integrations with real API calls",
-              "Add recommended AI agents for intelligent decision-making",
-              "Execute your automation with full monitoring and error handling"
+              "Configure your platform credentials using my guidance"
             ],
             platforms: [],
             clarification_questions: [
@@ -73,11 +70,6 @@ class ChatAIConnectionService {
                 fallback_actions: ["log_error"],
                 notification_rules: [],
                 critical_failure_actions: ["pause_automation"]
-              },
-              performance_optimization: {
-                rate_limit_handling: "exponential_backoff",
-                concurrency_limit: 5,
-                timeout_seconds_per_step: 60
               }
             }
           }),
@@ -87,31 +79,23 @@ class ChatAIConnectionService {
         };
       }
 
-      // UPDATED: Parse structured data from your consistent chat-ai JSON structure
+      // SURGICAL FIX #3: Simplified parsing for raw OpenAI JSON response
       let structuredData = null;
       try {
-        // FIXED: Your chat-ai function returns JSON string in response field
+        // The response now contains raw OpenAI JSON, so parse it directly
         if (typeof data.response === 'string') {
           structuredData = JSON.parse(data.response);
-          console.log('📊 Successfully parsed YusrAI structured data from your consistent JSON:', structuredData);
+          console.log('📊 Successfully parsed YusrAI structured data from raw OpenAI JSON:', structuredData);
         } else {
-          // Fallback for direct object (shouldn't happen with your new structure)
           structuredData = data.response;
           console.log('📊 Using direct structured data object:', structuredData);
         }
       } catch (parseError) {
         console.log('⚠️ Error parsing YusrAI JSON response:', parseError);
         
-        // Fallback regex extraction
-        try {
-          const jsonMatch = data.response.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            structuredData = JSON.parse(jsonMatch[0]);
-            console.log('📊 Extracted YusrAI JSON using regex fallback:', structuredData);
-          }
-        } catch (fallbackError) {
-          console.log('❌ All YusrAI JSON parsing attempts failed');
-        }
+        // Minimal fallback without complex regex
+        structuredData = null;
+        console.log('❌ YusrAI JSON parsing failed, treating as plain text');
       }
 
       return {

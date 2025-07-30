@@ -181,15 +181,23 @@ Return ONLY the JSON configuration with NO text before or after.`,
         return;
       }
 
+      // 🔍 FORENSIC LOGGING: Show exactly what ChatAI returned
+      console.log('🔍 Raw ChatAI response:', data);
+      console.log('🔍 Response type:', typeof data);
+      console.log('🔍 Response.response field:', data?.response);
+
       let testConfig;
       try {
-        if (typeof data === 'string') {
-          const jsonMatch = data.match(/\{[\s\S]*\}/);
+        // 🎯 SURGICAL FIX: Handle ChatAI's wrapped response format
+        let rawConfig = data?.response || data;
+        
+        if (typeof rawConfig === 'string') {
+          const jsonMatch = rawConfig.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             testConfig = JSON.parse(jsonMatch[0]);
           }
         } else {
-          testConfig = data;
+          testConfig = rawConfig;
         }
       } catch (parseError) {
         console.error('Failed to parse AI test config:', parseError);

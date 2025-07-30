@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { ChatCard } from '@/components/ChatCard';
+import ChatCard from '@/components/ChatCard';
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Copy, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useToast } from "@/components/ui/use-toast";
@@ -59,7 +59,7 @@ const AutomationDetail = () => {
       if (automationError) throw automationError;
       setAutomation(automationData);
 
-      // Load chat messages - THIS IS THE FIX
+      // Load chat messages - Include automation_chats data properly
       const { data: chatData, error: chatError } = await supabase
         .from('automation_chats')
         .select('*')
@@ -68,13 +68,22 @@ const AutomationDetail = () => {
 
       if (chatError) throw chatError;
 
-      // Transform chat data to message format
-      const transformedMessages = chatData.map((chat, index) => ({
-        id: index + 1,
-        text: chat.message_content,
-        isBot: chat.sender === 'ai' || chat.sender === 'yusrai',
-        timestamp: new Date(chat.timestamp)
-      }));
+      // Transform chat data to message format with structured data
+      const transformedMessages = chatData.map((chat, index) => {
+        const messageObj = {
+          id: index + 1,
+          text: chat.message_content,
+          isBot: chat.sender === 'ai' || chat.sender === 'yusrai',
+          timestamp: new Date(chat.timestamp)
+        };
+
+        // If this is a bot message with structured response data, include it
+        if ((chat.sender === 'ai' || chat.sender === 'yusrai') && chat.structured_response_data) {
+          messageObj.structuredData = chat.structured_response_data;
+        }
+
+        return messageObj;
+      });
 
       setMessages(transformedMessages);
 

@@ -157,7 +157,7 @@ const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: F
   };
 
   if (!platforms || platforms.length === 0) {
-    return null; // FIX: Remove the red banner when no platforms
+    return null;
   }
 
   return (

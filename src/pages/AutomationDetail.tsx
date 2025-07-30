@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/router';
+import { useParams } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, Loader2 } from "lucide-react";
@@ -10,8 +11,7 @@ import ChatCard from "@/components/ChatCard";
 import { useErrorRecovery } from "@/hooks/useErrorRecovery";
 import { agentStateManager } from '@/utils/agentStateManager';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import AgentConfigurationForm from '@/components/AgentConfigurationForm';
-import { GHQAutomationExecuteButton } from '@/components/GHQAutomationExecuteButton';
+import GHQAutomationExecuteButton from '@/components/GHQAutomationExecuteButton';
 
 interface Message {
   id: number;
@@ -34,8 +34,7 @@ interface Agent {
 }
 
 const AutomationDetail = () => {
-  const router = useRouter();
-  const { id } = router.query;
+  const { id } = useParams();
   const { toast } = useToast();
   const { user } = useAuth();
   const { handleError } = useErrorRecovery();
@@ -47,8 +46,6 @@ const AutomationDetail = () => {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [dismissedAgents, setDismissedAgents] = useState<Set<string>>(new Set());
   const [platformCredentialStatus, setPlatformCredentialStatus] = useState<{ [key: string]: 'saved' | 'tested' | 'missing' }>({});
-  const [showAgentForm, setShowAgentForm] = useState(false);
-  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
 
   const fetchAutomation = useCallback(async () => {
     if (!id || !user?.id) return;
@@ -85,8 +82,9 @@ const AutomationDetail = () => {
     if (!id) return;
 
     try {
+      // FIXED: Use correct table name from the schema - automation_chats (not chat_messages)
       const { data, error } = await supabase
-        .from('chat_messages')
+        .from('automation_chats')
         .select('*')
         .eq('automation_id', id)
         .order('timestamp', { ascending: true });
@@ -101,8 +99,11 @@ const AutomationDetail = () => {
         return;
       }
 
-      const formattedMessages = data.map(msg => ({
-        ...msg,
+      // FIXED: Map automation_chats to Message interface format
+      const formattedMessages: Message[] = data.map(msg => ({
+        id: parseInt(msg.id),
+        text: msg.message_content,
+        isBot: msg.sender === 'assistant',
         timestamp: new Date(msg.timestamp)
       }));
 
@@ -121,8 +122,9 @@ const AutomationDetail = () => {
     if (!id) return;
 
     try {
+      // FIXED: Use correct table name from schema - ai_agents (not agents)
       const { data, error } = await supabase
-        .from('agents')
+        .from('ai_agents')
         .select('*')
         .eq('automation_id', id);
 
@@ -136,8 +138,18 @@ const AutomationDetail = () => {
         return;
       }
 
-      setAgents(data || []);
-      data?.forEach(agent => {
+      // FIXED: Map ai_agents to Agent interface format
+      const formattedAgents: Agent[] = (data || []).map(agent => ({
+        name: agent.agent_name,
+        role: agent.agent_role || 'Assistant',
+        goal: agent.agent_goal || 'General assistance',
+        rule: agent.agent_rules || '',
+        memory: agent.agent_memory ? JSON.stringify(agent.agent_memory) : '',
+        why_needed: 'AI assistance for automation'
+      }));
+
+      setAgents(formattedAgents);
+      formattedAgents.forEach(agent => {
         agentStateManager.addAgent(agent.name, agent);
       });
     } catch (error: any) {
@@ -204,16 +216,16 @@ const AutomationDetail = () => {
     setInputMessage('');
 
     try {
+      // FIXED: Use correct table and field names for automation_chats
       const newMessage = {
-        text: messageText,
-        isBot: false,
-        timestamp: new Date(),
-        automation_id: id,
-        user_id: user.id
+        message_content: messageText,
+        sender: 'user',
+        timestamp: new Date().toISOString(),
+        automation_id: id
       };
 
       const { data: insertedMessage, error: insertError } = await supabase
-        .from('chat_messages')
+        .from('automation_chats')
         .insert([newMessage])
         .select('*')
         .single();
@@ -229,8 +241,10 @@ const AutomationDetail = () => {
         return;
       }
 
-      const optimisticMessage = {
-        ...insertedMessage,
+      const optimisticMessage: Message = {
+        id: parseInt(insertedMessage.id),
+        text: insertedMessage.message_content,
+        isBot: false,
         timestamp: new Date(insertedMessage.timestamp)
       };
 
@@ -254,34 +268,19 @@ const AutomationDetail = () => {
           description: "Failed to get response from AI.",
           variant: "destructive",
         });
-
-        await supabase
-          .from('chat_messages')
-          .update({ error_help_available: true })
-          .eq('id', optimisticMessage.id);
-
-        setMessages(prevMessages => {
-          return prevMessages.map(msg => {
-            if (msg.id === optimisticMessage.id) {
-              return { ...msg, error_help_available: true };
-            }
-            return msg;
-          });
-        });
         setIsLoading(false);
         return;
       }
 
       const botMessage = {
-        text: data.response,
-        isBot: true,
-        timestamp: new Date(),
-        automation_id: id,
-        user_id: user.id
+        message_content: data.response,
+        sender: 'assistant',
+        timestamp: new Date().toISOString(),
+        automation_id: id
       };
 
       const { data: insertedBotMessage, error: insertBotError } = await supabase
-        .from('chat_messages')
+        .from('automation_chats')
         .insert([botMessage])
         .select('*')
         .single();
@@ -297,13 +296,14 @@ const AutomationDetail = () => {
         return;
       }
 
-      setMessages(prevMessages => [
-        ...prevMessages,
-        {
-          ...insertedBotMessage,
-          timestamp: new Date(insertedBotMessage.timestamp)
-        }
-      ]);
+      const formattedBotMessage: Message = {
+        id: parseInt(insertedBotMessage.id),
+        text: insertedBotMessage.message_content,
+        isBot: true,
+        timestamp: new Date(insertedBotMessage.timestamp)
+      };
+
+      setMessages(prevMessages => [...prevMessages, formattedBotMessage]);
     } catch (error: any) {
       handleError(error, 'AutomationDetail - Send Message');
       toast({
@@ -327,9 +327,19 @@ const AutomationDetail = () => {
     if (!id) return;
 
     try {
+      // FIXED: Use correct field names for ai_agents table
+      const agentData = {
+        agent_name: agent.name,
+        agent_role: agent.role,
+        agent_goal: agent.goal,
+        agent_rules: agent.rule,
+        agent_memory: agent.memory ? JSON.parse(agent.memory) : {},
+        automation_id: id
+      };
+
       const { data, error } = await supabase
-        .from('agents')
-        .insert([{ ...agent, automation_id: id }])
+        .from('ai_agents')
+        .insert([agentData])
         .select('*')
         .single();
 
@@ -343,7 +353,16 @@ const AutomationDetail = () => {
         return;
       }
 
-      setAgents(prevAgents => [...prevAgents, data]);
+      const formattedAgent: Agent = {
+        name: data.agent_name,
+        role: data.agent_role || 'Assistant',
+        goal: data.agent_goal || 'General assistance',
+        rule: data.agent_rules || '',
+        memory: data.agent_memory ? JSON.stringify(data.agent_memory) : '',
+        why_needed: 'AI assistance for automation'
+      };
+
+      setAgents(prevAgents => [...prevAgents, formattedAgent]);
       toast({
         title: "Success",
         description: "Agent added successfully.",
@@ -376,15 +395,12 @@ const AutomationDetail = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      
       <div className="container mx-auto px-4 py-8 space-y-8">
-        
         <div className="text-center">
           <h1 className="text-3xl font-extrabold text-gray-900">{automation?.title || 'Loading...'}</h1>
           <p className="mt-2 text-lg text-gray-600">{automation?.description || 'Configure and run your automation.'}</p>
         </div>
 
-        
         <div className="space-y-6">
           <ChatCard
             messages={messages}
@@ -399,12 +415,8 @@ const AutomationDetail = () => {
             onPlatformCredentialChange={handlePlatformCredentialChange}
           />
 
-          
-
-          
           <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-xl border-0 p-6">
-            
-            <form onSubmit={handleSendMessage} className="space-y-4">
+            <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="space-y-4">
               <div className="relative">
                 <textarea
                   value={inputMessage}
@@ -447,7 +459,6 @@ const AutomationDetail = () => {
           </div>
         </div>
 
-        
         <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-xl border-0 p-6">
           <h2 className="text-xl font-semibold text-gray-800 mb-4">Execution</h2>
           <p className="text-gray-600 mb-6">Ready to execute the automation? Click the button below to start the process.</p>

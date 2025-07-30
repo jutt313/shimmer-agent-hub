@@ -23,6 +23,25 @@ export interface YusrAIStructuredResponse {
       example?: string;
     }>;
   }>;
+  platforms_and_credentials?: {
+    [platform_name: string]: {
+      credential_field?: string;
+      field?: string;
+      link?: string;
+      where_to_get?: string;
+      purpose?: string;
+      why_needed?: string;
+      example?: string;
+      credentials?: Array<{
+        field: string;
+        why_needed: string;
+        where_to_get?: string;
+        link?: string;
+        options?: string[];
+        example?: string;
+      }>;
+    };
+  };
   clarification_questions: string[];
   agents: Array<{
     name: string;

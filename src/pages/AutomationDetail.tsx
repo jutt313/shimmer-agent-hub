@@ -23,13 +23,14 @@ interface Message {
   text: string;
   isBot: boolean;
   timestamp: Date;
+  structuredData?: any;
 }
 
 const AutomationDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const [automation, setAutomation] = useState<any>(null);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isExecuting, setIsExecuting] = useState(false);
   const [platformCredentialStatus, setPlatformCredentialStatus] = useState<{ [key: string]: 'saved' | 'tested' | 'missing' }>({});
@@ -69,18 +70,13 @@ const AutomationDetail = () => {
       if (chatError) throw chatError;
 
       // Transform chat data to message format with structured data
-      const transformedMessages = chatData.map((chat, index) => {
-        const messageObj = {
+      const transformedMessages: Message[] = chatData.map((chat, index) => {
+        const messageObj: Message = {
           id: index + 1,
           text: chat.message_content,
           isBot: chat.sender === 'ai' || chat.sender === 'yusrai',
           timestamp: new Date(chat.timestamp)
         };
-
-        // If this is a bot message with structured response data, include it
-        if ((chat.sender === 'ai' || chat.sender === 'yusrai') && chat.structured_response_data) {
-          messageObj.structuredData = chat.structured_response_data;
-        }
 
         return messageObj;
       });

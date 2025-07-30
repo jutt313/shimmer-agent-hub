@@ -83,7 +83,7 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
   });
 
   React.useEffect(() => {
-    console.log('🎯 YusrAI sections rendering with data:', {
+    console.log('🎯 YusrAI sections rendering with your consistent JSON data:', {
       hasSummary: !!data?.summary,
       stepsCount: data?.steps?.length || 0,
       platformsCount: data?.platforms?.length || 0,
@@ -92,8 +92,7 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       hasExecutionBlueprint: !!data?.execution_blueprint,
       totalSections: data ? Object.keys(data).length : 0
     });
-    // Log the full structured data for debugging purposes
-    console.log('Full structuredData received by YusrAIStructuredDisplay:', data);
+    console.log('Full structuredData from your chat-ai JSON:', data);
   }, [data]);
 
   const toggleSection = (section: string) => {
@@ -103,21 +102,17 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
     }));
   };
 
-  // FIXED: Step display function to show "Step 1:" format without duplication
   const getStepDisplayText = (step: unknown, index: number): string => {
     if (typeof step === 'string') {
-      // Return the clean step text (already processed in jsonParser to remove numbering)
       return step;
     }
     if (typeof step === 'object' && step !== null) {
       const stepObj = step as any;
-      // Prioritize common properties for step description
       if (stepObj.description) return stepObj.description;
       if (stepObj.action) return stepObj.action;
       if (stepObj.name) return stepObj.name;
-      // Fallback to JSON stringify for debugging if no specific property is found
       try {
-        return JSON.stringify(stepObj, null, 2); // Pretty print JSON for readability
+        return JSON.stringify(stepObj, null, 2);
       } catch (e) {
         console.error('Error stringifying step object:', e);
         return `[Unrenderable Step Object ${index + 1}]`;
@@ -126,20 +121,17 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
     return `Step ${index + 1}`;
   };
 
-  // Helper function to get clarification question text
   const getQuestionDisplayText = (question: unknown, index: number): string => {
     if (typeof question === 'string') {
       return question;
     }
     if (typeof question === 'object' && question !== null) {
       const questionObj = question as any;
-      // Prioritize common properties for question text
       if (questionObj.question) return questionObj.question;
       if (questionObj.text) return questionObj.text;
       if (questionObj.description) return questionObj.description;
-      // Fallback to JSON stringify for debugging if no specific property is found
       try {
-        return JSON.stringify(questionObj, null, 2); // Pretty print JSON for readability
+        return JSON.stringify(questionObj, null, 2);
       } catch (e) {
         console.error('Error stringifying question object:', e);
         return `[Unrenderable Question Object ${index + 1}]`;
@@ -178,7 +170,6 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
           <div className="text-gray-700 leading-relaxed space-y-3">
             {(Array.isArray(data.steps) ? data.steps : []).map((step, index) => (
               <div key={index} className="flex gap-3 text-sm">
-                {/* FIXED: Clean step numbering format "Step 1:" without duplication */}
                 <span className="font-bold text-green-600 text-lg min-w-[60px]">Step {index + 1}:</span>
                 <span className="flex-1 whitespace-pre-wrap">{getStepDisplayText(step, index)}</span>
               </div>
@@ -201,7 +192,6 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
             {(Array.isArray(data.platforms) ? data.platforms : []).map((platform, index) => (
               <div key={index} className="bg-white p-5 rounded-xl border border-purple-100 shadow-sm">
                 <div className="space-y-4">
-                  {/* Platform Header */}
                   <div className="flex items-center gap-3 pb-3 border-b border-purple-100">
                     <Database className="w-5 h-5 text-purple-600" />
                     <div className="font-bold text-purple-800 text-xl">
@@ -209,7 +199,6 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
                     </div>
                   </div>
                   
-                  {/* Credentials Section */}
                   <div>
                     <div className="font-semibold text-gray-900 text-base mb-3 flex items-center gap-2">
                       <span>🔑 Required Credentials</span>
@@ -220,19 +209,16 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
                         Array.isArray((platform as any).credential_requirements) ? (platform as any).credential_requirements : []
                       ).map((cred: any, credIndex: number) => (
                         <div key={credIndex} className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-200">
-                          {/* Credential Field Name */}
                           <div className="font-semibold text-purple-900 text-base mb-2 flex items-center gap-2">
                             <span className="bg-purple-600 text-white px-2 py-1 rounded text-xs font-medium">
                               {cred.field || cred.name || cred.key || 'API Key'}
                             </span>
                           </div>
                           
-                          {/* Why Needed Explanation */}
                           <div className="text-gray-700 text-sm mb-3 leading-relaxed">
                             <span className="font-medium text-gray-900">Why needed:</span> {cred.why_needed || cred.description || cred.purpose || 'Authentication required for platform access'}
                           </div>
                           
-                          {/* Where to Get Information */}
                           {(cred.where_to_get || cred.link || cred.documentation_url || cred.url) && (
                             <div className="mt-2">
                               <a 
@@ -246,7 +232,6 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
                             </div>
                           )}
                           
-                          {/* Example or Additional Info */}
                           {(cred.example || cred.placeholder) && (
                             <div className="mt-2 text-xs text-gray-600 bg-gray-100 p-2 rounded">
                               <span className="font-medium">Example:</span> {cred.example || cred.placeholder}
@@ -255,7 +240,6 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
                         </div>
                       ))}
                       
-                      {/* Fallback if no credentials found */}
                       {(!(platform as any).credentials || (platform as any).credentials.length === 0) && 
                        (!(platform as any).required_credentials || (platform as any).required_credentials.length === 0) && 
                        (!(platform as any).credential_requirements || (platform as any).credential_requirements.length === 0) && (
@@ -385,7 +369,6 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
     }
   ];
 
-  // Filter sections to only show available ones
   const availableSections = sections.filter(section => section.show);
 
   return (
@@ -423,7 +406,6 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
         );
       })}
       
-      {/* Enhanced Execution Button */}
       {isReadyForExecution && onExecuteAutomation && (
         <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-xl border border-green-200">
           <div className="flex items-center justify-between">

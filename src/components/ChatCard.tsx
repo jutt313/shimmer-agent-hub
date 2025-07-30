@@ -88,14 +88,12 @@ const ChatCard = ({
               
               const parseResult = parseYusrAIStructuredResponse(message.text);
               if (parseResult.structuredData) {
-                console.log('✅ Structured data found:', parseResult.structuredData);
+                console.log('✅ Structured data found from your chat-ai JSON:', parseResult.structuredData);
                 
-                const platformsSource = parseResult.structuredData.platforms_and_credentials?.platforms || 
-                                       parseResult.structuredData.platforms_credentials || 
-                                       parseResult.structuredData.platforms || [];
+                const platformsSource = parseResult.structuredData.platforms || [];
                 
                 const platformData = platformsSource.map(platform => {
-                  console.log('🔍 Processing individual platform:', platform);
+                  console.log('🔍 Processing platform from your JSON structure:', platform);
                   
                   let credentials = [];
                   if (platform.credentials) {
@@ -122,15 +120,14 @@ const ChatCard = ({
                   };
                 });
                 
-                console.log('🔗 Transformed platform data with full names:', platformData);
+                console.log('🔗 Extracted platform data from your consistent JSON:', platformData);
                 
                 const diagramData = automationDiagramData ||
                                   parseResult.structuredData.execution_blueprint || 
                                   parseResult.structuredData.blueprint ||
-                                  parseResult.structuredData.automation_diagram ||
-                                  parseResult.structuredData.workflow;
+                                  parseResult.structuredData.automation_diagram;
                 
-                console.log('📊 Extracted diagram data:', diagramData);
+                console.log('📊 Extracted diagram data from your JSON structure:', diagramData);
                 
                 return {
                   ...message,
@@ -480,15 +477,13 @@ const ChatCard = ({
   const getLatestPlatforms = () => {
     const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.platformData).pop();
     if (latestBotMessage?.platformData) {
-      console.log('🔍 Found platforms from AI message:', latestBotMessage.platformData);
+      console.log('🔍 Found platforms from your consistent JSON structure:', latestBotMessage.platformData);
       return latestBotMessage.platformData;
     }
     
     const latestStructuredMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
     if (latestStructuredMessage?.structuredData) {
-      const platformsSource = latestStructuredMessage.structuredData.platforms_and_credentials?.platforms || 
-                             latestStructuredMessage.structuredData.platforms_credentials || 
-                             latestStructuredMessage.structuredData.platforms || [];
+      const platformsSource = latestStructuredMessage.structuredData.platforms || [];
       
       const transformedPlatforms = platformsSource.map((platform: any) => ({
         name: platform.name || 'Unknown Platform',
@@ -500,11 +495,11 @@ const ChatCard = ({
         })) : []
       }));
       
-      console.log('🔄 Extracted platforms from structured data:', transformedPlatforms);
+      console.log('🔄 Extracted platforms from your consistent JSON structure:', transformedPlatforms);
       return transformedPlatforms;
     }
     
-    console.log('⚠️ No platforms found in any messages');
+    console.log('⚠️ No platforms found in messages');
     return [];
   };
 
@@ -647,29 +642,30 @@ const ChatCard = ({
                       alt="YusrAI" 
                       className="w-5 h-5 object-contain animate-pulse"
                     />
-                    <span className="font-medium">YusrAI is processing your request...</span>
+                    <span className="text-sm font-medium text-blue-600">YusrAI is thinking...</span>
                     <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
                     </div>
                   </div>
                 </div>
               </div>
             )}
-            
             <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
       </div>
 
-      <div className="mt-4">
-        <FixedPlatformButtons
-          platforms={getLatestPlatforms()}
-          automationId={automationId}
-          onCredentialChange={onPlatformCredentialChange}
-        />
-      </div>
+      {getLatestPlatforms().length > 0 && (
+        <div className="mt-4">
+          <FixedPlatformButtons
+            platforms={transformPlatformsForButtons(getLatestPlatforms())}
+            automationId={automationId}
+            onCredentialChange={onPlatformCredentialChange}
+          />
+        </div>
+      )}
     </div>
   );
 };

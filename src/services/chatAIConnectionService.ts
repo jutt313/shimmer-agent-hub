@@ -45,7 +45,6 @@ class ChatAIConnectionService {
 
       console.log('✅ YusrAI 7-section response received:', data);
 
-      // Ensure we have a proper response
       if (!data || !data.response) {
         console.warn('⚠️ Empty response from YusrAI, using fallback');
         return {
@@ -88,11 +87,18 @@ class ChatAIConnectionService {
         };
       }
 
-      // Parse structured data
+      // UPDATED: Parse structured data from your consistent chat-ai JSON structure
       let structuredData = null;
       try {
-        structuredData = JSON.parse(data.response);
-        console.log('📊 Successfully parsed YusrAI 7-section structured data:', structuredData);
+        // FIXED: Your chat-ai function returns JSON string in response field
+        if (typeof data.response === 'string') {
+          structuredData = JSON.parse(data.response);
+          console.log('📊 Successfully parsed YusrAI structured data from your consistent JSON:', structuredData);
+        } else {
+          // Fallback for direct object (shouldn't happen with your new structure)
+          structuredData = data.response;
+          console.log('📊 Using direct structured data object:', structuredData);
+        }
       } catch (parseError) {
         console.log('⚠️ Error parsing YusrAI JSON response:', parseError);
         
@@ -101,7 +107,7 @@ class ChatAIConnectionService {
           const jsonMatch = data.response.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             structuredData = JSON.parse(jsonMatch[0]);
-            console.log('📊 Extracted YusrAI JSON using regex:', structuredData);
+            console.log('📊 Extracted YusrAI JSON using regex fallback:', structuredData);
           }
         } catch (fallbackError) {
           console.log('❌ All YusrAI JSON parsing attempts failed');

@@ -1,4 +1,3 @@
-
 export interface YusrAIStructuredResponse {
   summary: string;
   steps: string[];
@@ -123,46 +122,39 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('✅ Extracted JSON from markdown:', cleanResponseText.substring(0, 200) + '...');
     }
     
-    // Try to parse the response
+    // UPDATED: Handle your consistent chat-ai JSON structure
     try {
       parsedResponse = JSON.parse(cleanResponseText);
-      if (typeof parsedResponse !== 'object' || parsedResponse === null) {
-        throw new Error('Invalid JSON structure');
+      
+      // FIXED: Extract from your chat-ai response.response field (which contains stringified JSON)
+      if (parsedResponse.response && typeof parsedResponse.response === 'string') {
+        console.log('🎯 Extracting JSON from chat-ai response field');
+        
+        // Extract metadata from wrapper
+        metadata.yusrai_powered = parsedResponse.yusrai_powered || true;
+        metadata.seven_sections_validated = parsedResponse.seven_sections_validated || false;
+        metadata.error_help_available = parsedResponse.error_help_available || false;
+        
+        // Parse the inner JSON from response field
+        try {
+          const innerStructuredData = JSON.parse(parsedResponse.response);
+          console.log('✅ Successfully parsed inner JSON from chat-ai response field');
+          parsedResponse = innerStructuredData;
+        } catch (innerError) {
+          console.log('📄 Inner response is plain text');
+          return { structuredData: null, metadata, isPlainText: true };
+        }
+      } else if (parsedResponse.summary || parsedResponse.steps || parsedResponse.platforms) {
+        // Direct structured JSON (backup case)
+        console.log('📄 Processing direct structured JSON format');
+        metadata.yusrai_powered = true;
+      } else {
+        console.log('📄 Not a structured response, treating as plain text');
+        return { structuredData: null, metadata, isPlainText: true };
       }
     } catch (e) {
-      console.log('📄 Plain text response detected, no JSON found')
-      return { 
-        structuredData: null, 
-        metadata: { yusrai_powered: true }, 
-        isPlainText: true 
-      };
-    }
-
-    // Check if this is a wrapped response from chat-AI function
-    if (parsedResponse.response && typeof parsedResponse.response === 'string') {
-      console.log('🎯 Wrapped YusrAI response detected from chat-AI function')
-      
-      // Extract metadata from wrapper
-      metadata.yusrai_powered = parsedResponse.yusrai_powered || true;
-      metadata.seven_sections_validated = parsedResponse.seven_sections_validated || false;
-      metadata.error_help_available = parsedResponse.error_help_available || false;
-      
-      // Parse the inner JSON response
-      try {
-        const innerResponse = JSON.parse(parsedResponse.response);
-        console.log('✅ Successfully extracted inner YusrAI JSON from wrapper:', innerResponse);
-        parsedResponse = innerResponse;
-      } catch (innerError) {
-        console.log('📄 Inner response is plain text, treating as such');
-        return { 
-          structuredData: null, 
-          metadata, 
-          isPlainText: true 
-        };
-      }
-    } else {
-      console.log('📄 Processing direct YusrAI JSON format')
-      metadata.yusrai_powered = true;
+      console.log('📄 Plain text response detected, no JSON found');
+      return { structuredData: null, metadata: { yusrai_powered: true }, isPlainText: true };
     }
 
     // Check if this is a structured response with automation sections
@@ -237,6 +229,20 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       });
       
       console.log('📋 Fixed step_by_step_explanation mapping preventing duplication:', parsedResponse.steps.length);
+    }
+
+    // FIXED: Clean step processing to prevent duplication
+    if (parsedResponse.steps && Array.isArray(parsedResponse.steps)) {
+      parsedResponse.steps = parsedResponse.steps.map((step: any) => {
+        if (typeof step === 'string') {
+          return step.replace(/^\d+\.\s*/, '').trim();
+        }
+        if (typeof step === 'object' && step !== null) {
+          const stepText = step.description || step.action || step.step || step.instruction || step.text;
+          return typeof stepText === 'string' ? stepText.replace(/^\d+\.\s*/, '').trim() : stepText;
+        }
+        return 'Processing step...';
+      });
     }
 
     // FIXED PLATFORMS_AND_CREDENTIALS MAPPING - Handle nested structure properly
@@ -315,51 +321,31 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('🔗 Mapped platform_integrations to platforms:', parsedResponse.platforms.length);
     }
 
-    // FIXED PLATFORM NAME EXTRACTION - Keep full platform names
+    // FIXED: Platform name preservation (full names kept)
     if (parsedResponse.platforms && Array.isArray(parsedResponse.platforms)) {
       parsedResponse.platforms = parsedResponse.platforms.map((platform: any, index: number) => {
-        // Extract platform name from AI response - KEEP FULL NAME
-        let platformName = platform.name || 
-                          platform.platform_name || 
-                          platform.platform || 
-                          platform.service || 
-                          platform.integration ||
-                          platform.tool ||
-                          platform.api_name ||
-                          platform.service_name;
+        let platformName = platform.name || platform.platform_name || platform.platform || `Platform ${index + 1}`;
         
-        // Clean up the platform name if it exists - DON'T TRUNCATE
         if (platformName && typeof platformName === 'string') {
-          platformName = platformName.trim(); // Only trim whitespace, keep full name
-          
-          // Only clean up obvious formatting issues, no pattern matching
+          platformName = platformName.trim();
           platformName = platformName.replace(/^(Platform|Service|API|Tool)[\s\d]*:?\s*/i, '');
           platformName = platformName.replace(/\s+(API|Service|Platform|Tool)$/i, '');
           
-          // Capitalize first letter if needed
           if (platformName.length > 0) {
             platformName = platformName.charAt(0).toUpperCase() + platformName.slice(1);
           }
         }
         
-        // If no name found, use a simple index-based fallback
         if (!platformName || platformName.length === 0) {
           platformName = `Platform ${index + 1}`;
         }
         
-        console.log(`🔍 Processing platform ${index + 1}: extracted FULL name "${platformName}"`);
-        
         return {
           ...platform,
-          name: platformName, // FIXED: Full platform name preserved
-          credentials: platform.credentials || 
-                      platform.required_credentials || 
-                      platform.credential_requirements ||
-                      platform.fields ||
-                      []
+          name: platformName,
+          credentials: platform.credentials || platform.required_credentials || platform.credential_requirements || []
         };
       });
-      console.log('✅ Fixed platform name extraction with full names preserved');
     }
 
     // ENHANCED CLARIFICATION_QUESTIONS MAPPING - Convert objects to strings

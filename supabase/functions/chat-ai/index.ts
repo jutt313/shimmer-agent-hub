@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 
@@ -416,22 +415,59 @@ serve(async (req) => {
         }
 
         const data = await response.json();
-        const aiResponse = data.choices[0]?.message?.content;
+        const aiResponseContent = data.choices[0]?.message?.content; // Renamed for clarity
 
-        if (!aiResponse) {
+        if (!aiResponseContent) {
           throw new Error('Empty response from OpenAI');
         }
+        
+        console.log('✅ YusrAI raw AI response content generated successfully:', aiResponseContent.substring(0, 200) + '...');
 
-        console.log('✅ YusrAI response generated successfully:', aiResponse.substring(0, 200) + '...')
+        // --- START MODIFICATION (APPLYING USER'S REQUIRED CHANGES) ---
 
-        return new Response(JSON.stringify({ 
-          response: aiResponse,
-          yusrai_powered: true,
-          seven_sections_validated: true,
-          error_help_available: false,
-          training_acknowledged: true,
-          memory_updated: true
-        }), {
+        let parsedStructuredData: any;
+        let humanReadableSummary: string = "I've processed your request. Here's the detailed automation plan:";
+
+        try {
+            // FIX 2: Safer JSON Parsing Logic - Ensure aiResponseContent is a string and starts with '{' before parsing
+            if (typeof aiResponseContent === 'string' && aiResponseContent.trim().startsWith('{')) {
+                parsedStructuredData = JSON.parse(aiResponseContent);
+                // Optionally, take the summary from structured data for human-readable response
+                if (parsedStructuredData.summary && typeof parsedStructuredData.summary === 'string') {
+                    humanReadableSummary = parsedStructuredData.summary;
+                }
+            } else {
+                // If AI response is not JSON or not a string (e.g., plain text fallback)
+                console.error('❌ AI response content is not a valid JSON string. Treating as plain text.');
+                parsedStructuredData = {
+                    summary: aiResponseContent, // Use raw content as summary for plain text
+                    steps: [], platforms: [], agents: [], clarification_questions: [], test_payloads: {}, execution_blueprint: {}
+                };
+                humanReadableSummary = aiResponseContent;
+            }
+        } catch (parseError) {
+            console.error('❌ Failed to parse AI response content as JSON (outer try-catch for inner parse):', parseError);
+            parsedStructuredData = {
+                summary: aiResponseContent, // Fallback to raw content if parsing fails
+                steps: [], platforms: [], agents: [], clarification_questions: [], test_payloads: {}, execution_blueprint: {}
+            };
+            humanReadableSummary = aiResponseContent;
+        }
+
+        // FIX 1 & 3: Ensure the top-level 'response' key contains a JSON string of the structured data
+        // The frontend's jsonParser.ts expects the structured data to be STRINGIFIED within the 'response' field.
+        const finalResponseObject = {
+            response: JSON.stringify(parsedStructuredData), // Keep existing format for frontend compatibility
+            yusrai_powered: true,
+            seven_sections_validated: true, 
+            error_help_available: false,
+            training_acknowledged: true,
+            memory_updated: true
+        };
+
+        // --- END MODIFICATION ---
+
+        return new Response(JSON.stringify(finalResponseObject), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
 
@@ -451,47 +487,52 @@ serve(async (req) => {
   } catch (error: any) {
     console.error('💥 YusrAI Chat-AI Error:', error)
     
-    return new Response(JSON.stringify({
-      response: JSON.stringify({
-        summary: "I'm YusrAI, your automation specialist. I encountered a technical issue but I'm ready to help you create powerful automations. Please try asking me again about your automation needs.",
-        steps: [
-          "Describe the automation you want to create",
-          "I'll analyze your requirements and suggest the best platforms",
-          "We'll configure the necessary credentials together",
-          "I'll create a complete execution blueprint for your automation",
-          "Test and deploy your automation with full monitoring"
-        ],
-        platforms: [],
-        clarification_questions: [
-          "What specific automation would you like me to help you create?",
-          "Which platforms or services should be involved in your workflow?"
-        ],
-        agents: [],
-        test_payloads: {},
-        execution_blueprint: {
-          trigger: { type: "manual", configuration: {} },
-          workflow: [],
-          error_handling: {
-            retry_attempts: 3,
-            fallback_actions: ["log_error", "notify_admin"],
-            notification_rules: [],
-            critical_failure_actions: ["pause_automation"]
-          },
-          performance_optimization: {
-            rate_limit_handling: "exponential_backoff",
-            concurrency_limit: 5,
-            timeout_seconds_per_step: 60
-          }
+    // --- START MODIFICATION FOR ERROR FALLBACK (APPLYING USER'S REQUIRED CHANGES) ---
+    // Ensure the error fallback also adheres to the new consistent structure
+    const errorStructuredData = {
+      summary: "I'm YusrAI, your automation specialist. I encountered a technical issue but I'm ready to help you create powerful automations. Please try asking me again about your automation needs.",
+      steps: [
+        { "step": 1, "action": "Describe the automation you want to create", "description": "Start by telling me what you want to automate." },
+        { "step": 2, "action": "I'll analyze your requirements and suggest the best platforms", "description": "I will break down your request and identify necessary tools." },
+        { "step": 3, "action": "We'll configure the necessary credentials together", "description": "I will guide you through connecting to your services securely." },
+        { "step": 4, "action": "I'll create a complete execution blueprint for your automation", "description": "You'll get a detailed plan to run your automation." },
+        { "step": 5, "action": "Test and deploy your automation with full monitoring", "description": "Ensure everything works as expected before going live." }
+      ],
+      platforms: [], 
+      clarification_questions: [
+        { "question": "What specific automation would you like me to help you create?" },
+        { "question": "Which platforms or services should be involved in your workflow?" }
+      ],
+      agents: [], 
+      test_payloads: {},
+      execution_blueprint: {
+        trigger: { type: "manual", configuration: {} },
+        workflow: [],
+        error_handling: {
+          retry_attempts: 3,
+          fallback_actions: ["log_error", "notify_admin"],
+          notification_rules: [],
+          critical_failure_actions: ["pause_automation"]
+        },
+        performance_optimization: {
+          rate_limit_handling: "exponential_backoff",
+          concurrency_limit: 5,
+          timeout_seconds_per_step: 60
         }
-      }),
+      }
+    };
+
+    return new Response(JSON.stringify({
+      response: JSON.stringify(errorStructuredData), // FIX 3: Stringify errorStructuredData for consistency
       yusrai_powered: true,
-      seven_sections_validated: true,
+      seven_sections_validated: false, 
       error_help_available: true,
       training_acknowledged: false,
       memory_updated: false
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
+    });
+    // --- END MODIFICATION FOR ERROR FALLBACK ---
   }
 })

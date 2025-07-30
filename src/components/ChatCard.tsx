@@ -105,7 +105,7 @@ const ChatCard = ({
                       credentials = Object.entries(platform.credentials).map(([key, value]: [string, any]) => ({
                         field: key,
                         placeholder: value.example || value.placeholder || `Enter ${key}`,
-                        link: value.link || value.url || '#',
+                        link: value.link || value.url || value.where_to_get || '#',
                         why_needed: value.description || value.why_needed || `Required for ${key}`
                       }));
                     }
@@ -113,12 +113,7 @@ const ChatCard = ({
                   
                   return {
                     name: platform.name || 'Unknown Platform',
-                    credentials: credentials.map(cred => ({
-                      field: cred.field || cred.name || 'api_key',
-                      placeholder: cred.example || cred.placeholder || `Enter ${cred.field}`,
-                      link: cred.link || cred.where_to_get || '#',
-                      why_needed: cred.why_needed || cred.description || 'Authentication required'
-                    }))
+                    credentials: credentials
                   };
                 });
                 

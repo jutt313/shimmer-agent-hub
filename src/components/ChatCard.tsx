@@ -87,13 +87,13 @@ const ChatCard = ({
               console.log('🔍 Processing bot message for structured data:', message.text.substring(0, 200));
               
               const parseResult = parseYusrAIStructuredResponse(message.text);
-              if (parseResult.structuredData) {
-                console.log('✅ Structured data found from your chat-ai JSON:', parseResult.structuredData);
+              if (parseResult.structuredData && !parseResult.isPlainText) {
+                console.log('✅ Structured data found from YusrAI JSON:', parseResult.structuredData);
                 
                 const platformsSource = parseResult.structuredData.platforms || [];
                 
                 const platformData = platformsSource.map(platform => {
-                  console.log('🔍 Processing platform from your JSON structure:', platform);
+                  console.log('🔍 Processing platform from YusrAI JSON structure:', platform);
                   
                   let credentials = [];
                   if (platform.credentials) {
@@ -120,14 +120,14 @@ const ChatCard = ({
                   };
                 });
                 
-                console.log('🔗 Extracted platform data from your consistent JSON:', platformData);
+                console.log('🔗 Extracted platform data from YusrAI JSON:', platformData);
                 
                 const diagramData = automationDiagramData ||
                                   parseResult.structuredData.execution_blueprint || 
                                   parseResult.structuredData.blueprint ||
                                   parseResult.structuredData.automation_diagram;
                 
-                console.log('📊 Extracted diagram data from your JSON structure:', diagramData);
+                console.log('📊 Extracted diagram data from YusrAI JSON structure:', diagramData);
                 
                 return {
                   ...message,
@@ -138,6 +138,8 @@ const ChatCard = ({
                   automationDiagramData: diagramData,
                   executionBlueprint: parseResult.structuredData.execution_blueprint
                 };
+              } else {
+                console.log('📄 No structured data found, treating as plain text');
               }
             } catch (error) {
               console.log('❌ Error processing message:', error);

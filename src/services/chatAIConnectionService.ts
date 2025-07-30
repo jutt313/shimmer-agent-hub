@@ -79,23 +79,28 @@ class ChatAIConnectionService {
         };
       }
 
-      // SURGICAL FIX #3: Simplified parsing for raw OpenAI JSON response
+      // SURGICAL FIX: Simplified parsing for direct OpenAI JSON response
       let structuredData = null;
       try {
-        // The response now contains raw OpenAI JSON, so parse it directly
+        // Handle both string and object responses from chat-ai
         if (typeof data.response === 'string') {
-          structuredData = JSON.parse(data.response);
-          console.log('📊 Successfully parsed YusrAI structured data from raw OpenAI JSON:', structuredData);
-        } else {
+          // Try to parse as JSON first
+          try {
+            structuredData = JSON.parse(data.response);
+            console.log('📊 Successfully parsed YusrAI structured data from JSON string:', structuredData);
+          } catch (parseError) {
+            // If parsing fails, it's likely plain text
+            console.log('⚠️ Response is plain text, not JSON structure');
+            structuredData = null;
+          }
+        } else if (typeof data.response === 'object' && data.response !== null) {
+          // Direct object response
           structuredData = data.response;
           console.log('📊 Using direct structured data object:', structuredData);
         }
       } catch (parseError) {
-        console.log('⚠️ Error parsing YusrAI JSON response:', parseError);
-        
-        // Minimal fallback without complex regex
+        console.log('⚠️ Error processing YusrAI response:', parseError);
         structuredData = null;
-        console.log('❌ YusrAI JSON parsing failed, treating as plain text');
       }
 
       return {

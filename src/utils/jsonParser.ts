@@ -1,3 +1,4 @@
+
 export interface YusrAIStructuredResponse {
   summary: string;
   steps: string[];
@@ -122,7 +123,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('✅ Extracted JSON from markdown:', cleanResponseText.substring(0, 200) + '...');
     }
     
-    // SURGICAL FIX #2: Handle the raw OpenAI JSON response correctly
+    // SURGICAL FIX: Enhanced parsing for both wrapper and direct OpenAI JSON
     try {
       parsedResponse = JSON.parse(cleanResponseText);
       
@@ -135,18 +136,27 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
         metadata.seven_sections_validated = parsedResponse.seven_sections_validated || false;
         metadata.error_help_available = parsedResponse.error_help_available || false;
         
-        // SURGICAL FIX: Parse the inner JSON from response field (now raw OpenAI JSON)
+        // SURGICAL FIX: Parse the inner JSON (now raw OpenAI JSON)
         try {
           const innerStructuredData = JSON.parse(parsedResponse.response);
           console.log('✅ Successfully parsed inner JSON from raw OpenAI response');
           parsedResponse = innerStructuredData;
         } catch (innerError) {
-          console.log('📄 Inner response is plain text, treating as such');
-          return { structuredData: null, metadata, isPlainText: true };
+          // SURGICAL FIX: If inner parsing fails, try direct parsing of response content
+          console.log('🔄 Trying direct OpenAI JSON parsing from response field');
+          
+          // Check if response field contains direct structured data (not stringified)
+          if (typeof parsedResponse.response === 'object' && parsedResponse.response !== null) {
+            console.log('✅ Direct structured data found in response field');
+            parsedResponse = parsedResponse.response;
+          } else {
+            console.log('📄 Inner response is plain text, treating as such');
+            return { structuredData: null, metadata, isPlainText: true };
+          }
         }
       } else if (parsedResponse.summary || parsedResponse.steps || parsedResponse.platforms) {
-        // Direct structured JSON (backup case)
-        console.log('📄 Processing direct structured JSON format');
+        // Direct structured JSON from OpenAI
+        console.log('📄 Processing direct OpenAI structured JSON format');
         metadata.yusrai_powered = true;
       } else {
         console.log('📄 Not a structured response, treating as plain text');

@@ -88,18 +88,40 @@ const ChatCard = ({
               if (parseResult.structuredData) {
                 console.log('✅ Structured data found:', parseResult.structuredData);
                 
-                const platformsSource = parseResult.structuredData.platforms_credentials || parseResult.structuredData.platforms || [];
-                const platformData = platformsSource.map(platform => ({
-                  name: platform.name || 'Unknown Platform',
-                  credentials: platform.credentials.map(cred => ({
-                    field: cred.field,
-                    placeholder: cred.example || cred.where_to_get || `Enter ${cred.field}`,
-                    link: cred.link || cred.where_to_get || '#',
-                    why_needed: cred.why_needed
-                  }))
-                }));
+                // FIXED: Handle platforms_and_credentials object structure
+                const platformsSource = parseResult.structuredData.platforms_and_credentials || 
+                                      parseResult.structuredData.platforms_credentials || 
+                                      parseResult.structuredData.platforms || 
+                                      {};
                 
-                console.log('🔗 Transformed platform data with full names:', platformData);
+                let platformData = [];
+                
+                // Transform object to array format if needed
+                if (typeof platformsSource === 'object' && !Array.isArray(platformsSource)) {
+                  console.log('🔄 Transforming platforms_and_credentials object to array:', platformsSource);
+                  platformData = Object.entries(platformsSource).map(([platformName, platformInfo]: [string, any]) => ({
+                    name: platformName,
+                    credentials: [{
+                      field: platformInfo.credential_field || platformInfo.field || 'api_key',
+                      placeholder: platformInfo.example || `Enter ${platformInfo.credential_field || 'API key'}`,
+                      link: platformInfo.link || platformInfo.where_to_get || '#',
+                      why_needed: platformInfo.purpose || platformInfo.why_needed || 'Authentication required'
+                    }]
+                  }));
+                } else if (Array.isArray(platformsSource)) {
+                  // Handle array format
+                  platformData = platformsSource.map(platform => ({
+                    name: platform.name || 'Unknown Platform',
+                    credentials: platform.credentials.map(cred => ({
+                      field: cred.field,
+                      placeholder: cred.example || cred.where_to_get || `Enter ${cred.field}`,
+                      link: cred.link || cred.where_to_get || '#',
+                      why_needed: cred.why_needed
+                    }))
+                  }));
+                }
+                
+                console.log('🎯 Final transformed platform data:', platformData);
                 
                 const diagramData = parseResult.structuredData.execution_blueprint || 
                                   parseResult.structuredData.blueprint ||
@@ -455,6 +477,7 @@ const ChatCard = ({
 
   const getLatestPlatforms = () => {
     const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.platformData).pop();
+    console.log('🔍 getLatestPlatforms - Found message with platformData:', latestBotMessage?.platformData);
     return latestBotMessage?.platformData || [];
   };
 
@@ -474,21 +497,17 @@ const ChatCard = ({
     const transformedPlatforms = yusraiPlatforms.map((platform, index) => {
       console.log(`🔄 Processing platform ${index + 1}:`, platform);
       
-      const credentials = platform.credentials || 
-                         platform.required_credentials || 
-                         platform.credential_requirements ||
-                         platform.fields ||
-                         [];
+      const credentials = platform.credentials || [];
       
       const transformedPlatform = {
-        name: platform.name || platform.platform_name || platform.platform || `Platform ${index + 1}`,
+        name: platform.name || `Platform ${index + 1}`,
         credentials: Array.isArray(credentials) ? credentials.map((cred: any) => ({
-          field: cred.field || cred.name || cred.key || 'api_key',
-          placeholder: cred.example || cred.placeholder || cred.description || `Enter ${cred.field || 'credential'}`,
-          link: cred.link || cred.where_to_get || cred.documentation_url || cred.url || '#',
-          why_needed: cred.why_needed || cred.description || cred.purpose || 'Authentication required'
+          field: cred.field || 'api_key',
+          placeholder: cred.placeholder || `Enter ${cred.field || 'credential'}`,
+          link: cred.link || '#',
+          why_needed: cred.why_needed || 'Authentication required'
         })) : [],
-        test_payloads: platform.test_payloads || platform.test_payload || platform.test_data || []
+        test_payloads: platform.test_payloads || []
       };
       
       console.log(`✅ Transformed platform:`, transformedPlatform);

@@ -84,16 +84,17 @@ const ChatCard = ({
         const processed = messages.map((message) => {
           if (message.isBot && !message.structuredData) {
             try {
-              console.log('🔍 Processing bot message for structured data:', message.text.substring(0, 200));
+              console.log('🔍 Processing bot message for structured data:', message.text.substring(0, 150));
               
               const parseResult = parseYusrAIStructuredResponse(message.text);
               if (parseResult.structuredData && !parseResult.isPlainText) {
-                console.log('✅ Structured data found from YusrAI JSON:', parseResult.structuredData);
+                console.log('✅ Structured data found from YusrAI:', parseResult.structuredData);
                 
+                // FIXED: Enhanced platform data extraction
                 const platformsSource = parseResult.structuredData.platforms || [];
                 
                 const platformData = platformsSource.map(platform => {
-                  console.log('🔍 Processing platform from YusrAI JSON structure:', platform);
+                  console.log('🔍 Processing platform:', platform);
                   
                   let credentials = [];
                   if (platform.credentials) {
@@ -120,14 +121,14 @@ const ChatCard = ({
                   };
                 });
                 
-                console.log('🔗 Extracted platform data from YusrAI JSON:', platformData);
+                console.log('🔗 Extracted platform data:', platformData);
                 
                 const diagramData = automationDiagramData ||
                                   parseResult.structuredData.execution_blueprint || 
                                   parseResult.structuredData.blueprint ||
                                   parseResult.structuredData.automation_diagram;
                 
-                console.log('📊 Extracted diagram data from YusrAI JSON structure:', diagramData);
+                console.log('📊 Extracted diagram data:', diagramData);
                 
                 return {
                   ...message,
@@ -139,7 +140,7 @@ const ChatCard = ({
                   executionBlueprint: parseResult.structuredData.execution_blueprint
                 };
               } else {
-                console.log('📄 No structured data found, treating as plain text');
+                console.log('📄 No structured data found, keeping as plain text');
               }
             } catch (error) {
               console.log('❌ Error processing message:', error);
@@ -149,6 +150,7 @@ const ChatCard = ({
         });
         
         setEnhancedMessages(processed);
+        console.log('✅ Enhanced messages processed:', processed.length);
       } catch (error) {
         console.log('❌ Message processing error:', error);
         setEnhancedMessages(messages);
@@ -479,7 +481,7 @@ const ChatCard = ({
   const getLatestPlatforms = () => {
     const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.platformData).pop();
     if (latestBotMessage?.platformData) {
-      console.log('🔍 Found platforms from your consistent JSON structure:', latestBotMessage.platformData);
+      console.log('🔍 Found platforms from enhanced processing:', latestBotMessage.platformData);
       return latestBotMessage.platformData;
     }
     
@@ -497,7 +499,7 @@ const ChatCard = ({
         })) : []
       }));
       
-      console.log('🔄 Extracted platforms from your consistent JSON structure:', transformedPlatforms);
+      console.log('🔄 Transformed platforms from structured data:', transformedPlatforms);
       return transformedPlatforms;
     }
     
@@ -576,7 +578,7 @@ const ChatCard = ({
                           className="w-5 h-5 object-contain"
                         />
                         <span className="text-sm font-medium text-blue-600">
-                          YusrAI {message.yusrai_powered ? (message.seven_sections_validated ? '(Structured)' : '(Simple)') : '(Processing)'}
+                          YusrAI {message.yusrai_powered ? (message.seven_sections_validated ? '(Complete)' : '(Processing)') : '(Basic)'}
                         </span>
                         {message.seven_sections_validated && (
                           <CheckCircle2 className="w-4 h-4 text-green-500" />
@@ -644,7 +646,7 @@ const ChatCard = ({
                       alt="YusrAI" 
                       className="w-5 h-5 object-contain animate-pulse"
                     />
-                    <span className="text-sm font-medium text-blue-600">YusrAI is thinking...</span>
+                    <span className="text-sm font-medium text-blue-600">YusrAI is creating your automation...</span>
                     <div className="flex space-x-1">
                       <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
                       <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>

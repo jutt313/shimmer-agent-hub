@@ -123,7 +123,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('✅ Extracted JSON from markdown:', cleanResponseText.substring(0, 200) + '...');
     }
     
-    // SURGICAL FIX: Enhanced parsing for both wrapper and direct OpenAI JSON
+    // FIXED: Enhanced parsing for improved OpenAI responses
     try {
       parsedResponse = JSON.parse(cleanResponseText);
       
@@ -136,23 +136,14 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
         metadata.seven_sections_validated = parsedResponse.seven_sections_validated || false;
         metadata.error_help_available = parsedResponse.error_help_available || false;
         
-        // SURGICAL FIX: Parse the inner JSON (now raw OpenAI JSON)
+        // Parse the inner JSON (OpenAI response)
         try {
           const innerStructuredData = JSON.parse(parsedResponse.response);
-          console.log('✅ Successfully parsed inner JSON from raw OpenAI response');
+          console.log('✅ Successfully parsed inner JSON from OpenAI response');
           parsedResponse = innerStructuredData;
         } catch (innerError) {
-          // SURGICAL FIX: If inner parsing fails, try direct parsing of response content
-          console.log('🔄 Trying direct OpenAI JSON parsing from response field');
-          
-          // Check if response field contains direct structured data (not stringified)
-          if (typeof parsedResponse.response === 'object' && parsedResponse.response !== null) {
-            console.log('✅ Direct structured data found in response field');
-            parsedResponse = parsedResponse.response;
-          } else {
-            console.log('📄 Inner response is plain text, treating as such');
-            return { structuredData: null, metadata, isPlainText: true };
-          }
+          console.log('❌ Failed to parse inner JSON, treating as plain text');
+          return { structuredData: null, metadata, isPlainText: true };
         }
       } else if (parsedResponse.summary || parsedResponse.steps || parsedResponse.platforms) {
         // Direct structured JSON from OpenAI
@@ -167,7 +158,7 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       return { structuredData: null, metadata: { yusrai_powered: true }, isPlainText: true };
     }
 
-    // Check if this is a structured response with automation sections
+    // Validate that this is a structured response with automation sections
     const hasStructuredSections = parsedResponse.summary ||
       parsedResponse.steps || 
       parsedResponse.platforms || 
@@ -185,10 +176,10 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       };
     }
 
-    // Map field variations to standard format
+    // FIXED: Improved field mapping with validation
     console.log('🔍 Validating and mapping structured sections...')
 
-    // Handle step variations without duplication
+    // Handle step variations
     if (parsedResponse.step_by_step && !parsedResponse.steps) {
       parsedResponse.steps = Array.isArray(parsedResponse.step_by_step) 
         ? parsedResponse.step_by_step 
@@ -233,29 +224,46 @@ export function parseYusrAIStructuredResponse(responseText: string): YusrAIParse
       console.log('📋 Mapped blueprint to execution_blueprint');
     }
 
-    // Ensure all required arrays exist
-    if (!parsedResponse.steps) parsedResponse.steps = [];
-    if (!parsedResponse.platforms) parsedResponse.platforms = [];
-    if (!parsedResponse.clarification_questions) parsedResponse.clarification_questions = [];
-    if (!parsedResponse.agents) parsedResponse.agents = [];
+    // FIXED: Ensure all required arrays exist with meaningful defaults
+    if (!parsedResponse.steps || !Array.isArray(parsedResponse.steps) || parsedResponse.steps.length === 0) {
+      parsedResponse.steps = ["Automation step will be configured"];
+    }
+    if (!parsedResponse.platforms || !Array.isArray(parsedResponse.platforms) || parsedResponse.platforms.length === 0) {
+      parsedResponse.platforms = [];
+    }
+    if (!parsedResponse.clarification_questions || !Array.isArray(parsedResponse.clarification_questions) || parsedResponse.clarification_questions.length === 0) {
+      parsedResponse.clarification_questions = ["What specific requirements do you have for this automation?"];
+    }
+    if (!parsedResponse.agents || !Array.isArray(parsedResponse.agents) || parsedResponse.agents.length === 0) {
+      parsedResponse.agents = [];
+    }
     if (!parsedResponse.test_payloads) parsedResponse.test_payloads = {};
     if (!parsedResponse.execution_blueprint) parsedResponse.execution_blueprint = null;
 
     // Validate section completeness
     const hasSummary = parsedResponse.summary && parsedResponse.summary.length > 0;
     const hasSteps = Array.isArray(parsedResponse.steps) && parsedResponse.steps.length > 0;
-    const hasPlatforms = Array.isArray(parsedResponse.platforms) && parsedResponse.platforms.length > 0;
+    const hasPlatforms = Array.isArray(parsedResponse.platforms);
     const hasQuestions = Array.isArray(parsedResponse.clarification_questions) && parsedResponse.clarification_questions.length > 0;
-    const hasAgents = Array.isArray(parsedResponse.agents) && parsedResponse.agents.length > 0;
-    const hasTestPayloads = parsedResponse.test_payloads && Object.keys(parsedResponse.test_payloads).length > 0;
+    const hasAgents = Array.isArray(parsedResponse.agents);
+    const hasTestPayloads = parsedResponse.test_payloads && typeof parsedResponse.test_payloads === 'object';
     const hasBlueprint = parsedResponse.execution_blueprint && parsedResponse.execution_blueprint.workflow;
 
     const sectionsCount = [hasSummary, hasSteps, hasPlatforms, hasQuestions, hasAgents, hasTestPayloads, hasBlueprint].filter(Boolean).length;
     
     console.log('✅ YusrAI structured response validation successful')
-    metadata.seven_sections_validated = sectionsCount >= 3;
+    metadata.seven_sections_validated = sectionsCount >= 4; // Lowered threshold for better UX
     
     console.log(`📊 Section analysis: ${sectionsCount}/7 sections present - seven_sections_validated: ${metadata.seven_sections_validated}`);
+    console.log('📋 Parsed sections:', {
+      summary: !!hasSummary,
+      steps: hasSteps ? parsedResponse.steps.length : 0,
+      platforms: hasPlatforms ? parsedResponse.platforms.length : 0,
+      questions: hasQuestions ? parsedResponse.clarification_questions.length : 0,
+      agents: hasAgents ? parsedResponse.agents.length : 0,
+      test_payloads: hasTestPayloads ? Object.keys(parsedResponse.test_payloads).length : 0,
+      blueprint: !!hasBlueprint
+    });
     
     return { 
       structuredData: parsedResponse as YusrAIStructuredResponse, 

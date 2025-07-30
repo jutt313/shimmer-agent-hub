@@ -479,7 +479,33 @@ const ChatCard = ({
 
   const getLatestPlatforms = () => {
     const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.platformData).pop();
-    return latestBotMessage?.platformData || [];
+    if (latestBotMessage?.platformData) {
+      console.log('🔍 Found platforms from AI message:', latestBotMessage.platformData);
+      return latestBotMessage.platformData;
+    }
+    
+    const latestStructuredMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
+    if (latestStructuredMessage?.structuredData) {
+      const platformsSource = latestStructuredMessage.structuredData.platforms_and_credentials?.platforms || 
+                             latestStructuredMessage.structuredData.platforms_credentials || 
+                             latestStructuredMessage.structuredData.platforms || [];
+      
+      const transformedPlatforms = platformsSource.map((platform: any) => ({
+        name: platform.name || 'Unknown Platform',
+        credentials: platform.credentials ? Object.entries(platform.credentials).map(([key, value]: [string, any]) => ({
+          field: key,
+          placeholder: value.example || value.placeholder || `Enter ${key}`,
+          link: value.link || value.url || '#',
+          why_needed: value.description || value.why_needed || `Required for ${key}`
+        })) : []
+      }));
+      
+      console.log('🔄 Extracted platforms from structured data:', transformedPlatforms);
+      return transformedPlatforms;
+    }
+    
+    console.log('⚠️ No platforms found in any messages');
+    return [];
   };
 
   const getLatestDiagramData = () => {

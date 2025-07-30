@@ -224,13 +224,14 @@ const AutomationDetail = () => {
 
       if (chatError) throw chatError;
 
-      // CRITICAL FIX: Map database field names correctly to avoid crashes
+      // SURGICAL FIX: Include AI messages with structured data processing
       const formattedMessages = chatData.map((chat: ChatMessage, index: number) => {
         console.log('🔄 Processing stored chat message:', chat.message_content.substring(0, 100));
         
         let structuredData = null;
         let yusraiPowered = false;
         let sevenSectionsValidated = false;
+        let platformData = null;
         
         if (chat.sender === 'ai') {
           const parseResult = parseYusrAIStructuredResponse(chat.message_content);
@@ -238,10 +239,47 @@ const AutomationDetail = () => {
           yusraiPowered = parseResult.metadata.yusrai_powered || false;
           sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
           
+          // SURGICAL FIX: Extract platform data for credential buttons
+          if (structuredData) {
+            const platformsSource = structuredData.platforms_and_credentials?.platforms || 
+                                   structuredData.platforms_credentials || 
+                                   structuredData.platforms || [];
+            
+            platformData = platformsSource.map(platform => {
+              console.log('🔍 Processing individual platform:', platform);
+              
+              let credentials = [];
+              if (platform.credentials) {
+                if (Array.isArray(platform.credentials)) {
+                  credentials = platform.credentials;
+                } else if (typeof platform.credentials === 'object') {
+                  credentials = Object.entries(platform.credentials).map(([key, value]: [string, any]) => ({
+                    field: key,
+                    placeholder: value.example || value.placeholder || `Enter ${key}`,
+                    link: value.link || value.url || '#',
+                    why_needed: value.description || value.why_needed || `Required for ${key}`
+                  }));
+                }
+              }
+              
+              return {
+                name: platform.name || 'Unknown Platform',
+                credentials: credentials.map(cred => ({
+                  field: cred.field || cred.name || 'api_key',
+                  placeholder: cred.example || cred.placeholder || `Enter ${cred.field}`,
+                  link: cred.link || cred.where_to_get || '#',
+                  why_needed: cred.why_needed || cred.description || 'Authentication required'
+                }))
+              };
+            });
+            
+            console.log('🔗 Extracted platform data with full names:', platformData);
+          }
+          
           console.log('📦 Enhanced parsing result:', {
             hasStructuredData: !!structuredData,
-            platformsCount: structuredData?.platforms?.length || 0,
-            platformNames: structuredData?.platforms?.map((p: any) => p.name) || [],
+            platformsCount: platformData?.length || 0,
+            platformNames: platformData?.map((p: any) => p.name) || [],
             yusraiPowered,
             sevenSectionsValidated
           });
@@ -249,46 +287,29 @@ const AutomationDetail = () => {
 
         return {
           id: index + 1,
-          text: chat.message_content, // Correct field mapping
-          isBot: chat.sender === 'ai', // Correct field mapping
-          timestamp: new Date(chat.timestamp), // Correct field mapping
+          text: chat.message_content,
+          isBot: chat.sender === 'ai',
+          timestamp: new Date(chat.timestamp),
           structuredData,
+          platformData,
           yusrai_powered: yusraiPowered,
           seven_sections_validated: sevenSectionsValidated
         };
       });
 
-      // SIMPLIFIED: Extract platforms from text for credential buttons
+      // SURGICAL FIX: Extract platforms from AI messages for credential buttons
       const allPlatforms: any[] = [];
-      const commonPlatforms = ['Discord', 'OpenAI', 'Typeform', 'Slack', 'Gmail', 'Google Sheets', 'Zapier', 'Microsoft Teams', 'Notion', 'Airtable'];
-      
       formattedMessages.forEach(msg => {
-        if (msg.isBot) {
-          commonPlatforms.forEach(platform => {
-            if (msg.text.toLowerCase().includes(platform.toLowerCase())) {
-              allPlatforms.push({
-                name: platform,
-                credentials: [{ 
-                  field: 'api_key', 
-                  placeholder: 'Enter your API key',
-                  link: '#',
-                  why_needed: 'Authentication required' 
-                }]
-              });
-            }
-          });
+        if (msg.isBot && msg.platformData && Array.isArray(msg.platformData)) {
+          allPlatforms.push(...msg.platformData);
         }
       });
       
-      const uniquePlatforms = allPlatforms.filter((platform, index, self) => 
-        index === self.findIndex(p => p.name === platform.name)
-      );
-      
-      if (uniquePlatforms.length > 0) {
-        console.log('🔗 Setting platforms from text extraction:', uniquePlatforms.map(p => p.name));
-        setCurrentPlatforms(uniquePlatforms);
+      if (allPlatforms.length > 0) {
+        console.log('🔗 Setting platforms from AI messages:', allPlatforms.map(p => p.name));
+        setCurrentPlatforms(allPlatforms);
       } else {
-        console.log('⚠️ No platforms found in messages');
+        console.log('⚠️ No platforms found in AI messages');
       }
 
       if (formattedMessages.length === 0) {

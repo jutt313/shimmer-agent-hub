@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Play, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -26,15 +27,26 @@ const SimpleExecuteButton = ({
     if (!user?.id || !automationId) return;
     
     try {
+      // SURGICAL FIX: Enhanced credential detection
       const { data, error } = await supabase
         .from('automation_platform_credentials')
-        .select('platform_name')
+        .select('platform_name, is_active')
         .eq('automation_id', automationId)
         .eq('user_id', user.id)
         .eq('is_active', true);
 
       if (error) throw error;
-      setHasCredentials(data && data.length > 0);
+      
+      // SURGICAL FIX: Consider credentials available if any platform is configured
+      const credentialsAvailable = data && data.length > 0;
+      setHasCredentials(credentialsAvailable);
+      
+      console.log('🔍 Credential status check:', {
+        automationId,
+        credentialsFound: data?.length || 0,
+        platformNames: data?.map(d => d.platform_name) || [],
+        hasCredentials: credentialsAvailable
+      });
     } catch (error) {
       console.error('Failed to check credentials:', error);
       setHasCredentials(false);

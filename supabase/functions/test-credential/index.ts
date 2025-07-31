@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.2';
@@ -108,32 +107,49 @@ serve(async (req) => {
   }
 
   try {
-    const { platformName, credentials, userId } = await req.json();
+    // 🎯 SURGICAL FIX 1: Extract testConfig parameter from frontend
+    const { platformName, credentials, userId, testConfig: frontendTestConfig } = await req.json();
     
     console.log('🧪 FIXED: Enhanced credential testing for:', platformName);
+    console.log('🎯 FIXED: Frontend testConfig received:', frontendTestConfig ? 'YES' : 'NO');
 
-    // Step 1: Get test configuration (built-in or AI-generated)
-    let testConfig = BUILT_IN_CONFIGS[platformName.toLowerCase()];
+    // Step 1: Prioritize frontend-sent AI config, then built-in, then generate new AI config
+    let testConfig = frontendTestConfig;
+    
+    // 🎯 SURGICAL FIX 2: Use frontend testConfig first, fallback to built-in or AI generation
+    if (!testConfig) {
+      console.log('📋 FIXED: No frontend testConfig, checking built-in configs...');
+      testConfig = BUILT_IN_CONFIGS[platformName.toLowerCase()];
+    }
     
     if (!testConfig && openAIApiKey) {
-      console.log('🤖 FIXED: Generating AI configuration for:', platformName);
+      console.log('🤖 FIXED: Generating new AI configuration for:', platformName);
       testConfig = await generateAITestConfig(platformName);
     }
     
     if (!testConfig) {
+      console.log('❌ FIXED: No configuration available for:', platformName);
       return new Response(JSON.stringify({
         success: false,
-        message: `No test configuration available for ${platformName}`,
+        message: `No test configuration available for ${platformName}. Frontend config: ${frontendTestConfig ? 'received but invalid' : 'not received'}, built-in config: ${BUILT_IN_CONFIGS[platformName.toLowerCase()] ? 'available' : 'not available'}, AI generation: ${openAIApiKey ? 'attempted but failed' : 'unavailable'}`,
         details: {
           platform_name: platformName,
           ai_generated_config: false,
-          error_type: 'no_config'
+          error_type: 'no_config',
+          frontend_config_status: frontendTestConfig ? 'received' : 'not_received',
+          built_in_config_status: BUILT_IN_CONFIGS[platformName.toLowerCase()] ? 'available' : 'not_available'
         }
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
+    // 🎯 SURGICAL FIX 3: Log which config source is being used
+    const configSource = frontendTestConfig ? 'frontend-ai-generated' : 
+                        BUILT_IN_CONFIGS[platformName.toLowerCase()] ? 'built-in' : 
+                        'newly-ai-generated';
+    console.log('📡 FIXED: Using config source:', configSource);
 
     // Step 2: Build test request
     const testRequest = buildTestRequest(testConfig, credentials);
@@ -158,15 +174,15 @@ serve(async (req) => {
       
       return new Response(JSON.stringify({
         success: true,
-        message: `${platformName} credentials verified successfully!`,
+        message: `${platformName} credentials verified successfully using ${configSource} configuration!`,
         details: {
           status: response.status,
           endpoint_tested: testRequest.url,
-          ai_generated_config: testConfig.ai_generated || false,
-          platform_name: testConfig.platform_name,
+          ai_generated_config: testConfig.ai_generated || (configSource === 'frontend-ai-generated'),
+          platform_name: testConfig.platform_name || platformName,
           api_response: sanitizeResponse(responseData),
           headers_used: testRequest.options.headers || {},
-          config_source: testConfig.ai_generated ? 'openai-generated' : 'built-in'
+          config_source: configSource
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -176,16 +192,16 @@ serve(async (req) => {
       
       return new Response(JSON.stringify({
         success: false,
-        message: generateErrorMessage(platformName, response.status, testConfig),
+        message: generateErrorMessage(platformName, response.status, testConfig, configSource),
         error_type: categorizeError(response.status),
         details: {
           status: response.status,
           endpoint_tested: testRequest.url,
-          ai_generated_config: testConfig.ai_generated || false,
-          platform_name: testConfig.platform_name,
+          ai_generated_config: testConfig.ai_generated || (configSource === 'frontend-ai-generated'),
+          platform_name: testConfig.platform_name || platformName,
           api_response: sanitizeResponse(responseData),
           headers_used: testRequest.options.headers || {},
-          config_source: testConfig.ai_generated ? 'openai-generated' : 'built-in'
+          config_source: configSource
         },
         troubleshooting: generateTroubleshootingSteps(platformName, response.status, testConfig)
       }), {
@@ -359,8 +375,7 @@ function evaluateTestSuccess(response: Response, responseData: any, testConfig: 
   return true;
 }
 
-function generateErrorMessage(platformName: string, status: number, testConfig: any): string {
-  const configSource = testConfig.ai_generated ? 'AI-generated' : 'built-in';
+function generateErrorMessage(platformName: string, status: number, testConfig: any, configSource: string): string {
   const statusMessage = testConfig.error_patterns[status.toString()] || `HTTP ${status} error`;
   return `${platformName} test failed (${configSource} config): ${statusMessage}`;
 }
@@ -416,4 +431,4 @@ function sanitizeResponse(responseData: any): any {
   return responseData;
 }
 
-console.log('✅ FIXED: Enhanced test-credential function loaded with comprehensive AI support');
+console.log('✅ FIXED: Enhanced test-credential function loaded with frontend testConfig support');

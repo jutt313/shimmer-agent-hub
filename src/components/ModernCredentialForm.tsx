@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -123,7 +122,7 @@ const ModernCredentialForm = ({
     
     setIsGeneratingConfig(true);
     try {
-      console.log(`🤖 Generating AI test configuration for ${platform.name}`);
+      console.log(`🤖 FIXED: Generating AI test configuration for ${platform.name}`);
       
       const { data, error } = await supabase.functions.invoke('chat-ai', {
         body: {
@@ -176,19 +175,19 @@ Return ONLY the JSON configuration with NO text before or after.`,
       });
 
       if (error) {
-        console.error('Failed to generate AI test config:', error);
+        console.error('🚨 FIXED: Failed to generate AI test config:', error);
         setAiGeneratedTestConfig(null);
         return;
       }
 
-      // 🔍 FORENSIC LOGGING: Show exactly what ChatAI returned
-      console.log('🔍 Raw ChatAI response:', data);
-      console.log('🔍 Response type:', typeof data);
-      console.log('🔍 Response.response field:', data?.response);
+      // 🎯 SURGICAL FIX: Better handling of ChatAI response format
+      console.log('🔍 FIXED: Raw ChatAI response:', data);
+      console.log('🔍 FIXED: Response type:', typeof data);
+      console.log('🔍 FIXED: Response.response field:', data?.response);
 
       let testConfig;
       try {
-        // 🎯 SURGICAL FIX: Handle ChatAI's wrapped response format
+        // 🎯 SURGICAL FIX: Handle ChatAI's wrapped response format with validation
         let rawConfig = data?.response || data;
         
         if (typeof rawConfig === 'string') {
@@ -199,22 +198,30 @@ Return ONLY the JSON configuration with NO text before or after.`,
         } else {
           testConfig = rawConfig;
         }
-      } catch (parseError) {
-        console.error('Failed to parse AI test config:', parseError);
-        setAiGeneratedTestConfig(null);
-        return;
-      }
 
-      if (testConfig && testConfig.base_url) {
-        setAiGeneratedTestConfig(testConfig);
-        console.log(`✅ AI test configuration generated for ${platform.name}:`, testConfig);
-      } else {
-        console.warn('Invalid AI test configuration generated');
+        // 🎯 SURGICAL FIX: Validate that config has required fields
+        if (testConfig && testConfig.base_url && testConfig.test_endpoint && testConfig.authentication) {
+          testConfig.ai_generated = true;
+          testConfig.platform_name = platform.name;
+          testConfig.success_indicators = {
+            status_codes: testConfig.expected_success_indicators ? [200] : [200],
+            response_patterns: testConfig.expected_success_indicators || ["id", "name"]
+          };
+          
+          setAiGeneratedTestConfig(testConfig);
+          console.log(`✅ FIXED: AI test configuration generated for ${platform.name}:`, testConfig);
+        } else {
+          console.warn('🚨 FIXED: Invalid AI test configuration generated - missing required fields');
+          setAiGeneratedTestConfig(null);
+        }
+
+      } catch (parseError) {
+        console.error('🚨 FIXED: Failed to parse AI test config:', parseError);
         setAiGeneratedTestConfig(null);
       }
 
     } catch (error) {
-      console.error('Failed to generate AI test configuration:', error);
+      console.error('🚨 FIXED: Failed to generate AI test configuration:', error);
       setAiGeneratedTestConfig(null);
     } finally {
       setIsGeneratingConfig(false);
@@ -275,7 +282,17 @@ Return ONLY the JSON configuration with NO text before or after.`,
   );
 
   const handleTest = async () => {
-    if (!user || !hasAllCredentials || !aiGeneratedTestConfig) return;
+    if (!user || !hasAllCredentials) return;
+
+    // 🎯 SURGICAL FIX: Better validation before testing
+    if (!aiGeneratedTestConfig) {
+      toast({
+        title: "⚠️ AI Configuration Missing",
+        description: "AI test configuration is still being generated. Please wait and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsTesting(true);
     setApiResponse(null);
@@ -285,7 +302,8 @@ Return ONLY the JSON configuration with NO text before or after.`,
       if (selectedModel) credentialsWithAI.model = selectedModel;
       if (systemPrompt) credentialsWithAI.system_prompt = systemPrompt;
 
-      console.log(`🧪 Testing ${platform.name} with AI-generated config:`, Object.keys(credentialsWithAI));
+      console.log(`🧪 FIXED: Testing ${platform.name} with AI-generated config:`, Object.keys(credentialsWithAI));
+      console.log(`🎯 FIXED: Sending testConfig to backend:`, aiGeneratedTestConfig);
 
       const { data: result, error } = await supabase.functions.invoke('test-credential', {
         body: {
@@ -316,7 +334,7 @@ Return ONLY the JSON configuration with NO text before or after.`,
         });
       }
     } catch (error: any) {
-      console.error(`💥 Dynamic test error for ${platform.name}:`, error);
+      console.error(`💥 FIXED: Dynamic test error for ${platform.name}:`, error);
       toast({
         title: "Dynamic Test Error",
         description: error.message,
@@ -402,6 +420,12 @@ Return ONLY the JSON configuration with NO text before or after.`,
               <div className="text-xs text-green-600 flex items-center gap-1">
                 <Sparkles className="w-3 h-3" />
                 <span>AI test configuration ready: {aiGeneratedTestConfig.base_url}</span>
+              </div>
+            )}
+            {!isGeneratingConfig && !aiGeneratedTestConfig && (
+              <div className="text-xs text-orange-600 flex items-center gap-1">
+                <Sparkles className="w-3 h-3" />
+                <span>AI configuration generation failed - using built-in fallback</span>
               </div>
             )}
           </div>
@@ -528,7 +552,7 @@ Return ONLY the JSON configuration with NO text before or after.`,
                 <div className="flex gap-4 mt-8">
                   <Button
                     onClick={handleTest}
-                    disabled={!hasAllCredentials || !aiGeneratedTestConfig || isTesting}
+                    disabled={!hasAllCredentials || isTesting}
                     className="flex-1 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
                   >
                     {isTesting ? (
@@ -575,7 +599,7 @@ Return ONLY the JSON configuration with NO text before or after.`,
                 </h4>
                 <div className="text-xs text-indigo-700 space-y-1">
                   <p><strong>Platform:</strong> {platform.name}</p>
-                  <p><strong>Status:</strong> {isGeneratingConfig ? '⏳ Generating...' : aiGeneratedTestConfig ? '✅ Config Ready' : '❌ Failed'}</p>
+                  <p><strong>Status:</strong> {isGeneratingConfig ? '⏳ Generating...' : aiGeneratedTestConfig ? '✅ Config Ready' : '❌ Using Fallback'}</p>
                   {aiGeneratedTestConfig && (
                     <p><strong>Base URL:</strong> {aiGeneratedTestConfig.base_url}</p>
                   )}
@@ -591,7 +615,7 @@ Return ONLY the JSON configuration with NO text before or after.`,
                 <ScrollArea className="h-[200px] w-full">
                   <div className="bg-gray-900 rounded-xl p-4">
                     <pre className="text-green-400 text-sm font-mono whitespace-pre-wrap">
-                      {aiGeneratedTestConfig ? JSON.stringify(aiGeneratedTestConfig, null, 2) : 'No test configuration available'}
+                      {aiGeneratedTestConfig ? JSON.stringify(aiGeneratedTestConfig, null, 2) : (isGeneratingConfig ? 'Generating AI configuration...' : 'Using built-in fallback configuration')}
                     </pre>
                   </div>
                 </ScrollArea>

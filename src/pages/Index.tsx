@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useMemo } from "react";
 import { Send, Bot } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -18,16 +19,7 @@ const Index = () => {
   const [showAgentForm, setShowAgentForm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [currentAgentConfig, setCurrentAgentConfig] = useState<any>(null);
-  const [messages, setMessages] = useState([{
-    id: 1,
-    text: "I am YusrAI, your AI assistant powered by OpenAI. I'll help you create comprehensive automations with specific platform integrations. How can I help you today?",
-    isBot: true,
-    timestamp: new Date(),
-    structuredData: null,
-    yusrai_powered: true,
-    seven_sections_validated: false,
-    error_help_available: false
-  }]);
+  const [automationId, setAutomationId] = useState<string | null>(null);
   
   const { toast } = useToast();
   const { user } = useAuth();
@@ -50,18 +42,6 @@ const Index = () => {
       return;
     }
 
-    const newMessage = {
-      id: Date.now(),
-      text: message.trim(),
-      isBot: false,
-      timestamp: new Date(),
-      structuredData: null,
-      yusrai_powered: false,
-      seven_sections_validated: false,
-      error_help_available: false
-    };
-    
-    setMessages(prev => [...prev, newMessage]);
     const currentMessage = message.trim();
     setMessage("");
     setIsLoading(true);
@@ -73,11 +53,7 @@ const Index = () => {
         const response = await chatAIConnectionService.processConnectionRequest({
           userId: user?.id || 'anonymous',
           message: currentMessage,
-          messages: messages.slice(-10).map(msg => ({
-            text: msg.text,
-            isBot: msg.isBot,
-            message_content: msg.text
-          })),
+          messages: [],
           context: 'yusrai_automation_creation',
           automationContext: currentAgentConfig ? {
             agentConfig: currentAgentConfig.config || {},
@@ -97,8 +73,6 @@ const Index = () => {
       
       // Process the response
       let responseText = "I'm YusrAI, ready to help you create comprehensive automations with the right platforms and credentials.";
-      let structuredData = null;
-      let errorHelpAvailable = false;
       
       if (result && typeof result === 'object') {
         if (result.response && 
@@ -108,19 +82,6 @@ const Index = () => {
           responseText = result.response;
           console.log('✅ Using response text from YusrAI service');
         }
-        
-        // Get structured data from result or parse from response
-        if (result.structuredData && typeof result.structuredData === 'object') {
-          structuredData = result.structuredData;
-          console.log('✅ YusrAI structured data available from service');
-        } else if (result.response) {
-          // Try to parse structured data from response text
-          const parseResult = parseYusrAIStructuredResponse(result.response);
-          structuredData = parseResult.structuredData;
-          console.log('✅ Parsed YusrAI structured data from response text:', !!structuredData);
-        }
-
-        errorHelpAvailable = result.error_help_available || false;
       }
       
       // Final validation
@@ -161,87 +122,16 @@ const Index = () => {
             }
           }
         });
-        
-        // Parse the fallback as structured data
-        const fallbackParseResult = parseYusrAIStructuredResponse(responseText);
-        structuredData = fallbackParseResult.structuredData;
       }
-      
-      const botResponse = {
-        id: Date.now() + 1,
-        text: responseText,
-        isBot: true,
-        timestamp: new Date(),
-        structuredData: structuredData,
-        error_help_available: errorHelpAvailable,
-        yusrai_powered: !!structuredData,
-        seven_sections_validated: !!structuredData
-      };
-      
-      console.log('📤 Adding YusrAI bot response:', {
-        textLength: botResponse.text.length,
-        textPreview: botResponse.text.substring(0, 100),
-        hasStructuredData: !!botResponse.structuredData,
-        errorHelpAvailable: botResponse.error_help_available
-      });
-      
-      setMessages(prev => [...prev, botResponse]);
 
     } catch (error: any) {
       console.error('❌ Error in YusrAI chat request:', error);
       handleError(error, 'YusrAI Chat message sending');
       
-      const errorResponse = {
-        id: Date.now() + 1,
-        text: JSON.stringify({
-          summary: "I encountered a technical issue, but I'm YusrAI and ready to help you create your automation. Please rephrase your request with specific platform names and I'll provide a complete solution.",
-          steps: [
-            "Specify the platforms you want to integrate",
-            "Describe your automation workflow",
-            "I'll provide complete setup instructions",
-            "Test credentials with real API calls",
-            "Execute with full monitoring"
-          ],
-          platforms: [],
-          clarification_questions: [
-            "Which platforms would you like to integrate?",
-            "What should the automation accomplish?"
-          ],
-          agents: [],
-          test_payloads: {},
-          execution_blueprint: {
-            trigger: { type: "manual", configuration: {} },
-            workflow: [],
-            error_handling: {
-              retry_attempts: 3,
-              fallback_actions: ["log_error"],
-              notification_rules: [],
-              critical_failure_actions: ["pause_automation"]
-            },
-            performance_optimization: {
-              rate_limit_handling: "exponential_backoff",
-              concurrency_limit: 5,
-              timeout_seconds_per_step: 60
-            }
-          }
-        }),
-        isBot: true,
-        timestamp: new Date(),
-        structuredData: null,
-        error_help_available: true,
-        yusrai_powered: true,
-        seven_sections_validated: false
-      };
-      
-      // Parse the error response as structured data
-      const errorParseResult = parseYusrAIStructuredResponse(errorResponse.text);
-      errorResponse.structuredData = errorParseResult.structuredData;
-      setMessages(prev => [...prev, errorResponse]);
-      
     } finally {
       setIsLoading(false);
     }
-  }, [message, isLoading, messages, currentAgentConfig, executeChatRequest, handleError, user]);
+  }, [message, isLoading, currentAgentConfig, executeChatRequest, handleError, user]);
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !isLoading) {
@@ -330,19 +220,22 @@ const Index = () => {
       <div className="max-w-6xl mx-auto h-full flex flex-col relative z-10">
         {/* Main Chat Card */}
         <div className="flex-1 flex items-center justify-center mb-6">
-          <ChatCard 
-            messages={messages} 
-            isLoading={isLoading}
-            onSendMessage={(helpMessage) => {
-              setMessage(helpMessage);
-              // Automatically send the help message
-              setTimeout(() => {
-                if (!isLoading) {
-                  handleSendMessage();
-                }
-              }, 100);
-            }}
-          />
+          {automationId ? (
+            <ChatCard 
+              automationId={automationId}
+              title="Chat Automation"
+            />
+          ) : (
+            <div className="text-center">
+              <p className="text-gray-600 mb-4">Create an automation to start chatting</p>
+              <Button 
+                onClick={() => navigate("/automations")}
+                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
+              >
+                Create Automation
+              </Button>
+            </div>
+          )}
         </div>
         
         {/* Input Section */}

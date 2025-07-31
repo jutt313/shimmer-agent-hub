@@ -22,10 +22,29 @@ interface ChatMessage {
 
 interface ChatCardProps {
   automationId: string;
-  title: string;
+  title?: string;
+  messages?: any[];
+  onAgentAdd?: (agent: any) => void;
+  dismissedAgents?: Set<string>;
+  onAgentDismiss?: (agentName: string) => void;
+  isLoading?: boolean;
+  platformCredentialStatus?: any;
+  onPlatformCredentialChange?: () => void;
+  onSendMessage?: (message: any) => void;
 }
 
-const ChatCard = ({ automationId, title }: ChatCardProps) => {
+const ChatCard = ({ 
+  automationId, 
+  title,
+  messages: externalMessages,
+  onAgentAdd,
+  dismissedAgents,
+  onAgentDismiss,
+  isLoading: externalLoading,
+  platformCredentialStatus,
+  onPlatformCredentialChange,
+  onSendMessage
+}: ChatCardProps) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [latestResponse, setLatestResponse] = useState<string | null>(null);
   const [input, setInput] = useState('');
@@ -37,8 +56,30 @@ const ChatCard = ({ automationId, title }: ChatCardProps) => {
   const { toast } = useToast();
 
   useEffect(() => {
-    loadChatMessages();
-  }, [automationId]);
+    if (externalMessages) {
+      // Use external messages if provided (from AutomationDetail)
+      const formattedMessages = externalMessages.map((msg, index) => ({
+        id: msg.id || index.toString(),
+        sender: msg.isBot ? 'ai' : 'user',
+        message: msg.text || msg.message || '',
+        timestamp: msg.timestamp || new Date(),
+        automation_id: automationId
+      }));
+      setMessages(formattedMessages);
+      
+      // Find latest AI response
+      const latestAiMessage = formattedMessages
+        .filter(msg => msg.sender === 'ai')
+        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0];
+      
+      if (latestAiMessage) {
+        setLatestResponse(latestAiMessage.message);
+      }
+    } else {
+      // Load from database if no external messages provided
+      loadChatMessages();
+    }
+  }, [automationId, externalMessages]);
 
   const loadChatMessages = async () => {
     try {
@@ -79,6 +120,13 @@ const ChatCard = ({ automationId, title }: ChatCardProps) => {
 
   const handleSendMessage = async () => {
     if (!input.trim()) return;
+
+    // If external onSendMessage is provided, use it
+    if (onSendMessage) {
+      onSendMessage(input);
+      setInput('');
+      return;
+    }
 
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -219,7 +267,7 @@ const ChatCard = ({ automationId, title }: ChatCardProps) => {
 
       toast({
         title: "✅ Automation Saved Successfully!",
-        description: `${title} is now ready for execution with structured platform data.`,
+        description: `${title || 'Automation'} is now ready for execution with structured platform data.`,
       });
 
       setSaved(true);
@@ -244,7 +292,7 @@ const ChatCard = ({ automationId, title }: ChatCardProps) => {
       setTimeout(() => {
         toast({
           title: "✅ Automation Run Successfully!",
-          description: `${title} has been executed.`,
+          description: `${title || 'Automation'} has been executed.`,
         });
         setRunning(false);
       }, 2000);
@@ -263,12 +311,15 @@ const ChatCard = ({ automationId, title }: ChatCardProps) => {
     console.log('Automation saved successfully!');
   };
 
+  const displayTitle = title || 'Chat';
+  const isLoadingState = externalLoading || false;
+
   return (
     <Card className="h-full flex flex-col bg-white/80">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
           <MessageSquare className="h-5 w-5 text-blue-600" />
-          {title}
+          {displayTitle}
           {!isSaved && (
             <Badge variant="secondary" className="ml-2">
               Unsaved
@@ -293,6 +344,16 @@ const ChatCard = ({ automationId, title }: ChatCardProps) => {
                 </div>
               </div>
             ))}
+            {isLoadingState && (
+              <div className="flex justify-start">
+                <div className="bg-blue-50 border-blue-200 rounded-lg p-3 border max-w-[85%]">
+                  <div className="flex items-start gap-2">
+                    <Bot className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-gray-700">AI is thinking...</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </ScrollArea>
 

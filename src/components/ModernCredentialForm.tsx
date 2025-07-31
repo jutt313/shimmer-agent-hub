@@ -124,51 +124,45 @@ const ModernCredentialForm = ({
     try {
       console.log(`🤖 FIXED: Generating AI test configuration for ${platform.name}`);
       
+      // 🎯 FIX 1: Request specific test configuration, not automation blueprint
       const { data, error } = await supabase.functions.invoke('chat-ai', {
         body: {
-          message: `Generate COMPLETE and COMPREHENSIVE test configuration for ${platform.name} platform.
+          message: `Generate ONLY a test configuration JSON for ${platform.name} platform.
 
-CRITICAL: Return ONLY valid JSON with ALL required fields:
+RETURN ONLY this exact JSON structure:
 {
-  "base_url": "https://api.platform.com",
+  "platform_name": "${platform.name}",
+  "base_url": "https://api.${platform.name.toLowerCase()}.com",
   "test_endpoint": {
     "method": "GET",
     "path": "/me",
     "headers": {
-      "Authorization": "Bearer {api_key}",
       "Content-Type": "application/json"
     },
-    "query_params": {},
-    "body": null
+    "query_params": {}
   },
   "authentication": {
     "type": "bearer",
     "location": "header",
     "parameter_name": "Authorization",
-    "format": "Bearer {access_token}"
-  },
-  "expected_success_indicators": ["id", "name", "email"],
-  "expected_error_indicators": ["error", "invalid", "unauthorized"],
-  "validation_rules": {
-    "api_key": {
-      "prefix": "sk-",
-      "min_length": 20,
-      "format": "alphanumeric"
-    }
+    "format": "Bearer {api_key}"
   },
   "field_mappings": {
     "api_key": "api_key"
   },
+  "success_indicators": {
+    "status_codes": [200],
+    "response_patterns": ["id", "name", "email"]
+  },
   "error_patterns": {
     "401": "Invalid credentials",
-    "403": "Access denied",
-    "404": "Endpoint not found"
+    "403": "Access denied"
   },
-  "test_description": "Test ${platform.name} API connectivity and authentication"
+  "ai_generated": true
 }
 
 Platform: ${platform.name}
-Return ONLY the JSON configuration with NO text before or after.`,
+Return ONLY the JSON with no extra text.`,
           messages: [],
           requestType: 'test_config_generation'
         }
@@ -180,49 +174,141 @@ Return ONLY the JSON configuration with NO text before or after.`,
         return;
       }
 
-      // 🎯 SURGICAL FIX: Better handling of ChatAI response format
+      // 🎯 FIX 2: Handle ChatAI's wrapped response structure correctly
       console.log('🔍 FIXED: Raw ChatAI response:', data);
-      console.log('🔍 FIXED: Response type:', typeof data);
-      console.log('🔍 FIXED: Response.response field:', data?.response);
-
+      
       let testConfig;
       try {
-        // 🎯 SURGICAL FIX: Handle ChatAI's wrapped response format with validation
-        let rawConfig = data?.response || data;
+        // ChatAI returns {response: "JSON_STRING", yusrai_powered: true, ...}
+        // We need to extract and parse the response field
+        let configText = data?.response || data;
         
-        if (typeof rawConfig === 'string') {
-          const jsonMatch = rawConfig.match(/\{[\s\S]*\}/);
+        if (typeof configText === 'string') {
+          // Extract JSON from the response string
+          const jsonMatch = configText.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             testConfig = JSON.parse(jsonMatch[0]);
           }
-        } else {
-          testConfig = rawConfig;
+        } else if (typeof configText === 'object') {
+          testConfig = configText;
         }
 
-        // 🎯 SURGICAL FIX: Validate that config has required fields
+        // 🎯 FIX 3: Validate that config has required fields
         if (testConfig && testConfig.base_url && testConfig.test_endpoint && testConfig.authentication) {
           testConfig.ai_generated = true;
           testConfig.platform_name = platform.name;
-          testConfig.success_indicators = {
-            status_codes: testConfig.expected_success_indicators ? [200] : [200],
-            response_patterns: testConfig.expected_success_indicators || ["id", "name"]
-          };
+          
+          // Add success indicators if missing
+          if (!testConfig.success_indicators) {
+            testConfig.success_indicators = {
+              status_codes: [200],
+              response_patterns: ["id", "name", "email"]
+            };
+          }
           
           setAiGeneratedTestConfig(testConfig);
           console.log(`✅ FIXED: AI test configuration generated for ${platform.name}:`, testConfig);
         } else {
-          console.warn('🚨 FIXED: Invalid AI test configuration generated - missing required fields');
-          setAiGeneratedTestConfig(null);
+          console.warn('🚨 FIXED: Invalid AI test configuration - using fallback');
+          // 🎯 FIX 4: Create proper fallback configuration
+          const fallbackConfig = {
+            platform_name: platform.name,
+            base_url: `https://api.${platform.name.toLowerCase()}.com`,
+            test_endpoint: {
+              method: "GET",
+              path: "/me",
+              headers: { "Content-Type": "application/json" }
+            },
+            authentication: {
+              type: "bearer",
+              location: "header",
+              parameter_name: "Authorization",
+              format: "Bearer {api_key}"
+            },
+            field_mappings: { "api_key": "api_key" },
+            success_indicators: {
+              status_codes: [200],
+              response_patterns: ["id", "name"]
+            },
+            error_patterns: {
+              "401": "Invalid credentials",
+              "403": "Access denied"
+            },
+            ai_generated: false,
+            fallback_config: true
+          };
+          
+          setAiGeneratedTestConfig(fallbackConfig);
         }
 
       } catch (parseError) {
         console.error('🚨 FIXED: Failed to parse AI test config:', parseError);
-        setAiGeneratedTestConfig(null);
+        
+        // 🎯 FIX 5: Always provide fallback even on parse error
+        const fallbackConfig = {
+          platform_name: platform.name,
+          base_url: `https://api.${platform.name.toLowerCase()}.com`,
+          test_endpoint: {
+            method: "GET",
+            path: "/test",
+            headers: { "Content-Type": "application/json" }
+          },
+          authentication: {
+            type: "bearer",
+            location: "header", 
+            parameter_name: "Authorization",
+            format: "Bearer {api_key}"
+          },
+          field_mappings: { "api_key": "api_key" },
+          success_indicators: {
+            status_codes: [200],
+            response_patterns: ["success", "data"]
+          },
+          error_patterns: {
+            "401": "Invalid API key",
+            "403": "Access denied"
+          },
+          ai_generated: false,
+          fallback_config: true,
+          parse_error: true
+        };
+        
+        setAiGeneratedTestConfig(fallbackConfig);
       }
 
     } catch (error) {
       console.error('🚨 FIXED: Failed to generate AI test configuration:', error);
-      setAiGeneratedTestConfig(null);
+      
+      // 🎯 FIX 6: Always provide fallback on any error
+      const fallbackConfig = {
+        platform_name: platform.name,
+        base_url: `https://api.${platform.name.toLowerCase()}.com`,
+        test_endpoint: {
+          method: "GET",
+          path: "/status",
+          headers: { "Content-Type": "application/json" }
+        },
+        authentication: {
+          type: "bearer",
+          location: "header",
+          parameter_name: "Authorization", 
+          format: "Bearer {api_key}"
+        },
+        field_mappings: { "api_key": "api_key" },
+        success_indicators: {
+          status_codes: [200],
+          response_patterns: ["ok", "status"]
+        },
+        error_patterns: {
+          "401": "Invalid credentials",
+          "403": "Access denied"
+        },
+        ai_generated: false,
+        fallback_config: true,
+        system_error: true
+      };
+      
+      setAiGeneratedTestConfig(fallbackConfig);
     } finally {
       setIsGeneratingConfig(false);
     }
@@ -284,11 +370,11 @@ Return ONLY the JSON configuration with NO text before or after.`,
   const handleTest = async () => {
     if (!user || !hasAllCredentials) return;
 
-    // 🎯 SURGICAL FIX: Better validation before testing
+    // 🎯 FIX 7: Remove strict validation that prevents testing with fallback
     if (!aiGeneratedTestConfig) {
       toast({
-        title: "⚠️ AI Configuration Missing",
-        description: "AI test configuration is still being generated. Please wait and try again.",
+        title: "⚠️ Configuration Missing",
+        description: "Test configuration is not available. Please wait for generation to complete.",
         variant: "destructive",
       });
       return;
@@ -302,14 +388,14 @@ Return ONLY the JSON configuration with NO text before or after.`,
       if (selectedModel) credentialsWithAI.model = selectedModel;
       if (systemPrompt) credentialsWithAI.system_prompt = systemPrompt;
 
-      console.log(`🧪 FIXED: Testing ${platform.name} with AI-generated config:`, Object.keys(credentialsWithAI));
+      console.log(`🧪 FIXED: Testing ${platform.name} with config:`, aiGeneratedTestConfig.ai_generated ? 'AI-generated' : 'fallback');
       console.log(`🎯 FIXED: Sending testConfig to backend:`, aiGeneratedTestConfig);
 
       const { data: result, error } = await supabase.functions.invoke('test-credential', {
         body: {
           platformName: platform.name,
           credentials: credentialsWithAI,
-          testConfig: aiGeneratedTestConfig,
+          testConfig: aiGeneratedTestConfig, // Send the config we have (AI or fallback)
           userId: user.id
         }
       });
@@ -323,20 +409,20 @@ Return ONLY the JSON configuration with NO text before or after.`,
       
       if (result.success) {
         toast({
-          title: "✅ Dynamic Test Successful",
-          description: `${platform.name} credentials work with AI-generated dynamic testing!`,
+          title: "✅ Test Successful",
+          description: `${platform.name} credentials verified using ${aiGeneratedTestConfig.ai_generated ? 'AI-generated' : 'fallback'} configuration!`,
         });
       } else {
         toast({
-          title: "❌ Dynamic Test Failed",
+          title: "❌ Test Failed", 
           description: result.message,
           variant: "destructive",
         });
       }
     } catch (error: any) {
-      console.error(`💥 FIXED: Dynamic test error for ${platform.name}:`, error);
+      console.error(`💥 FIXED: Test error for ${platform.name}:`, error);
       toast({
-        title: "Dynamic Test Error",
+        title: "Test Error",
         description: error.message,
         variant: "destructive",
       });
@@ -405,27 +491,35 @@ Return ONLY the JSON configuration with NO text before or after.`,
         <DialogHeader className="pb-6">
           <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-green-600 bg-clip-text text-transparent flex items-center gap-2">
             <Sparkles className="w-6 h-6 text-purple-600" />
-            Fully Dynamic {platform.name} Configuration
+            Dynamic {platform.name} Configuration
           </DialogTitle>
           <div className="text-gray-600 mt-2 space-y-1">
             <p className="font-medium">Automation: {automationContext?.title || 'Loading...'}</p>
-            <p className="text-sm">{automationContext?.description || 'Configure your credentials with AI-generated dynamic testing.'}</p>
+            <p className="text-sm">{automationContext?.description || 'Configure your credentials with AI-generated testing.'}</p>
+            
+            {/* 🎯 FIX 8: Improved UI status logic with proper state transitions */}
             {isGeneratingConfig && (
               <div className="text-xs text-blue-600 flex items-center gap-1">
                 <Loader2 className="w-3 h-3 animate-spin" />
                 <span>Generating AI test configuration...</span>
               </div>
             )}
-            {aiGeneratedTestConfig && (
+            {!isGeneratingConfig && aiGeneratedTestConfig && aiGeneratedTestConfig.ai_generated && (
               <div className="text-xs text-green-600 flex items-center gap-1">
                 <Sparkles className="w-3 h-3" />
-                <span>AI test configuration ready: {aiGeneratedTestConfig.base_url}</span>
+                <span>✅ AI configuration ready: {aiGeneratedTestConfig.base_url}</span>
+              </div>
+            )}
+            {!isGeneratingConfig && aiGeneratedTestConfig && !aiGeneratedTestConfig.ai_generated && (
+              <div className="text-xs text-orange-600 flex items-center gap-1">
+                <Sparkles className="w-3 h-3" />
+                <span>⚠️ Using fallback configuration: {aiGeneratedTestConfig.base_url}</span>
               </div>
             )}
             {!isGeneratingConfig && !aiGeneratedTestConfig && (
-              <div className="text-xs text-orange-600 flex items-center gap-1">
+              <div className="text-xs text-red-600 flex items-center gap-1">
                 <Sparkles className="w-3 h-3" />
-                <span>AI configuration generation failed - using built-in fallback</span>
+                <span>❌ Configuration generation failed</span>
               </div>
             )}
           </div>
@@ -438,7 +532,7 @@ Return ONLY the JSON configuration with NO text before or after.`,
               <div className="bg-gradient-to-br from-purple-50 via-blue-50 to-green-50 rounded-2xl p-6 border border-purple-200/50">
                 <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
                   <TestTube className="w-5 h-5 text-purple-600" />
-                  Dynamic Platform Credentials
+                  Platform Credentials
                 </h3>
                 
                 <div className="space-y-5">
@@ -457,10 +551,10 @@ Return ONLY the JSON configuration with NO text before or after.`,
                             <div className="group relative">
                               <Info className="h-4 w-4 text-gray-400 cursor-help" />
                               <div className="absolute left-0 top-6 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
-                                <strong>For dynamic automation:</strong> {cred.why_needed}
+                                <strong>Required:</strong> {cred.why_needed}
                                 {automationContext && (
                                   <div className="mt-2 pt-2 border-t border-gray-700">
-                                    <strong>Workflow:</strong> {automationContext.title}
+                                    <strong>Automation:</strong> {automationContext.title}
                                   </div>
                                 )}
                               </div>
@@ -558,12 +652,12 @@ Return ONLY the JSON configuration with NO text before or after.`,
                     {isTesting ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        AI Dynamic Testing...
+                        Testing...
                       </>
                     ) : (
                       <>
                         <TestTube className="w-4 h-4 mr-2" />
-                        AI Dynamic Test
+                        Test Credentials
                       </>
                     )}
                   </Button>
@@ -581,7 +675,7 @@ Return ONLY the JSON configuration with NO text before or after.`,
                     ) : (
                       <>
                         <Save className="w-4 h-4 mr-2" />
-                        Save for Dynamic Automation
+                        Save Credentials
                       </>
                     )}
                   </Button>
@@ -589,43 +683,48 @@ Return ONLY the JSON configuration with NO text before or after.`,
               </div>
             </div>
 
-            {/* Right Side - AI Configuration & Test Results */}
+            {/* Right Side - Configuration & Test Results */}
             <div className="space-y-4">
-              {/* AI Configuration Status */}
+              {/* 🎯 FIX 9: Improved configuration status display */}
               <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-200/50">
                 <h4 className="text-sm font-semibold text-indigo-900 mb-2 flex items-center gap-2">
                   <Sparkles className="w-4 h-4" />
-                  AI Dynamic Configuration Status
+                  Configuration Status
                 </h4>
                 <div className="text-xs text-indigo-700 space-y-1">
                   <p><strong>Platform:</strong> {platform.name}</p>
-                  <p><strong>Status:</strong> {isGeneratingConfig ? '⏳ Generating...' : aiGeneratedTestConfig ? '✅ Config Ready' : '❌ Using Fallback'}</p>
+                  <p><strong>Status:</strong> {
+                    isGeneratingConfig ? '⏳ Generating...' : 
+                    aiGeneratedTestConfig?.ai_generated ? '✅ AI Config Ready' :
+                    aiGeneratedTestConfig?.fallback_config ? '⚠️ Using Fallback' :
+                    '❌ No Configuration'
+                  }</p>
                   {aiGeneratedTestConfig && (
-                    <p><strong>Base URL:</strong> {aiGeneratedTestConfig.base_url}</p>
+                    <p><strong>Endpoint:</strong> {aiGeneratedTestConfig.base_url}</p>
                   )}
                 </div>
               </div>
 
-              {/* AI Test Configuration Display */}
+              {/* Test Configuration Display */}
               <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl p-6 border border-green-200/50">
                 <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <TestTube className="w-5 h-5 text-green-600" />
-                  AI-Generated Test Configuration
+                  Test Configuration
                 </h4>
                 <ScrollArea className="h-[200px] w-full">
                   <div className="bg-gray-900 rounded-xl p-4">
                     <pre className="text-green-400 text-sm font-mono whitespace-pre-wrap">
-                      {aiGeneratedTestConfig ? JSON.stringify(aiGeneratedTestConfig, null, 2) : (isGeneratingConfig ? 'Generating AI configuration...' : 'Using built-in fallback configuration')}
+                      {aiGeneratedTestConfig ? JSON.stringify(aiGeneratedTestConfig, null, 2) : (isGeneratingConfig ? 'Generating configuration...' : 'No configuration available')}
                     </pre>
                   </div>
                 </ScrollArea>
               </div>
 
-              {/* Dynamic API Response */}
+              {/* API Response */}
               <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-200/50">
                 <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-blue-600" />
-                  Dynamic API Response
+                  Test Response
                 </h4>
                 <ScrollArea className="h-[280px] w-full">
                   <div className="bg-gray-900 rounded-xl p-4">
@@ -638,7 +737,7 @@ Return ONLY the JSON configuration with NO text before or after.`,
                         <div className="text-center space-y-2">
                           <TestTube className="w-8 h-8 mx-auto opacity-50" />
                           <p className="text-sm">
-                            Click "AI Dynamic Test" to see how your credentials work with AI-generated configurations
+                            Click "Test Credentials" to see the API response
                           </p>
                         </div>
                       </div>
@@ -650,16 +749,16 @@ Return ONLY the JSON configuration with NO text before or after.`,
           </div>
         </ScrollArea>
 
-        {/* Enhanced Footer */}
+        {/* Footer */}
         <div className="pt-4 border-t border-gray-200/50">
           <div className="flex items-center justify-between">
             <p className="text-xs text-gray-500">
-              🔒 Credentials are encrypted and stored securely • 🤖 AI-powered fully dynamic testing
+              🔒 Credentials are encrypted and stored securely • 🤖 AI-powered testing with fallback
             </p>
             {testResult?.success && (
               <div className="flex items-center gap-2 text-xs text-green-600">
                 <TestTube className="w-4 h-4" />
-                <span>Ready for fully dynamic automation execution</span>
+                <span>Ready for automation execution</span>
               </div>
             )}
           </div>

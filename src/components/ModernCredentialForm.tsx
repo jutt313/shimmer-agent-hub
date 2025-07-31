@@ -119,8 +119,9 @@ const ModernCredentialForm = ({
         setAutomationContext(automationData);
         
         // CRITICAL FIX: Load platform credentials from automation_responses if not in blueprint
-        if (!automationData.automation_blueprint?.platforms || 
-            !automationData.automation_blueprint?.platforms[platform.name]) {
+        const automationBlueprint = automationData.automation_blueprint as any;
+        if (!automationBlueprint?.platforms || 
+            !automationBlueprint?.platforms[platform.name]) {
           
           console.log('🔍 FIXED: No platform data in blueprint, checking automation_responses...');
           
@@ -134,11 +135,11 @@ const ModernCredentialForm = ({
             .limit(1);
 
           if (responseData && responseData.length > 0) {
-            const structuredData = responseData[0].structured_data;
+            const structuredData = responseData[0].structured_data as any;
             console.log('📊 FIXED: Found structured data:', structuredData);
             
             // Extract platform credentials from structured data
-            if (structuredData.platforms && structuredData.platforms[platform.name]) {
+            if (structuredData?.platforms && structuredData.platforms[platform.name]) {
               const platformData = structuredData.platforms[platform.name];
               console.log('🔧 FIXED: Platform data found:', platformData);
               
@@ -153,7 +154,7 @@ const ModernCredentialForm = ({
           }
         } else {
           // Use platform data from automation blueprint
-          const blueprintPlatforms = automationData.automation_blueprint.platforms;
+          const blueprintPlatforms = automationBlueprint.platforms;
           if (blueprintPlatforms && blueprintPlatforms[platform.name]) {
             setPlatformCredentials(blueprintPlatforms[platform.name].credentials || []);
           }

@@ -17,6 +17,33 @@ export interface ExtractedPlatformData {
   apiUrl?: string;
 }
 
+// Add the missing export function
+export const extractPlatformCredentials = (responseText: string): any => {
+  try {
+    // Try to parse JSON from the response text
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    
+    // Return a basic structure if no JSON found
+    return {
+      platforms: {},
+      workflow_steps: [],
+      triggers: [],
+      variables: {}
+    };
+  } catch (error) {
+    console.error('Error extracting platform credentials:', error);
+    return {
+      platforms: {},
+      workflow_steps: [],
+      triggers: [],
+      variables: {}
+    };
+  }
+};
+
 export class PlatformDataExtractor {
   /**
    * Extract platform credentials from automation responses structured data
@@ -49,7 +76,7 @@ export class PlatformDataExtractor {
 
       // Search through responses for platform data
       for (const response of responseData) {
-        const structuredData = response.structured_data;
+        const structuredData = response.structured_data as any;
         
         if (structuredData?.platforms && structuredData.platforms[platformName]) {
           const platformData = structuredData.platforms[platformName];
@@ -111,7 +138,7 @@ export class PlatformDataExtractor {
         return [];
       }
 
-      const structuredData = responseData[0].structured_data;
+      const structuredData = responseData[0].structured_data as any;
       const platformsData: ExtractedPlatformData[] = [];
 
       if (structuredData?.platforms) {

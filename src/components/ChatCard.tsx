@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Bot, User, Play, Copy, Check } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -58,9 +57,9 @@ const ChatCard = ({
   useEffect(() => {
     if (externalMessages) {
       // Use external messages if provided (from AutomationDetail)
-      const formattedMessages = externalMessages.map((msg, index) => ({
+      const formattedMessages: ChatMessage[] = externalMessages.map((msg, index) => ({
         id: msg.id || index.toString(),
-        sender: msg.isBot ? 'ai' : 'user',
+        sender: msg.isBot ? 'ai' as const : 'user' as const,
         message: msg.text || msg.message || '',
         timestamp: msg.timestamp || new Date(),
         automation_id: automationId

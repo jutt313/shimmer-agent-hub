@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -49,7 +48,6 @@ const ModernCredentialForm = ({
   const [automationContext, setAutomationContext] = useState<any>(null);
   const [aiGeneratedTestConfig, setAiGeneratedTestConfig] = useState<any>(null);
   const [isGeneratingConfig, setIsGeneratingConfig] = useState(false);
-  const [platformCredentials, setPlatformCredentials] = useState<Array<any>>([]);
 
   // AI Configuration States
   const [selectedModel, setSelectedModel] = useState<string>('');
@@ -105,9 +103,6 @@ const ModernCredentialForm = ({
 
   const loadAutomationContext = async () => {
     try {
-      console.log('🔍 FIXED: Loading automation context for:', automationId);
-      
-      // First, get the automation data
       const { data: automationData } = await supabase
         .from('automations')
         .select('*')
@@ -115,54 +110,10 @@ const ModernCredentialForm = ({
         .single();
 
       if (automationData) {
-        console.log('📋 FIXED: Automation data loaded:', automationData.title);
         setAutomationContext(automationData);
-        
-        // CRITICAL FIX: Load platform credentials from automation_responses if not in blueprint
-        const automationBlueprint = automationData.automation_blueprint as any;
-        if (!automationBlueprint?.platforms || 
-            !automationBlueprint?.platforms[platform.name]) {
-          
-          console.log('🔍 FIXED: No platform data in blueprint, checking automation_responses...');
-          
-          // Get the latest automation response with structured data
-          const { data: responseData } = await supabase
-            .from('automation_responses')
-            .select('structured_data')
-            .eq('automation_id', automationId)
-            .not('structured_data', 'is', null)
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-          if (responseData && responseData.length > 0) {
-            const structuredData = responseData[0].structured_data as any;
-            console.log('📊 FIXED: Found structured data:', structuredData);
-            
-            // Extract platform credentials from structured data
-            if (structuredData?.platforms && structuredData.platforms[platform.name]) {
-              const platformData = structuredData.platforms[platform.name];
-              console.log('🔧 FIXED: Platform data found:', platformData);
-              
-              if (platformData.credentials && Array.isArray(platformData.credentials)) {
-                setPlatformCredentials(platformData.credentials);
-                console.log('✅ FIXED: Platform credentials loaded:', platformData.credentials.length, 'fields');
-              }
-            }
-          } else {
-            console.log('⚠️ FIXED: No structured data found, using provided platform data');
-            setPlatformCredentials(platform.credentials || []);
-          }
-        } else {
-          // Use platform data from automation blueprint
-          const blueprintPlatforms = automationBlueprint.platforms;
-          if (blueprintPlatforms && blueprintPlatforms[platform.name]) {
-            setPlatformCredentials(blueprintPlatforms[platform.name].credentials || []);
-          }
-        }
       }
     } catch (error) {
-      console.error('❌ FIXED: Failed to load automation context:', error);
-      setPlatformCredentials(platform.credentials || []);
+      console.error('Failed to load automation context:', error);
     }
   };
 
@@ -326,8 +277,7 @@ Return ONLY the JSON configuration with NO text before or after.`,
     }));
   };
 
-  // CRITICAL FIX: Use platformCredentials instead of platform.credentials
-  const hasAllCredentials = platformCredentials.every(cred => 
+  const hasAllCredentials = platform.credentials.every(cred => 
     credentials[cred.field] && credentials[cred.field].trim() !== ''
   );
 
@@ -460,9 +410,6 @@ Return ONLY the JSON configuration with NO text before or after.`,
           <div className="text-gray-600 mt-2 space-y-1">
             <p className="font-medium">Automation: {automationContext?.title || 'Loading...'}</p>
             <p className="text-sm">{automationContext?.description || 'Configure your credentials with AI-generated dynamic testing.'}</p>
-            <p className="text-xs text-blue-600">
-              📊 Platform Fields Detected: {platformCredentials.length} credential{platformCredentials.length !== 1 ? 's' : ''}
-            </p>
             {isGeneratingConfig && (
               <div className="text-xs text-blue-600 flex items-center gap-1">
                 <Loader2 className="w-3 h-3 animate-spin" />
@@ -495,8 +442,7 @@ Return ONLY the JSON configuration with NO text before or after.`,
                 </h3>
                 
                 <div className="space-y-5">
-                  {/* CRITICAL FIX: Use platformCredentials instead of platform.credentials */}
-                  {platformCredentials.map((cred, index) => {
+                  {platform.credentials.map((cred, index) => {
                     const inputType = getInputType(cred.field);
                     const showPassword = showPasswords[cred.field];
                     const currentValue = credentials[cred.field] || '';
@@ -654,7 +600,6 @@ Return ONLY the JSON configuration with NO text before or after.`,
                 <div className="text-xs text-indigo-700 space-y-1">
                   <p><strong>Platform:</strong> {platform.name}</p>
                   <p><strong>Status:</strong> {isGeneratingConfig ? '⏳ Generating...' : aiGeneratedTestConfig ? '✅ Config Ready' : '❌ Using Fallback'}</p>
-                  <p><strong>Fields Loaded:</strong> {platformCredentials.length} credential field{platformCredentials.length !== 1 ? 's' : ''}</p>
                   {aiGeneratedTestConfig && (
                     <p><strong>Base URL:</strong> {aiGeneratedTestConfig.base_url}</p>
                   )}

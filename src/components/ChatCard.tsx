@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Bot, User, Play, Copy, Check } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -5,10 +6,11 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
+import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { AutomationRunsMonitor } from './AutomationRunsMonitor';
-import { processJsonWithInstructions } from '@/utils/jsonParser';
+import AutomationRunsMonitor from './AutomationRunsMonitor';
+import { extractPlatformCredentials } from '@/utils/platformDataExtractor';
 
 interface ChatMessage {
   id: string;
@@ -41,7 +43,7 @@ const ChatCard = ({ automationId, title }: ChatCardProps) => {
   const loadChatMessages = async () => {
     try {
       const { data, error } = await supabase
-        .from('chat_messages')
+        .from('automation_chats')
         .select('*')
         .eq('automation_id', automationId)
         .order('timestamp', { ascending: true });
@@ -53,8 +55,8 @@ const ChatCard = ({ automationId, title }: ChatCardProps) => {
 
       const chatMessages: ChatMessage[] = data.map(msg => ({
         id: msg.id,
-        sender: msg.sender,
-        message: msg.message,
+        sender: msg.sender as 'user' | 'ai',
+        message: msg.message_content,
         timestamp: new Date(msg.timestamp),
         automation_id: msg.automation_id
       }));
@@ -91,11 +93,11 @@ const ChatCard = ({ automationId, title }: ChatCardProps) => {
 
     try {
       const { error } = await supabase
-        .from('chat_messages')
+        .from('automation_chats')
         .insert({
           automation_id: automationId,
           sender: 'user',
-          message: input,
+          message_content: input,
           timestamp: new Date().toISOString()
         });
 
@@ -119,11 +121,11 @@ const ChatCard = ({ automationId, title }: ChatCardProps) => {
         setMessages(prev => [...prev, aiMessage]);
 
         supabase
-          .from('chat_messages')
+          .from('automation_chats')
           .insert({
             automation_id: automationId,
             sender: 'ai',
-            message: aiResponse,
+            message_content: aiResponse,
             timestamp: new Date().toISOString()
           })
           .then(({ error }) => {
@@ -154,7 +156,7 @@ const ChatCard = ({ automationId, title }: ChatCardProps) => {
       console.log('💾 FIXED: Starting automation save process...');
       
       // Process the latest AI response to extract structured data
-      const processedData = processJsonWithInstructions(latestResponse);
+      const processedData = extractPlatformCredentials(latestResponse);
       console.log('📊 FIXED: Processed structured data:', processedData);
 
       // CRITICAL FIX: Save structured data to automation_responses table first
@@ -324,6 +326,7 @@ const ChatCard = ({ automationId, title }: ChatCardProps) => {
             disabled={running || !isSaved}
             className="flex-1"
           >
+            <Play className="h-4 w-4 mr-2" />
             {running ? 'Running...' : 'Run Automation'}
           </Button>
         </div>

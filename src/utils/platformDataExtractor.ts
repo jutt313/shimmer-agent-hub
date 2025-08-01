@@ -22,7 +22,20 @@ export interface ExtractedPlatform {
 export function extractPlatformCredentials(automationBlueprint: any): ExtractedPlatform[] {
   console.log('🔍 Extracting platform credentials from blueprint:', automationBlueprint);
   
-  if (!automationBlueprint || !automationBlueprint.steps) {
+  if (!automationBlueprint) {
+    console.warn('⚠️ No automation blueprint provided');
+    return [];
+  }
+
+  // Handle different blueprint structures
+  let steps = [];
+  if (automationBlueprint.steps) {
+    steps = automationBlueprint.steps;
+  } else if (automationBlueprint.automation_blueprint?.steps) {
+    steps = automationBlueprint.automation_blueprint.steps;
+  } else if (Array.isArray(automationBlueprint)) {
+    steps = automationBlueprint;
+  } else {
     console.warn('⚠️ Invalid automation blueprint structure');
     return [];
   }
@@ -31,7 +44,7 @@ export function extractPlatformCredentials(automationBlueprint: any): ExtractedP
   const seenPlatforms = new Set<string>();
 
   // Extract platforms from blueprint steps
-  automationBlueprint.steps.forEach((step: any, index: number) => {
+  steps.forEach((step: any, index: number) => {
     if (step.originalWorkflowData?.platform) {
       const platformData = step.originalWorkflowData.platform;
       const platformName = platformData.name || `Platform_${index}`;
@@ -42,6 +55,24 @@ export function extractPlatformCredentials(automationBlueprint: any): ExtractedP
         platforms.push({
           name: platformName,
           credentials: platformData.credentials || [
+            {
+              field: "api_key",
+              placeholder: `Enter ${platformName} API key`,
+              link: `https://${platformName.toLowerCase()}.com/developers`,
+              why_needed: `Required for ${platformName} API authentication`
+            }
+          ]
+        });
+      }
+    } else if (step.platform) {
+      // Handle direct platform reference
+      const platformName = step.platform;
+      if (!seenPlatforms.has(platformName)) {
+        seenPlatforms.add(platformName);
+        
+        platforms.push({
+          name: platformName,
+          credentials: [
             {
               field: "api_key",
               placeholder: `Enter ${platformName} API key`,

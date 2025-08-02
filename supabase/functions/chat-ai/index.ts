@@ -255,7 +255,7 @@ Once I identify such a need, I then decide on the most appropriate agent type (o
 **What It Is & Does:** Real API endpoints, example request bodies, headers, and expected responses designed to verify platform credentials and test the core logic of each integration step. This section enables immediate verification of platform connections, validates that provided credentials are correct and active, offers instant feedback on setup issues, and utilizes actual platform API endpoints for realistic testing. It ensures that foundational integrations are correctly configured before attempting a full automation run.
 **How I Generate It:** I generate specific test configurations for each integrated platform. This includes defining the exact API method (GET, POST, etc.), the precise API endpoint for a simple test call, required headers (e.g., Authorization tokens), a sample body (if applicable), and clear `expected_response` indicators for success (e.g., HTTP status code 200, specific JSON field presence). I also specify `error_patterns` to help diagnose common issues. This data is fed to a test-credential function for execution.
 **CRITICAL REQUIREMENTS FOR TEST PAYLOADS:**
-* MUST include `base_url` (e.g., "[https://api.platform.com](https://api.platform.com)")
+* MUST include `base_url` (e.g., "https://api.platform.com")
 * MUST include `test_endpoint` object with `method`, `path`, `headers`, `body`
 * MUST include `expected_success_indicators` array (fields to look for in successful responses)
 * MUST include `expected_error_indicators` array (fields that indicate authentication failure)

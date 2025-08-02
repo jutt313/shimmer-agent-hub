@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.2';
@@ -12,19 +11,97 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+// AGENT-BASED THINKING: Platform-specific test configurations
+const PLATFORM_TEST_CONFIGS = {
+  'OpenAI': {
+    base_url: 'https://api.openai.com',
+    test_endpoint: '/v1/models',
+    method: 'GET',
+    auth_header: 'Authorization',
+    auth_format: 'Bearer {api_key}',
+    success_indicators: ['data', 'object'],
+    field_mapping: 'api_key'
+  },
+  'GitHub': {
+    base_url: 'https://api.github.com',
+    test_endpoint: '/user',
+    method: 'GET',
+    auth_header: 'Authorization',
+    auth_format: 'token {personal_access_token}',
+    success_indicators: ['login', 'id'],
+    field_mapping: 'personal_access_token'
+  },
+  'Slack': {
+    base_url: 'https://slack.com/api',
+    test_endpoint: '/auth.test',
+    method: 'POST',
+    auth_header: 'Authorization',
+    auth_format: 'Bearer {bot_token}',
+    success_indicators: ['ok'],
+    field_mapping: 'bot_token'
+  },
+  'Gmail': {
+    base_url: 'https://gmail.googleapis.com',
+    test_endpoint: '/gmail/v1/users/me/profile',
+    method: 'GET',
+    auth_header: 'Authorization',
+    auth_format: 'Bearer {access_token}',
+    success_indicators: ['emailAddress'],
+    field_mapping: 'access_token'
   }
+};
 
-  try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { message, userId, messages = [], context = 'yusrai_automation_creation', automationContext } = await req.json();
+// TEST CONFIGURATION SYSTEM PROMPT - Focused and intelligent
+const TEST_CONFIG_SYSTEM_PROMPT = `You are an intelligent API testing configuration generator. 
 
-    console.log('🚀 YusrAI Chat AI processing request:', { message, userId, context });
+CRITICAL THINKING PROCESS:
+1. ANALYZE: What platform is being requested?
+2. THINK: What is the correct test endpoint for this platform?
+3. VALIDATE: Does this platform exist in my knowledge base?
+4. GENERATE: Create a precise test configuration
 
-    // FIXED: Enhanced system prompt to ensure complete structured responses
-    const systemPrompt = `I will rewrite the YusrAI system prompt to introduce response type detection, make the 7 sections conditional, add intelligent rules for agent recommendations and clarification questions, provide model and prompt options for AI/LLM credentials, and ensure flexible, accurate credential naming, moving away from a forced 7-section validation.
+PLATFORM KNOWLEDGE:
+- OpenAI: Use /v1/models endpoint (NOT /me which doesn't exist)
+- GitHub: Use /user endpoint with token authentication
+- Slack: Use /auth.test endpoint with Bearer token
+- Gmail: Use /gmail/v1/users/me/profile endpoint
+
+RESPONSE FORMAT: Return ONLY a JSON configuration object with these exact fields:
+{
+  "platform_name": "ExactPlatformName",
+  "base_url": "https://api.platform.com",
+  "test_endpoint": {
+    "method": "GET|POST",
+    "path": "/correct/test/endpoint",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "query_params": {}
+  },
+  "authentication": {
+    "type": "bearer|token",
+    "location": "header",
+    "parameter_name": "Authorization", 
+    "format": "Bearer {credential_field}|token {credential_field}"
+  },
+  "field_mappings": {
+    "credential_field": "user_input_field"
+  },
+  "success_indicators": {
+    "status_codes": [200],
+    "response_patterns": ["field1", "field2"]
+  },
+  "error_patterns": {
+    "401": "Invalid credentials",
+    "403": "Access denied"
+  },
+  "ai_generated": true
+}
+
+THINK STEP BY STEP: Analyze the platform name, map to correct endpoint, generate accurate config.`;
+
+// EXISTING COMPREHENSIVE SYSTEM PROMPT FOR AUTOMATION BLUEPRINTS
+const AUTOMATION_SYSTEM_PROMPT = `I will rewrite the YusrAI system prompt to introduce response type detection, make the 7 sections conditional, add intelligent rules for agent recommendations and clarification questions, provide model and prompt options for AI/LLM credentials, and ensure flexible, accurate credential naming, moving away from a forced 7-section validation.
 
 ---
 
@@ -355,6 +432,71 @@ CRITICAL REQUIREMENTS:
 4. Return ONLY this JSON structure - no explanations, no markdown, no extra text
 5. Ensure all platform names have corresponding test_payloads entries`;
 
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const { message, userId, messages = [], context = 'yusrai_automation_creation', automationContext, requestType, platformName, generateOnlyTestConfig } = await req.json();
+
+    console.log('🚀 AGENT-BASED YusrAI Chat AI processing request:', { message, userId, context, requestType, platformName, generateOnlyTestConfig });
+
+    // AGENT-BASED THINKING: Analyze request type first
+    let systemPrompt = AUTOMATION_SYSTEM_PROMPT; // Default to comprehensive system prompt
+    
+    // CRITICAL: Check for test configuration generation request
+    if (requestType === 'test_config_generation' || generateOnlyTestConfig === true) {
+      console.log('🤖 AGENT THINKING: Switching to test configuration mode for platform:', platformName);
+      systemPrompt = TEST_CONFIG_SYSTEM_PROMPT;
+      
+      // INTELLIGENT PLATFORM MAPPING: Use built-in config if available
+      if (platformName && PLATFORM_TEST_CONFIGS[platformName]) {
+        const config = PLATFORM_TEST_CONFIGS[platformName];
+        console.log('🎯 AGENT FOUND: Built-in config for', platformName, config);
+        
+        // Return the built-in configuration immediately
+        const builtInConfig = {
+          platform_name: platformName,
+          base_url: config.base_url,
+          test_endpoint: {
+            method: config.method,
+            path: config.test_endpoint,
+            headers: {
+              "Content-Type": "application/json"
+            },
+            query_params: {}
+          },
+          authentication: {
+            type: config.auth_format.includes('Bearer') ? 'bearer' : 'token',
+            location: 'header',
+            parameter_name: config.auth_header,
+            format: config.auth_format
+          },
+          field_mappings: {
+            [config.field_mapping]: config.field_mapping
+          },
+          success_indicators: {
+            status_codes: [200],
+            response_patterns: config.success_indicators
+          },
+          error_patterns: {
+            "401": "Invalid credentials",
+            "403": "Access denied",
+            "404": "Endpoint not found"
+          },
+          ai_generated: false,
+          built_in_config: true
+        };
+        
+        console.log('✅ AGENT RETURNING: Built-in test config for', platformName);
+        return new Response(JSON.stringify({ response: JSON.stringify(builtInConfig) }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     const userMessages = messages.map(msg => ({
       role: msg.isBot ? 'assistant' : 'user',
       content: msg.text || msg.message_content || ''
@@ -366,7 +508,7 @@ CRITICAL REQUIREMENTS:
       { role: 'user', content: message }
     ];
 
-    console.log('📤 Sending request to OpenAI with enhanced structured prompt');
+    console.log('📤 AGENT SENDING: Request to OpenAI with', requestType === 'test_config_generation' ? 'TEST CONFIG' : 'AUTOMATION BLUEPRINT', 'prompt');
 
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -377,8 +519,8 @@ CRITICAL REQUIREMENTS:
       body: JSON.stringify({
         model: 'gpt-4o',
         messages: openAIMessages,
-        temperature: 0.3,
-        max_tokens: 4000,
+        temperature: requestType === 'test_config_generation' ? 0.1 : 0.3, // Lower temperature for test configs
+        max_tokens: requestType === 'test_config_generation' ? 1000 : 4000,
       }),
     });
 
@@ -389,7 +531,21 @@ CRITICAL REQUIREMENTS:
     const openAIData = await openAIResponse.json();
     const aiResponseContent = openAIData.choices[0].message.content;
 
-    console.log('📥 OpenAI response received:', aiResponseContent.substring(0, 200) + '...');
+    console.log('📥 AGENT RECEIVED:', requestType === 'test_config_generation' ? 'Test config' : 'Blueprint', 'response from OpenAI');
+
+    // AGENT VALIDATION: For test config requests, validate the response format
+    if (requestType === 'test_config_generation') {
+      try {
+        const parsedResponse = JSON.parse(aiResponseContent);
+        if (parsedResponse.platform_name && parsedResponse.base_url && parsedResponse.test_endpoint) {
+          console.log('✅ AGENT VALIDATION: Test config format is correct');
+        } else {
+          console.log('⚠️ AGENT WARNING: Test config format may be incomplete');
+        }
+      } catch (e) {
+        console.log('⚠️ AGENT WARNING: Could not parse test config JSON, returning raw response');
+      }
+    }
 
     // FIXED: Validate response structure before returning
     let validatedResponse = aiResponseContent;
@@ -592,13 +748,13 @@ CRITICAL REQUIREMENTS:
     const finalResponseObject = {
       response: validatedResponse,
       yusrai_powered: true,
-      seven_sections_validated: true,
-      error_help_available: true,
-      training_acknowledged: true,
-      memory_updated: true
+      agent_thinking_enabled: true,
+      request_type_detected: requestType || 'automation_blueprint',
+      system_prompt_used: requestType === 'test_config_generation' ? 'test_config' : 'automation_blueprint',
+      platform_specific_config: platformName && PLATFORM_TEST_CONFIGS[platformName] ? true : false
     };
 
-    console.log('✅ YusrAI response prepared with validated structured content');
+    console.log('✅ AGENT SUCCESS: Response prepared with agent-based thinking');
 
     // Save to database
     try {
@@ -612,7 +768,9 @@ CRITICAL REQUIREMENTS:
           metadata: {
             model: 'gpt-4o',
             yusrai_powered: true,
-            automation_context: automationContext
+            automation_context: automationContext,
+            request_type: requestType,
+            agent_thinking_enabled: true
           }
         });
 
@@ -628,16 +786,16 @@ CRITICAL REQUIREMENTS:
     });
 
   } catch (error: any) {
-    console.error('❌ YusrAI Chat AI error:', error);
+    console.error('❌ AGENT ERROR:', error);
     
     const fallbackResponse = {
       response: JSON.stringify({
-        summary: "YusrAI is ready to help you create comprehensive automations with platform integrations and AI agents.",
+        summary: "YusrAI Agent is ready to help you create comprehensive automations with intelligent platform integrations.",
         steps: [
           "Tell me what automation you'd like to create",
-          "I'll provide a complete blueprint with platforms and AI agents",
-          "Configure your platform credentials using my guidance",
-          "Test and deploy your automation"
+          "I'll analyze your request with agent-based thinking",
+          "Provide a complete blueprint with platforms and AI agents",
+          "Test and deploy your automation with intelligent validation"
         ],
         platforms: [
           {
@@ -661,10 +819,10 @@ CRITICAL REQUIREMENTS:
           {
             name: "Welcome Assistant Agent",
             role: "Responder",
-            rule: "Help users get started with their first automation",
-            goal: "Provide clear guidance for automation creation",
-            memory: "Store user preferences and common patterns",
-            why_needed: "Ensures smooth onboarding experience"
+            rule: "Help users get started with their first automation using intelligent analysis",
+            goal: "Provide clear guidance for automation creation with agent-based thinking",
+            memory: "Store user preferences and successful automation patterns",
+            why_needed: "Ensures smooth onboarding with intelligent conversation flow"
           }
         ],
         test_payloads: {
@@ -684,10 +842,10 @@ CRITICAL REQUIREMENTS:
           workflow: [
             {
               step: 1,
-              action: "Initialize automation",
+              action: "Initialize automation with agent thinking",
               platform: "YusrAI Platform",
               method: "POST",
-              description: "Set up automation framework"
+              description: "Set up automation framework with intelligent analysis"
             }
           ],
           error_handling: {
@@ -704,8 +862,8 @@ CRITICAL REQUIREMENTS:
         }
       }),
       yusrai_powered: true,
-      seven_sections_validated: true,
-      error_help_available: true
+      agent_thinking_enabled: true,
+      error_recovery: true
     };
 
     return new Response(JSON.stringify(fallbackResponse), {

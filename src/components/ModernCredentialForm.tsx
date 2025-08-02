@@ -1,350 +1,52 @@
-import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Info, ExternalLink, TestTube, Save, Eye, EyeOff, Loader2, Sparkles } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
+import { useState } from 'react';
+import { Button } from "@/components/ui/button";
+import { Settings } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/components/ui/use-toast";
 import { AutomationCredentialManager } from '@/utils/automationCredentialManager';
-import { UniversalPlatformManager, mapCredentialsForPlatform, AI_MODEL_CONFIGS } from '@/utils/universalPlatformManager';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+
+interface Platform {
+  name: string;
+  credentials: Array<{
+    field: string;
+    placeholder: string;
+    link: string;
+    why_needed: string;
+  }>;
+  test_payloads?: any[];
+}
 
 interface ModernCredentialFormProps {
   automationId: string;
-  platform: {
-    name: string;
-    credentials: Array<{
-      field: string;
-      placeholder: string;
-      link: string;
-      why_needed: string;
-    }>;
-  };
+  platform: Platform;
   onCredentialSaved?: () => void;
-  onClose?: () => void;
+  onClose: () => void;
   isOpen: boolean;
 }
 
-const ModernCredentialForm = ({ 
-  automationId, 
-  platform, 
-  onCredentialSaved,
-  onClose,
-  isOpen
-}: ModernCredentialFormProps) => {
+const ModernCredentialForm = ({ automationId, platform, onCredentialSaved, onClose, isOpen }: ModernCredentialFormProps) => {
+  const [credentials, setCredentials] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [testResults, setTestResults] = useState<any>(null);
   const { user } = useAuth();
   const { toast } = useToast();
-  const [credentials, setCredentials] = useState<Record<string, string>>({});
-  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
-  const [isTesting, setIsTesting] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [testResult, setTestResult] = useState<any>(null);
-  const [automationContextPayload, setAutomationContextPayload] = useState<any>(null);
-  const [apiResponse, setApiResponse] = useState<any>(null);
-  const [automationContext, setAutomationContext] = useState<any>(null);
-  const [aiGeneratedTestConfig, setAiGeneratedTestConfig] = useState<any>(null);
-  const [isGeneratingConfig, setIsGeneratingConfig] = useState(false);
-  const [configGenerationStatus, setConfigGenerationStatus] = useState<'idle' | 'generating' | 'ai_ready' | 'fallback_ready' | 'failed'>('idle');
 
-  // AI Configuration States
-  const [selectedModel, setSelectedModel] = useState<string>('');
-  const [systemPrompt, setSystemPrompt] = useState<string>('');
+  console.log('🔧 ModernCredentialForm opened for platform:', platform.name);
 
-  useEffect(() => {
-    if (user && automationId && platform.name) {
-      loadExistingCredentials();
-      loadAutomationContext();
-      generateAITestConfiguration();
-    }
-  }, [user, automationId, platform.name]);
-
-  useEffect(() => {
-    if (automationContext) {
-      generateAutomationContextPayload();
-    }
-  }, [credentials, automationContext, selectedModel, systemPrompt]);
-
-  // Initialize AI model selection for AI platforms
-  useEffect(() => {
-    const aiConfig = AI_MODEL_CONFIGS[platform.name];
-    if (aiConfig && !selectedModel) {
-      setSelectedModel(aiConfig.defaultModel);
-    }
-  }, [platform.name, selectedModel]);
-
-  const loadExistingCredentials = async () => {
-    if (!user) return;
-
+  const generateTestConfiguration = async (platformName: string): Promise<any> => {
     try {
-      const existingCredentials = await AutomationCredentialManager.getCredentials(
-        automationId,
-        platform.name,
-        user.id
-      );
-
-      if (existingCredentials) {
-        setCredentials(existingCredentials);
-        
-        // Load AI configs if they exist
-        if (existingCredentials.model) {
-          setSelectedModel(existingCredentials.model);
-        }
-        if (existingCredentials.system_prompt) {
-          setSystemPrompt(existingCredentials.system_prompt);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load existing credentials:', error);
-    }
-  };
-
-  const loadAutomationContext = async () => {
-    try {
-      const { data: automationData } = await supabase
-        .from('automations')
-        .select('*')
-        .eq('id', automationId)
-        .single();
-
-      if (automationData) {
-        setAutomationContext(automationData);
-      }
-    } catch (error) {
-      console.error('Failed to load automation context:', error);
-    }
-  };
-
-  const generateAITestConfiguration = async () => {
-    if (!platform.name) return;
-    
-    setIsGeneratingConfig(true);
-    setConfigGenerationStatus('generating');
-    
-    try {
-      console.log(`🤖 FIXED: Generating AI test configuration specifically for ${platform.name}`);
+      console.log('🤖 REQUESTING: Test configuration for platform:', platformName);
       
-      // CRITICAL FIX: Request ONLY test configuration, not automation blueprint
+      // CRITICAL FIX: Send correct request type to ChatAI
       const { data, error } = await supabase.functions.invoke('chat-ai', {
         body: {
-          message: `Generate ONLY a JSON test configuration for ${platform.name} platform API testing.
-
-RETURN ONLY this exact JSON structure:
-{
-  "platform_name": "${platform.name}",
-  "base_url": "https://api.${platform.name.toLowerCase()}.com",
-  "test_endpoint": {
-    "method": "GET",
-    "path": "/me",
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "query_params": {}
-  },
-  "authentication": {
-    "type": "bearer",
-    "location": "header",
-    "parameter_name": "Authorization",
-    "format": "Bearer {api_key}"
-  },
-  "field_mappings": {
-    "api_key": "api_key"
-  },
-  "success_indicators": {
-    "status_codes": [200],
-    "response_patterns": ["id", "name", "email"]
-  },
-  "error_patterns": {
-    "401": "Invalid credentials",
-    "403": "Access denied"
-  },
-  "ai_generated": true
-}
-
-Platform: ${platform.name}
-Return ONLY the JSON configuration with no extra text or explanation.`,
-          messages: [],
-          requestType: 'test_config_generation',
-          generateOnlyTestConfig: true
-        }
-      });
-
-      if (error) {
-        console.error('🚨 FIXED: ChatAI request failed:', error);
-        throw new Error(`ChatAI request failed: ${error.message}`);
-      }
-
-      // CRITICAL FIX: Handle ChatAI's wrapped response structure correctly
-      console.log('🔍 FIXED: Raw ChatAI response structure:', data);
-      
-      let testConfig;
-      try {
-        // ChatAI returns {response: "JSON_STRING", yusrai_powered: true, ...}
-        // Extract the actual response content
-        let configText = data?.response || data;
-        
-        if (typeof configText === 'string') {
-          // Try to extract JSON from the response string
-          const jsonMatch = configText.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const parsedConfig = JSON.parse(jsonMatch[0]);
-            
-            // Validate that this is a test configuration, not an automation blueprint
-            if (parsedConfig.base_url && parsedConfig.test_endpoint && parsedConfig.authentication) {
-              testConfig = parsedConfig;
-              testConfig.ai_generated = true;
-              testConfig.platform_name = platform.name;
-              
-              console.log('✅ FIXED: Valid AI test configuration generated:', testConfig);
-              setAiGeneratedTestConfig(testConfig);
-              setConfigGenerationStatus('ai_ready');
-            } else {
-              console.warn('🚨 FIXED: ChatAI returned automation blueprint instead of test config');
-              throw new Error('Invalid test configuration structure');
-            }
-          } else {
-            throw new Error('No JSON found in ChatAI response');
-          }
-        } else if (typeof configText === 'object' && configText?.base_url) {
-          testConfig = configText;
-          testConfig.ai_generated = true;
-          setAiGeneratedTestConfig(testConfig);
-          setConfigGenerationStatus('ai_ready');
-        } else {
-          throw new Error('Invalid ChatAI response format');
-        }
-
-      } catch (parseError) {
-        console.error('🚨 FIXED: Failed to parse ChatAI response:', parseError);
-        throw parseError;
-      }
-
-    } catch (error) {
-      console.error('🚨 FIXED: AI test configuration generation failed:', error);
-      
-      // CRITICAL FIX: Always provide fallback configuration
-      const fallbackConfig = {
-        platform_name: platform.name,
-        base_url: `https://api.${platform.name.toLowerCase()}.com`,
-        test_endpoint: {
-          method: "GET",
-          path: "/me",
-          headers: { "Content-Type": "application/json" }
-        },
-        authentication: {
-          type: "bearer",
-          location: "header",
-          parameter_name: "Authorization",
-          format: "Bearer {api_key}"
-        },
-        field_mappings: { "api_key": "api_key" },
-        success_indicators: {
-          status_codes: [200],
-          response_patterns: ["id", "name", "email"]
-        },
-        error_patterns: {
-          "401": "Invalid credentials",
-          "403": "Access denied"
-        },
-        ai_generated: false,
-        fallback_config: true,
-        fallback_reason: error.message || 'AI generation failed'
-      };
-      
-      setAiGeneratedTestConfig(fallbackConfig);
-      setConfigGenerationStatus('fallback_ready');
-      console.log('✅ FIXED: Fallback configuration ready:', fallbackConfig);
-    } finally {
-      setIsGeneratingConfig(false);
-    }
-  };
-
-  const generateAutomationContextPayload = async () => {
-    try {
-      let credentialsWithAI = { ...credentials };
-      if (selectedModel) credentialsWithAI.model = selectedModel;
-      if (systemPrompt) credentialsWithAI.system_prompt = systemPrompt;
-
-      const sampleCall = await UniversalPlatformManager.generateSampleCall(
-        platform.name,
-        credentialsWithAI,
-        automationContext
-      );
-      setAutomationContextPayload(sampleCall);
-    } catch (error) {
-      console.error('Failed to generate automation context payload:', error);
-      const fallbackPayload = {
-        task_description: `${platform.name} operation for automation: ${automationContext?.title || 'Unnamed Automation'}`,
-        automation_context: 'Automation-aware testing',
-        request: {
-          method: "GET",
-          url: `https://api.${platform.name.toLowerCase()}.com/test`,
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer [YOUR_API_KEY]",
-            "User-Agent": "YusrAI-Automation-Context-Test/1.0"
-          }
-        },
-        expected_response: {
-          success: true,
-          message: "Authentication successful for automation context"
-        }
-      };
-      setAutomationContextPayload(fallbackPayload);
-    }
-  };
-
-  const handleCredentialChange = (field: string, value: string) => {
-    setCredentials(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const togglePasswordVisibility = (field: string) => {
-    setShowPasswords(prev => ({
-      ...prev,
-      [field]: !prev[field]
-    }));
-  };
-
-  const hasAllCredentials = platform.credentials.every(cred => 
-    credentials[cred.field] && credentials[cred.field].trim() !== ''
-  );
-
-  const handleTest = async () => {
-    if (!user || !hasAllCredentials) return;
-
-    // CRITICAL FIX: Remove strict validation, allow fallback usage
-    if (!aiGeneratedTestConfig) {
-      toast({
-        title: "⚠️ Configuration Issue",
-        description: "Test configuration is still being generated. Please wait.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsTesting(true);
-    setApiResponse(null);
-    
-    try {
-      let credentialsWithAI = { ...credentials };
-      if (selectedModel) credentialsWithAI.model = selectedModel;
-      if (systemPrompt) credentialsWithAI.system_prompt = systemPrompt;
-
-      console.log(`🧪 FIXED: Testing ${platform.name} with config type:`, aiGeneratedTestConfig.ai_generated ? 'AI-generated' : 'fallback');
-
-      const { data: result, error } = await supabase.functions.invoke('test-credential', {
-        body: {
-          platformName: platform.name,
-          credentials: credentialsWithAI,
-          testConfig: aiGeneratedTestConfig, // Send whatever config we have
-          userId: user.id,
-          allowFallback: true // Enable fallback usage
+          message: `Generate test configuration for ${platformName} platform`,
+          userId: user?.id,
+          context: 'test_config_generation',
+          requestType: 'test_config_generation', // CRITICAL: This tells ChatAI to switch modes
+          platformName: platformName,
+          generateOnlyTestConfig: true // Additional flag for safety
         }
       });
 
@@ -352,368 +54,222 @@ Return ONLY the JSON configuration with no extra text or explanation.`,
         throw error;
       }
 
-      setTestResult(result);
-      setApiResponse(result.details);
-      
+      console.log('📥 RECEIVED: Raw ChatAI response:', data);
+
+      // IMPROVED PARSING: Handle both simple config and complex response
+      let testConfig;
+      if (typeof data.response === 'string') {
+        try {
+          testConfig = JSON.parse(data.response);
+          console.log('✅ PARSED: Test config successfully:', testConfig);
+        } catch (parseError) {
+          console.error('❌ PARSE ERROR: Could not parse ChatAI response:', parseError);
+          throw new Error('Invalid test configuration format from AI');
+        }
+      } else {
+        testConfig = data.response;
+      }
+
+      // VALIDATION: Ensure we got a test config, not an automation blueprint
+      if (testConfig.summary || testConfig.steps || testConfig.execution_blueprint) {
+        console.warn('⚠️ WARNING: Received automation blueprint instead of test config');
+        // Extract test config from blueprint if present
+        if (testConfig.test_payloads && testConfig.test_payloads[platformName]) {
+          const payload = testConfig.test_payloads[platformName];
+          testConfig = {
+            platform_name: platformName,
+            base_url: payload.endpoint.split('/')[0] + '//' + payload.endpoint.split('/')[2],
+            test_endpoint: {
+              method: payload.method,
+              path: '/' + payload.endpoint.split('/').slice(3).join('/'),
+              headers: payload.headers || { "Content-Type": "application/json" },
+              query_params: {}
+            },
+            authentication: {
+              type: payload.headers?.Authorization?.includes('Bearer') ? 'bearer' : 'token',
+              location: 'header',
+              parameter_name: 'Authorization',
+              format: payload.headers?.Authorization || 'Bearer {api_key}'
+            },
+            field_mappings: { "api_key": "api_key" },
+            success_indicators: {
+              status_codes: [200],
+              response_patterns: payload.expected_response ? Object.keys(payload.expected_response) : ["success"]
+            },
+            error_patterns: {
+              "401": "Invalid credentials",
+              "403": "Access denied"
+            },
+            ai_generated: true,
+            extracted_from_blueprint: true
+          };
+          console.log('🔄 EXTRACTED: Test config from blueprint:', testConfig);
+        } else {
+          throw new Error('No test configuration available for this platform');
+        }
+      }
+
+      // FINAL VALIDATION: Ensure required fields
+      if (!testConfig.platform_name || !testConfig.base_url || !testConfig.test_endpoint) {
+        console.error('❌ INCOMPLETE: Test config missing required fields:', testConfig);
+        throw new Error('Incomplete test configuration received');
+      }
+
+      console.log('✅ FINAL: Valid test configuration generated:', testConfig);
+      return testConfig;
+
+    } catch (error: any) {
+      console.error('💥 ERROR: Test configuration generation failed:', error);
+      throw error;
+    }
+  };
+
+  const handleTest = async () => {
+    try {
+      setIsLoading(true);
+      console.log('🧪 TESTING: Starting credential test for', platform.name);
+
+      // Generate test configuration using ChatAI
+      const testConfig = await generateTestConfiguration(platform.name);
+
+      // Test using the AI-generated configuration
+      const result = await AutomationCredentialManager.testCredentials(
+        user?.id!,
+        automationId,
+        platform.name,
+        credentials,
+        { testConfig }
+      );
+
+      setTestResults(result);
+      console.log('🧪 TEST RESULT:', result);
+
       if (result.success) {
-        const configType = aiGeneratedTestConfig.ai_generated ? 'AI-generated' : 'fallback';
         toast({
           title: "✅ Test Successful",
-          description: `${platform.name} credentials verified using ${configType} configuration!`,
+          description: `${platform.name} credentials are working correctly`,
         });
       } else {
         toast({
-          title: "❌ Test Failed", 
-          description: result.message,
+          title: "❌ Test Failed",
+          description: result.message || `${platform.name} credentials test failed`,
           variant: "destructive",
         });
       }
+
     } catch (error: any) {
-      console.error(`💥 FIXED: Test error for ${platform.name}:`, error);
+      console.error('💥 TEST ERROR:', error);
+      setTestResults({
+        success: false,
+        message: `Test failed: ${error.message}`,
+        details: { error: error.message }
+      });
+      
       toast({
-        title: "Test Error",
-        description: error.message,
+        title: "❌ Test Error",
+        description: `Failed to test ${platform.name} credentials: ${error.message}`,
         variant: "destructive",
       });
     } finally {
-      setIsTesting(false);
+      setIsLoading(false);
     }
   };
 
   const handleSave = async () => {
-    if (!user || !hasAllCredentials) return;
-
-    setIsSaving(true);
     try {
-      let credentialsToSave = { ...credentials };
-      if (selectedModel) credentialsToSave.model = selectedModel;
-      if (systemPrompt) credentialsToSave.system_prompt = systemPrompt;
-
-      console.log(`💾 Saving ${platform.name} credentials:`, Object.keys(credentialsToSave));
+      setIsLoading(true);
+      console.log('💾 SAVING: Credentials for', platform.name);
 
       const result = await AutomationCredentialManager.saveCredentials(
         automationId,
         platform.name,
-        credentialsToSave,
-        user.id
+        credentials,
+        user?.id!
       );
 
       if (result.success) {
         toast({
           title: "✅ Credentials Saved",
-          description: `${platform.name} credentials saved successfully!`,
+          description: `${platform.name} credentials saved successfully`,
         });
+        
         onCredentialSaved?.();
-        onClose?.();
+        onClose();
       } else {
-        toast({
-          title: "❌ Save Failed",
-          description: result.error || "Failed to save credentials",
-          variant: "destructive",
-        });
+        throw new Error(result.error || 'Failed to save credentials');
       }
+
     } catch (error: any) {
-      console.error(`💥 Save error for ${platform.name}:`, error);
+      console.error('💥 SAVE ERROR:', error);
       toast({
-        title: "Save Error",
-        description: error.message,
+        title: "❌ Save Failed",
+        description: `Failed to save ${platform.name} credentials: ${error.message}`,
         variant: "destructive",
       });
     } finally {
-      setIsSaving(false);
+      setIsLoading(false);
     }
   };
 
-  const getInputType = (field: string) => {
-    const lowerField = field.toLowerCase();
-    return lowerField.includes('password') || 
-           lowerField.includes('secret') || 
-           lowerField.includes('key') ||
-           lowerField.includes('token') ? 'password' : 'text';
-  };
-
-  const isAIPlatform = AI_MODEL_CONFIGS[platform.name];
-
-  // FIXED: Proper status message generation
-  const getStatusMessage = () => {
-    switch (configGenerationStatus) {
-      case 'generating':
-        return '⏳ Generating AI configuration...';
-      case 'ai_ready':
-        return `✅ AI configuration ready: ${aiGeneratedTestConfig?.base_url}`;
-      case 'fallback_ready':
-        return `⚠️ Using fallback configuration: ${aiGeneratedTestConfig?.base_url}`;
-      case 'failed':
-        return '❌ Configuration generation failed';
-      default:
-        return 'Initializing...';
-    }
-  };
+  if (!isOpen) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-7xl max-h-[95vh] bg-white/95 backdrop-blur-md border-0 shadow-2xl rounded-3xl overflow-hidden">
-        <DialogHeader className="pb-6">
-          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-green-600 bg-clip-text text-transparent flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-purple-600" />
-            Dynamic {platform.name} Configuration
-          </DialogTitle>
-          <div className="text-gray-600 mt-2 space-y-1">
-            <p className="font-medium">Automation: {automationContext?.title || 'Loading...'}</p>
-            <p className="text-sm">{automationContext?.description || 'Configure your credentials with AI-generated testing.'}</p>
-            
-            {/* FIXED: Clear status message display */}
-            <div className="text-xs flex items-center gap-1">
-              {configGenerationStatus === 'generating' && <Loader2 className="w-3 h-3 animate-spin text-blue-600" />}
-              {configGenerationStatus === 'ai_ready' && <Sparkles className="w-3 h-3 text-green-600" />}
-              {configGenerationStatus === 'fallback_ready' && <Sparkles className="w-3 h-3 text-orange-600" />}
-              {configGenerationStatus === 'failed' && <Sparkles className="w-3 h-3 text-red-600" />}
-              <span className={`${
-                configGenerationStatus === 'generating' ? 'text-blue-600' :
-                configGenerationStatus === 'ai_ready' ? 'text-green-600' :
-                configGenerationStatus === 'fallback_ready' ? 'text-orange-600' :
-                'text-red-600'
-              }`}>
-                {getStatusMessage()}
-              </span>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold">Setup {platform.name} Credentials</h3>
+          <Button onClick={onClose} variant="ghost" size="sm">×</Button>
+        </div>
+
+        <div className="space-y-4">
+          {platform.credentials?.map((cred, index) => (
+            <div key={index} className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                {cred.field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              </label>
+              <input
+                type={cred.field.includes('secret') || cred.field.includes('token') || cred.field.includes('key') ? 'password' : 'text'}
+                value={credentials[cred.field] || ''}
+                onChange={(e) => setCredentials(prev => ({
+                  ...prev,
+                  [cred.field]: e.target.value
+                }))}
+                placeholder={cred.placeholder}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-gray-500">{cred.why_needed}</p>
+              {cred.link && (
+                <a href={cred.link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
+                  Get your {cred.field}
+                </a>
+              )}
             </div>
-          </div>
-        </DialogHeader>
+          ))}
 
-        <ScrollArea className="h-[600px] w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 px-2">
-            {/* Left Side - Credential Form */}
-            <div className="space-y-6">
-              <div className="bg-gradient-to-br from-purple-50 via-blue-50 to-green-50 rounded-2xl p-6 border border-purple-200/50">
-                <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
-                  <TestTube className="w-5 h-5 text-purple-600" />
-                  Platform Credentials
-                </h3>
-                
-                <div className="space-y-5">
-                  {platform.credentials.map((cred, index) => {
-                    const inputType = getInputType(cred.field);
-                    const showPassword = showPasswords[cred.field];
-                    const currentValue = credentials[cred.field] || '';
-                    
-                    return (
-                      <div key={index} className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Label className="text-sm font-medium text-gray-700">
-                              {cred.field}
-                            </Label>
-                            <div className="group relative">
-                              <Info className="h-4 w-4 text-gray-400 cursor-help" />
-                              <div className="absolute left-0 top-6 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
-                                <strong>Required:</strong> {cred.why_needed}
-                                {automationContext && (
-                                  <div className="mt-2 pt-2 border-t border-gray-700">
-                                    <strong>Automation:</strong> {automationContext.title}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {cred.link && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => window.open(cred.link, '_blank')}
-                              className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 p-2"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                        
-                        <div className="relative">
-                          <Input
-                            type={inputType === 'password' && !showPassword ? 'password' : 'text'}
-                            placeholder={cred.placeholder}
-                            value={currentValue}
-                            onChange={(e) => handleCredentialChange(cred.field, e.target.value)}
-                            className="rounded-xl border-purple-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 bg-white/70 pr-12"
-                          />
-                          
-                          {inputType === 'password' && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-purple-100"
-                              onClick={() => togglePasswordVisibility(cred.field)}
-                            >
-                              {showPassword ? (
-                                <EyeOff className="h-4 w-4 text-gray-400" />
-                              ) : (
-                                <Eye className="h-4 w-4 text-gray-400" />
-                              )}
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* AI Model Configuration for AI platforms */}
-                  {isAIPlatform && (
-                    <div className="space-y-5 pt-4 border-t border-purple-200">
-                      <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-purple-600" />
-                        AI Model Configuration
-                      </h4>
-                      
-                      <div className="space-y-3">
-                        <Label className="text-sm font-medium text-gray-700">AI Model</Label>
-                        <Select value={selectedModel} onValueChange={setSelectedModel}>
-                          <SelectTrigger className="rounded-xl border-purple-200 focus:border-purple-500">
-                            <SelectValue placeholder="Select an AI model" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {isAIPlatform.models.map((model: any) => (
-                              <SelectItem key={model.value} value={model.value}>
-                                {model.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {isAIPlatform.supportsSystemPrompt && (
-                        <div className="space-y-3">
-                          <Label className="text-sm font-medium text-gray-700">System Prompt</Label>
-                          <Textarea
-                            placeholder="You are a helpful AI assistant..."
-                            value={systemPrompt}
-                            onChange={(e) => setSystemPrompt(e.target.value)}
-                            className="rounded-xl border-purple-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 bg-white/70 min-h-[100px]"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-4 mt-8">
-                  <Button
-                    onClick={handleTest}
-                    disabled={!hasAllCredentials || isTesting}
-                    className="flex-1 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-                  >
-                    {isTesting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Testing...
-                      </>
-                    ) : (
-                      <>
-                        <TestTube className="w-4 h-4 mr-2" />
-                        Test Credentials
-                      </>
-                    )}
-                  </Button>
-
-                  <Button
-                    onClick={handleSave}
-                    disabled={!testResult?.success || isSaving}
-                    className="flex-1 rounded-xl bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50"
-                  >
-                    {isSaving ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4 mr-2" />
-                        Save Credentials
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
+          {testResults && (
+            <div className={`p-3 rounded-md ${testResults.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+              <p className={`text-sm ${testResults.success ? 'text-green-800' : 'text-red-800'}`}>
+                {testResults.message}
+              </p>
+              {testResults.details && (
+                <pre className="text-xs mt-2 overflow-auto max-h-32">
+                  {JSON.stringify(testResults.details, null, 2)}
+                </pre>
+              )}
             </div>
+          )}
 
-            {/* Right Side - Configuration & Test Results */}
-            <div className="space-y-4">
-              {/* Configuration Status */}
-              <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-200/50">
-                <h4 className="text-sm font-semibold text-indigo-900 mb-2 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4" />
-                  Configuration Status
-                </h4>
-                <div className="text-xs text-indigo-700 space-y-1">
-                  <p><strong>Platform:</strong> {platform.name}</p>
-                  <p><strong>Status:</strong> {getStatusMessage()}</p>
-                  {aiGeneratedTestConfig && (
-                    <p><strong>Endpoint:</strong> {aiGeneratedTestConfig.base_url}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Test Configuration Display */}
-              <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl p-6 border border-green-200/50">
-                <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <TestTube className="w-5 h-5 text-green-600" />
-                  Test Configuration
-                </h4>
-                <ScrollArea className="h-[200px] w-full">
-                  <div className="bg-gray-900 rounded-xl p-4">
-                    <pre className="text-green-400 text-sm font-mono whitespace-pre-wrap">
-                      {aiGeneratedTestConfig ? JSON.stringify(aiGeneratedTestConfig, null, 2) : 'Generating configuration...'}
-                    </pre>
-                  </div>
-                </ScrollArea>
-              </div>
-
-              {/* API Response */}
-              <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-200/50">
-                <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-blue-600" />
-                  Test Response
-                </h4>
-                <ScrollArea className="h-[280px] w-full">
-                  <div className="bg-gray-900 rounded-xl p-4">
-                    {apiResponse ? (
-                      <pre className="text-blue-400 text-sm font-mono whitespace-pre-wrap">
-                        {JSON.stringify(apiResponse, null, 2)}
-                      </pre>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-gray-500">
-                        <div className="text-center space-y-2">
-                          <TestTube className="w-8 h-8 mx-auto opacity-50" />
-                          <p className="text-sm">
-                            Click "Test Credentials" to see the API response
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </ScrollArea>
-              </div>
-            </div>
-          </div>
-        </ScrollArea>
-
-        {/* Footer */}
-        <div className="pt-4 border-t border-gray-200/50">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-500">
-              🔒 Credentials are encrypted and stored securely • 🤖 AI-powered testing with fallback
-            </p>
-            {testResult?.success && (
-              <div className="flex items-center gap-2 text-xs text-green-600">
-                <TestTube className="w-4 h-4" />
-                <span>Ready for automation execution</span>
-              </div>
-            )}
+          <div className="flex gap-2 pt-4">
+            <Button onClick={handleTest} disabled={isLoading} variant="outline" className="flex-1">
+              {isLoading ? 'Testing...' : 'Test Connection'}
+            </Button>
+            <Button onClick={handleSave} disabled={isLoading || !testResults?.success} className="flex-1">
+              {isLoading ? 'Saving...' : 'Save Credentials'}
+            </Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 };
 

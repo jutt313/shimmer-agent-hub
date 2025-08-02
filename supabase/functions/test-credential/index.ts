@@ -1,103 +1,82 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.2';
-
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// FIXED: Enhanced built-in platform configurations
-const BUILT_IN_CONFIGS: Record<string, any> = {
-  'typeform': {
-    platform_name: 'Typeform',
-    base_url: 'https://api.typeform.com',
-    test_endpoint: {
-      path: '/me',
-      method: 'GET',
-      headers: {},
-      query_params: {}
-    },
-    authentication: {
-      location: 'header',
-      parameter_name: 'Authorization',
-      format: 'Bearer {token}'
-    },
-    field_mappings: {
-      'personal_access_token': 'token',
-      'api_key': 'token',
-      'access_token': 'token'
-    },
-    success_indicators: {
-      status_codes: [200],
-      response_patterns: ['alias', 'email']
-    },
+// FIXED: Correct built-in configurations with real API endpoints
+const PLATFORM_CONFIGS = {
+  'OpenAI': {
+    base_url: 'https://api.openai.com',
+    test_endpoint: '/v1/models', // CORRECT: OpenAI uses /v1/models, NOT /me
+    method: 'GET',
+    auth_header: 'Authorization',
+    auth_format: 'Bearer {api_key}',
+    success_indicators: ['data', 'object'],
     error_patterns: {
-      '401': 'Invalid or expired personal access token',
-      '403': 'Insufficient permissions for this token',
-      '404': 'API endpoint not found'
-    },
-    ai_generated: false
+      401: 'Invalid API key',
+      429: 'Rate limit exceeded'
+    }
   },
-  'slack': {
-    platform_name: 'Slack',
+  'GitHub': {
+    base_url: 'https://api.github.com',
+    test_endpoint: '/user', // CORRECT: GitHub uses /user
+    method: 'GET',
+    auth_header: 'Authorization',
+    auth_format: 'token {personal_access_token}',
+    success_indicators: ['login', 'id'],
+    error_patterns: {
+      401: 'Bad credentials',
+      403: 'Forbidden'
+    }
+  },
+  'Slack': {
     base_url: 'https://slack.com/api',
-    test_endpoint: {
-      path: '/auth.test',
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-    },
-    authentication: {
-      location: 'header',
-      parameter_name: 'Authorization',
-      format: 'Bearer {token}'
-    },
-    field_mappings: {
-      'bot_token': 'token',
-      'oauth_token': 'token',
-      'api_token': 'token'
-    },
-    success_indicators: {
-      status_codes: [200],
-      response_patterns: ['ok', 'user']
-    },
+    test_endpoint: '/auth.test', // CORRECT: Slack auth test endpoint
+    method: 'POST',
+    auth_header: 'Authorization',
+    auth_format: 'Bearer {bot_token}',
+    success_indicators: ['ok'],
     error_patterns: {
-      '401': 'Invalid Slack token',
-      '403': 'Token lacks required scopes'
-    },
-    ai_generated: false
+      401: 'Invalid token'
+    }
   },
-  'discord': {
-    platform_name: 'Discord',
-    base_url: 'https://discord.com/api/v10',
-    test_endpoint: {
-      path: '/users/@me',
-      method: 'GET'
-    },
-    authentication: {
-      location: 'header',
-      parameter_name: 'Authorization',
-      format: 'Bot {token}'
-    },
-    field_mappings: {
-      'bot_token': 'token',
-      'token': 'token'
-    },
-    success_indicators: {
-      status_codes: [200],
-      response_patterns: ['id', 'username']
-    },
+  'Gmail': {
+    base_url: 'https://gmail.googleapis.com',
+    test_endpoint: '/gmail/v1/users/me/profile', // CORRECT: Gmail profile endpoint
+    method: 'GET',
+    auth_header: 'Authorization',
+    auth_format: 'Bearer {access_token}',
+    success_indicators: ['emailAddress'],
     error_patterns: {
-      '401': 'Invalid Discord bot token',
-      '403': 'Bot lacks required permissions'
-    },
-    ai_generated: false
+      401: 'Invalid access token',
+      403: 'Insufficient permissions'
+    }
+  },
+  'Notion': {
+    base_url: 'https://api.notion.com',
+    test_endpoint: '/v1/users/me', // CORRECT: Notion user endpoint
+    method: 'GET',
+    auth_header: 'Authorization',
+    auth_format: 'Bearer {integration_token}',
+    success_indicators: ['id', 'name'],
+    error_patterns: {
+      401: 'Invalid integration token'
+    }
+  },
+  'Trello': {
+    base_url: 'https://api.trello.com',
+    test_endpoint: '/1/members/me', // CORRECT: Trello member endpoint
+    method: 'GET',
+    auth_header: 'Authorization',
+    auth_format: 'OAuth oauth_consumer_key="{api_key}", oauth_token="{token}"',
+    success_indicators: ['id', 'username'],
+    error_patterns: {
+      401: 'Invalid API key or token'
+    }
   }
 };
 
@@ -107,119 +86,167 @@ serve(async (req) => {
   }
 
   try {
-    // 🎯 SURGICAL FIX 1: Extract testConfig parameter from frontend
-    const { platformName, credentials, userId, testConfig: frontendTestConfig } = await req.json();
+    const { platformName, credentials, testConfig, userId } = await req.json();
     
-    console.log('🧪 FIXED: Enhanced credential testing for:', platformName);
-    console.log('🎯 FIXED: Frontend testConfig received:', frontendTestConfig ? 'YES' : 'NO');
+    console.log('🧪 TESTING CREDENTIALS:', { platformName, userId, hasTestConfig: !!testConfig });
 
-    // Step 1: Prioritize frontend-sent AI config, then built-in, then generate new AI config
-    let testConfig = frontendTestConfig;
-    
-    // 🎯 SURGICAL FIX 2: Use frontend testConfig first, fallback to built-in or AI generation
-    if (!testConfig) {
-      console.log('📋 FIXED: No frontend testConfig, checking built-in configs...');
-      testConfig = BUILT_IN_CONFIGS[platformName.toLowerCase()];
+    // PRIORITY 1: Use AI-generated test config if provided
+    let config;
+    if (testConfig && testConfig.base_url && testConfig.test_endpoint) {
+      console.log('✅ USING: AI-generated test configuration');
+      config = {
+        base_url: testConfig.base_url,
+        test_endpoint: testConfig.test_endpoint.path || testConfig.test_endpoint,
+        method: testConfig.test_endpoint.method || 'GET',
+        auth_header: testConfig.authentication?.parameter_name || 'Authorization',
+        auth_format: testConfig.authentication?.format || 'Bearer {api_key}',
+        success_indicators: testConfig.success_indicators?.response_patterns || ['success'],
+        error_patterns: testConfig.error_patterns || { 401: 'Unauthorized' }
+      };
     }
-    
-    if (!testConfig && openAIApiKey) {
-      console.log('🤖 FIXED: Generating new AI configuration for:', platformName);
-      testConfig = await generateAITestConfig(platformName);
+    // PRIORITY 2: Use built-in configuration
+    else if (PLATFORM_CONFIGS[platformName]) {
+      console.log('✅ USING: Built-in platform configuration for', platformName);
+      config = PLATFORM_CONFIGS[platformName];
     }
-    
-    if (!testConfig) {
-      console.log('❌ FIXED: No configuration available for:', platformName);
-      return new Response(JSON.stringify({
-        success: false,
-        message: `No test configuration available for ${platformName}. Frontend config: ${frontendTestConfig ? 'received but invalid' : 'not received'}, built-in config: ${BUILT_IN_CONFIGS[platformName.toLowerCase()] ? 'available' : 'not available'}, AI generation: ${openAIApiKey ? 'attempted but failed' : 'unavailable'}`,
-        details: {
-          platform_name: platformName,
-          ai_generated_config: false,
-          error_type: 'no_config',
-          frontend_config_status: frontendTestConfig ? 'received' : 'not_received',
-          built_in_config_status: BUILT_IN_CONFIGS[platformName.toLowerCase()] ? 'available' : 'not_available'
+    // PRIORITY 3: Generate basic fallback
+    else {
+      console.log('⚠️ FALLBACK: Using basic configuration for', platformName);
+      config = {
+        base_url: `https://api.${platformName.toLowerCase()}.com`,
+        test_endpoint: '/me',
+        method: 'GET',
+        auth_header: 'Authorization',
+        auth_format: 'Bearer {api_key}',
+        success_indicators: ['id'],
+        error_patterns: { 401: 'Invalid credentials' }
+      };
+    }
+
+    // Build test URL
+    const testUrl = `${config.base_url}${config.test_endpoint}`;
+    console.log('🎯 TESTING URL:', testUrl);
+
+    // Build headers
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'YusrAI-Test/1.0'
+    };
+
+    // IMPROVED: Add authentication header
+    if (config.auth_header && config.auth_format) {
+      // Find the credential field to use
+      let credentialValue = null;
+      
+      // Try common patterns
+      const commonFields = ['api_key', 'access_token', 'token', 'bot_token', 'integration_token', 'personal_access_token'];
+      for (const field of commonFields) {
+        if (credentials[field]) {
+          credentialValue = credentials[field];
+          break;
         }
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      }
+
+      // Use first available credential if no common pattern found
+      if (!credentialValue) {
+        const credentialKeys = Object.keys(credentials);
+        if (credentialKeys.length > 0) {
+          credentialValue = credentials[credentialKeys[0]];
+        }
+      }
+
+      if (credentialValue) {
+        // Replace placeholder in auth format
+        const authValue = config.auth_format.replace(/\{[^}]+\}/g, credentialValue);
+        headers[config.auth_header] = authValue;
+        console.log('🔐 AUTH HEADER:', config.auth_header, 'set');
+      } else {
+        console.error('❌ NO CREDENTIAL: No valid credential found');
+        return new Response(JSON.stringify({
+          success: false,
+          message: 'No valid credentials provided',
+          details: {
+            platform: platformName,
+            available_fields: Object.keys(credentials),
+            expected_fields: commonFields
+          }
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
     }
 
-    // 🎯 SURGICAL FIX 3: Log which config source is being used
-    const configSource = frontendTestConfig ? 'frontend-ai-generated' : 
-                        BUILT_IN_CONFIGS[platformName.toLowerCase()] ? 'built-in' : 
-                        'newly-ai-generated';
-    console.log('📡 FIXED: Using config source:', configSource);
+    // Make the test request
+    console.log('📡 MAKING REQUEST:', config.method, testUrl);
+    const response = await fetch(testUrl, {
+      method: config.method,
+      headers: headers
+    });
 
-    // Step 2: Build test request
-    const testRequest = buildTestRequest(testConfig, credentials);
-    console.log('📡 FIXED: Testing endpoint:', testRequest.url);
-
-    // Step 3: Execute test
-    const response = await fetch(testRequest.url, testRequest.options);
     const responseText = await response.text();
-    
     let responseData;
+    
     try {
       responseData = JSON.parse(responseText);
     } catch {
-      responseData = responseText;
+      responseData = { raw_response: responseText };
     }
 
-    // Step 4: Evaluate success
-    const isSuccess = evaluateTestSuccess(response, responseData, testConfig);
-    
+    console.log('📥 RESPONSE:', response.status, typeof responseData);
+
+    // Check for success
+    const isSuccess = response.ok && (
+      config.success_indicators.some(indicator => 
+        responseData && typeof responseData === 'object' && responseData[indicator] !== undefined
+      ) || response.status === 200
+    );
+
     if (isSuccess) {
-      console.log('✅ FIXED: Credential test successful for:', platformName);
-      
+      console.log('✅ TEST SUCCESS:', platformName);
       return new Response(JSON.stringify({
         success: true,
-        message: `${platformName} credentials verified successfully using ${configSource} configuration!`,
+        message: `${platformName} credentials are valid and working`,
         details: {
           status: response.status,
-          endpoint_tested: testRequest.url,
-          ai_generated_config: testConfig.ai_generated || (configSource === 'frontend-ai-generated'),
-          platform_name: testConfig.platform_name || platformName,
-          api_response: sanitizeResponse(responseData),
-          headers_used: testRequest.options.headers || {},
-          config_source: configSource
+          platform: platformName,
+          endpoint_tested: testUrl,
+          response_preview: Object.keys(responseData).slice(0, 3),
+          config_source: testConfig ? 'ai_generated' : 'built_in'
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     } else {
-      console.error('❌ FIXED: Credential test failed for:', platformName, response.status);
+      console.log('❌ TEST FAILED:', response.status, platformName);
+      const errorMessage = config.error_patterns[response.status] || 
+                          (responseData?.error || responseData?.message) || 
+                          `HTTP ${response.status}`;
       
       return new Response(JSON.stringify({
         success: false,
-        message: generateErrorMessage(platformName, response.status, testConfig, configSource),
-        error_type: categorizeError(response.status),
+        message: `${platformName} test failed: ${errorMessage}`,
         details: {
           status: response.status,
-          endpoint_tested: testRequest.url,
-          ai_generated_config: testConfig.ai_generated || (configSource === 'frontend-ai-generated'),
-          platform_name: testConfig.platform_name || platformName,
-          api_response: sanitizeResponse(responseData),
-          headers_used: testRequest.options.headers || {},
-          config_source: configSource
-        },
-        troubleshooting: generateTroubleshootingSteps(platformName, response.status, testConfig)
+          platform: platformName,
+          endpoint_tested: testUrl,
+          error: errorMessage,
+          response: responseData,
+          config_source: testConfig ? 'ai_generated' : 'built_in'
+        }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
   } catch (error: any) {
-    console.error('💥 FIXED: Test credential error:', error);
-    
+    console.error('💥 TEST ERROR:', error);
     return new Response(JSON.stringify({
       success: false,
-      message: `Testing failed: ${error.message}`,
-      error_type: 'system_error',
+      message: `Test failed: ${error.message}`,
       details: {
-        platform_name: 'unknown',
-        system_error: true,
-        error_message: error.message
+        error: error.message,
+        stack: error.stack?.substring(0, 500)
       }
     }), {
       status: 500,
@@ -227,208 +254,3 @@ serve(async (req) => {
     });
   }
 });
-
-// FIXED: Enhanced AI configuration generation
-async function generateAITestConfig(platformName: string): Promise<any> {
-  if (!openAIApiKey) {
-    console.warn('⚠️ FIXED: No OpenAI API key available for AI config generation');
-    return null;
-  }
-
-  try {
-    console.log('🤖 FIXED: Generating AI test configuration for:', platformName);
-    
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an API testing expert. Generate a test configuration for ${platformName} API credential testing. Respond with ONLY valid JSON in this exact format:
-{
-  "platform_name": "${platformName}",
-  "base_url": "https://api.example.com",
-  "test_endpoint": {
-    "path": "/endpoint/path",
-    "method": "GET",
-    "headers": {},
-    "query_params": {}
-  },
-  "authentication": {
-    "location": "header",
-    "parameter_name": "Authorization",
-    "format": "Bearer {token}"
-  },
-  "field_mappings": {
-    "api_key": "token",
-    "access_token": "token"
-  },
-  "success_indicators": {
-    "status_codes": [200],
-    "response_patterns": ["id", "name"]
-  },
-  "error_patterns": {
-    "401": "Invalid credentials",
-    "403": "Insufficient permissions"
-  },
-  "ai_generated": true
-}`
-          },
-          {
-            role: 'user',
-            content: `Generate API test configuration for ${platformName}`
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: 1000
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const configText = data.choices[0].message.content.trim();
-    
-    // Parse the AI-generated configuration
-    const config = JSON.parse(configText);
-    config.ai_generated = true;
-    
-    console.log('✅ FIXED: AI configuration generated successfully for:', platformName);
-    return config;
-    
-  } catch (error) {
-    console.error('❌ FIXED: Failed to generate AI configuration:', error);
-    return null;
-  }
-}
-
-// Helper functions
-function buildTestRequest(testConfig: any, credentials: Record<string, string>): any {
-  const { base_url, test_endpoint, authentication, field_mappings } = testConfig;
-  
-  let url = `${base_url}${test_endpoint.path}`;
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'User-Agent': 'YusrAI-Enhanced-Tester/2.0',
-    ...test_endpoint.headers
-  };
-
-  // Apply authentication
-  if (authentication.location === 'header') {
-    const credentialValue = getCredentialValue(credentials, field_mappings);
-    if (credentialValue) {
-      headers[authentication.parameter_name] = authentication.format.replace(/\{[\w_]+\}/g, credentialValue);
-    }
-  }
-
-  // Add query parameters
-  if (test_endpoint.query_params) {
-    const params = new URLSearchParams(test_endpoint.query_params);
-    url += `?${params.toString()}`;
-  }
-
-  return {
-    url,
-    options: {
-      method: test_endpoint.method,
-      headers
-    }
-  };
-}
-
-function getCredentialValue(credentials: Record<string, string>, fieldMappings: Record<string, string>): string | null {
-  for (const [platformField, userField] of Object.entries(fieldMappings)) {
-    if (credentials[userField] || credentials[platformField]) {
-      return credentials[userField] || credentials[platformField];
-    }
-  }
-  
-  // Fallback to common patterns
-  const commonPatterns = ['api_key', 'access_token', 'token', 'bot_token'];
-  for (const pattern of commonPatterns) {
-    if (credentials[pattern]) {
-      return credentials[pattern];
-    }
-  }
-  
-  return null;
-}
-
-function evaluateTestSuccess(response: Response, responseData: any, testConfig: any): boolean {
-  if (!testConfig.success_indicators.status_codes.includes(response.status)) {
-    return false;
-  }
-  
-  if (typeof responseData === 'object' && responseData !== null) {
-    return testConfig.success_indicators.response_patterns.some((pattern: string) => {
-      return responseData.hasOwnProperty(pattern);
-    });
-  }
-  
-  return true;
-}
-
-function generateErrorMessage(platformName: string, status: number, testConfig: any, configSource: string): string {
-  const statusMessage = testConfig.error_patterns[status.toString()] || `HTTP ${status} error`;
-  return `${platformName} test failed (${configSource} config): ${statusMessage}`;
-}
-
-function generateTroubleshootingSteps(platformName: string, status: number, testConfig: any): string[] {
-  const base = [
-    `Verify ${platformName} credentials are correct and active`,
-    'Check API documentation for required permissions',
-    'Ensure account has necessary subscription level'
-  ];
-
-  if (testConfig.ai_generated) {
-    base.push('Using AI-generated test configuration - may need manual verification');
-  }
-
-  switch (status) {
-    case 401:
-      return [...base, 'Check if API keys have expired', 'Verify authentication format'];
-    case 403:
-      return [...base, 'Check API scopes and permissions', 'Verify account access level'];
-    case 404:
-      return [...base, 'Verify API endpoint URL', 'Check API version compatibility'];
-    case 429:
-      return [...base, 'Wait for rate limit reset', 'Consider upgrading API plan'];
-    default:
-      return base;
-  }
-}
-
-function categorizeError(status: number): string {
-  if (status === 401) return 'authentication_error';
-  if (status === 403) return 'permission_error';
-  if (status === 404) return 'endpoint_not_found';
-  if (status === 429) return 'rate_limit_error';
-  if (status >= 500) return 'server_error';
-  return 'api_error';
-}
-
-function sanitizeResponse(responseData: any): any {
-  if (typeof responseData === 'string') {
-    return responseData.substring(0, 200) + (responseData.length > 200 ? '...' : '');
-  }
-  
-  if (typeof responseData === 'object' && responseData !== null) {
-    const keys = Object.keys(responseData).slice(0, 5);
-    const preview: any = {};
-    keys.forEach(key => {
-      preview[key] = responseData[key];
-    });
-    return preview;
-  }
-  
-  return responseData;
-}
-
-console.log('✅ FIXED: Enhanced test-credential function loaded with frontend testConfig support');

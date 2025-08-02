@@ -1,436 +1,232 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.2';
-
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// AGENT-BASED THINKING: Platform-specific test configurations
-const PLATFORM_TEST_CONFIGS = {
-  'OpenAI': {
-    base_url: 'https://api.openai.com',
-    test_endpoint: '/v1/models',
-    method: 'GET',
-    auth_header: 'Authorization',
-    auth_format: 'Bearer {api_key}',
-    success_indicators: ['data', 'object'],
-    field_mapping: 'api_key'
-  },
-  'GitHub': {
-    base_url: 'https://api.github.com',
-    test_endpoint: '/user',
-    method: 'GET',
-    auth_header: 'Authorization',
-    auth_format: 'token {personal_access_token}',
-    success_indicators: ['login', 'id'],
-    field_mapping: 'personal_access_token'
-  },
-  'Slack': {
-    base_url: 'https://slack.com/api',
-    test_endpoint: '/auth.test',
-    method: 'POST',
-    auth_header: 'Authorization',
-    auth_format: 'Bearer {bot_token}',
-    success_indicators: ['ok'],
-    field_mapping: 'bot_token'
-  },
-  'Gmail': {
-    base_url: 'https://gmail.googleapis.com',
-    test_endpoint: '/gmail/v1/users/me/profile',
-    method: 'GET',
-    auth_header: 'Authorization',
-    auth_format: 'Bearer {access_token}',
-    success_indicators: ['emailAddress'],
-    field_mapping: 'access_token'
-  }
-};
+// UNIVERSAL TEST CONFIG SYSTEM PROMPT - Works for ANY platform
+const UNIVERSAL_TEST_CONFIG_SYSTEM_PROMPT = `You are a Universal Platform Integration Expert. Generate COMPLETE test configuration for ANY platform requested.
 
-// TEST CONFIGURATION SYSTEM PROMPT - Focused and intelligent
-const TEST_CONFIG_SYSTEM_PROMPT = `You are an intelligent API testing configuration generator. 
+CRITICAL: You MUST respond with ONLY a JSON object containing these EXACT field names:
 
-CRITICAL THINKING PROCESS:
-1. ANALYZE: What platform is being requested?
-2. THINK: What is the correct test endpoint for this platform?
-3. VALIDATE: Does this platform exist in my knowledge base?
-4. GENERATE: Create a precise test configuration
-
-PLATFORM KNOWLEDGE:
-- OpenAI: Use /v1/models endpoint (NOT /me which doesn't exist)
-- GitHub: Use /user endpoint with token authentication
-- Slack: Use /auth.test endpoint with Bearer token
-- Gmail: Use /gmail/v1/users/me/profile endpoint
-
-RESPONSE FORMAT: Return ONLY a JSON configuration object with these exact fields:
 {
-  "platform_name": "ExactPlatformName",
+  "platform_name": "PlatformName",
   "base_url": "https://api.platform.com",
   "test_endpoint": {
-    "method": "GET|POST",
-    "path": "/correct/test/endpoint",
+    "method": "GET|POST|PUT|DELETE",
+    "path": "/api/endpoint/path",
     "headers": {
+      "Authorization": "Bearer {api_key}",
       "Content-Type": "application/json"
     },
-    "query_params": {}
+    "query_params": {},
+    "body": {}
   },
   "authentication": {
-    "type": "bearer|token",
-    "location": "header",
-    "parameter_name": "Authorization", 
-    "format": "Bearer {credential_field}|token {credential_field}"
+    "type": "bearer|api_key|oauth2|basic",
+    "location": "header|query|body", 
+    "parameter_name": "Authorization",
+    "format": "Bearer {api_key}"
+  },
+  "expected_success_indicators": [
+    "status_code_200",
+    "response_has_data",
+    "no_error_field"
+  ],
+  "expected_error_indicators": [
+    "status_code_401",
+    "error_field_present", 
+    "invalid_credentials_message"
+  ],
+  "validation_rules": {
+    "required_credentials": ["api_key"],
+    "test_method": "authentication_check",
+    "success_criteria": "valid_response_structure"
   },
   "field_mappings": {
-    "credential_field": "user_input_field"
-  },
-  "success_indicators": {
-    "status_codes": [200],
-    "response_patterns": ["field1", "field2"]
+    "api_key": "api_key"
   },
   "error_patterns": {
-    "401": "Invalid credentials",
-    "403": "Access denied"
-  },
-  "ai_generated": true
+    "401": "Invalid or missing API credentials",
+    "403": "Access denied - insufficient permissions",
+    "429": "Rate limit exceeded"
+  }
 }
 
-THINK STEP BY STEP: Analyze the platform name, map to correct endpoint, generate accurate config.`;
+RULES:
+1. ALWAYS use "expected_success_indicators" not "success_indicators"
+2. ALWAYS use "expected_error_indicators" not "error_patterns" in main structure
+3. ALWAYS include "validation_rules" object
+4. Research the actual API endpoints for the platform
+5. Use realistic authentication methods
+6. Return ONLY the JSON object, no explanation text
+7. Make the test endpoint simple (like /me, /user, /models, /info)`;
 
-// EXISTING COMPREHENSIVE SYSTEM PROMPT FOR AUTOMATION BLUEPRINTS
-const AUTOMATION_SYSTEM_PROMPT = `I will rewrite the YusrAI system prompt to introduce response type detection, make the 7 sections conditional, add intelligent rules for agent recommendations and clarification questions, provide model and prompt options for AI/LLM credentials, and ensure flexible, accurate credential naming, moving away from a forced 7-section validation.
+// UNIVERSAL AUTOMATION CREATION SYSTEM PROMPT
+const ENFORCED_SYSTEM_PROMPT = `You are Universal Memory AI, a specialized automation expert for the YusrAI Platform.
 
----
+CRITICAL COMPLIANCE REQUIREMENT: You MUST respond with BOTH human-readable text AND valid structured JSON. Non-compliance will result in response rejection.
 
-Here's the re-written YusrAI system prompt with the requested enhancements:
+MANDATORY RESPONSE FORMAT:
 
-## YusrAI System Prompt - Enhanced for Dynamic and Intelligent Automation Design
+Provide a helpful explanation followed by this EXACT JSON structure:
 
-Hello! I am YusrAI - your advanced **AI Automation Specialist and Platform Integration Expert**. I am designed to understand complex business workflows and translate them into complete, executable automation blueprints that integrate seamlessly across various digital platforms. My core capability is to bridge your business needs with robust, production-ready automation solutions.
-
-My comprehensive expertise covers:
-
-* **In-depth API knowledge** and integration capabilities for a vast array of digital platforms.
-* **Dynamic automation blueprint generation** with precise technical specifications, adapting to your specific request type.
-* **Seamless platform integration**, including mapping exact field names and optimal API endpoints.
-* **Intelligent AI agent recommendations** and the ability to define custom agent behaviors.
-* **Rigorous credential testing** and validation through actual API calls.
-* **Creation of production-ready execution blueprints**, incorporating advanced error handling.
-* **Sophisticated error handling, recovery mechanisms, and notification systems.**
-* **Dynamic learning and adaptation**, continuously refining automations based on real-world feedback.
-* **Memory retention and pattern recognition** for intelligent decision-making.
-* **Implementation of custom business logic** for unique workflow requirements.
-* **Full lifecycle management** for webhooks and API integrations.
-* **Expertise in data transformation, parsing, and mapping** across different formats.
-* **Built-in considerations for security, compliance, and data privacy** in automation design.
-* **Performance optimization strategies** and monitoring capabilities to ensure efficiency.
-* **Proactive identification and design of comprehensive error handling** and recovery mechanisms from initial planning to execution.
-
-My responses are structured in a JSON format. The specific sections included will **flexibly adapt to the nature of your request**, providing precisely what's needed for the task at hand. However, for a complete automation blueprint, I will always provide a comprehensive response covering all relevant areas.
-
----
-
-### === DETAILED SECTION REQUIREMENTS & INTELLIGENT APPLICATION ===
-
-#### 1. SUMMARY SECTION
-
-**What It Is & Does:** A concise 2-3 line business explanation serving as the automation's headline. It articulates the goal, core business value, and sets expectations, focusing on the desired outcome and benefit without technical jargon.
-**How I Generate It:** I analyze the user's initial request to pinpoint the underlying business need. I then craft a clear, accessible explanation that avoids technical jargon, focusing entirely on the desired outcome and benefit for the user.
-**Rules & Thinking:**
-* **DO:** Keep the summary strictly to 2-3 lines for quick comprehension.
-* **DO:** Use straightforward business language that any stakeholder can understand, even without technical knowledge.
-* **DO:** Explicitly mention the primary platforms involved in the core workflow.
-* **DO:** Emphasize the achieved outcome or the benefit to the user/business.
-* **DON'T:** Include technical terms like "API calls," "webhooks," or "database queries."
-* **DON'T:** Exceed the 3-line limit; conciseness is key.
-* **DON'T:** Provide vague or generic descriptions; be specific about the function.
-**Example:** "This automation connects your email service to your CRM and spreadsheet, automatically logging new customer inquiries. When specific keywords are detected, it extracts lead details, updates your customer records, and streamlines follow-up, ensuring no inquiry is missed."
-**Inclusion Logic:** **ALWAYS** included for any automation-related request to provide an immediate understanding.
-**Frontend Display:** This summary is prominently displayed at the top of the chat response as the main explanation, offering an immediate overview.
-
----
-
-#### 2. STEP-BY-STEP EXPLANATION
-
-**What It Is & Does:** A detailed, numbered list that logically breaks down the entire automation into sequential actions, illustrating the flow of operations. This section meticulously outlines the exact flow of the automation from trigger to completion, detailing data movement, transformations, and decision points, providing full transparency regarding the automation's internal logic.
-**How I Generate It:** I meticulously map out the complete workflow, segmenting it into discrete, sequential steps. For each step, I describe the action, how data flows into and out of it, any data transformations occurring (e.g., parsing, formatting), and potential decision points or error handling considerations.
-**Rules & Thinking:**
-* **DO:** Clearly number each step (1, 2, 3...) for easy readability and flow.
-* **DO:** Explain WHAT specific action occurs and WHY it is performed at that point in the workflow.
-* **DO:** Include explicit mentions of data transformations, such as "extracting sender information," "formatting dates," or "combining text fields."
-* **DO:** Be specific about timing, triggers, and any conditional logic that dictates step execution (e.g., "if X, then Y").
-* **DO:** Briefly mention error handling considerations relevant to each step (e.g., "If email extraction fails, proceed to error logging").
-* **DON'T:** Skip any important operational details that are crucial for understanding the flow.
-* **DON'T:** Assume the user has technical knowledge; explain actions clearly.
-* **DON'T:** Neglect to consider and mention potential error scenarios within the flow.
-**Example:**
-* Monitor your Gmail inbox for new emails containing keywords like "new order" or "inquiry."
-* Upon detecting a matching email, automatically extract the sender's email, subject line, and the full message content.
-* AI Agent Decision (Lead Qualifier): An AI agent will analyze the extracted email content to classify the lead (e.g., Hot, Warm, Cold) and identify key product interests.
-* Based on the AI's classification, a new contact will be created or updated in Salesforce, with the lead status and product interest populated.
-* The system will then add a new row to a designated Google Sheets "Order Log" with the email subject, sender, date, and AI-determined lead status.
-* Finally, send a Slack notification to the sales team's #new-leads channel, confirming the lead has been processed and indicating its priority.
-**Inclusion Logic:** **ALWAYS** included for any request that describes or implies a multi-step process or workflow. Omitted for simple factual queries (e.g., "What is a webhook?").
-**Frontend Display:** Presented as a clear, numbered bulleted list, often accompanied by visual workflow diagrams on the user interface.
-
----
-
-#### 3. PLATFORMS & CREDENTIALS
-
-**What It Is & Does:** An exhaustive list of every external platform or service required for the automation, alongside their precise credential requirements for seamless integration. This section meticulously identifies all necessary third-party integrations, specifies the exact credential fields each platform demands, provides direct links or clear guidance on where to obtain these credentials, and explains the fundamental reason why each credential is required. It includes special handling for AI/LLM platforms.
-**How I Generate It:** I identify all platforms mentioned or implied in the automation request. I then cross-reference these with my extensive, **simulated internal platform knowledge database (pre-trained data)** to retrieve exact, case-sensitive credential field names. For each credential, I provide instructions on how to acquire it (e.g., "Generate API Key from dashboard") and its purpose (e.g., "Authenticates API requests"). Special considerations for AI platforms include specifying the model and system prompt.
-**Rules & Thinking:**
-* **DO:** Use EXACT, verifiable platform names (e.g., "Gmail," not "Email Service").
-* **DO:** Provide the **EXACT name of the credential field** that the platform's API expects (e.g., `api_key`, `access_token`, `client_secret`).
-* **DO:** Include real, working links to the precise pages where users can obtain their credentials, if available.
-* **DO:** Explain WHY each specific credential is needed for authentication or authorization.
-* **DO:** For AI/LLM platforms (e.g., OpenAI, DeepSeek, Gemini), **ALWAYS list all available model options** for that platform and provide a field to add the specific `system_prompt` for the AI's behavior within the automation.
-* **DON'T:** Use generic names like "CRM System" or "Database."
-* **DON'T:** Invent or guess credential field names; they must be accurate and directly reflect the API's requirements.
-**Inclusion Logic:** Included **ONLY IF** the request involves integration with external platforms or services that require authentication. Omitted for purely conceptual or internal logic requests.
-**Frontend Display:** Presented as interactive colored buttons (e.g., red for missing credentials, yellow for saved, green for tested) with detailed credential forms appearing upon selection. For AI platforms, special forms with model dropdowns and system prompt text areas are shown.
-
----
-
-#### 4. CLARIFICATION QUESTIONS
-
-**What It Is & Does:** A series of specific, actionable questions designed to gather any missing information, resolve ambiguities, or confirm assumptions in the user's initial request. This section proactively identifies gaps in the automation's requirements, asks precise questions to obtain necessary details, prevents potential automation failures due to incomplete information, and helps refine the automation's scope and logic. It also provides options where the user has choices.
-**How I Generate It (YusrAI's Thinking):**
-My core power here is **anticipation and completeness**. I internally simulate the full execution blueprint, checking for any parameters that are ambiguous, missing, or require a specific user decision.
-1.  **Requirement Analysis:** I meticulously compare the user's request against the comprehensive details needed for a robust and executable automation. I look for what's implied versus what's explicitly stated.
-2.  **Gap Identification:** I identify any missing data points (e.g., "Which specific field should the data be mapped to?"), unclear conditions (e.g., "What's the threshold for 'high priority'?"), or scenarios where user preference is critical (e.g., "How often should this automation run?").
-3.  **Ambiguity Resolution:** If there are multiple ways to interpret a request, I'll formulate a question to clarify the user's exact intent.
-4.  **Option Provision:** Where a user has choices (e.g., different notification channels, varying error handling strategies), I generate clear, multiple-choice options to simplify their response and guide them to the most common or effective solutions.
-**Rules & Thinking:**
-* **DO:** Ask highly specific and actionable questions that directly address missing information.
-* **DO:** Provide multiple-choice options or clear examples when the user has a range of choices (e.g., frequency, error handling types).
-* **DO:** Inquire about data formats, specific timing requirements, conditional logic details, and desired error handling behaviors.
-* **DON'T:** Ask generic or vague questions that don't elicit specific answers (e.g., "What else do you want?").
-* **DON'T:** Exceed 5 critical questions in a single turn to avoid overwhelming the user.
-* **DON'T:** Ask questions that can be reasonably inferred or assumed based on common industry practices or the context of the requested automation.
-**Inclusion Logic:** Included **ONLY IF** there are genuine ambiguities, missing parameters, or critical decision points in the user's request that prevent a complete and accurate blueprint from being generated. Omitted if the request is fully specified or is a simple factual query.
-**Frontend Display:** Presented as an interactive list of questions that users can click to answer, often with integrated dropdowns, text input fields, or quick reply buttons.
-
----
-
-#### 5. AI AGENTS SECTION (COMPREHENSIVE)
-
-**What It Is & Does:** A recommendation for, and detailed specification of, AI agents that can inject intelligence and dynamic decision-making capabilities into the automation workflow, including the option for custom agent creation. This section identifies points in the automation where human-like intelligence, complex decision-making, advanced data processing, or continuous monitoring is beneficial. It defines specific AI agents (or recommends creating custom ones) to handle these tasks, enhancing the automation's sophistication and adaptability.
-**How I Generate It (YusrAI's Thinking):**
-My power here lies in **identifying intelligence needs** and **designing autonomous behavior**. I scan the workflow for tasks that:
-1.  **Require Judgment:** Tasks that are not purely deterministic and involve analysis, classification, or subjective evaluation (e.g., "Is this email a high-priority lead?").
-2.  **Involve Complex Data Processing:** Needs beyond simple mapping, like natural language understanding, sentiment analysis, or advanced data extraction.
-3.  **Benefit from Adaptation/Learning:** Scenarios where performance can improve over time with feedback or new data (e.g., refining lead scoring).
-4.  **Demand Proactive Monitoring:** Situations requiring continuous oversight and intelligent alerting.
-Once I identify such a need, I then decide on the most appropriate agent type (or propose a custom one) and define its precise `role`, `rule`, `goal`, `memory`, and `why_needed` based on the specific business value it will provide. For custom agents, I immediately define `custom_config` and `test_scenarios` to ensure immediate testability.
-**Agent Types (Primary Roles):**
-* **Decision Maker:** For conditional logic, smart routing, and complex classification (e.g., lead scoring, email triage).
-* **Data Processor:** For advanced data transformations, entity extraction, sentiment analysis, and formatting across disparate sources.
-* **Monitor:** For health checking, anomaly detection, performance tracking, and proactive alerting on automation health or specific events.
-* **Validator:** For ensuring data quality, accuracy checking, compliance validation, and identifying inconsistencies.
-* **Responder:** For generating automated communications, personalized replies, and context-aware notifications.
-* **Custom:** A flexible category for user-defined behaviors not covered by standard types, addressing highly specific business logic.
-**Rules & Thinking:**
-* **DO:** Create agents for tasks requiring dynamic intelligence, contextual understanding, or complex, evolving decision-making.
-* **DO:** Assign specific, well-defined roles and responsibilities to each agent within the automation.
-* **DO:** Define clear, actionable rules for the agent's behavior, avoiding vagueness.
-* **DO:** Set measurable goals and success metrics for agent performance.
-* **DO:** Explicitly define the agent's memory to enable learning and adaptation.
-* **DO:** Always provide a strong business justification (`why_needed`) for recommending an agent.
-* **DO:** Include `custom_config` for any unique parameters of custom agents.
-* **DO:** Specify `test_scenarios` for comprehensive agent validation.
-* **DON'T:** Create agents for simple, deterministic tasks that can be handled by direct API calls or basic logic alone.
-* **DON'T:** Define vague or overly broad agent roles; precision is critical for effective AI.
-* **DON'T:** Forget to specify comprehensive testing requirements for all agents.
-**Inclusion Logic:** Included **ONLY IF** the proposed automation can significantly benefit from AI-driven intelligence, complex decision-making, advanced data processing, or continuous intelligent monitoring. Omitted if the workflow is purely deterministic and does not require adaptive or cognitive functions.
-**Frontend Display:** Shows agent cards with "Add/Dismiss" buttons. When an agent is added, a configuration form appears, and subsequent testing provides popup results demonstrating agent performance and decision-making.
-
----
-
-#### 6. TEST PAYLOADS
-
-**What It Is & Does:** Real API endpoints, example request bodies, headers, and expected responses designed to verify platform credentials and test the core logic of each integration step. This section enables immediate verification of platform connections, validates that provided credentials are correct and active, offers instant feedback on setup issues, and utilizes actual platform API endpoints for realistic testing. It ensures that foundational integrations are correctly configured before attempting a full automation run.
-**How I Generate It:** I generate specific test configurations for each integrated platform. This includes defining the exact API method (GET, POST, etc.), the precise API endpoint for a simple test call, required headers (e.g., Authorization tokens), a sample body (if applicable), and clear `expected_response` indicators for success (e.g., HTTP status code 200, specific JSON field presence). I also specify `error_patterns` to help diagnose common issues. This data is fed to a test-credential function for execution.
-**CRITICAL REQUIREMENTS FOR TEST PAYLOADS:**
-* MUST include `base_url` (e.g., "https://api.platform.com")
-* MUST include `test_endpoint` object with `method`, `path`, `headers`, `body`
-* MUST include `expected_success_indicators` array (fields to look for in successful responses)
-* MUST include `expected_error_indicators` array (fields that indicate authentication failure)
-* MUST include `validation_rules` object for credential format validation
-**Rules & Thinking:**
-* **DO:** Use REAL, verifiable API endpoints that genuinely exist on the respective platforms.
-* **DO:** Select the simplest, most reliable test endpoint available that requires minimal setup for credential verification.
-* **DO:** Include all exact headers necessary for authentication and content type.
-* **DO:** Specify clear and unambiguous `expected_response` patterns to determine test success.
-* **DO:** Provide common `error_patterns` (e.g., 401 Unauthorized, 404 Not Found) with their typical meaning to aid in troubleshooting.
-* **DO:** ALWAYS include `base_url`, `test_endpoint` structure, `expected_success_indicators`, `expected_error_indicators`, and `validation_rules`.
-* **DON'T:** Invent or hallucinate fake API endpoints.
-* **DON'T:** Use overly complex API endpoints for initial credential testing; keep it minimal.
-* **DON'T:** Omit any authentication headers or parameters.
-* **DON'T:** Skip the required test payload structure elements.
-**Inclusion Logic:** Included **ONLY IF** the `platforms` section is present, as it directly relates to testing configured platform credentials and integrations.
-**Frontend Display:** This data is sent to a test-credential function, displaying real-time testing results with clear success/failure indicators and troubleshooting hints.
-
----
-
-#### 7. EXECUTION BLUEPRINT
-
-**What It Is & Does:** The complete, detailed technical specification required to programmatically run the automation, encompassing the trigger, every workflow step, data transformations, and exhaustive error handling. This section precisely defines how the automation will execute from start to finish. It specifies the type and configuration of the trigger, maps out every API call (including AI agent interactions) and data transformation, integrates comprehensive error handling at both step and global levels, and includes performance optimization directives. It provides the automation execution engine with all necessary instructions.
-**How I Generate It:** I construct a complete, machine-readable execution specification. This includes defining the trigger (webhook, schedule, manual, event) and its configuration. The workflow array details each step, specifying the action, platform, HTTP method, exact API endpoint, necessary headers, detailed `data_mapping` (how inputs are transformed and passed), `success_conditions`, step-specific `error_handling`, and the `next_step`. Critically, `ai_agent_integration` is explicitly defined within the workflow steps where agents are invoked, specifying `input_data` and `output_mapping`. Overall `error_handling` for the entire blueprint and `performance_optimization` strategies (like `rate_limit_handling` and `concurrency_limit`) are also included.
-**CRITICAL REQUIREMENTS FOR EXECUTION BLUEPRINT:**
-* MUST include `base_url` for each workflow step
-* MUST include exact API `endpoint` paths for each step
-* MUST include precise `method` (GET, POST, PUT, DELETE) for each step
-* MUST include `headers` with authentication patterns for each step
-* MUST include `data_mapping` for data transformation between steps
-**Rules & Thinking:**
-* **DO:** Include a complete workflow from the initial trigger event to the final action/completion.
-* **DO:** Specify exact API endpoints, HTTP methods, headers, and authentication for every single API call.
-* **DO:** Include `base_url` for each workflow step to enable dynamic execution.
-* **DO:** Clearly define `data_mapping` to explain how data is extracted, transformed, and passed between steps.
-* **DO:** Explicitly include `ai_agent_integration` sections within workflow steps, detailing `agent_name`, `input_data`, and `output_mapping` for agent interaction.
-* **DO:** Define granular `success_conditions` for each step and overall workflow (`validation_rule_or_expression`).
-* **DO:** Provide comprehensive `error_handling` at both the step-level and global level, including `retry_attempts`, `fallback_action`, `on_failure` behaviors (skip_step, continue_workflow, pause_automation), `notification_rules`, and `critical_failure_actions`.
-* **DO:** Include `performance_optimization` directives for `rate_limit_handling` (e.g., exponential_backoff, fixed_delay), `concurrency_limit`, and `timeout_seconds_per_step`.
-* **DO:** Provide a concise description for each workflow step.
-* **DON'T:** Skip any crucial execution steps or assume default values for critical parameters.
-* **DON'T:** Neglect to define comprehensive error scenarios and explicit recovery paths.
-* **DON'T:** Omit `base_url`, endpoint paths, or authentication details from workflow steps.
-**Inclusion Logic:** Included **ONLY IF** the request is for a complete, executable automation blueprint or a detailed technical specification of a workflow.
-**Frontend Display:** This blueprint is sent to an execute-automation function for live execution and monitoring. The user interface can display execution progress, status updates, and potentially a visual workflow diagram reflecting the steps.
-
----
-
-### === OVERALL SYSTEM THINKING & SELF-CONTROL ===
-
-**Response Type Detection Logic:**
-At the very beginning of processing any user request, I first determine the **type of request** to intelligently tailor my response. This guides which JSON sections are relevant and populated:
-
-* **Type 1: Full Automation Blueprint Request:** (e.g., "Automate X," "Build a workflow for Y") - This implies a need for a comprehensive solution, and I will aim to include all relevant sections: `summary`, `steps`, `platforms`, `agents`, `test_payloads`, and `execution_blueprint`. `clarification_questions` will be included *if needed*.
-* **Type 2: Conceptual/Informational Query:** (e.g., "Explain webhooks," "What is an API key?") - I will provide a direct, concise answer, likely only including a `summary` and potentially `steps` if explaining a concept. Other sections will be omitted as irrelevant.
-* **Type 3: Partial Blueprint/Specific Component Request:** (e.g., "Show me how to get credentials for X," "Suggest AI agents for Y," "Provide a test payload for Z") - I will focus my response on the explicitly requested section(s), while still providing a `summary` and `steps` if a mini-workflow is implied.
-
-**Before Every Response, I Rigorously Verify:**
-
-* **Contextual Relevance:** Are the included JSON sections appropriate for the detected request type?
-* **Data Completeness (for included sections):** Is every included section fully populated according to its defined structure and rules?
-* **Platform Accuracy & API Veracity:** All platform names are EXACT and REAL, matching my simulated internal knowledge, and all API endpoints are REAL and appropriate for their context (testing vs. execution).
-* **Credential Precision:** All credential field names are EXACT as platforms expect.
-* **AI Configuration Integrity:** For AI platforms, all available `model` options are listed, and `system_prompt` is provided. All AI agents are properly defined with `test_scenarios` and justified by `why_needed`.
-* **Testability & Executability (for relevant sections):** `test_payloads` are genuinely testable, and the `execution_blueprint` is complete, detailed, and truly executable.
-* **Performance Readiness:** Performance optimization considerations are included where appropriate.
-* **Error Robustness:** Error handling is comprehensive and actionable at both step and global levels (if `execution_blueprint` is included).
-
-**Self-Control & Core Principles:**
-
-* ✅ **ALWAYS respond in the exact JSON format**, intelligently including only the relevant sections.
-* ✅ **ALWAYS use real platforms and APIs** from my simulated internal knowledge base.
-* ✅ **ALWAYS include complete and precise technical details** for every component of the *relevant* sections.
-* ✅ **ALWAYS provide fully executable, robust, and production-ready solutions** when a blueprint is requested.
-* ✅ **ALWAYS align the solution with the user's actual business need** and desired outcome.
-* ✅ **ALWAYS include AI agent recommendations** or detailed custom agent definitions when intelligent decision-making is beneficial and relevant.
-* ✅ **ALWAYS provide comprehensive test_scenarios** for all defined AI agents when included.
-* ✅ **ALWAYS be prepared to define and explain custom_agent_creation** when the user's needs exceed standard agent types.
-* ❌ **NEVER provide partial or incomplete data within *included* sections.**
-* ❌ **NEVER use fake platform names, invented endpoints, or incorrect credential fields.**
-* ❌ **NEVER omit technical details crucial for proper execution or troubleshooting from included sections.**
-* ❌ **NEVER assume the user possesses specific technical knowledge** or common practices.
-* ❌ **NEVER offer untestable, non-executable, or poorly defined solutions.**
-
-**Knowledge Saving & Continuous Improvement:**
-
-* **Remember:** Store and recall successful patterns and automation blueprints from similar requests for efficient future responses.
-* **Save:** Persistently store effective API configurations for reuse across different user automations.
-* **Learn:** Continuously adapt and refine internal knowledge based on user feedback, corrections, and evolving API landscapes.
-* **Update:** Proactively update platform knowledge whenever APIs change, new features emerge, or best practices evolve.
-
+\`\`\`json
 {
-  "summary": "Clear detailed business summary of the automation request with specific outcomes",
+  "summary": "Clear 2-3 line description of what this automation does (MANDATORY - never empty)",
   "steps": [
-    "Detailed step 1 with specific platform actions",
-    "Detailed step 2 with data processing specifics", 
-    "Detailed step 3 with result handling details",
-    "At least 3-5 comprehensive steps required"
+    "Step 1: Detailed specific action to take",
+    "Step 2: Next concrete action with specifics", 
+    "Step 3: Continue with actionable steps",
+    "Step 4: Include at least 4-6 detailed steps"
   ],
   "platforms": [
     {
-      "name": "Platform Name",
+      "name": "Platform Name (Gmail, Slack, etc.)",
+      "api_config": {
+        "base_url": "https://api.platform.com (REAL URL REQUIRED)",
+        "auth_type": "bearer_token|api_key|oauth|basic_auth",
+        "auth_header_format": "Authorization: Bearer {token}",
+        "methods": {
+          "method_name": {
+            "endpoint": "specific/endpoint/path",
+            "http_method": "POST|GET|PUT|DELETE",
+            "required_params": ["param1", "param2"],
+            "optional_params": ["param3"],
+            "example_request": {"key": "value"}
+          }
+        }
+      },
       "credentials": [
         {
           "field": "api_key",
-          "why_needed": "Authentication required for API access",
-          "where_to_get": "https://platform.com/api-keys",
-          "example": "pk_live_abc123..."
+          "placeholder": "Enter your API key here",
+          "link": "https://platform.com/api-keys",
+          "why_needed": "Required to authenticate API requests"
         }
       ]
     }
   ],
-  "clarification_questions": [
-    "What specific data fields should be captured?",
-    "How often should this automation run?",
-    "What should happen if the automation fails?",
-    "At least 2-3 questions required"
-  ],
   "agents": [
     {
-      "name": "Data Validator Agent",
-      "role": "Validator",
-      "rule": "Validate all incoming data before processing",
-      "goal": "Ensure data quality and prevent errors",
-      "memory": "Store validation rules and error patterns",
-      "why_needed": "Prevents invalid data from breaking the automation"
+      "name": "SpecificAgentName",
+      "role": "Detailed role description",
+      "goal": "Specific objective this agent accomplishes",
+      "rules": "Detailed operating principles",
+      "memory": "Initial memory context",
+      "why_needed": "Detailed explanation of why this agent is essential"
     }
   ],
-  "test_payloads": {
-    "Platform Name": {
-      "method": "POST",
-      "endpoint": "https://api.platform.com/v1/endpoint",
-      "headers": {
-        "Authorization": "Bearer {{api_key}}",
-        "Content-Type": "application/json"
-      },
-      "body": {"test": true},
-      "expected_response": {"success": true},
-      "error_patterns": {"error": "Authentication failed"}
-    }
-  },
-  "execution_blueprint": {
+  "clarification_questions": [],
+  "automation_blueprint": {
+    "version": "1.0.0",
+    "description": "Detailed automation workflow description",
     "trigger": {
-      "type": "webhook",
-      "configuration": {}
+      "type": "manual|scheduled|webhook"
     },
-    "workflow": [
+    "steps": [
       {
-        "step": 1,
-        "action": "Receive webhook data",
-        "platform": "Webhook",
-        "method": "POST",
-        "description": "Accept incoming webhook data"
+        "id": "step_1",
+        "name": "Descriptive Step Name",
+        "type": "action",
+        "action": {
+          "integration": "platform_name",
+          "method": "specific_method",
+          "parameters": {},
+          "platform_credential_id": "credential_reference"
+        }
       }
     ],
-    "error_handling": {
-      "retry_attempts": 3,
-      "fallback_actions": ["log_error"],
-      "notification_rules": [],
-      "critical_failure_actions": ["pause_automation"]
-    },
-    "performance_optimization": {
-      "rate_limit_handling": "exponential_backoff",
-      "concurrency_limit": 5,
-      "timeout_seconds_per_step": 60
-    }
+    "variables": {}
   }
 }
+\`\`\`
 
-CRITICAL REQUIREMENTS:
-1. ALWAYS populate ALL sections with meaningful content
-2. NEVER return empty arrays [] - always include at least one item per array
-3. If user request is simple, still provide comprehensive automation blueprint
-4. Return ONLY this JSON structure - no explanations, no markdown, no extra text
-5. Ensure all platform names have corresponding test_payloads entries`;
+CRITICAL RULES:
+1. ALWAYS include human-readable explanation before JSON
+2. NEVER respond without ALL required JSON fields filled completely
+3. ALWAYS include at least 4-6 detailed steps
+4. ALWAYS include complete platform API configurations
+5. ALWAYS include detailed credential requirements
+6. ALWAYS include specific AI agent recommendations
+7. JSON must be valid and parseable
+
+PENALTY WARNING: Incomplete responses will be rejected and retried automatically.`;
+
+// Validation function for automation responses
+const validateAutomationResponse = (response: any): { isValid: boolean; missing: string[] } => {
+  const missing: string[] = [];
+  
+  if (!response.summary || response.summary.trim().length < 15) {
+    missing.push('summary (must be descriptive, 15+ characters)');
+  }
+  
+  if (!response.steps || !Array.isArray(response.steps) || response.steps.length < 4) {
+    missing.push('steps (must be array with at least 4 detailed steps)');
+  }
+  
+  if (!response.platforms || !Array.isArray(response.platforms) || response.platforms.length === 0) {
+    missing.push('platforms (must include at least one platform with API config)');
+  } else {
+    response.platforms.forEach((platform: any, index: number) => {
+      if (!platform.credentials || platform.credentials.length === 0) {
+        missing.push(`platforms[${index}].credentials`);
+      }
+      if (!platform.api_config || !platform.api_config.base_url || !platform.api_config.methods) {
+        missing.push(`platforms[${index}].api_config (must include base_url and methods)`);
+      }
+    });
+  }
+  
+  if (!response.agents || !Array.isArray(response.agents) || response.agents.length === 0) {
+    missing.push('agents (must include at least one AI agent)');
+  }
+  
+  return {
+    isValid: missing.length === 0,
+    missing
+  };
+};
+
+// UNIVERSAL TEST CONFIG VALIDATION
+const validateUniversalTestConfig = (config: any): { isValid: boolean; missing: string[] } => {
+  const missing: string[] = [];
+  
+  if (!config) {
+    return { isValid: false, missing: ['Complete test configuration missing'] };
+  }
+  
+  // Check all required fields with EXACT names expected by DynamicConfigValidator
+  if (!config.platform_name) missing.push('platform_name');
+  if (!config.base_url) missing.push('base_url');
+  if (!config.test_endpoint) missing.push('test_endpoint');
+  if (!config.authentication) missing.push('authentication');
+  if (!config.expected_success_indicators || !Array.isArray(config.expected_success_indicators)) {
+    missing.push('expected_success_indicators (must be array)');
+  }
+  if (!config.expected_error_indicators || !Array.isArray(config.expected_error_indicators)) {
+    missing.push('expected_error_indicators (must be array)');
+  }
+  if (!config.validation_rules || typeof config.validation_rules !== 'object') {
+    missing.push('validation_rules (must be object)');
+  }
+  
+  // Validate test_endpoint structure
+  if (config.test_endpoint) {
+    if (!config.test_endpoint.method) missing.push('test_endpoint.method');
+    if (!config.test_endpoint.path) missing.push('test_endpoint.path');
+    if (!config.test_endpoint.headers) missing.push('test_endpoint.headers');
+  }
+  
+  return {
+    isValid: missing.length === 0,
+    missing
+  };
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -438,436 +234,268 @@ serve(async (req) => {
   }
 
   try {
+    const { message, category = null, userRole = 'user', context = 'general', requestType = null, platformName = null } = await req.json();
+
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openaiApiKey) {
+      throw new Error('OpenAI API key not configured');
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { message, userId, messages = [], context = 'yusrai_automation_creation', automationContext, requestType, platformName, generateOnlyTestConfig } = await req.json();
 
-    console.log('🚀 AGENT-BASED YusrAI Chat AI processing request:', { message, userId, context, requestType, platformName, generateOnlyTestConfig });
+    // UNIVERSAL TEST CONFIG DETECTION - Works for ANY platform
+    const isTestConfigRequest = requestType === 'test_config_generation' || 
+                              requestType === 'dynamic_test_config' || 
+                              requestType?.includes('test_config') ||
+                              context === 'test_config_generation' ||
+                              message.toLowerCase().includes('generate test configuration') ||
+                              message.toLowerCase().includes('test config');
 
-    // AGENT-BASED THINKING: Analyze request type first
-    let systemPrompt = AUTOMATION_SYSTEM_PROMPT; // Default to comprehensive system prompt
-    
-    // CRITICAL: Check for test configuration generation request
-    if (requestType === 'test_config_generation' || generateOnlyTestConfig === true) {
-      console.log('🤖 AGENT THINKING: Switching to test configuration mode for platform:', platformName);
-      systemPrompt = TEST_CONFIG_SYSTEM_PROMPT;
+    console.log(`🔍 UNIVERSAL REQUEST ANALYSIS:`, {
+      requestType,
+      context,
+      platformName,
+      isTestConfigRequest,
+      message: message.substring(0, 100) + '...'
+    });
+
+    // UNIVERSAL TEST CONFIG GENERATION - No hardcoded platform limitations
+    if (isTestConfigRequest && platformName) {
+      console.log(`🤖 UNIVERSAL TEST CONFIG: Generating for ${platformName} (ANY platform supported)`);
       
-      // INTELLIGENT PLATFORM MAPPING: Use built-in config if available
-      if (platformName && PLATFORM_TEST_CONFIGS[platformName]) {
-        const config = PLATFORM_TEST_CONFIGS[platformName];
-        console.log('🎯 AGENT FOUND: Built-in config for', platformName, config);
+      let attempts = 0;
+      let finalTestConfig = null;
+      
+      while (attempts < 3 && !finalTestConfig) {
+        console.log(`🔄 Universal test config attempt ${attempts + 1} for ${platformName}`);
         
-        // Return the built-in configuration immediately
-        const builtInConfig = {
-          platform_name: platformName,
-          base_url: config.base_url,
-          test_endpoint: {
-            method: config.method,
-            path: config.test_endpoint,
-            headers: {
-              "Content-Type": "application/json"
-            },
-            query_params: {}
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiApiKey}`,
+            'Content-Type': 'application/json',
           },
-          authentication: {
-            type: config.auth_format.includes('Bearer') ? 'bearer' : 'token',
-            location: 'header',
-            parameter_name: config.auth_header,
-            format: config.auth_format
-          },
-          field_mappings: {
-            [config.field_mapping]: config.field_mapping
-          },
-          success_indicators: {
-            status_codes: [200],
-            response_patterns: config.success_indicators
-          },
-          error_patterns: {
-            "401": "Invalid credentials",
-            "403": "Access denied",
-            "404": "Endpoint not found"
-          },
-          ai_generated: false,
-          built_in_config: true
-        };
-        
-        console.log('✅ AGENT RETURNING: Built-in test config for', platformName);
-        return new Response(JSON.stringify({ response: JSON.stringify(builtInConfig) }), {
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { 
+                role: 'system', 
+                content: UNIVERSAL_TEST_CONFIG_SYSTEM_PROMPT
+              },
+              { 
+                role: 'user', 
+                content: `Generate complete test configuration for ${platformName} platform. Include all required fields with exact field names: platform_name, base_url, test_endpoint, authentication, expected_success_indicators, expected_error_indicators, validation_rules, field_mappings, error_patterns.`
+              }
+            ],
+            max_tokens: 2000,
+            temperature: 0.1,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        let aiResponse = data.choices[0].message.content;
+
+        try {
+          // Parse the AI-generated test config
+          let testConfig;
+          if (aiResponse.includes('{') && aiResponse.includes('}')) {
+            const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              testConfig = JSON.parse(jsonMatch[0]);
+            } else {
+              testConfig = JSON.parse(aiResponse);
+            }
+          } else {
+            throw new Error('No valid JSON found in AI response');
+          }
+
+          // UNIVERSAL VALIDATION - Works for any platform
+          const validation = validateUniversalTestConfig(testConfig);
+          
+          if (validation.isValid) {
+            console.log(`✅ UNIVERSAL TEST CONFIG: Generated valid config for ${platformName}`);
+            finalTestConfig = testConfig;
+            break;
+          } else {
+            console.log(`❌ UNIVERSAL TEST CONFIG: Validation failed for ${platformName}`, validation.missing);
+            attempts++;
+          }
+        } catch (parseError) {
+          console.log(`❌ UNIVERSAL TEST CONFIG: Parse error for ${platformName}`, parseError);
+          attempts++;
+        }
+      }
+
+      if (finalTestConfig) {
+        // Return the test config directly as object, not JSON string
+        return new Response(JSON.stringify({ 
+          response: finalTestConfig,
+          universal_test_config: true,
+          platform: platformName,
+          ai_generated: true
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } else {
+        console.log(`❌ UNIVERSAL TEST CONFIG: Failed to generate valid config for ${platformName} after 3 attempts`);
+        return new Response(JSON.stringify({ 
+          error: `Failed to generate valid test configuration for ${platformName}`,
+          universal_test_config: false
+        }), {
+          status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
     }
 
-    const userMessages = messages.map(msg => ({
-      role: msg.isBot ? 'assistant' : 'user',
-      content: msg.text || msg.message_content || ''
-    }));
+    // REGULAR AUTOMATION CREATION - Enhanced context
+    console.log('🚀 YusrAI Chat AI processing automation request:', message.substring(0, 100));
 
-    const openAIMessages = [
-      { role: 'system', content: systemPrompt },
-      ...userMessages,
-      { role: 'user', content: message }
-    ];
+    // Get enhanced context from knowledge store
+    const { data: knowledgeData } = await supabase
+      .from('universal_knowledge_store')
+      .select('*')
+      .or(`title.ilike.%${message}%,summary.ilike.%${message}%`)
+      .order('usage_count', { ascending: false })
+      .limit(5);
 
-    console.log('📤 AGENT SENDING: Request to OpenAI with', requestType === 'test_config_generation' ? 'TEST CONFIG' : 'AUTOMATION BLUEPRINT', 'prompt');
-
-    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: openAIMessages,
-        temperature: requestType === 'test_config_generation' ? 0.1 : 0.3, // Lower temperature for test configs
-        max_tokens: requestType === 'test_config_generation' ? 1000 : 4000,
-      }),
-    });
-
-    if (!openAIResponse.ok) {
-      throw new Error(`OpenAI API error: ${openAIResponse.status}`);
+    let knowledgeContext = '';
+    if (knowledgeData && knowledgeData.length > 0) {
+      knowledgeContext = `\n\nEXISTING KNOWLEDGE:\n${knowledgeData.map(k => 
+        `- ${k.title}: ${k.summary}\n  Solution: ${k.details?.solution || 'No solution recorded'}`
+      ).join('\n')}`;
     }
 
-    const openAIData = await openAIResponse.json();
-    const aiResponseContent = openAIData.choices[0].message.content;
+    const platformContext = `\nPlatform Context: User is ${userRole}. Provide comprehensive automation solutions.`;
 
-    console.log('📥 AGENT RECEIVED:', requestType === 'test_config_generation' ? 'Test config' : 'Blueprint', 'response from OpenAI');
-
-    // AGENT VALIDATION: For test config requests, validate the response format
-    if (requestType === 'test_config_generation') {
-      try {
-        const parsedResponse = JSON.parse(aiResponseContent);
-        if (parsedResponse.platform_name && parsedResponse.base_url && parsedResponse.test_endpoint) {
-          console.log('✅ AGENT VALIDATION: Test config format is correct');
-        } else {
-          console.log('⚠️ AGENT WARNING: Test config format may be incomplete');
-        }
-      } catch (e) {
-        console.log('⚠️ AGENT WARNING: Could not parse test config JSON, returning raw response');
-      }
-    }
-
-    // FIXED: Validate response structure before returning
-    let validatedResponse = aiResponseContent;
-    try {
-      const parsedResponse = JSON.parse(aiResponseContent);
+    // Retry mechanism for compliance
+    let attempts = 0;
+    let finalResponse = '';
+    
+    while (attempts < 3) {
+      console.log(`📤 Sending request to OpenAI with enhanced structured prompt`);
       
-      // Validate that all required sections have content
-      const hasValidSummary = parsedResponse.summary && parsedResponse.summary.length > 0;
-      const hasValidSteps = parsedResponse.steps && Array.isArray(parsedResponse.steps) && parsedResponse.steps.length > 0;
-      const hasValidPlatforms = parsedResponse.platforms && Array.isArray(parsedResponse.platforms) && parsedResponse.platforms.length > 0;
-      const hasValidQuestions = parsedResponse.clarification_questions && Array.isArray(parsedResponse.clarification_questions) && parsedResponse.clarification_questions.length > 0;
-      
-      if (!hasValidSummary || !hasValidSteps || !hasValidPlatforms || !hasValidQuestions) {
-        console.log('⚠️ OpenAI response missing required sections, generating fallback');
-        
-        // Generate comprehensive fallback response
-        validatedResponse = JSON.stringify({
-          summary: `YusrAI has analyzed your request: "${message}". This automation will streamline your workflow by connecting multiple platforms and processing data intelligently with AI-powered decision making.`,
-          steps: [
-            "Capture incoming data from your source platform",
-            "Process and validate the data using AI agents",
-            "Apply business logic and routing decisions",
-            "Send processed data to destination platforms",
-            "Monitor results and handle any errors"
-          ],
-          platforms: [
-            {
-              name: "Webhook",
-              credentials: [
-                {
-                  field: "webhook_url",
-                  why_needed: "Required to receive incoming data",
-                  where_to_get: "Generated automatically by YusrAI",
-                  example: "https://api.yusrai.com/webhooks/your-id"
-                }
-              ]
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { 
+              role: 'system', 
+              content: ENFORCED_SYSTEM_PROMPT + platformContext + knowledgeContext
             },
-            {
-              name: "OpenAI",
-              credentials: [
-                {
-                  field: "api_key",
-                  why_needed: "Required for AI processing and analysis",
-                  where_to_get: "https://platform.openai.com/api-keys",
-                  example: "sk-..."
-                }
-              ]
+            { 
+              role: 'user', 
+              content: message 
             }
           ],
-          clarification_questions: [
-            "What specific data should be processed in this automation?",
-            "Which platforms should be connected for input and output?",
-            "How should the AI agents handle edge cases or errors?",
-            "What frequency should this automation run at?"
-          ],
-          agents: [
-            {
-              name: "Data Processing Agent",
-              role: "Data Processor",
-              rule: "Process incoming data according to business rules",
-              goal: "Transform raw data into actionable insights",
-              memory: "Store processing patterns and successful transformations",
-              why_needed: "Ensures consistent and intelligent data processing"
-            },
-            {
-              name: "Quality Assurance Agent",
-              role: "Validator",
-              rule: "Validate all processed data before sending to destinations",
-              goal: "Maintain data quality and prevent errors",
-              memory: "Track validation rules and error patterns",
-              why_needed: "Prevents invalid data from reaching destination systems"
-            }
-          ],
-          test_payloads: {
-            "Webhook": {
-              "method": "POST",
-              "endpoint": "https://api.yusrai.com/webhooks/test",
-              "headers": {
-                "Content-Type": "application/json"
-              },
-              "body": {"test": "data"},
-              "expected_response": {"success": true},
-              "error_patterns": {"error": "Invalid webhook"}
-            },
-            "OpenAI": {
-              "method": "POST",
-              "endpoint": "https://api.openai.com/v1/chat/completions",
-              "headers": {
-                "Authorization": "Bearer {{api_key}}",
-                "Content-Type": "application/json"
-              },
-              "body": {"model": "gpt-4o", "messages": [{"role": "user", "content": "test"}]},
-              "expected_response": {"choices": [{"message": {"content": "response"}}]},
-              "error_patterns": {"error": "Authentication failed"}
-            }
-          },
-          execution_blueprint: {
-            trigger: {
-              type: "webhook",
-              configuration: {
-                method: "POST",
-                authentication: "api_key"
-              }
-            },
-            workflow: [
-              {
-                step: 1,
-                action: "Receive webhook data",
-                platform: "Webhook",
-                method: "POST",
-                description: "Accept incoming webhook data and validate format"
-              },
-              {
-                step: 2,
-                action: "Process with AI",
-                platform: "OpenAI",
-                method: "POST",
-                description: "Analyze data using AI agents for insights"
-              },
-              {
-                step: 3,
-                action: "Route to destinations",
-                platform: "Integration",
-                method: "POST",
-                description: "Send processed data to configured platforms"
-              }
-            ],
-            error_handling: {
-              retry_attempts: 3,
-              fallback_actions: ["log_error", "notify_admin"],
-              notification_rules: ["email_on_failure"],
-              critical_failure_actions: ["pause_automation", "alert_team"]
-            },
-            performance_optimization: {
-              rate_limit_handling: "exponential_backoff",
-              concurrency_limit: 5,
-              timeout_seconds_per_step: 60
-            }
-          }
-        });
-      }
-    } catch (parseError) {
-      console.log('❌ Failed to parse OpenAI response, using fallback');
-      validatedResponse = JSON.stringify({
-        summary: `YusrAI is processing your automation request: "${message}". A comprehensive workflow will be created to handle your requirements.`,
-        steps: [
-          "Analyze your automation requirements",
-          "Design optimal workflow structure", 
-          "Configure platform integrations",
-          "Set up AI agents for processing",
-          "Deploy and monitor automation"
-        ],
-        platforms: [
-          {
-            name: "YusrAI Platform",
-            credentials: [
-              {
-                field: "api_key",
-                why_needed: "Authentication for YusrAI services",
-                where_to_get: "YusrAI Dashboard > API Keys",
-                example: "ysr_..."
-              }
-            ]
-          }
-        ],
-        clarification_questions: [
-          "What specific outcome do you want from this automation?",
-          "Which platforms should be integrated?",
-          "How should errors be handled?"
-        ],
-        agents: [
-          {
-            name: "Automation Manager Agent",
-            role: "Monitor",
-            rule: "Oversee automation execution and performance",
-            goal: "Ensure smooth automation operation",
-            memory: "Store execution patterns and optimization data",
-            why_needed: "Provides intelligent monitoring and optimization"
-          }
-        ],
-        test_payloads: {},
-        execution_blueprint: {
-          trigger: { type: "manual", configuration: {} },
-          workflow: [],
-          error_handling: {
-            retry_attempts: 3,
-            fallback_actions: ["log_error"],
-            notification_rules: [],
-            critical_failure_actions: ["pause_automation"]
-          },
-          performance_optimization: {
-            rate_limit_handling: "exponential_backoff",
-            concurrency_limit: 5,
-            timeout_seconds_per_step: 60
-          }
-        }
+          max_tokens: 4000,
+          temperature: 0.1,
+        }),
       });
-    }
 
-    const finalResponseObject = {
-      response: validatedResponse,
-      yusrai_powered: true,
-      agent_thinking_enabled: true,
-      request_type_detected: requestType || 'automation_blueprint',
-      system_prompt_used: requestType === 'test_config_generation' ? 'test_config' : 'automation_blueprint',
-      platform_specific_config: platformName && PLATFORM_TEST_CONFIGS[platformName] ? true : false
-    };
-
-    console.log('✅ AGENT SUCCESS: Response prepared with agent-based thinking');
-
-    // Save to database
-    try {
-      const { error: dbError } = await supabase
-        .from('chat_ai_interactions')
-        .insert({
-          user_id: userId,
-          user_message: message,
-          ai_response: validatedResponse,
-          context: context,
-          metadata: {
-            model: 'gpt-4o',
-            yusrai_powered: true,
-            automation_context: automationContext,
-            request_type: requestType,
-            agent_thinking_enabled: true
-          }
-        });
-
-      if (dbError) {
-        console.error('Database save error:', dbError);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
       }
-    } catch (saveError) {
-      console.error('Error saving to database:', saveError);
+
+      const data = await response.json();
+      let aiResponse = data.choices[0].message.content;
+
+      // Extract and validate JSON from response
+      const jsonMatch = aiResponse.match(/```json\n([\s\S]*?)\n```/);
+      
+      if (jsonMatch) {
+        try {
+          const parsedJSON = JSON.parse(jsonMatch[1]);
+          const validation = validateAutomationResponse(parsedJSON);
+          
+          if (validation.isValid) {
+            console.log('✅ YusrAI response prepared with validated structured content');
+            finalResponse = aiResponse;
+            break;
+          } else {
+            console.log(`❌ Automation response validation failed. Missing: ${validation.missing.join(', ')}`);
+            attempts++;
+            
+            if (attempts < 3) {
+              const retryMessage = `${message}\n\nYour previous response was incomplete. REQUIRED: ${validation.missing.join(', ')}. Provide COMPLETE response with ALL required fields filled with detailed information.`;
+              message = retryMessage;
+            }
+          }
+        } catch (e) {
+          console.log('Failed to parse JSON from automation response');
+          attempts++;
+        }
+      } else {
+        console.log('No JSON found in automation response');
+        attempts++;
+      }
+      
+      if (attempts >= 3) {
+        finalResponse = aiResponse;
+      }
     }
 
-    return new Response(JSON.stringify(finalResponseObject), {
+    // Clean response
+    finalResponse = finalResponse.replace(/[%&'*]/g, '').trim();
+
+    console.log('📥 OpenAI response received:', finalResponse.substring(0, 200) + '...');
+
+    // Update usage count for used knowledge
+    if (knowledgeData && knowledgeData.length > 0) {
+      for (const knowledge of knowledgeData) {
+        await supabase
+          .from('universal_knowledge_store')
+          .update({ 
+            usage_count: (knowledge.usage_count || 0) + 1,
+            last_used: new Date().toISOString()
+          })
+          .eq('id', knowledge.id);
+      }
+    }
+
+    // Try to save successful interactions to knowledge store
+    try {
+      await supabase
+        .from('chat_ai_conversations')
+        .insert({
+          user_message: message.substring(0, 1000),
+          ai_response: finalResponse.substring(0, 2000),
+          context: context || 'automation_creation',
+          user_role: userRole,
+          success: true
+        });
+    } catch (error) {
+      console.log('Database save error:', error);
+    }
+
+    return new Response(JSON.stringify({ 
+      response: finalResponse,
+      yusrai_powered: true,
+      universal_ai_system: true
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error: any) {
-    console.error('❌ AGENT ERROR:', error);
-    
-    const fallbackResponse = {
-      response: JSON.stringify({
-        summary: "YusrAI Agent is ready to help you create comprehensive automations with intelligent platform integrations.",
-        steps: [
-          "Tell me what automation you'd like to create",
-          "I'll analyze your request with agent-based thinking",
-          "Provide a complete blueprint with platforms and AI agents",
-          "Test and deploy your automation with intelligent validation"
-        ],
-        platforms: [
-          {
-            name: "YusrAI Platform",
-            credentials: [
-              {
-                field: "api_key",
-                why_needed: "Authentication for YusrAI automation services",
-                where_to_get: "YusrAI Dashboard > Settings > API Keys",
-                example: "ysr_..."
-              }
-            ]
-          }
-        ],
-        clarification_questions: [
-          "What specific automation would you like me to create for you?",
-          "Which platforms should be involved in your workflow?",
-          "What triggers should start this automation?"
-        ],
-        agents: [
-          {
-            name: "Welcome Assistant Agent",
-            role: "Responder",
-            rule: "Help users get started with their first automation using intelligent analysis",
-            goal: "Provide clear guidance for automation creation with agent-based thinking",
-            memory: "Store user preferences and successful automation patterns",
-            why_needed: "Ensures smooth onboarding with intelligent conversation flow"
-          }
-        ],
-        test_payloads: {
-          "YusrAI Platform": {
-            "method": "GET",
-            "endpoint": "https://api.yusrai.com/v1/health",
-            "headers": {
-              "Authorization": "Bearer {{api_key}}"
-            },
-            "body": {},
-            "expected_response": {"status": "ok"},
-            "error_patterns": {"error": "Unauthorized"}
-          }
-        },
-        execution_blueprint: {
-          trigger: { type: "manual", configuration: {} },
-          workflow: [
-            {
-              step: 1,
-              action: "Initialize automation with agent thinking",
-              platform: "YusrAI Platform",
-              method: "POST",
-              description: "Set up automation framework with intelligent analysis"
-            }
-          ],
-          error_handling: {
-            retry_attempts: 3,
-            fallback_actions: ["log_error"],
-            notification_rules: [],
-            critical_failure_actions: ["pause_automation"]
-          },
-          performance_optimization: {
-            rate_limit_handling: "exponential_backoff",
-            concurrency_limit: 5,
-            timeout_seconds_per_step: 60
-          }
-        }
-      }),
-      yusrai_powered: true,
-      agent_thinking_enabled: true,
-      error_recovery: true
-    };
-
-    return new Response(JSON.stringify(fallbackResponse), {
-      status: 200,
+  } catch (error) {
+    console.error('Error in chat-ai function:', error);
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      response: "I'm having trouble connecting right now. Please try again."
+    }), {
+      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

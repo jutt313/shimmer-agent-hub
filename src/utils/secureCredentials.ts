@@ -48,7 +48,7 @@ export class SecureCredentialManager {
     automationId?: string
   ): Promise<boolean> {
     try {
-      console.log(`💾 UNIFIED STORAGE: Storing credentials for ${platformName} in automation ${automationId}...`);
+      console.log(`💾 Storing credentials for ${platformName} in automation ${automationId}...`);
       
       const encryptedCredentials = JSON.stringify(credentials);
       
@@ -75,7 +75,6 @@ export class SecureCredentialManager {
             .eq('id', existing.id);
 
           if (error) throw error;
-          console.log(`✅ UPDATED automation-specific credentials for ${platformName}`);
         } else {
           // Insert new
           const { error } = await supabase
@@ -85,20 +84,49 @@ export class SecureCredentialManager {
               platform_name: platformName,
               automation_id: automationId,
               credentials: encryptedCredentials,
-              credential_type: 'ai_generated_multi_field',
+              credential_type: 'api_key',
               is_active: true,
               is_tested: false
             });
 
           if (error) throw error;
-          console.log(`✅ CREATED new automation-specific credentials for ${platformName}`);
         }
       } else {
-        // NO FALLBACK - Force automation-specific storage
-        console.warn(`⚠️ NO AUTOMATION ID: Cannot store credentials for ${platformName} without automation context`);
-        return false;
+        // Fallback to platform_credentials for backward compatibility
+        const { data: existing } = await supabase
+          .from('platform_credentials')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('platform_name', platformName)
+          .single();
+
+        if (existing) {
+          // Update existing
+          const { error } = await supabase
+            .from('platform_credentials')
+            .update({
+              credentials: encryptedCredentials,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existing.id);
+
+          if (error) throw error;
+        } else {
+          // Insert new
+          const { error } = await supabase
+            .from('platform_credentials')
+            .insert({
+              user_id: userId,
+              platform_name: platformName,
+              credential_type: 'api_key',
+              credentials: encryptedCredentials
+            });
+
+          if (error) throw error;
+        }
       }
 
+      console.log(`✅ Successfully stored credentials for ${platformName}`);
       return true;
     } catch (error) {
       console.error(`❌ Failed to store credentials for ${platformName}:`, error);
@@ -112,36 +140,55 @@ export class SecureCredentialManager {
     automationId?: string
   ): Promise<Record<string, string> | null> {
     try {
-      console.log(`🔍 UNIFIED RETRIEVAL: Fetching credentials for ${platformName} in automation ${automationId}...`);
+      console.log(`🔍 Fetching credentials for ${platformName} in automation ${automationId}...`);
       
-      if (!automationId) {
-        console.log(`❌ NO AUTOMATION ID: Cannot retrieve credentials without automation context`);
-        return null;
+      if (automationId) {
+        // Check automation_platform_credentials first (UNIFIED APPROACH)
+        const { data, error } = await supabase
+          .from('automation_platform_credentials')
+          .select('credentials')
+          .eq('user_id', userId)
+          .eq('platform_name', platformName)
+          .eq('automation_id', automationId)
+          .eq('is_active', true)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          throw error;
+        }
+
+        if (data?.credentials) {
+          const decryptedCredentials = this.decryptCredentials(data.credentials);
+          console.log(`✅ Found automation-specific credentials for ${platformName}`);
+          return decryptedCredentials;
+        }
       }
       
-      // Check automation_platform_credentials ONLY - NO FALLBACK
+      // Fallback to platform_credentials for backward compatibility
       const { data, error } = await supabase
-        .from('automation_platform_credentials')
+        .from('platform_credentials')
         .select('credentials')
         .eq('user_id', userId)
         .eq('platform_name', platformName)
-        .eq('automation_id', automationId)
         .eq('is_active', true)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
+        if (error.code === 'PGRST116') {
+          console.log(`❌ No credentials found for ${platformName}`);
+          return null;
+        }
         throw error;
       }
 
-      if (data?.credentials) {
-        const decryptedCredentials = this.decryptCredentials(data.credentials);
-        console.log(`✅ FOUND automation-specific credentials for ${platformName}:`, Object.keys(decryptedCredentials));
-        return decryptedCredentials;
+      if (!data?.credentials) {
+        console.log(`❌ Empty credentials for ${platformName}`);
+        return null;
       }
-      
-      console.log(`❌ NO CREDENTIALS: No automation-specific credentials found for ${platformName}`);
-      return null;
 
+      const decryptedCredentials = this.decryptCredentials(data.credentials);
+      console.log(`✅ Found fallback credentials for ${platformName}`);
+      return decryptedCredentials;
     } catch (error) {
       console.error(`❌ Error fetching credentials for ${platformName}:`, error);
       return null;
@@ -165,8 +212,14 @@ export class SecureCredentialManager {
 
         if (error) throw error;
       } else {
-        console.warn(`⚠️ Cannot delete credentials without automation context`);
-        return false;
+        // Delete from platform_credentials
+        const { error } = await supabase
+          .from('platform_credentials')
+          .update({ is_active: false })
+          .eq('user_id', userId)
+          .eq('platform_name', platformName);
+
+        if (error) throw error;
       }
       
       return true;

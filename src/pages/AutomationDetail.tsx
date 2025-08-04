@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +15,20 @@ import AutomationDiagramDisplay from "@/components/AutomationDiagramDisplay";
 import AutomationExecutionPanel from "@/components/AutomationExecutionPanel";
 import AutomationRunsMonitor from "@/components/AutomationRunsMonitor";
 
+interface AutomationBlueprint {
+  platforms?: Array<{
+    name: string;
+    credentials: Array<{
+      field: string;
+      placeholder: string;
+      link: string;
+      why_needed: string;
+    }>;
+    test_payloads?: any[];
+  }>;
+  [key: string]: any;
+}
+
 const AutomationDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -24,6 +39,7 @@ const AutomationDetail = () => {
   const [platforms, setPlatforms] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("chat");
+  const [blueprintCardVisible, setBlueprintCardVisible] = useState(false);
 
   const fetchAutomation = async () => {
     if (!id || !user) return;
@@ -46,12 +62,18 @@ const AutomationDetail = () => {
       setAutomation(data);
       console.log('✅ ENHANCED: Automation data loaded:', data?.title);
 
-      // Extract platforms from automation blueprint
-      if (data?.automation_blueprint?.platforms) {
-        console.log('🚀 ENHANCED: Extracting platforms from blueprint:', data.automation_blueprint.platforms);
-        setPlatforms(data.automation_blueprint.platforms);
+      // Safely extract platforms from automation blueprint with type casting
+      if (data?.automation_blueprint) {
+        const blueprint = data.automation_blueprint as AutomationBlueprint;
+        if (blueprint && typeof blueprint === 'object' && blueprint.platforms) {
+          console.log('🚀 ENHANCED: Extracting platforms from blueprint:', blueprint.platforms);
+          setPlatforms(blueprint.platforms);
+        } else {
+          console.log('⚠️ ENHANCED: No platforms found in blueprint');
+          setPlatforms([]);
+        }
       } else {
-        console.log('⚠️ ENHANCED: No platforms found in blueprint');
+        console.log('⚠️ ENHANCED: No blueprint found');
         setPlatforms([]);
       }
       
@@ -106,20 +128,33 @@ const AutomationDetail = () => {
     <div className="container mx-auto px-4 py-6 space-y-6">
       {/* Header Section */}
       <div className="bg-gradient-to-r from-purple-100 to-blue-100 rounded-2xl p-6 border border-purple-200">
-        <h1 className="text-3xl font-bold text-purple-900 mb-2">🚀 {automation.title}</h1>
-        {automation.description && (
-          <p className="text-purple-700 text-lg">{automation.description}</p>
-        )}
-        <div className="flex items-center gap-4 mt-4 text-sm text-purple-600">
-          <span className="bg-purple-200 px-3 py-1 rounded-full">
-            📊 Status: {automation.status}
-          </span>
-          <span className="bg-blue-200 px-3 py-1 rounded-full">
-            🤖 Enhanced System
-          </span>
-          <span className="bg-green-200 px-3 py-1 rounded-full">
-            🔧 {platforms.length} Platforms
-          </span>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-purple-900 mb-2">🚀 {automation.title}</h1>
+            {automation.description && (
+              <p className="text-purple-700 text-lg">{automation.description}</p>
+            )}
+            <div className="flex items-center gap-4 mt-4 text-sm text-purple-600">
+              <span className="bg-purple-200 px-3 py-1 rounded-full">
+                📊 Status: {automation.status}
+              </span>
+              <span className="bg-blue-200 px-3 py-1 rounded-full">
+                🤖 Enhanced System
+              </span>
+              <span className="bg-green-200 px-3 py-1 rounded-full">
+                🔧 {platforms.length} Platforms
+              </span>
+            </div>
+          </div>
+          
+          <div>
+            <button
+              onClick={() => setBlueprintCardVisible(true)}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl transition-colors"
+            >
+              View Blueprint
+            </button>
+          </div>
         </div>
       </div>
 
@@ -134,14 +169,10 @@ const AutomationDetail = () => {
         </TabsList>
 
         <TabsContent value="chat" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <ChatCard automationId={id!} />
-            </div>
-            <div>
-              <BlueprintCard automation={automation} />
-            </div>
-          </div>
+          <ChatCard 
+            automationId={id!} 
+            messages={automation.automation_responses || []}
+          />
         </TabsContent>
 
         <TabsContent value="platforms" className="space-y-6">
@@ -169,7 +200,10 @@ const AutomationDetail = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <AIAgentForm automationId={id!} />
+              <AIAgentForm 
+                automationId={id!}
+                onClose={() => {}}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -183,7 +217,6 @@ const AutomationDetail = () => {
             </CardHeader>
             <CardContent>
               <AutomationDiagramDisplay
-                automationId={id!}
                 automationData={automation}
               />
             </CardContent>
@@ -191,16 +224,32 @@ const AutomationDetail = () => {
         </TabsContent>
 
         <TabsContent value="execution" className="space-y-6">
-          <AutomationExecutionPanel automationId={id!} />
+          <AutomationExecutionPanel 
+            automationId={id!}
+            blueprint={automation.automation_blueprint as AutomationBlueprint}
+            title={automation.title}
+          />
         </TabsContent>
 
         <TabsContent value="monitoring" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <AutomationDashboard automationId={id!} />
+            <AutomationDashboard 
+              automationId={id!}
+              automationTitle={automation.title}
+              automationBlueprint={automation.automation_blueprint as AutomationBlueprint}
+            />
             <AutomationRunsMonitor automationId={id!} />
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Blueprint Card - Slide-out Panel */}
+      {blueprintCardVisible && automation.automation_blueprint && (
+        <BlueprintCard
+          blueprint={automation.automation_blueprint as AutomationBlueprint}
+          onClose={() => setBlueprintCardVisible(false)}
+        />
+      )}
     </div>
   );
 };

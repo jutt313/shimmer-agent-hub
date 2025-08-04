@@ -1,9 +1,10 @@
+
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { AutomationCredentialManager } from '@/utils/automationCredentialManager';
 
 interface Platform {
@@ -29,6 +30,7 @@ const ModernCredentialForm = ({ automationId, platform, onCredentialSaved, onClo
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [testResults, setTestResults] = useState<any>(null);
+  const [testConfig, setTestConfig] = useState<any>(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -38,15 +40,14 @@ const ModernCredentialForm = ({ automationId, platform, onCredentialSaved, onClo
     try {
       console.log('🤖 REQUESTING: Test configuration for platform:', platformName);
       
-      // CRITICAL FIX: Send correct request type to ChatAI
       const { data, error } = await supabase.functions.invoke('chat-ai', {
         body: {
           message: `Generate test configuration for ${platformName} platform`,
           userId: user?.id,
           context: 'test_config_generation',
-          requestType: 'test_config_generation', // CRITICAL: This tells ChatAI to switch modes
+          requestType: 'test_config_generation',
           platformName: platformName,
-          generateOnlyTestConfig: true // Additional flag for safety
+          generateOnlyTestConfig: true
         }
       });
 
@@ -56,7 +57,7 @@ const ModernCredentialForm = ({ automationId, platform, onCredentialSaved, onClo
 
       console.log('📥 RECEIVED: Raw ChatAI response:', data);
 
-      // IMPROVED PARSING: Handle both simple config and complex response
+      // SIMPLIFIED PARSING: Use ChatAI response directly
       let testConfig;
       if (typeof data.response === 'string') {
         try {
@@ -70,52 +71,14 @@ const ModernCredentialForm = ({ automationId, platform, onCredentialSaved, onClo
         testConfig = data.response;
       }
 
-      // VALIDATION: Ensure we got a test config, not an automation blueprint
-      if (testConfig.summary || testConfig.steps || testConfig.execution_blueprint) {
-        console.warn('⚠️ WARNING: Received automation blueprint instead of test config');
-        // Extract test config from blueprint if present
-        if (testConfig.test_payloads && testConfig.test_payloads[platformName]) {
-          const payload = testConfig.test_payloads[platformName];
-          testConfig = {
-            platform_name: platformName,
-            base_url: payload.endpoint.split('/')[0] + '//' + payload.endpoint.split('/')[2],
-            test_endpoint: {
-              method: payload.method,
-              path: '/' + payload.endpoint.split('/').slice(3).join('/'),
-              headers: payload.headers || { "Content-Type": "application/json" },
-              query_params: {}
-            },
-            authentication: {
-              type: payload.headers?.Authorization?.includes('Bearer') ? 'bearer' : 'token',
-              location: 'header',
-              parameter_name: 'Authorization',
-              format: payload.headers?.Authorization || 'Bearer {api_key}'
-            },
-            field_mappings: { "api_key": "api_key" },
-            success_indicators: {
-              status_codes: [200],
-              response_patterns: payload.expected_response ? Object.keys(payload.expected_response) : ["success"]
-            },
-            error_patterns: {
-              "401": "Invalid credentials",
-              "403": "Access denied"
-            },
-            ai_generated: true,
-            extracted_from_blueprint: true
-          };
-          console.log('🔄 EXTRACTED: Test config from blueprint:', testConfig);
-        } else {
-          throw new Error('No test configuration available for this platform');
-        }
-      }
-
-      // FINAL VALIDATION: Ensure required fields
-      if (!testConfig.platform_name || !testConfig.base_url || !testConfig.test_endpoint) {
+      // SIMPLE VALIDATION: Ensure we have basic test config structure
+      if (!testConfig.platform_name && !testConfig.base_url && !testConfig.test_endpoint) {
         console.error('❌ INCOMPLETE: Test config missing required fields:', testConfig);
         throw new Error('Incomplete test configuration received');
       }
 
       console.log('✅ FINAL: Valid test configuration generated:', testConfig);
+      setTestConfig(testConfig);
       return testConfig;
 
     } catch (error: any) {
@@ -130,7 +93,7 @@ const ModernCredentialForm = ({ automationId, platform, onCredentialSaved, onClo
       console.log('🧪 TESTING: Starting credential test for', platform.name);
 
       // Generate test configuration using ChatAI
-      const testConfig = await generateTestConfiguration(platform.name);
+      const generatedConfig = await generateTestConfiguration(platform.name);
 
       // Test using the AI-generated configuration
       const result = await AutomationCredentialManager.testCredentials(
@@ -138,7 +101,7 @@ const ModernCredentialForm = ({ automationId, platform, onCredentialSaved, onClo
         automationId,
         platform.name,
         credentials,
-        { testConfig }
+        { testConfig: generatedConfig }
       );
 
       setTestResults(result);
@@ -215,55 +178,85 @@ const ModernCredentialForm = ({ automationId, platform, onCredentialSaved, onClo
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">Setup {platform.name} Credentials</h3>
-          <Button onClick={onClose} variant="ghost" size="sm">×</Button>
+      <div className="bg-white rounded-xl p-6 w-full max-w-2xl mx-4 shadow-2xl">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-semibold text-gray-900">Setup {platform.name} Credentials</h3>
+          <Button onClick={onClose} variant="ghost" size="sm" className="text-gray-500 hover:text-gray-700">×</Button>
         </div>
 
-        <div className="space-y-4">
-          {platform.credentials?.map((cred, index) => (
-            <div key={index} className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
-                {cred.field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-              </label>
-              <input
-                type={cred.field.includes('secret') || cred.field.includes('token') || cred.field.includes('key') ? 'password' : 'text'}
-                value={credentials[cred.field] || ''}
-                onChange={(e) => setCredentials(prev => ({
-                  ...prev,
-                  [cred.field]: e.target.value
-                }))}
-                placeholder={cred.placeholder}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p className="text-xs text-gray-500">{cred.why_needed}</p>
-              {cred.link && (
-                <a href={cred.link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
-                  Get your {cred.field}
-                </a>
-              )}
+        <div className="space-y-6">
+          {/* AI-Generated Test Configuration Display */}
+          {testConfig && (
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 border border-blue-200">
+              <h4 className="text-sm font-medium text-blue-900 mb-2">AI Generated Test Configuration</h4>
+              <div className="bg-white rounded-lg p-3 text-xs font-mono text-gray-700 overflow-auto max-h-32">
+                <pre>{JSON.stringify(testConfig, null, 2)}</pre>
+              </div>
             </div>
-          ))}
+          )}
 
+          {/* Dynamic Input Fields based on Platform Credentials */}
+          <div className="space-y-4">
+            {platform.credentials?.map((cred, index) => (
+              <div key={index} className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  {cred.field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                </label>
+                <input
+                  type={cred.field.includes('secret') || cred.field.includes('token') || cred.field.includes('key') ? 'password' : 'text'}
+                  value={credentials[cred.field] || ''}
+                  onChange={(e) => setCredentials(prev => ({
+                    ...prev,
+                    [cred.field]: e.target.value
+                  }))}
+                  placeholder={cred.placeholder}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                />
+                <p className="text-xs text-gray-600">{cred.why_needed}</p>
+                {cred.link && (
+                  <a href={cred.link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:text-blue-800 underline transition-colors">
+                    Get your {cred.field}
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Test Results Display */}
           {testResults && (
-            <div className={`p-3 rounded-md ${testResults.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-              <p className={`text-sm ${testResults.success ? 'text-green-800' : 'text-red-800'}`}>
+            <div className={`p-4 rounded-xl ${testResults.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+              <p className={`text-sm font-medium ${testResults.success ? 'text-green-800' : 'text-red-800'}`}>
+                {testResults.success ? '✅ Test Successful' : '❌ Test Failed'}
+              </p>
+              <p className={`text-sm mt-1 ${testResults.success ? 'text-green-700' : 'text-red-700'}`}>
                 {testResults.message}
               </p>
               {testResults.details && (
-                <pre className="text-xs mt-2 overflow-auto max-h-32">
-                  {JSON.stringify(testResults.details, null, 2)}
-                </pre>
+                <details className="mt-2">
+                  <summary className="text-xs text-gray-600 cursor-pointer hover:text-gray-800">View Details</summary>
+                  <pre className="text-xs mt-2 p-2 bg-white rounded-lg overflow-auto max-h-32 text-gray-700">
+                    {JSON.stringify(testResults.details, null, 2)}
+                  </pre>
+                </details>
               )}
             </div>
           )}
 
-          <div className="flex gap-2 pt-4">
-            <Button onClick={handleTest} disabled={isLoading} variant="outline" className="flex-1">
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-4 border-t border-gray-200">
+            <Button 
+              onClick={handleTest} 
+              disabled={isLoading} 
+              variant="outline" 
+              className="flex-1 rounded-xl border-blue-300 text-blue-700 hover:bg-blue-50 transition-all duration-200"
+            >
               {isLoading ? 'Testing...' : 'Test Connection'}
             </Button>
-            <Button onClick={handleSave} disabled={isLoading || !testResults?.success} className="flex-1">
+            <Button 
+              onClick={handleSave} 
+              disabled={isLoading || !testResults?.success} 
+              className="flex-1 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200"
+            >
               {isLoading ? 'Saving...' : 'Save Credentials'}
             </Button>
           </div>

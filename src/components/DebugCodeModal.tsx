@@ -41,7 +41,7 @@ const DebugCodeModal = ({ structuredData, isOpen, onOpenChange }: DebugCodeModal
       show: Array.isArray(structuredData.agents) && structuredData.agents.length > 0
     },
     {
-      title: "Blueprint Code", 
+      title: "Execution Blueprint Code", 
       data: structuredData.execution_blueprint,
       show: !!structuredData.execution_blueprint
     },

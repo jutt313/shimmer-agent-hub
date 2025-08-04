@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, ExternalLink, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Loader2, ExternalLink, CheckCircle, AlertCircle, Eye, EyeOff, Code } from 'lucide-react';
 import { SecureCredentialManager } from '@/utils/secureCredentials';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,6 +17,12 @@ interface Platform {
     placeholder: string;
     link: string;
     why_needed: string;
+  }>;
+  test_payloads?: Array<{
+    platform: string;
+    test_data: any;
+    field_mapping: Record<string, string>;
+    api_config: any;
   }>;
 }
 
@@ -43,6 +49,8 @@ const PlatformCredentialForm = ({
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [isReadOnly, setIsReadOnly] = useState(false);
   const [isCheckingExisting, setIsCheckingExisting] = useState(true);
+  const [showTestScript, setShowTestScript] = useState(false);
+  const [testConfig, setTestConfig] = useState<any>(null);
 
   // Initialize credentials and check for existing ones
   useEffect(() => {
@@ -58,6 +66,13 @@ const PlatformCredentialForm = ({
         const normalizedField = cred.field.toLowerCase().replace(/\s+/g, '_');
         initialCredentials[normalizedField] = '';
       });
+      
+      // Extract test configuration from platform test_payloads if available
+      if (platform.test_payloads && platform.test_payloads.length > 0) {
+        const testPayload = platform.test_payloads[0];
+        setTestConfig(testPayload.api_config || testPayload);
+        console.log(`✅ Using pre-generated test config for ${platform.name}:`, testPayload);
+      }
       
       try {
         // Check for existing credentials
@@ -95,7 +110,7 @@ const PlatformCredentialForm = ({
     };
 
     initializeForm();
-  }, [user, platform.name, platform.credentials]);
+  }, [user, platform.name, platform.credentials, platform.test_payloads]);
 
   const handleInputChange = (field: string, value: string) => {
     if (isReadOnly) return;
@@ -136,6 +151,32 @@ const PlatformCredentialForm = ({
     return true;
   };
 
+  const generateLiveTestScript = () => {
+    if (!testConfig) return "No test configuration available";
+    
+    const baseUrl = testConfig.base_url || testConfig.api_config?.base_url || `https://api.${platform.name.toLowerCase()}.com`;
+    const endpoint = testConfig.test_endpoint || testConfig.api_config?.test_endpoint || '/test';
+    const method = testConfig.method || 'GET';
+    
+    // Inject real credential values into script
+    let authHeader = 'Authorization: Bearer YOUR_API_KEY';
+    const apiKeyField = Object.keys(credentials).find(key => 
+      key.includes('api_key') || key.includes('token') || key.includes('key')
+    );
+    
+    if (apiKeyField && credentials[apiKeyField] && credentials[apiKeyField] !== '••••••••••••••••') {
+      authHeader = `Authorization: Bearer ${credentials[apiKeyField]}`;
+    }
+    
+    return `curl -X ${method} "${baseUrl}${endpoint}" \\
+  -H "Content-Type: application/json" \\
+  -H "${authHeader}" \\
+  -d '${JSON.stringify(testConfig.test_data || {}, null, 2)}'
+
+Expected Success Response:
+${JSON.stringify(testConfig.expected_response || { success: true }, null, 2)}`;
+  };
+
   const handleTest = async () => {
     if (!user || !validateCredentials() || isReadOnly) return;
 
@@ -150,9 +191,10 @@ const PlatformCredentialForm = ({
 
       const response = await supabase.functions.invoke('test-credential', {
         body: {
-          platform_name: platform.name,
+          platformName: platform.name,
           credentials: filteredCredentials,
-          user_id: user.id
+          testConfig: testConfig,
+          userId: user.id
         }
       });
 
@@ -172,10 +214,10 @@ const PlatformCredentialForm = ({
         onCredentialTested(platform.name);
       } else {
         setTestStatus('error');
-        setTestMessage(result.error || 'Credential test failed');
+        setTestMessage(result.message || 'Credential test failed');
         toast({
           title: "Test Failed",
-          description: result.error || 'Invalid credentials or connection failed',
+          description: result.message || 'Invalid credentials or connection failed',
           variant: "destructive",
         });
       }
@@ -271,7 +313,7 @@ const PlatformCredentialForm = ({
   if (isCheckingExisting) {
     return (
       <Dialog open={true} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[500px] bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200">
+        <DialogContent className="sm:max-w-[600px] bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200 rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-purple-800">
               Loading {platform.name} Credentials...
@@ -287,7 +329,7 @@ const PlatformCredentialForm = ({
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200 rounded-2xl">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-purple-800">
             {isReadOnly ? `${platform.name} Credentials (Saved)` : `Setup ${platform.name} Credentials`}
@@ -295,6 +337,37 @@ const PlatformCredentialForm = ({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Live Test Script Preview */}
+          {testConfig && !isReadOnly && (
+            <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-2xl p-4 border border-blue-200">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Code className="w-4 h-4 text-blue-600" />
+                  <h4 className="text-sm font-semibold text-blue-900">Live Test Script Preview</h4>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowTestScript(!showTestScript)}
+                  className="text-blue-600 hover:text-blue-700"
+                >
+                  {showTestScript ? 'Hide' : 'Show'} Script
+                </Button>
+              </div>
+              
+              {showTestScript && (
+                <div className="bg-gray-900 rounded-xl p-4 text-xs font-mono text-green-400 overflow-auto max-h-48">
+                  <pre>{generateLiveTestScript()}</pre>
+                </div>
+              )}
+              
+              <p className="text-xs text-blue-700 mt-2">
+                💡 This script updates in real-time as you enter your credentials below
+              </p>
+            </div>
+          )}
+
+          {/* Credential Input Fields */}
           {platform.credentials.map((cred, index) => {
             const normalizedField = cred.field.toLowerCase().replace(/\s+/g, '_');
             const inputType = getInputType(cred.field);
@@ -327,7 +400,7 @@ const PlatformCredentialForm = ({
                     placeholder={isReadOnly ? 'Saved and verified' : cred.placeholder}
                     value={currentValue}
                     onChange={(e) => handleInputChange(cred.field, e.target.value)}
-                    className={`border-purple-300 focus:border-purple-500 focus:ring-purple-200 ${
+                    className={`rounded-2xl border-purple-300 focus:border-purple-500 focus:ring-purple-200 ${
                       isReadOnly ? 'bg-green-50 border-green-300 text-green-800' : ''
                     }`}
                     readOnly={isReadOnly}
@@ -339,7 +412,7 @@ const PlatformCredentialForm = ({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 p-0 rounded-full"
                       onClick={() => togglePasswordVisibility(cred.field)}
                     >
                       {showPassword ? (
@@ -358,8 +431,9 @@ const PlatformCredentialForm = ({
             );
           })}
 
+          {/* Test Status Display */}
           {testStatus !== 'idle' && (
-            <div className={`p-3 rounded-lg text-sm ${
+            <div className={`p-3 rounded-2xl text-sm ${
               testStatus === 'success' 
                 ? 'bg-green-100 text-green-800 border border-green-300' 
                 : testStatus === 'error'
@@ -375,11 +449,12 @@ const PlatformCredentialForm = ({
             </div>
           )}
 
+          {/* Action Buttons */}
           {isReadOnly ? (
             <div className="flex justify-center pt-4">
               <Button
                 onClick={onClose}
-                className="bg-green-600 hover:bg-green-700 text-white"
+                className="bg-green-600 hover:bg-green-700 text-white rounded-2xl"
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Credentials Saved
@@ -391,7 +466,7 @@ const PlatformCredentialForm = ({
                 onClick={handleTest}
                 variant="outline"
                 disabled={isTestingCredentials || isLoading}
-                className="flex-1 border-purple-400 text-purple-700 hover:bg-purple-100"
+                className="flex-1 rounded-2xl border-purple-400 text-purple-700 hover:bg-purple-100"
               >
                 {isTestingCredentials ? (
                   <>
@@ -404,14 +479,14 @@ const PlatformCredentialForm = ({
                     Tested ✓
                   </>
                 ) : (
-                  'Test Credentials'
+                  'Test Connection'
                 )}
               </Button>
               
               <Button
                 onClick={handleSave}
                 disabled={isLoading || isTestingCredentials || testStatus !== 'success'}
-                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl"
               >
                 {isLoading ? (
                   <>

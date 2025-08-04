@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useParams } from 'react-router-dom';
-import EnhancedCredentialForm from './EnhancedCredentialForm';
+import PlatformCredentialForm from './PlatformCredentialForm';
 import { AutomationCredentialManager } from '@/utils/automationCredentialManager';
 
 interface Platform {
@@ -84,11 +84,16 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
     console.log('📊 Final credential status:', status);
   };
 
-  const handleCredentialSaved = () => {
+  const handleCredentialSaved = (platformName: string) => {
     console.log('💾 Credential saved, refreshing status...');
     checkCredentialStatus();
     onCredentialChange?.();
     setSelectedPlatform(null);
+  };
+
+  const handleCredentialTested = (platformName: string) => {
+    console.log('🧪 Credential tested for:', platformName);
+    checkCredentialStatus();
   };
 
   const getButtonStyle = (platform: Platform) => {
@@ -148,7 +153,7 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
           <Settings className="w-4 h-4 text-purple-600" />
           <h3 className="text-sm font-semibold text-gray-900">Platform Credentials</h3>
           <span className="text-xs text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
-            AI-Enhanced
+            Pre-Generated Configs
           </span>
         </div>
         
@@ -162,7 +167,7 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
               <button
                 key={platform.name}
                 onClick={() => {
-                  console.log(`🔧 Opening enhanced credential form for ${platform.name}`);
+                  console.log(`🔧 Opening credential form for ${platform.name}`);
                   console.log('🧪 Platform test payloads:', platform.test_payloads);
                   setSelectedPlatform(platform);
                 }}
@@ -181,21 +186,20 @@ const PlatformButtons = ({ platforms, onCredentialChange }: PlatformButtonsProps
 
         <div className="mt-3 p-2 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200/50">
           <p className="text-xs text-gray-700 leading-relaxed">
-            <strong>🤖 AI-Enhanced Testing:</strong> Each platform uses AI-generated configurations for automatic credential validation and testing.
+            <strong>🚀 Pre-Generated Testing:</strong> Each platform uses ChatAI-generated configurations that are passed directly to the form - no additional API calls needed!
           </p>
         </div>
       </div>
 
-      {selectedPlatform && automationId && (
-        <EnhancedCredentialForm
-          automationId={automationId}
+      {selectedPlatform && (
+        <PlatformCredentialForm
           platform={selectedPlatform}
           onCredentialSaved={handleCredentialSaved}
+          onCredentialTested={handleCredentialTested}
           onClose={() => {
-            console.log('❌ Closing enhanced credential form');
+            console.log('❌ Closing credential form');
             setSelectedPlatform(null);
           }}
-          isOpen={!!selectedPlatform}
         />
       )}
     </>

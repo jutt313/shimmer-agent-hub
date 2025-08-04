@@ -12,6 +12,7 @@ import {
   AlertCircle,
   Clock
 } from 'lucide-react';
+import { AutomationBlueprint } from '@/types/automation';
 
 interface AutomationStep {
   id: string;
@@ -20,17 +21,6 @@ interface AutomationStep {
   status?: 'completed' | 'pending' | 'error';
   platform?: string;
   description?: string;
-}
-
-interface AutomationBlueprint {
-  version: string;
-  trigger: {
-    type: string;
-    platform: string;
-    description: string;
-  };
-  steps: AutomationStep[];
-  platforms?: string[];
 }
 
 interface AutomationDiagramDisplayProps {
@@ -46,9 +36,8 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   const blueprint = automationBlueprint || {
     version: '1.0',
     trigger: {
-      type: 'webhook',
-      platform: 'Generic',
-      description: 'Automation trigger'
+      type: 'manual' as const,
+      platform: 'Generic'
     },
     steps: automationDiagramData?.steps || []
   };
@@ -98,10 +87,10 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
               <div className="flex-1">
                 <div className="font-medium">Trigger: {blueprint.trigger.type}</div>
                 <div className="text-sm text-muted-foreground">
-                  Platform: {blueprint.trigger.platform}
+                  Platform: {blueprint.trigger.platform || 'Generic'}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {blueprint.trigger.description}
+                  {blueprint.description || 'Automation trigger'}
                 </div>
               </div>
               <Badge variant="outline">Start</Badge>
@@ -130,9 +119,9 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
                         Platform: {step.platform}
                       </div>
                     )}
-                    {step.description && (
+                    {step.action?.integration && (
                       <div className="text-xs text-muted-foreground">
-                        {step.description}
+                        {step.action.integration}
                       </div>
                     )}
                   </div>

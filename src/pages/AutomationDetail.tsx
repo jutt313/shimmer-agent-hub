@@ -9,7 +9,7 @@ import { Send, ArrowLeft, Bot, BarChart3, Code2 } from "lucide-react";
 import ChatCard from "@/components/ChatCard";
 import AutomationDashboard from "@/components/AutomationDashboard";
 import AIAgentForm from "@/components/AIAgentForm";
-import PlatformButtons from "@/components/PlatformButtons";
+import FixedPlatformButtons from "@/components/FixedPlatformButtons";
 import BlueprintCard from "@/components/BlueprintCard";
 import AutomationDiagramDisplay from "@/components/AutomationDiagramDisplay";
 import AutomationExecutionPanel from "@/components/AutomationExecutionPanel";

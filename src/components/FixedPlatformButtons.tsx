@@ -1,9 +1,8 @@
+
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/components/ui/use-toast";
 import PlatformCredentialForm from './PlatformCredentialForm';
 
 interface Platform {
@@ -25,93 +24,11 @@ interface FixedPlatformButtonsProps {
 
 const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: FixedPlatformButtonsProps) => {
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
-  const [credentialStatus, setCredentialStatus] = useState<{ [key: string]: 'saved' | 'tested' | 'missing' }>({});
   const { user } = useAuth();
-  const { toast } = useToast();
 
   console.log('🔧 FixedPlatformButtons received platforms:', platforms);
+  console.log('🧪 Automation ID:', automationId);
 
-  const handleCredentialSave = async (platformName: string, credentials: any) => {
-    try {
-      console.log(`💾 Saving credentials for ${platformName}:`, credentials);
-      
-      // Use the correct table: automation_platform_credentials (not platform_credentials)
-      const { error } = await supabase
-        .from('automation_platform_credentials')
-        .upsert({
-          user_id: user?.id,
-          platform_name: platformName,
-          credentials: JSON.stringify(credentials), // credentials field expects string in this table
-          automation_id: automationId,
-          credential_type: 'api_key',
-          is_active: true,
-          is_tested: false
-        });
-
-      if (error) throw error;
-
-      setCredentialStatus(prev => ({
-        ...prev,
-        [platformName]: 'saved'
-      }));
-
-      toast({
-        title: "✅ Credentials Saved",
-        description: `${platformName} credentials saved successfully`,
-      });
-
-      onCredentialChange?.();
-    } catch (error: any) {
-      console.error('❌ Error saving credentials:', error);
-      toast({
-        title: "❌ Save Failed",
-        description: `Failed to save ${platformName} credentials`,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleCredentialTest = async (platformName: string, credentials: any) => {
-    try {
-      console.log(`🧪 Testing credentials for ${platformName}`);
-      
-      const { data, error } = await supabase.functions.invoke('test-credential', {
-        body: {
-          platform: platformName,
-          credentials: credentials
-        }
-      });
-
-      if (error) throw error;
-
-      if (data.success) {
-        setCredentialStatus(prev => ({
-          ...prev,
-          [platformName]: 'tested'
-        }));
-        
-        toast({
-          title: "✅ Test Successful",
-          description: `${platformName} credentials are working correctly`,
-        });
-      } else {
-        toast({
-          title: "❌ Test Failed",
-          description: data.message || `${platformName} credentials test failed`,
-          variant: "destructive",
-        });
-      }
-    } catch (error: any) {
-      console.error('❌ Error testing credentials:', error);
-      toast({
-        title: "❌ Test Error",
-        description: `Failed to test ${platformName} credentials`,
-        variant: "destructive",
-      });
-    }
-  };
-
-  // FIXED: Enhanced platform setup button click handler
   const handlePlatformSetup = (platformName: string) => {
     console.log(`🔧 Opening credential setup for platform: ${platformName}`);
     setSelectedPlatform(platformName);
@@ -123,7 +40,6 @@ const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: F
 
   return (
     <div className="space-y-4">
-      {/* SURGICAL REPLACEMENT: Small minimal buttons instead of large cards */}
       <div className="flex flex-wrap gap-2">
         {platforms.map((platform, index) => (
           <Button
@@ -138,7 +54,6 @@ const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: F
         ))}
       </div>
 
-      {/* FIXED: Use PlatformCredentialForm instead of ModernCredentialForm */}
       {selectedPlatform && (
         <PlatformCredentialForm
           platform={{
@@ -146,12 +61,14 @@ const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: F
             credentials: platforms.find(p => p.name === selectedPlatform)?.credentials || [],
             test_payloads: platforms.find(p => p.name === selectedPlatform)?.test_payloads || []
           }}
-          onCredentialSaved={() => {
+          automationId={automationId}
+          onCredentialSaved={(platformName: string) => {
+            console.log(`✅ Credentials saved for ${platformName}`);
             onCredentialChange?.();
             setSelectedPlatform(null);
           }}
-          onCredentialTested={() => {
-            console.log('🧪 Credential tested successfully');
+          onCredentialTested={(platformName: string) => {
+            console.log(`🧪 Credential tested successfully for ${platformName}`);
           }}
           onClose={() => setSelectedPlatform(null)}
         />

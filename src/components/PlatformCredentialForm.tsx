@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -28,6 +27,7 @@ interface Platform {
 
 interface PlatformCredentialFormProps {
   platform: Platform;
+  automationId?: string; // Make this required for unified system
   onClose: () => void;
   onCredentialSaved: (platformName: string) => void;
   onCredentialTested: (platformName: string) => void;
@@ -35,6 +35,7 @@ interface PlatformCredentialFormProps {
 
 const PlatformCredentialForm = ({ 
   platform, 
+  automationId,
   onClose, 
   onCredentialSaved, 
   onCredentialTested 
@@ -57,10 +58,10 @@ const PlatformCredentialForm = ({
     if (!user) return;
 
     const initializeForm = async () => {
-      console.log(`🔍 Initializing form for ${platform.name}...`);
+      console.log(`🔍 Initializing UNIFIED form for ${platform.name} in automation ${automationId}...`);
       setIsCheckingExisting(true);
       
-      // Initialize empty credentials structure
+      // Initialize empty credentials structure from AI-generated fields
       const initialCredentials: Record<string, string> = {};
       platform.credentials.forEach(cred => {
         const normalizedField = cred.field.toLowerCase().replace(/\s+/g, '_');
@@ -75,11 +76,15 @@ const PlatformCredentialForm = ({
       }
       
       try {
-        // Check for existing credentials
-        const existingCreds = await SecureCredentialManager.getCredentials(user.id, platform.name);
+        // Check for existing credentials using UNIFIED system
+        const existingCreds = await SecureCredentialManager.getCredentials(
+          user.id, 
+          platform.name, 
+          automationId
+        );
         
         if (existingCreds && Object.keys(existingCreds).length > 0) {
-          console.log(`✅ Found existing credentials for ${platform.name}`);
+          console.log(`✅ Found existing UNIFIED credentials for ${platform.name}`);
           
           // Show masked versions in read-only mode
           const maskedCreds: Record<string, string> = {};
@@ -92,14 +97,14 @@ const PlatformCredentialForm = ({
           setTestStatus('success');
           setTestMessage('Credentials are saved and verified');
         } else {
-          console.log(`❌ No existing credentials for ${platform.name}`);
+          console.log(`❌ No existing UNIFIED credentials for ${platform.name}`);
           setCredentials(initialCredentials);
           setIsReadOnly(false);
           setTestStatus('idle');
           setTestMessage('');
         }
       } catch (error) {
-        console.error(`❌ Error checking existing credentials for ${platform.name}:`, error);
+        console.error(`❌ Error checking existing UNIFIED credentials for ${platform.name}:`, error);
         setCredentials(initialCredentials);
         setIsReadOnly(false);
         setTestStatus('idle');
@@ -110,7 +115,7 @@ const PlatformCredentialForm = ({
     };
 
     initializeForm();
-  }, [user, platform.name, platform.credentials, platform.test_payloads]);
+  }, [user, platform.name, platform.credentials, platform.test_payloads, automationId]);
 
   const handleInputChange = (field: string, value: string) => {
     if (isReadOnly) return;
@@ -158,7 +163,7 @@ const PlatformCredentialForm = ({
     const endpoint = testConfig.test_endpoint || testConfig.api_config?.test_endpoint || '/test';
     const method = testConfig.method || 'GET';
     
-    // Inject real credential values into script
+    // Inject REAL credential values into script (LIVE PREVIEW)
     let authHeader = 'Authorization: Bearer YOUR_API_KEY';
     const apiKeyField = Object.keys(credentials).find(key => 
       key.includes('api_key') || key.includes('token') || key.includes('key')
@@ -182,19 +187,22 @@ ${JSON.stringify(testConfig.expected_response || { success: true }, null, 2)}`;
 
     setIsTestingCredentials(true);
     setTestStatus('testing');
-    setTestMessage('Testing credentials...');
+    setTestMessage('Testing credentials with AI-generated configuration...');
 
     try {
       const filteredCredentials = Object.fromEntries(
         Object.entries(credentials).filter(([_, value]) => value.trim() !== '')
       );
 
+      console.log(`🧪 Testing credentials for ${platform.name} with AI config:`, testConfig);
+
       const response = await supabase.functions.invoke('test-credential', {
         body: {
           platformName: platform.name,
           credentials: filteredCredentials,
           testConfig: testConfig,
-          userId: user.id
+          userId: user.id,
+          automationId: automationId
         }
       });
 
@@ -206,10 +214,10 @@ ${JSON.stringify(testConfig.expected_response || { success: true }, null, 2)}`;
 
       if (result.success) {
         setTestStatus('success');
-        setTestMessage('Credentials verified successfully!');
+        setTestMessage('Credentials verified successfully with AI-generated test!');
         toast({
           title: "Test Successful",
-          description: 'Credentials are valid and working!',
+          description: 'Credentials are valid and working with AI test configuration!',
         });
         onCredentialTested(platform.name);
       } else {
@@ -244,16 +252,17 @@ ${JSON.stringify(testConfig.expected_response || { success: true }, null, 2)}`;
         Object.entries(credentials).filter(([_, value]) => value.trim() !== '')
       );
 
-      console.log(`💾 Saving credentials for ${platform.name}...`);
+      console.log(`💾 Saving UNIFIED credentials for ${platform.name} in automation ${automationId}...`);
 
       const success = await SecureCredentialManager.storeCredentials(
         user.id,
         platform.name,
-        filteredCredentials
+        filteredCredentials,
+        automationId // Use UNIFIED system with automation ID
       );
 
       if (success) {
-        console.log(`✅ Successfully saved credentials for ${platform.name}`);
+        console.log(`✅ Successfully saved UNIFIED credentials for ${platform.name}`);
         
         // Update form to read-only immediately
         const maskedCreds: Record<string, string> = {};
@@ -264,11 +273,11 @@ ${JSON.stringify(testConfig.expected_response || { success: true }, null, 2)}`;
         setCredentials(maskedCreds);
         setIsReadOnly(true);
         setTestStatus('success');
-        setTestMessage('Credentials are saved and verified');
+        setTestMessage('Credentials are saved and verified in unified system');
         
         toast({
           title: "Success",
-          description: `${platform.name} credentials saved successfully!`,
+          description: `${platform.name} credentials saved successfully in unified system!`,
         });
         
         // Notify parent component immediately
@@ -280,7 +289,7 @@ ${JSON.stringify(testConfig.expected_response || { success: true }, null, 2)}`;
         throw new Error('Failed to save credentials');
       }
     } catch (error: any) {
-      console.error(`❌ Failed to save credentials for ${platform.name}:`, error);
+      console.error(`❌ Failed to save UNIFIED credentials for ${platform.name}:`, error);
       toast({
         title: "Save Failed",
         description: error.message || 'Failed to save credentials',
@@ -316,7 +325,7 @@ ${JSON.stringify(testConfig.expected_response || { success: true }, null, 2)}`;
         <DialogContent className="sm:max-w-[600px] bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200 rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-purple-800">
-              Loading {platform.name} Credentials...
+              Loading {platform.name} Credentials... (Unified System)
             </DialogTitle>
           </DialogHeader>
           <div className="flex items-center justify-center p-8">
@@ -332,24 +341,25 @@ ${JSON.stringify(testConfig.expected_response || { success: true }, null, 2)}`;
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200 rounded-2xl">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-purple-800">
-            {isReadOnly ? `${platform.name} Credentials (Saved)` : `Setup ${platform.name} Credentials`}
+            {isReadOnly ? `${platform.name} Credentials (Saved - Unified System)` : `Setup ${platform.name} Credentials (Unified System)`}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Live Test Script Preview */}
+          {/* AI-Generated Live Test Script Preview */}
           {testConfig && !isReadOnly && (
-            <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-2xl p-4 border border-blue-200">
+            <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-2xl p-4 border border-green-200">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <Code className="w-4 h-4 text-blue-600" />
-                  <h4 className="text-sm font-semibold text-blue-900">Live Test Script Preview</h4>
+                  <Code className="w-4 h-4 text-green-600" />
+                  <h4 className="text-sm font-semibold text-green-900">AI-Generated Live Test Script</h4>
+                  <span className="text-xs bg-green-200 text-green-800 px-2 py-0.5 rounded-full">LIVE PREVIEW</span>
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowTestScript(!showTestScript)}
-                  className="text-blue-600 hover:text-blue-700"
+                  className="text-green-600 hover:text-green-700"
                 >
                   {showTestScript ? 'Hide' : 'Show'} Script
                 </Button>
@@ -361,13 +371,13 @@ ${JSON.stringify(testConfig.expected_response || { success: true }, null, 2)}`;
                 </div>
               )}
               
-              <p className="text-xs text-blue-700 mt-2">
-                💡 This script updates in real-time as you enter your credentials below
+              <p className="text-xs text-green-700 mt-2">
+                🚀 This script uses AI-generated test configuration and updates in REAL-TIME as you type!
               </p>
             </div>
           )}
 
-          {/* Credential Input Fields */}
+          {/* All AI-Generated Credential Input Fields */}
           {platform.credentials.map((cred, index) => {
             const normalizedField = cred.field.toLowerCase().replace(/\s+/g, '_');
             const inputType = getInputType(cred.field);
@@ -378,7 +388,7 @@ ${JSON.stringify(testConfig.expected_response || { success: true }, null, 2)}`;
               <div key={index} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor={normalizedField} className="text-sm font-medium text-purple-700">
-                    {cred.field}
+                    {cred.field} {/* Show AI-generated field name */}
                   </Label>
                   {cred.link && !isReadOnly && (
                     <Button
@@ -397,7 +407,7 @@ ${JSON.stringify(testConfig.expected_response || { success: true }, null, 2)}`;
                   <Input
                     id={normalizedField}
                     type={inputType === 'password' && !showPassword ? 'password' : 'text'}
-                    placeholder={isReadOnly ? 'Saved and verified' : cred.placeholder}
+                    placeholder={isReadOnly ? 'Saved and verified in unified system' : cred.placeholder}
                     value={currentValue}
                     onChange={(e) => handleInputChange(cred.field, e.target.value)}
                     className={`rounded-2xl border-purple-300 focus:border-purple-500 focus:ring-purple-200 ${
@@ -457,7 +467,7 @@ ${JSON.stringify(testConfig.expected_response || { success: true }, null, 2)}`;
                 className="bg-green-600 hover:bg-green-700 text-white rounded-2xl"
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
-                Credentials Saved
+                Credentials Saved (Unified System)
               </Button>
             </div>
           ) : (
@@ -471,15 +481,15 @@ ${JSON.stringify(testConfig.expected_response || { success: true }, null, 2)}`;
                 {isTestingCredentials ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Testing...
+                    Testing with AI Config...
                   </>
                 ) : testStatus === 'success' ? (
                   <>
                     <CheckCircle className="h-4 w-4 mr-2" />
-                    Tested ✓
+                    AI Test Passed ✓
                   </>
                 ) : (
-                  'Test Connection'
+                  'Test with AI Config'
                 )}
               </Button>
               
@@ -491,10 +501,10 @@ ${JSON.stringify(testConfig.expected_response || { success: true }, null, 2)}`;
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
+                    Saving to Unified System...
                   </>
                 ) : (
-                  'Save Credentials'
+                  'Save to Unified System'
                 )}
               </Button>
             </div>

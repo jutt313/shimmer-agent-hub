@@ -45,91 +45,57 @@ export class SecureCredentialManager {
     userId: string,
     platformName: string,
     credentials: Record<string, string>,
-    automationId?: string
+    automationId: string
   ): Promise<boolean> {
     try {
-      console.log(`💾 Storing credentials for ${platformName} in automation ${automationId}...`);
+      console.log(`💾 Storing UNIFIED credentials for ${platformName} in automation ${automationId}...`);
       
       const encryptedCredentials = JSON.stringify(credentials);
       
-      if (automationId) {
-        // Store in automation_platform_credentials table (UNIFIED APPROACH)
-        const { data: existing } = await supabase
+      // Store ONLY in automation_platform_credentials table (UNIFIED APPROACH)
+      const { data: existing } = await supabase
+        .from('automation_platform_credentials')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('platform_name', platformName)
+        .eq('automation_id', automationId)
+        .single();
+
+      if (existing) {
+        // Update existing
+        const { error } = await supabase
           .from('automation_platform_credentials')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('platform_name', platformName)
-          .eq('automation_id', automationId)
-          .single();
+          .update({
+            credentials: encryptedCredentials,
+            updated_at: new Date().toISOString(),
+            is_tested: false,
+            test_status: 'pending',
+            credential_type: 'unified_chat_ai'
+          })
+          .eq('id', existing.id);
 
-        if (existing) {
-          // Update existing
-          const { error } = await supabase
-            .from('automation_platform_credentials')
-            .update({
-              credentials: encryptedCredentials,
-              updated_at: new Date().toISOString(),
-              is_tested: false,
-              test_status: null
-            })
-            .eq('id', existing.id);
-
-          if (error) throw error;
-        } else {
-          // Insert new
-          const { error } = await supabase
-            .from('automation_platform_credentials')
-            .insert({
-              user_id: userId,
-              platform_name: platformName,
-              automation_id: automationId,
-              credentials: encryptedCredentials,
-              credential_type: 'api_key',
-              is_active: true,
-              is_tested: false
-            });
-
-          if (error) throw error;
-        }
+        if (error) throw error;
       } else {
-        // Fallback to platform_credentials for backward compatibility
-        const { data: existing } = await supabase
-          .from('platform_credentials')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('platform_name', platformName)
-          .single();
+        // Insert new
+        const { error } = await supabase
+          .from('automation_platform_credentials')
+          .insert({
+            user_id: userId,
+            platform_name: platformName,
+            automation_id: automationId,
+            credentials: encryptedCredentials,
+            credential_type: 'unified_chat_ai',
+            is_active: true,
+            is_tested: false
+          });
 
-        if (existing) {
-          // Update existing
-          const { error } = await supabase
-            .from('platform_credentials')
-            .update({
-              credentials: encryptedCredentials,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existing.id);
-
-          if (error) throw error;
-        } else {
-          // Insert new
-          const { error } = await supabase
-            .from('platform_credentials')
-            .insert({
-              user_id: userId,
-              platform_name: platformName,
-              credential_type: 'api_key',
-              credentials: encryptedCredentials
-            });
-
-          if (error) throw error;
-        }
+        if (error) throw error;
       }
 
-      console.log(`✅ Successfully stored credentials for ${platformName}`);
+      console.log(`✅ Successfully stored UNIFIED credentials for ${platformName}`);
       return true;
     } catch (error) {
-      console.error(`❌ Failed to store credentials for ${platformName}:`, error);
+      console.error(`❌ Failed to store UNIFIED credentials for ${platformName}:`, error);
       return false;
     }
   }
@@ -137,60 +103,35 @@ export class SecureCredentialManager {
   static async getCredentials(
     userId: string,
     platformName: string,
-    automationId?: string
+    automationId: string
   ): Promise<Record<string, string> | null> {
     try {
-      console.log(`🔍 Fetching credentials for ${platformName} in automation ${automationId}...`);
+      console.log(`🔍 Fetching UNIFIED credentials for ${platformName} in automation ${automationId}...`);
       
-      if (automationId) {
-        // Check automation_platform_credentials first (UNIFIED APPROACH)
-        const { data, error } = await supabase
-          .from('automation_platform_credentials')
-          .select('credentials')
-          .eq('user_id', userId)
-          .eq('platform_name', platformName)
-          .eq('automation_id', automationId)
-          .eq('is_active', true)
-          .single();
-
-        if (error && error.code !== 'PGRST116') {
-          throw error;
-        }
-
-        if (data?.credentials) {
-          const decryptedCredentials = this.decryptCredentials(data.credentials);
-          console.log(`✅ Found automation-specific credentials for ${platformName}`);
-          return decryptedCredentials;
-        }
-      }
-      
-      // Fallback to platform_credentials for backward compatibility
+      // Check ONLY automation_platform_credentials (UNIFIED APPROACH)
       const { data, error } = await supabase
-        .from('platform_credentials')
+        .from('automation_platform_credentials')
         .select('credentials')
         .eq('user_id', userId)
         .eq('platform_name', platformName)
+        .eq('automation_id', automationId)
         .eq('is_active', true)
         .single();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          console.log(`❌ No credentials found for ${platformName}`);
-          return null;
-        }
+      if (error && error.code !== 'PGRST116') {
         throw error;
       }
 
-      if (!data?.credentials) {
-        console.log(`❌ Empty credentials for ${platformName}`);
-        return null;
+      if (data?.credentials) {
+        const decryptedCredentials = this.decryptCredentials(data.credentials);
+        console.log(`✅ Found UNIFIED credentials for ${platformName}`);
+        return decryptedCredentials;
       }
 
-      const decryptedCredentials = this.decryptCredentials(data.credentials);
-      console.log(`✅ Found fallback credentials for ${platformName}`);
-      return decryptedCredentials;
+      console.log(`❌ No UNIFIED credentials found for ${platformName}`);
+      return null;
     } catch (error) {
-      console.error(`❌ Error fetching credentials for ${platformName}:`, error);
+      console.error(`❌ Error fetching UNIFIED credentials for ${platformName}:`, error);
       return null;
     }
   }
@@ -198,33 +139,23 @@ export class SecureCredentialManager {
   static async deleteCredentials(
     userId: string,
     platformName: string,
-    automationId?: string
+    automationId: string
   ): Promise<boolean> {
     try {
-      if (automationId) {
-        // Delete from automation_platform_credentials
-        const { error } = await supabase
-          .from('automation_platform_credentials')
-          .update({ is_active: false })
-          .eq('user_id', userId)
-          .eq('platform_name', platformName)
-          .eq('automation_id', automationId);
+      // Delete from ONLY automation_platform_credentials (UNIFIED APPROACH)
+      const { error } = await supabase
+        .from('automation_platform_credentials')
+        .update({ is_active: false })
+        .eq('user_id', userId)
+        .eq('platform_name', platformName)
+        .eq('automation_id', automationId);
 
-        if (error) throw error;
-      } else {
-        // Delete from platform_credentials
-        const { error } = await supabase
-          .from('platform_credentials')
-          .update({ is_active: false })
-          .eq('user_id', userId)
-          .eq('platform_name', platformName);
-
-        if (error) throw error;
-      }
+      if (error) throw error;
       
+      console.log(`✅ Successfully deactivated UNIFIED credentials for ${platformName}`);
       return true;
     } catch (error) {
-      console.error(`❌ Error deleting credentials for ${platformName}:`, error);
+      console.error(`❌ Error deleting UNIFIED credentials for ${platformName}:`, error);
       return false;
     }
   }

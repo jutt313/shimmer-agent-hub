@@ -1,10 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -14,9 +12,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { UnifiedCredentialManager } from '@/utils/unifiedCredentialManager';
+import { extractTestScript, injectCredentials, formatExecutableScript } from '@/utils/platformTestScriptExtractor';
 
 interface Platform {
   name: string;
+  testConfig?: any;
   credentials: Array<{
     field: string;
     placeholder: string;
@@ -46,27 +46,24 @@ const ChatAICredentialForm = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const [testScript, setTestScript] = useState<string>('');
-  const [testConfig, setTestConfig] = useState<any>(null); // CRITICAL: Store AI-generated test config
   const [testResponse, setTestResponse] = useState<any>(null);
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [existingCredentials, setExistingCredentials] = useState<boolean>(false);
 
-  // Load existing credentials and initialize form
+  // Load existing credentials and initialize test script
   useEffect(() => {
     if (user && automationId && platform.name) {
       loadExistingCredentials();
-      generateInitialScript();
     }
   }, [user, automationId, platform.name]);
 
-  // FIXED: Generate live script when credentials change with dynamic injection
+  // Update test script when credentials change
   useEffect(() => {
-    if (Object.keys(credentials).length > 0) {
-      generateLiveTestPayload();
+    if (platform && Object.keys(credentials).length > 0) {
+      updateTestScript();
     }
-  }, [credentials]);
+  }, [credentials, platform]);
 
   const loadExistingCredentials = async () => {
     if (!user) return;
@@ -96,83 +93,35 @@ const ChatAICredentialForm = ({
         });
         setCredentials(initialCreds);
       }
+
+      // Initialize test script immediately using platform data
+      const baseScript = extractTestScript(platform, existingCreds || {});
+      setTestScript(baseScript);
+
     } catch (error) {
       console.error('Failed to load existing credentials:', error);
+      // Still initialize test script even if credentials fail to load
+      const baseScript = extractTestScript(platform, {});
+      setTestScript(baseScript);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const generateInitialScript = async () => {
-    setIsGeneratingScript(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('chat-ai', {
-        body: {
-          message: `Generate API test payload for ${platform.name}`,
-          requestType: 'test_payload_generation',
-          platformName: platform.name,
-          credentialFields: platform.credentials.map(c => c.field)
-        }
-      });
-
-      if (error) throw error;
-
-      setTestScript(data.response || `# ${platform.name} Test Payload\n\n// Enter credentials to see live test payload`);
-    } catch (error) {
-      console.error('Failed to generate initial script:', error);
-      setTestScript(`# ${platform.name} Test Payload\n\n// Enter your credentials to see live test payload`);
-    } finally {
-      setIsGeneratingScript(false);
-    }
-  };
-
-  // CRITICAL FIX: Generate live test payload with real credential injection
-  const generateLiveTestPayload = async () => {
-    if (existingCredentials || Object.values(credentials).every(val => !val || val === '••••••••••••••••')) return;
-
-    setIsGeneratingScript(true);
-    try {
-      // FIXED: Request actual test payload with credentials
-      const { data, error } = await supabase.functions.invoke('chat-ai', {
-        body: {
-          message: `Generate executable API test payload for ${platform.name} with these credentials: ${JSON.stringify(Object.keys(credentials))}`,
-          requestType: 'live_test_payload',
-          platformName: platform.name,
-          credentialFields: Object.keys(credentials),
-          hasCredentialValues: Object.values(credentials).some(val => val && val !== ''),
-          generateExecutableScript: true
-        }
-      });
-
-      if (error) throw error;
-
-      // CRITICAL: Inject real credentials into the script (with masking for display)
-      let payload = data.response || testScript;
-      
-      // Replace credential placeholders with actual values (masked for security)
-      Object.entries(credentials).forEach(([key, value]) => {
-        if (value && value !== '••••••••••••••••') {
-          const maskedValue = value.substring(0, 4) + '••••••••';
-          payload = payload.replace(new RegExp(`\\{${key}\\}`, 'g'), maskedValue);
-          payload = payload.replace(new RegExp(`\\$\\{${key}\\}`, 'g'), maskedValue);
-          payload = payload.replace(new RegExp(`<${key}>`, 'g'), maskedValue);
-        }
-      });
-
-      setTestScript(payload);
-    } catch (error) {
-      console.error('Failed to generate live payload:', error);
-    } finally {
-      setIsGeneratingScript(false);
-    }
+  const updateTestScript = () => {
+    // Generate test script with current credentials injected
+    const baseScript = extractTestScript(platform, credentials);
+    const updatedScript = injectCredentials(baseScript, credentials);
+    setTestScript(updatedScript);
   };
 
   const handleInputChange = (field: string, value: string) => {
-    setCredentials(prev => ({
-      ...prev,
+    const newCredentials = {
+      ...credentials,
       [field]: value
-    }));
-    // FIXED: No need to call generateLiveTestPayload here, useEffect handles it
+    };
+    setCredentials(newCredentials);
+    // Test script will update via useEffect
   };
 
   const togglePasswordVisibility = (field: string) => {
@@ -182,7 +131,6 @@ const ChatAICredentialForm = ({
     }));
   };
 
-  // CRITICAL FIX: Generate testConfig and pass to test-credential function
   const handleTest = async () => {
     if (!user || Object.values(credentials).every(val => !val || val === '••••••••••••••••')) {
       toast.error('Please enter your credentials before testing');
@@ -194,26 +142,16 @@ const ChatAICredentialForm = ({
     setTestResponse(null);
 
     try {
-      console.log(`🧪 CRITICAL FIX: Generating testConfig for ${platform.name}`);
+      console.log(`🧪 Testing credentials for ${platform.name} using existing platform configuration`);
       
-      // PHASE 1: Generate AI testConfig (not display script)
-      const { data: configData, error: configError } = await supabase.functions.invoke('chat-ai', {
-        body: {
-          message: `Generate test configuration for ${platform.name} API with fields: ${Object.keys(credentials).join(', ')}`,
-          requestType: 'test_config_generation',
-          platformName: platform.name,
-          credentialFields: Object.keys(credentials),
-          generateConfigOnly: true
-        }
-      });
-
-      if (configError) throw configError;
-
-      // PHASE 2: Extract testConfig from AI response
-      const generatedConfig = configData.config || {
+      // Use platform's existing testConfig directly (no Chat AI generation needed)
+      const testConfig = platform.testConfig || {
         platform_name: platform.name,
-        base_url: `https://api.${platform.name.toLowerCase()}.com`,
-        test_endpoint: { path: '/me', method: 'GET' },
+        base_url: platform.name === 'OpenAI' ? 'https://api.openai.com' : `https://api.${platform.name.toLowerCase()}.com`,
+        test_endpoint: { 
+          path: platform.name === 'OpenAI' ? '/v1/models' : '/me', 
+          method: 'GET' 
+        },
         authentication: { 
           type: 'bearer',
           location: 'header',
@@ -222,25 +160,23 @@ const ChatAICredentialForm = ({
         },
         success_indicators: { 
           status_codes: [200], 
-          response_patterns: ['id', 'user', 'success'] 
+          response_patterns: platform.name === 'OpenAI' ? ['data'] : ['id', 'user', 'success'] 
         },
-        error_patterns: { 401: 'Unauthorized', 403: 'Forbidden' },
-        ai_generated: true
+        error_patterns: { 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found' }
       };
 
-      setTestConfig(generatedConfig);
-      console.log(`✅ Generated testConfig:`, generatedConfig);
+      console.log(`✅ Using testConfig for ${platform.name}:`, testConfig);
 
-      // PHASE 3: Call test-credential with the AI-generated testConfig
+      // Call test-credential with the platform's testConfig
       const { data: result, error } = await supabase.functions.invoke('test-credential', {
         body: {
           platformName: platform.name,
           credentials,
-          testConfig: generatedConfig, // CRITICAL: Pass the AI-generated config
+          testConfig, // Use platform's existing configuration
           userId: user.id,
           unified_testing: true,
           chatai_integration: true,
-          ai_generated_config: true
+          platform_driven_config: true
         }
       });
 
@@ -338,7 +274,7 @@ const ChatAICredentialForm = ({
             </div>
             <div>
               <h3 className="text-xl font-bold text-purple-900">{platform.name} Credentials</h3>
-              <p className="text-sm text-purple-600 font-normal">Chat AI Powered • Unified System</p>
+              <p className="text-sm text-purple-600 font-normal">Platform-Powered • Unified System</p>
             </div>
             <Badge variant="secondary" className="ml-auto bg-green-100 text-green-800">
               <Zap className="w-3 h-3 mr-1" />
@@ -454,20 +390,19 @@ const ChatAICredentialForm = ({
                 <CardTitle className="flex items-center gap-2 text-lg text-purple-900">
                   <Code2 className="w-5 h-5" />
                   Live Test Payload
-                  {isGeneratingScript && <Loader2 className="w-4 h-4 animate-spin" />}
                   <Badge variant="secondary" className="ml-auto bg-blue-100 text-blue-700">
-                    Live Credential Injection
+                    Platform-Generated Script
                   </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-96 w-full rounded-xl border border-purple-200/50 bg-gray-900 p-4">
                   <pre className="text-sm text-green-400 font-mono whitespace-pre-wrap">
-                    {testScript}
+                    {formatExecutableScript(testScript)}
                   </pre>
                 </ScrollArea>
                 <p className="text-xs text-purple-600 mt-3">
-                  🚀 This payload updates in real-time as you enter credentials and shows the exact API call that will be tested
+                  🚀 This script updates in real-time as you enter credentials and shows the exact API call for testing
                 </p>
               </CardContent>
             </Card>
@@ -531,7 +466,7 @@ const ChatAICredentialForm = ({
             {isTesting ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Testing with AI Config...
+                Testing with Platform Config...
               </>
             ) : (
               <>
@@ -565,7 +500,7 @@ const ChatAICredentialForm = ({
           <div className="mt-4">
             {testStatus === 'success' && !isSaving && (
               <p className="text-xs text-green-700 text-center">
-                ✅ Credentials verified with AI-generated config! You can now save them.
+                ✅ Credentials verified with platform configuration! You can now save them.
               </p>
             )}
             {testStatus === 'error' && (

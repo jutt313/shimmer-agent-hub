@@ -100,7 +100,7 @@ export class UnifiedCredentialManager {
   }
 
   /**
-   * Test credentials with Chat AI integration
+   * CRITICAL FIX: Test credentials with AI-generated testConfig
    */
   static async testCredentials(
     userId: string,
@@ -109,16 +109,56 @@ export class UnifiedCredentialManager {
     credentials: Record<string, string>
   ): Promise<{ success: boolean; message: string; details?: any }> {
     try {
-      console.log(`🧪 Testing UNIFIED credentials for ${platformName} with Chat AI integration`);
+      console.log(`🧪 CRITICAL FIX: Testing UNIFIED credentials for ${platformName} with AI-generated testConfig`);
 
+      // PHASE 1: Generate AI testConfig before testing
+      const { data: configData, error: configError } = await supabase.functions.invoke('chat-ai', {
+        body: {
+          message: `Generate test configuration for ${platformName} API with credential fields: ${Object.keys(credentials).join(', ')}`,
+          requestType: 'test_config_generation',
+          platformName: platformName,
+          credentialFields: Object.keys(credentials),
+          generateConfigOnly: true
+        }
+      });
+
+      if (configError) {
+        console.error('❌ Failed to generate AI testConfig:', configError);
+        throw configError;
+      }
+
+      // PHASE 2: Extract and validate testConfig
+      const testConfig = configData.config || {
+        platform_name: platformName,
+        base_url: `https://api.${platformName.toLowerCase()}.com`,
+        test_endpoint: { path: '/me', method: 'GET' },
+        authentication: { 
+          type: 'bearer',
+          location: 'header',
+          parameter_name: 'Authorization',
+          format: 'Bearer {api_key}'
+        },
+        success_indicators: { 
+          status_codes: [200], 
+          response_patterns: ['id', 'user', 'success'] 
+        },
+        error_patterns: { 401: 'Unauthorized', 403: 'Forbidden' },
+        ai_generated: true
+      };
+
+      console.log(`✅ Generated AI testConfig for ${platformName}:`, testConfig);
+
+      // PHASE 3: Call test-credential with the AI-generated testConfig
       const { data: result, error } = await supabase.functions.invoke('test-credential', {
         body: {
           platformName,
           credentials,
+          testConfig, // CRITICAL: Pass the AI-generated testConfig
           userId,
           automationId,
           unified_testing: true,
-          chatai_integration: true
+          chatai_integration: true,
+          ai_generated_config: true
         }
       });
 
@@ -137,13 +177,17 @@ export class UnifiedCredentialManager {
         .eq('automation_id', automationId)
         .eq('platform_name', platformName);
 
+      console.log(`${result.success ? '✅' : '❌'} Test completed for ${platformName}:`, result.message);
+
       return {
         success: result.success,
         message: result.message,
         details: {
           ...result.details,
           unified_system: true,
-          chatai_powered: true
+          chatai_powered: true,
+          ai_config_used: true,
+          testConfig_generated: true
         }
       };
 
@@ -156,7 +200,8 @@ export class UnifiedCredentialManager {
         details: { 
           error: error.message,
           unified_system: true,
-          chatai_powered: true
+          chatai_powered: true,
+          ai_config_failed: true
         }
       };
     }

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +34,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
   // Use blueprint data if available, otherwise create a basic structure
   const blueprint = automationBlueprint || {
     version: '1.0',
+    description: 'Default automation workflow',
     trigger: {
       type: 'manual' as const,
       platform: 'Generic'
@@ -42,7 +42,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
     steps: automationDiagramData?.steps || []
   };
 
-  const getStatusIcon = (status?: string) => {
+  function getStatusIcon(status?: string) {
     switch (status) {
       case 'completed':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
@@ -53,9 +53,9 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       default:
         return <Settings className="h-4 w-4 text-gray-400" />;
     }
-  };
+  }
 
-  const getStatusColor = (status?: string) => {
+  function getStatusColor(status?: string) {
     switch (status) {
       case 'completed':
         return 'bg-green-100 border-green-300 text-green-800';
@@ -66,7 +66,7 @@ const AutomationDiagramDisplay: React.FC<AutomationDiagramDisplayProps> = ({
       default:
         return 'bg-gray-100 border-gray-300 text-gray-800';
     }
-  };
+  }
 
   return (
     <Card className="w-full">

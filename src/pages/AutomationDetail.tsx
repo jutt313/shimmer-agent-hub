@@ -14,20 +14,7 @@ import BlueprintCard from "@/components/BlueprintCard";
 import AutomationDiagramDisplay from "@/components/AutomationDiagramDisplay";
 import AutomationExecutionPanel from "@/components/AutomationExecutionPanel";
 import AutomationRunsMonitor from "@/components/AutomationRunsMonitor";
-
-interface AutomationBlueprint {
-  platforms?: Array<{
-    name: string;
-    credentials: Array<{
-      field: string;
-      placeholder: string;
-      link: string;
-      why_needed: string;
-    }>;
-    test_payloads?: any[];
-  }>;
-  [key: string]: any;
-}
+import { AutomationBlueprint } from "@/types/automation";
 
 const AutomationDetail = () => {
   const { id } = useParams();
@@ -62,10 +49,10 @@ const AutomationDetail = () => {
       setAutomation(data);
       console.log('✅ ENHANCED: Automation data loaded:', data?.title);
 
-      // Safely extract platforms from automation blueprint with type casting
-      if (data?.automation_blueprint) {
-        const blueprint = data.automation_blueprint as AutomationBlueprint;
-        if (blueprint && typeof blueprint === 'object' && blueprint.platforms) {
+      // Safely extract platforms from automation blueprint
+      if (data?.automation_blueprint && typeof data.automation_blueprint === 'object') {
+        const blueprint = data.automation_blueprint as any;
+        if (blueprint.platforms && Array.isArray(blueprint.platforms)) {
           console.log('🚀 ENHANCED: Extracting platforms from blueprint:', blueprint.platforms);
           setPlatforms(blueprint.platforms);
         } else {
@@ -123,6 +110,29 @@ const AutomationDetail = () => {
       </div>
     );
   }
+
+  // Helper function to safely get blueprint
+  const getBlueprint = (): AutomationBlueprint | null => {
+    if (!automation.automation_blueprint) return null;
+    if (typeof automation.automation_blueprint !== 'object') return null;
+    
+    const bp = automation.automation_blueprint as any;
+    // Ensure minimum required fields are present
+    if (!bp.trigger || !bp.steps || !bp.version) {
+      // Create a minimal valid blueprint if structure is incomplete
+      return {
+        version: bp.version || "1.0",
+        trigger: bp.trigger || { type: "manual" as const },
+        steps: bp.steps || [],
+        platforms: bp.platforms || [],
+        ...bp
+      } as AutomationBlueprint;
+    }
+    
+    return bp as AutomationBlueprint;
+  };
+
+  const blueprint = getBlueprint();
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
@@ -217,7 +227,8 @@ const AutomationDetail = () => {
             </CardHeader>
             <CardContent>
               <AutomationDiagramDisplay
-                automationData={automation}
+                automationBlueprint={blueprint}
+                automationDiagramData={automation.automation_diagram_data}
               />
             </CardContent>
           </Card>
@@ -226,7 +237,11 @@ const AutomationDetail = () => {
         <TabsContent value="execution" className="space-y-6">
           <AutomationExecutionPanel 
             automationId={id!}
-            blueprint={automation.automation_blueprint as AutomationBlueprint}
+            blueprint={blueprint || {
+              version: "1.0",
+              trigger: { type: "manual" as const },
+              steps: []
+            }}
             title={automation.title}
           />
         </TabsContent>
@@ -236,7 +251,11 @@ const AutomationDetail = () => {
             <AutomationDashboard 
               automationId={id!}
               automationTitle={automation.title}
-              automationBlueprint={automation.automation_blueprint as AutomationBlueprint}
+              automationBlueprint={blueprint || {
+                version: "1.0",
+                trigger: { type: "manual" as const },
+                steps: []
+              }}
             />
             <AutomationRunsMonitor automationId={id!} />
           </div>
@@ -244,9 +263,9 @@ const AutomationDetail = () => {
       </Tabs>
 
       {/* Blueprint Card - Slide-out Panel */}
-      {blueprintCardVisible && automation.automation_blueprint && (
+      {blueprintCardVisible && blueprint && (
         <BlueprintCard
-          blueprint={automation.automation_blueprint as AutomationBlueprint}
+          blueprint={blueprint}
           onClose={() => setBlueprintCardVisible(false)}
         />
       )}

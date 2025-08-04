@@ -15,6 +15,7 @@ import ExecutionBlueprintVisualizer from './ExecutionBlueprintVisualizer';
 import { FlagPropagationLogger } from '@/utils/flagPropagationLogger';
 import FixedPlatformButtons from './FixedPlatformButtons';
 import { GHQ } from '@/utils/GHQ';
+import DebugCodeModal from './DebugCodeModal';
 
 interface Message {
   id: number;
@@ -73,6 +74,8 @@ const ChatCard = ({
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [showBlueprintModal, setShowBlueprintModal] = useState(false);
   const [enhancedMessages, setEnhancedMessages] = useState<Message[]>([]);
+  const [debugModalData, setDebugModalData] = useState<any>(null);
+  const [showDebugModal, setShowDebugModal] = useState(false);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -583,13 +586,27 @@ const ChatCard = ({
                         {message.seven_sections_validated && (
                           <CheckCircle2 className="w-4 h-4 text-green-500" />
                         )}
+                        {message.structuredData && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="ml-2 text-xs h-6 px-2"
+                            onClick={() => {
+                              setDebugModalData(message.structuredData);
+                              setShowDebugModal(true);
+                            }}
+                          >
+                            <Code className="w-3 h-3 mr-1" />
+                            Code
+                          </Button>
+                        )}
                         {message.automationDiagramData && (
                           <Dialog>
                             <DialogTrigger asChild>
                               <Button 
                                 variant="outline" 
                                 size="sm" 
-                                className="ml-2 text-xs"
+                                className="ml-2 text-xs h-6 px-2"
                               >
                                 <Code className="w-3 h-3 mr-1" />
                                 Diagram
@@ -670,6 +687,12 @@ const ChatCard = ({
           />
         </div>
       )}
+
+      <DebugCodeModal
+        structuredData={debugModalData}
+        isOpen={showDebugModal}
+        onOpenChange={setShowDebugModal}
+      />
     </div>
   );
 };

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -12,17 +13,7 @@ import AutomationDiagramDisplay from '@/components/AutomationDiagramDisplay';
 import AIAgentForm from '@/components/AIAgentForm';
 import AutomationExecutionPanel from '@/components/AutomationExecutionPanel';
 import { supabase } from '@/integrations/supabase/client';
-
-interface AutomationBlueprint {
-  version: string;
-  trigger: {
-    type: string;
-    platform: string;
-    description: string;
-  };
-  steps: any[];
-  platforms?: string[];
-}
+import { AutomationBlueprint } from '@/types/automation';
 
 const AutomationDetail = () => {
   const { automationId } = useParams();
@@ -69,9 +60,8 @@ const AutomationDetail = () => {
       return {
         version: '1.0',
         trigger: {
-          type: 'webhook',
-          platform: 'Generic',
-          description: 'Automation trigger'
+          type: 'manual' as const, // Fix: Use const assertion for union type
+          platform: 'Generic'
         },
         steps: []
       };
@@ -81,14 +71,34 @@ const AutomationDetail = () => {
       ? JSON.parse(automation.automation_blueprint)
       : automation.automation_blueprint;
 
+    // Ensure trigger type is one of the allowed values
+    const getTriggerType = (type: string): 'manual' | 'scheduled' | 'webhook' | 'platform' => {
+      switch (type) {
+        case 'scheduled':
+          return 'scheduled';
+        case 'webhook':
+          return 'webhook';
+        case 'platform':
+          return 'platform';
+        default:
+          return 'manual';
+      }
+    };
+
     return {
       version: blueprint.version || '1.0',
-      trigger: blueprint.trigger || {
-        type: 'webhook',
-        platform: 'Generic',
-        description: 'Automation trigger'
+      trigger: {
+        type: getTriggerType(blueprint.trigger?.type || 'manual'),
+        platform: blueprint.trigger?.platform,
+        cron_expression: blueprint.trigger?.cron_expression,
+        webhook_endpoint: blueprint.trigger?.webhook_endpoint,
+        webhook_secret: blueprint.trigger?.webhook_secret,
+        integration: blueprint.trigger?.integration
       },
-      steps: blueprint.steps || []
+      steps: blueprint.steps || [],
+      variables: blueprint.variables,
+      platforms: blueprint.platforms,
+      test_payloads: blueprint.test_payloads
     };
   };
 

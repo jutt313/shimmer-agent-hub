@@ -1,11 +1,10 @@
-
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
-import ModernCredentialForm from './ModernCredentialForm';
+import PlatformCredentialForm from './PlatformCredentialForm';
 
 interface Platform {
   name: string;
@@ -139,17 +138,22 @@ const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: F
         ))}
       </div>
 
-      {/* FIXED: Enhanced credential form modal with correct props */}
+      {/* FIXED: Use PlatformCredentialForm instead of ModernCredentialForm */}
       {selectedPlatform && (
-        <ModernCredentialForm
-          automationId={automationId}
+        <PlatformCredentialForm
           platform={{
             name: selectedPlatform,
-            credentials: platforms.find(p => p.name === selectedPlatform)?.credentials || []
+            credentials: platforms.find(p => p.name === selectedPlatform)?.credentials || [],
+            test_payloads: platforms.find(p => p.name === selectedPlatform)?.test_payloads || []
           }}
-          onCredentialSaved={onCredentialChange}
+          onCredentialSaved={() => {
+            onCredentialChange?.();
+            setSelectedPlatform(null);
+          }}
+          onCredentialTested={() => {
+            console.log('🧪 Credential tested successfully');
+          }}
           onClose={() => setSelectedPlatform(null)}
-          isOpen={true}
         />
       )}
     </div>

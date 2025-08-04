@@ -2,7 +2,8 @@
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
-import ChatAICredentialForm from './ChatAICredentialForm';
+import { useAuth } from "@/contexts/AuthContext";
+import PlatformCredentialForm from './PlatformCredentialForm';
 
 interface Platform {
   name: string;
@@ -22,14 +23,15 @@ interface FixedPlatformButtonsProps {
 }
 
 const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: FixedPlatformButtonsProps) => {
-  const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
+  const { user } = useAuth();
 
   console.log('🔧 FixedPlatformButtons received platforms:', platforms);
   console.log('🧪 Automation ID:', automationId);
 
-  const handlePlatformSetup = (platform: Platform) => {
-    console.log(`🔧 Opening UNIFIED credential setup for platform: ${platform.name}`);
-    setSelectedPlatform(platform);
+  const handlePlatformSetup = (platformName: string) => {
+    console.log(`🔧 Opening credential setup for platform: ${platformName}`);
+    setSelectedPlatform(platformName);
   };
 
   if (!platforms || platforms.length === 0) {
@@ -42,7 +44,7 @@ const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: F
         {platforms.map((platform, index) => (
           <Button
             key={index}
-            onClick={() => handlePlatformSetup(platform)}
+            onClick={() => handlePlatformSetup(platform.name)}
             size="sm"
             className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white border-0 rounded-lg shadow-sm hover:shadow-md transition-all duration-300 text-xs px-3 py-1.5"
           >
@@ -53,13 +55,20 @@ const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: F
       </div>
 
       {selectedPlatform && (
-        <ChatAICredentialForm
-          platform={selectedPlatform}
+        <PlatformCredentialForm
+          platform={{
+            name: selectedPlatform,
+            credentials: platforms.find(p => p.name === selectedPlatform)?.credentials || [],
+            test_payloads: platforms.find(p => p.name === selectedPlatform)?.test_payloads || []
+          }}
           automationId={automationId}
           onCredentialSaved={(platformName: string) => {
-            console.log(`✅ UNIFIED credentials saved for ${platformName}`);
+            console.log(`✅ Credentials saved for ${platformName}`);
             onCredentialChange?.();
             setSelectedPlatform(null);
+          }}
+          onCredentialTested={(platformName: string) => {
+            console.log(`🧪 Credential tested successfully for ${platformName}`);
           }}
           onClose={() => setSelectedPlatform(null)}
         />

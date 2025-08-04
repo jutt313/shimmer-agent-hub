@@ -216,7 +216,7 @@ const ChatAICredentialForm = ({
       return;
     }
 
-    setSaving(true);
+    setIsSaving(true);
 
     try {
       const result = await UnifiedCredentialManager.saveCredentials(
@@ -237,7 +237,7 @@ const ChatAICredentialForm = ({
       console.error('Save failed:', error);
       toast.error('Failed to save credentials. Please try again.');
     } finally {
-      setSaving(false);
+      setIsSaving(false);
     }
   };
 

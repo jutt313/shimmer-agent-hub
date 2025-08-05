@@ -86,6 +86,10 @@ export type AutomationBlueprint = {
     payload: any;
     [key: string]: any;
   }>;
+  
+  // NEW: Optional properties to support YusrAI structured responses
+  conditions?: Array<any>;
+  agents?: Array<any>;
 };
 
 export interface AutomationDiagramData {

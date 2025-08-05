@@ -136,7 +136,7 @@ const constructEnhancedBlueprintFromWorkflow = (structuredData: any): Automation
         }));
   }
 
-  // ENHANCED: Additional metadata from YusrAI responses
+  // ENHANCED: Additional metadata from YusrAI responses - with proper optional checks
   if (structuredData.variables) blueprint.variables = structuredData.variables;
   if (structuredData.conditions) blueprint.conditions = structuredData.conditions;
   if (structuredData.agents) blueprint.agents = structuredData.agents;
@@ -307,6 +307,10 @@ const constructBlueprintFromComponents = (structuredData: any): AutomationBluepr
   if (structuredData.test_payloads) {
     blueprint.test_payloads = structuredData.test_payloads;
   }
+
+  // ENHANCED: Additional metadata from YusrAI responses - with proper optional checks
+  if (structuredData.conditions) blueprint.conditions = structuredData.conditions;
+  if (structuredData.agents) blueprint.agents = structuredData.agents;
 
   console.log(`🔧 ENHANCED: Constructed YusrAI blueprint with ${blueprint.steps.length} steps from components`);
   return blueprint;

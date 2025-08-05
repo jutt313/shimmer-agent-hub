@@ -1,6 +1,38 @@
 import { cleanText } from "./stringUtils";
 
 /**
+ * YusrAI Structured Response Type Definition
+ */
+export interface YusrAIStructuredResponse {
+  summary?: string;
+  steps?: Array<any>;
+  platforms?: Array<any>;
+  clarification_questions?: Array<any>;
+  agents?: Array<any>;
+  execution_blueprint?: {
+    trigger?: any;
+    workflow?: Array<any>;
+    error_handling?: any;
+    performance_optimization?: any;
+  };
+  test_payloads?: any;
+  workflow?: Array<any>;
+  variables?: any;
+  conditions?: any;
+  [key: string]: any;
+}
+
+/**
+ * Enhanced parsing result interface
+ */
+export interface ParsedResponse {
+  structuredData: any;
+  displayText: string;
+  metadata: any;
+  isPlainText?: boolean;
+}
+
+/**
  * PHASE 3: Enhanced JSON parsing with improved extraction and cleaning
  */
 export const parseStructuredResponse = (responseText: string): { structuredData: any; displayText: string } => {
@@ -53,17 +85,18 @@ export const cleanDisplayText = (text: string): string => {
  * ENHANCED PHASE 3: Advanced YusrAI structured response parsing with comprehensive extraction
  * Handles complex nested structures and edge cases for better blueprint data extraction
  */
-export const parseYusrAIStructuredResponse = (responseText: string): { 
-  structuredData: any; 
-  displayText: string; 
-  metadata: any 
-} => {
+export const parseYusrAIStructuredResponse = (responseText: string): ParsedResponse => {
   console.log('🔍 ENHANCED: Starting advanced YusrAI response parsing');
   
   try {
     if (!responseText || typeof responseText !== 'string') {
       console.warn('⚠️ ENHANCED: Invalid response text provided');
-      return { structuredData: null, displayText: responseText || '', metadata: {} };
+      return { 
+        structuredData: null, 
+        displayText: responseText || '', 
+        metadata: {},
+        isPlainText: true
+      };
     }
 
     // ENHANCED: Multiple JSON extraction patterns with better regex
@@ -156,7 +189,7 @@ export const parseYusrAIStructuredResponse = (responseText: string): {
 
     const cleanedText = cleanDisplayText(responseText);
     
-    const result = {
+    const result: ParsedResponse = {
       structuredData: bestStructuredData,
       displayText: cleanedText,
       metadata: {
@@ -167,7 +200,8 @@ export const parseYusrAIStructuredResponse = (responseText: string): {
         has_workflow: !!(bestStructuredData?.workflow),
         workflow_steps: bestStructuredData?.workflow?.length || 0,
         platforms_count: bestStructuredData?.platforms?.length || 0
-      }
+      },
+      isPlainText: !bestStructuredData
     };
     
     console.log('🎯 ENHANCED: Final parsing result:', {
@@ -186,7 +220,8 @@ export const parseYusrAIStructuredResponse = (responseText: string): {
     return {
       structuredData: null,
       displayText: cleanDisplayText(responseText),
-      metadata: { parsing_error: error.message }
+      metadata: { parsing_error: error.message },
+      isPlainText: true
     };
   }
 };

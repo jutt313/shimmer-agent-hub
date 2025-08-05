@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/router';
+import { useParams } from 'react-router-dom';
 import {
   Card,
   CardContent,
@@ -61,8 +62,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 
 const AutomationDetail = () => {
-  const router = useRouter();
-  const { id } = router.query;
+  const { id } = useParams();
 
   const [automation, setAutomation] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -206,7 +206,7 @@ const AutomationDetail = () => {
               <CardContent>
                 <div className="space-y-3">
                   <div>
-                    <Badge variant={automation.isActive ? "success" : "destructive"}>
+                    <Badge variant={automation.isActive ? "secondary" : "destructive"}>
                       {automation.isActive ? "Active" : "Inactive"}
                     </Badge>
                   </div>

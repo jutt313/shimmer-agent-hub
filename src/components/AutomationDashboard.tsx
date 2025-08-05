@@ -1,4 +1,6 @@
+
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Plus,
   Key,
@@ -6,6 +8,12 @@ import {
   BarChart3,
   Bot,
   MessageCircle,
+  ListOrdered,
+  Pin,
+  PinOff,
+  Edit,
+  ClipboardList,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,22 +29,17 @@ import EnhancedAgentChatPopup from "@/components/EnhancedAgentChatPopup";
 interface Automation {
   id: string;
   title: string;
-  name: string; // Add missing property
   description: string | null;
   status: string;
   created_at: string;
   updated_at: string;
   is_pinned: boolean;
   automation_blueprint: any;
-  trigger_type: string; // Add missing property
-  run_count: number; // Add missing property
-  success_rate: number; // Add missing property
   ai_agents?: AIAgent[];
 }
 
 interface PlatformCredential {
   id: string;
-  credential_name: string; // Add missing property
   platform_name: string;
   credential_type: string;
   is_active: boolean;
@@ -57,12 +60,13 @@ interface AIAgent {
   model: string;
   api_key: string;
   automation_id: string;
-  is_active: boolean; // Add missing property
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
 
 const AutomationDashboard = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const [automations, setAutomations] = useState<Automation[]>([]);
@@ -105,25 +109,20 @@ const AutomationDashboard = () => {
       const transformedAutomations: Automation[] = (automationsData || []).map((auto: any) => ({
         id: auto.id,
         title: auto.title,
-        name: auto.title, // Use title as name
         description: auto.description,
         status: auto.status,
         created_at: auto.created_at,
         updated_at: auto.updated_at,
         is_pinned: auto.is_pinned,
         automation_blueprint: auto.automation_blueprint,
-        trigger_type: auto.automation_blueprint?.trigger?.type || 'manual',
-        run_count: 0, // Default value since not in database
-        success_rate: 100, // Default value since not in database
         ai_agents: (auto.ai_agents || []).map((agent: any) => ({
           ...agent,
-          is_active: true // Add default value
+          is_active: true
         }))
       }));
 
       const transformedCredentials: PlatformCredential[] = (credentialsData || []).map((cred: any) => ({
-        ...cred,
-        credential_name: `${cred.platform_name} Credential` // Generate name from platform
+        ...cred
       }));
 
       setAutomations(transformedAutomations);
@@ -133,7 +132,7 @@ const AutomationDashboard = () => {
       // Calculate stats
       setTotalAutomations(transformedAutomations.length);
       setRunningAutomations(transformedAutomations.filter(a => a.status === 'active').length);
-      setAverageSuccessRate(transformedAutomations.reduce((acc, auto) => acc + auto.success_rate, 0) / Math.max(transformedAutomations.length, 1));
+      setAverageSuccessRate(100); // Default success rate
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -176,6 +175,10 @@ const AutomationDashboard = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleEditAutomation = (automationId: string) => {
+    navigate(`/automation/${automationId}`);
   };
 
   return (
@@ -297,15 +300,17 @@ const AutomationDashboard = () => {
                               onClick={() => pinAutomation(auto.id, auto.is_pinned)}
                               className="bg-white/80 hover:bg-white border-gray-200 text-gray-700 hover:text-gray-800"
                             >
-                              {auto.is_pinned ? <Unpin className="w-4 h-4 mr-1" /> : <Pin className="w-4 h-4 mr-1" />}
+                              {auto.is_pinned ? <PinOff className="w-4 h-4 mr-1" /> : <Pin className="w-4 h-4 mr-1" />}
                               {auto.is_pinned ? 'Unpin' : 'Pin'}
                             </Button>
-                            <Link href={`/automation/${auto.id}`} passHref>
-                              <Button size="sm" className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white">
-                                <Edit className="w-4 h-4 mr-1" />
-                                Edit
-                              </Button>
-                            </Link>
+                            <Button 
+                              size="sm" 
+                              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
+                              onClick={() => handleEditAutomation(auto.id)}
+                            >
+                              <Edit className="w-4 h-4 mr-1" />
+                              Edit
+                            </Button>
                           </div>
                         </div>
                       ))
@@ -394,7 +399,7 @@ const AutomationDashboard = () => {
                       platformCredentials.map((cred) => (
                         <div key={cred.id} className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
                           <div>
-                            <h3 className="font-semibold text-gray-800">{cred.credential_name}</h3>
+                            <h3 className="font-semibold text-gray-800">{cred.platform_name} Credential</h3>
                             <p className="text-sm text-gray-600">{cred.platform_name}</p>
                             <p className="text-xs text-gray-500">Created at {new Date(cred.created_at).toLocaleDateString()}</p>
                           </div>
@@ -461,7 +466,6 @@ const AutomationDashboard = () => {
                 .from('platform_credentials')
                 .insert([{
                   user_id: user!.id,
-                  credential_name: data.credential_name,
                   platform_name: data.platform_name,
                   credential_type: data.credential_type,
                   credentials: JSON.stringify(data.credentials),
@@ -501,12 +505,3 @@ const AutomationDashboard = () => {
 };
 
 export default AutomationDashboard;
-import {
-  ListOrdered,
-  Pin,
-  Unpin,
-  Edit,
-  ClipboardList,
-  KeyRound,
-} from "lucide-react";
-import Link from 'next/link';

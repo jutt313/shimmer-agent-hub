@@ -14,6 +14,9 @@ verify_jwt = false
 [functions.test-credential]
 verify_jwt = false
 
+[functions.test-ai-agent]
+verify_jwt = false
+
 [functions.execute-automation]
 verify_jwt = false
 

@@ -99,11 +99,15 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
 
       if (saveError) throw saveError;
 
-      // Test the agent
-      const { data, error } = await supabase.functions.invoke('test-credential', {
+      // Test the agent using the new test-ai-agent function
+      const { data, error } = await supabase.functions.invoke('test-ai-agent', {
         body: {
-          type: 'agent',
-          agent_id: tempAgent.id
+          agent_id: tempAgent.id,
+          automation_context: automationId ? {
+            id: automationId,
+            name: 'Test Automation',
+            description: 'Testing agent configuration'
+          } : null
         }
       });
 
@@ -111,12 +115,13 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
 
       if (data.success) {
         toast({
-          title: "✅ Test Successful",
+          title: "✅ Agent Test Successful",
           description: data.user_message,
         });
+        console.log('🎉 Agent test details:', data.technical_details);
       } else {
         toast({
-          title: "❌ Test Failed",
+          title: "❌ Agent Test Failed",
           description: data.user_message,
           variant: "destructive",
         });

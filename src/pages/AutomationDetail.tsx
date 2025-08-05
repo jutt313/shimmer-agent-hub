@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -346,7 +347,7 @@ const AutomationDetail = () => {
     setSendingMessage(true);
 
     try {
-      console.log('🚀 PHASE 1: Enhanced message sending with improved pipeline');
+      console.log('🚀 ENHANCED: Starting improved blueprint extraction pipeline');
 
       await supabase
         .from('automation_chats')
@@ -379,17 +380,18 @@ const AutomationDetail = () => {
       });
 
       if (error) {
-        console.error('❌ PHASE 1: Chat AI error:', error);
+        console.error('❌ Chat AI error:', error);
         throw error;
       }
 
-      console.log('✅ PHASE 1: Enhanced AI response processing');
+      console.log('✅ ENHANCED: Received AI response, starting enhanced blueprint processing');
 
       let structuredData = null;
       let aiResponseText = "";
       let yusraiPowered = false;
       let sevenSectionsValidated = false;
 
+      // ENHANCED: Improved structured data parsing with multiple fallbacks
       if (data && (data.response || typeof data === 'string')) {
         const responseText = data.response || (typeof data === 'string' ? data : JSON.stringify(data));
         const parseResult = parseYusrAIStructuredResponse(responseText);
@@ -398,18 +400,11 @@ const AutomationDetail = () => {
         yusraiPowered = parseResult.metadata.yusrai_powered || false;
         sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
         
-        FlagPropagationLogger.logFlagState(
-          yusraiPowered,
-          sevenSectionsValidated,
-          'handleSendMessage - AI response processing',
-          !!structuredData,
-          structuredData ? Object.keys(structuredData) : undefined
-        );
-        
-        console.log('📋 PHASE 1: Enhanced parsing result:', {
+        console.log('📋 ENHANCED: Blueprint extraction result:', {
           hasStructuredData: !!structuredData,
           yusraiPowered,
           sevenSectionsValidated,
+          hasExecutionBlueprint: !!(structuredData?.execution_blueprint),
           hasWorkflow: !!(structuredData?.workflow),
           workflowLength: structuredData?.workflow?.length || 0,
           hasTestPayloads: !!(structuredData?.test_payloads),
@@ -417,6 +412,7 @@ const AutomationDetail = () => {
         });
       }
 
+      // ENHANCED: Better AI response text generation
       if (structuredData) {
         if (structuredData.clarification_questions?.length > 0) {
           aiResponseText = "I need clarification:\n\n" + 
@@ -451,84 +447,110 @@ const AutomationDetail = () => {
         seven_sections_validated: sevenSectionsValidated
       };
 
-      FlagPropagationLogger.logFlagState(
-        yusraiPowered,
-        sevenSectionsValidated,
-        'handleSendMessage - final AI message creation',
-        !!structuredData,
-        structuredData ? Object.keys(structuredData) : undefined
-      );
-
       setMessages(prev => [...prev, aiMessage]);
 
-      if (structuredData && structuredData.execution_blueprint) {
-        console.log('🔄 PHASE 5: Auto-generating diagram from execution_blueprint with SAFE object handling');
-        try {
-          const blueprintData: AutomationBlueprint = {
-            version: '1.0',
-            description: String(structuredData.summary || 'AI-generated automation workflow'),
-            trigger: structuredData.execution_blueprint.trigger || { type: 'manual' },
-            steps: Array.isArray(structuredData.execution_blueprint.workflow) ? 
-              structuredData.execution_blueprint.workflow.map((step: any, index: number) => ({
-                id: `step-${step?.step || index + 1}`,
-                name: String(step?.action || `Step ${index + 1}`),
-                type: 'action' as const,
-                action: {
-                  integration: String(step?.platform || 'system'),
-                  method: String(step?.method || step?.action || 'execute'),
-                  parameters: (step?.data_mapping && typeof step.data_mapping === 'object') ? step.data_mapping : 
-                            (step?.parameters && typeof step.parameters === 'object') ? step.parameters : {}
-              },
-              originalWorkflowData: step
-            })) : []
-          };
-          
-          const { error: updateError } = await supabase
-            .from('automations')
-            .update({ automation_blueprint: blueprintData })
-            .eq('id', automation.id);
-            
-          if (!updateError) {
-            console.log('📋 Blueprint saved successfully');
-            setAutomation(prev => ({ ...prev!, automation_blueprint: blueprintData }));
-            
-            setTimeout(() => {
-              generateAndSaveDiagram(automation.id, blueprintData);
-            }, 2000);
+      // ENHANCED: Comprehensive blueprint extraction with multiple detection methods
+      if (structuredData) {
+        let blueprintGenerated = false;
+        
+        // Method 1: ENHANCED execution_blueprint processing
+        if (structuredData.execution_blueprint) {
+          console.log('🔧 ENHANCED: Processing execution_blueprint with improved validation');
+          try {
+            const extractedBlueprint = extractBlueprintFromStructuredData(structuredData);
+            if (extractedBlueprint && validateBlueprintForDiagram(extractedBlueprint)) {
+              console.log('✅ ENHANCED: Valid blueprint extracted from execution_blueprint');
+              
+              const { error: updateError } = await supabase
+                .from('automations')
+                .update({ automation_blueprint: extractedBlueprint })
+                .eq('id', automation.id);
+                
+              if (!updateError) {
+                console.log('📋 ENHANCED: Blueprint saved successfully from execution_blueprint');
+                setAutomation(prev => ({ ...prev!, automation_blueprint: extractedBlueprint }));
+                
+                setTimeout(() => {
+                  generateAndSaveDiagram(automation.id, extractedBlueprint);
+                }, 1500);
+                
+                blueprintGenerated = true;
+              }
+            }
+          } catch (error) {
+            console.warn('⚠️ ENHANCED: execution_blueprint processing failed, trying fallbacks:', error);
           }
-        } catch (error) {
-          console.error('❌ Error processing execution blueprint:', error);
         }
-      } else if (structuredData && structuredData.workflow && structuredData.workflow.length > 0) {
-        console.log('🔄 PHASE 3: Fallback - Auto-generating diagram from workflow data');
-        try {
-          const blueprintData: AutomationBlueprint = {
-            version: '1.0',
-            description: structuredData.summary || 'AI-generated automation workflow',
-            trigger: {
-              type: 'manual'
-            },
-            steps: structuredData.workflow.map((step: any, index: number) => ({
-              id: `step-${index + 1}`,
-              name: step.action || step.step || `Step ${index + 1}`,
-              type: 'action' as const,
-              action: {
-                integration: step.platform || 'system',
-                method: step.action || 'execute',
-                parameters: step.parameters || {}
-              },
-              platform: step.platform,
-              originalWorkflowData: step
-            })),
-            platforms: structuredData.platforms || []
-          };
-          
-          setTimeout(() => {
-            generateAndSaveDiagram(automation.id, blueprintData);
-          }, 2000);
-          
-        } catch (error) {
-          console.error('❌ PHASE 4: Error generating diagram from ChatAI response:', error);
+
+        // Method 2: ENHANCED workflow array processing (fallback)
+        if (!blueprintGenerated && structuredData.workflow && Array.isArray(structuredData.workflow) && structuredData.workflow.length > 0) {
+          console.log('🔧 ENHANCED: Processing workflow array as fallback');
+          try {
+            const fallbackBlueprint = extractBlueprintFromStructuredData({
+              workflow: structuredData.workflow,
+              summary: structuredData.summary,
+              platforms: structuredData.platforms,
+              test_payloads: structuredData.test_payloads
+            });
+            
+            if (fallbackBlueprint && validateBlueprintForDiagram(fallbackBlueprint)) {
+              console.log('✅ ENHANCED: Valid blueprint created from workflow array');
+              
+              const { error: updateError } = await supabase
+                .from('automations')
+                .update({ automation_blueprint: fallbackBlueprint })
+                .eq('id', automation.id);
+                
+              if (!updateError) {
+                console.log('📋 ENHANCED: Fallback blueprint saved successfully');
+                setAutomation(prev => ({ ...prev!, automation_blueprint: fallbackBlueprint }));
+                
+                setTimeout(() => {
+                  generateAndSaveDiagram(automation.id, fallbackBlueprint);
+                }, 1500);
+                
+                blueprintGenerated = true;
+              }
+            }
+          } catch (error) {
+            console.warn('⚠️ ENHANCED: Workflow fallback processing failed:', error);
+          }
+        }
+
+        // Method 3: ENHANCED minimal blueprint creation (final fallback)
+        if (!blueprintGenerated && (structuredData.steps || structuredData.platforms || structuredData.agents)) {
+          console.log('🔧 ENHANCED: Creating minimal blueprint from available components');
+          try {
+            const minimalBlueprint = extractBlueprintFromStructuredData(structuredData);
+            
+            if (minimalBlueprint && minimalBlueprint.steps && minimalBlueprint.steps.length > 0) {
+              console.log('✅ ENHANCED: Minimal blueprint created from components');
+              
+              const { error: updateError } = await supabase
+                .from('automations')
+                .update({ automation_blueprint: minimalBlueprint })
+                .eq('id', automation.id);
+                
+              if (!updateError) {
+                console.log('📋 ENHANCED: Minimal blueprint saved successfully');
+                setAutomation(prev => ({ ...prev!, automation_blueprint: minimalBlueprint }));
+                
+                setTimeout(() => {
+                  generateAndSaveDiagram(automation.id, minimalBlueprint);
+                }, 2000);
+                
+                blueprintGenerated = true;
+              }
+            }
+          } catch (error) {
+            console.warn('⚠️ ENHANCED: Minimal blueprint creation failed:', error);
+          }
+        }
+
+        if (!blueprintGenerated) {
+          console.log('⚠️ ENHANCED: No valid blueprint could be generated from structured data');
+        } else {
+          console.log('🎯 ENHANCED: Blueprint generation pipeline completed successfully');
         }
       }
 
@@ -542,7 +564,7 @@ const AutomationDetail = () => {
         });
 
     } catch (error) {
-      console.error('💥 PHASE 1: Error in enhanced message handling:', error);
+      console.error('💥 ENHANCED: Error in message handling:', error);
       toast({
         title: "Error",
         description: "Failed to process message. Please try again.",

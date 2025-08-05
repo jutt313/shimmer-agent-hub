@@ -1,110 +1,127 @@
-
 import { AutomationBlueprint } from "@/types/automation";
 
 /**
- * PHASE 2 FIX: Enhanced blueprint extraction with perfect workflow → steps conversion
- * This ensures YusrAI responses are properly converted for diagram generation
+ * ENHANCED PHASE 2 FIX: Improved blueprint extraction with comprehensive workflow → steps conversion
+ * This ensures YusrAI responses are properly converted for diagram generation with better validation
  */
 export const extractBlueprintFromStructuredData = (structuredData: any): AutomationBlueprint | null => {
   try {
-    console.log('🔧 PHASE 2: Enhanced blueprint extraction from:', Object.keys(structuredData || {}));
+    console.log('🔧 ENHANCED: Advanced blueprint extraction from:', Object.keys(structuredData || {}));
 
     if (!structuredData || typeof structuredData !== 'object') {
-      console.warn('❌ PHASE 2: Invalid structured data provided');
+      console.warn('❌ ENHANCED: Invalid structured data provided');
       return null;
     }
 
-    // Method 1: Direct execution_blueprint extraction with workflow → steps conversion
+    // Method 1: ENHANCED direct execution_blueprint extraction with improved validation
     if (structuredData.execution_blueprint) {
-      console.log('✅ PHASE 2: Found execution_blueprint');
+      console.log('✅ ENHANCED: Found execution_blueprint, processing with enhanced validation');
       const blueprint = validateAndCleanBlueprint(structuredData.execution_blueprint);
       if (blueprint) {
         // Add additional data from structured response
         if (structuredData.platforms) blueprint.platforms = structuredData.platforms;
         if (structuredData.test_payloads) blueprint.test_payloads = structuredData.test_payloads;
+        if (structuredData.summary) blueprint.description = structuredData.summary;
         return blueprint;
       }
     }
 
-    // Method 2: Construct from workflow in root level
+    // Method 2: ENHANCED workflow conversion with comprehensive step mapping
     if (structuredData.workflow && Array.isArray(structuredData.workflow) && structuredData.workflow.length > 0) {
-      console.log('🔧 PHASE 2: Converting root-level workflow to blueprint with steps');
-      return constructBlueprintFromWorkflow(structuredData);
+      console.log('🔧 ENHANCED: Converting root-level workflow to blueprint with comprehensive steps');
+      return constructEnhancedBlueprintFromWorkflow(structuredData);
     }
 
-    // Method 3: Construct from mixed components (platforms, steps, agents)
+    // Method 3: ENHANCED component-based construction with better error handling
     if (structuredData.steps || structuredData.platforms || structuredData.agents) {
-      console.log('🔧 PHASE 2: Constructing blueprint from YusrAI components');
+      console.log('🔧 ENHANCED: Constructing blueprint from YusrAI components with enhanced processing');
       return constructBlueprintFromComponents(structuredData);
     }
 
-    console.warn('⚠️ PHASE 2: No valid blueprint data found in structured response');
+    // Method 4: ENHANCED fallback for minimal data structures
+    if (structuredData.summary || structuredData.description) {
+      console.log('🔧 ENHANCED: Creating minimal blueprint from description data');
+      return createMinimalBlueprint(structuredData);
+    }
+
+    console.warn('⚠️ ENHANCED: No valid blueprint data found in structured response');
     return null;
 
   } catch (error) {
-    console.error('❌ PHASE 2: Error extracting blueprint:', error);
+    console.error('❌ ENHANCED: Error extracting blueprint:', error);
     return null;
   }
 };
 
 /**
- * PHASE 2: Perfect workflow to steps conversion for YusrAI responses
+ * ENHANCED: Comprehensive workflow to steps conversion with better type handling
  */
-const constructBlueprintFromWorkflow = (structuredData: any): AutomationBlueprint => {
-  console.log('🔧 PHASE 2: Converting workflow to steps format for YusrAI');
+const constructEnhancedBlueprintFromWorkflow = (structuredData: any): AutomationBlueprint => {
+  console.log('🔧 ENHANCED: Converting workflow to steps format with advanced processing');
   
   const blueprint: AutomationBlueprint = {
     version: "1.0",
-    description: structuredData.summary || "YusrAI-generated automation workflow",
+    description: structuredData.summary || structuredData.description || "YusrAI-generated automation workflow",
     trigger: {
-      type: 'manual', // Default for YusrAI automations
+      type: 'manual',
       platform: undefined
     },
-    steps: [] // Always use steps array format for diagram generator
+    steps: []
   };
 
-  // Extract trigger info if available from execution_blueprint
+  // ENHANCED: Better trigger extraction
   if (structuredData.execution_blueprint?.trigger) {
     blueprint.trigger = {
       type: structuredData.execution_blueprint.trigger.type || 'manual',
       platform: structuredData.execution_blueprint.trigger.platform
     };
+  } else if (structuredData.trigger) {
+    blueprint.trigger = {
+      type: structuredData.trigger.type || 'manual',
+      platform: structuredData.trigger.platform
+    };
   }
 
-  // Convert workflow array to steps array for diagram generator
+  // ENHANCED: Comprehensive workflow processing with type safety
   const workflowSource = structuredData.workflow || structuredData.execution_blueprint?.workflow || [];
   
   if (Array.isArray(workflowSource) && workflowSource.length > 0) {
     blueprint.steps = workflowSource.map((workflowItem: any, index: number) => {
-      console.log(`📋 PHASE 2: Converting workflow step ${index + 1}:`, workflowItem);
+      console.log(`📋 ENHANCED: Converting workflow step ${index + 1}:`, workflowItem);
+
+      // ENHANCED: Better step data extraction with multiple fallbacks
+      const stepName = workflowItem.action || workflowItem.step || workflowItem.name || `Step ${index + 1}`;
+      const stepPlatform = workflowItem.platform || workflowItem.integration || 'system';
+      const stepMethod = workflowItem.method || workflowItem.action || 'execute';
 
       return {
-        id: `step-${index + 1}`,
-        name: workflowItem.action || workflowItem.step || `Step ${index + 1}`,
+        id: workflowItem.id || `step-${index + 1}`,
+        name: stepName,
         type: 'action' as const,
         action: {
-          integration: workflowItem.platform || 'system',
-          method: workflowItem.method || 'execute',
+          integration: stepPlatform,
+          method: stepMethod,
           parameters: {
             ...workflowItem.parameters,
-            description: workflowItem.action || workflowItem.step,
-            platform: workflowItem.platform || 'system',
+            description: stepName,
+            platform: stepPlatform,
             base_url: workflowItem.base_url,
             endpoint: workflowItem.endpoint,
-            method: workflowItem.method,
+            method: stepMethod,
             headers: workflowItem.headers,
-            data_mapping: workflowItem.data_mapping
+            data_mapping: workflowItem.data_mapping,
+            ...(workflowItem.config && typeof workflowItem.config === 'object' ? workflowItem.config : {})
           }
         },
-        // Preserve all workflow data for diagram generation
+        // ENHANCED: Preserve all workflow data for diagram generation
         originalWorkflowData: workflowItem,
-        platform: workflowItem.platform,
-        platformDetails: workflowItem.config || workflowItem.headers
+        platform: stepPlatform,
+        platformDetails: workflowItem.config || workflowItem.headers || workflowItem.credentials
       };
     });
   }
 
-  // Add YusrAI specific data
+  // ENHANCED: Comprehensive metadata preservation
   if (structuredData.platforms && Array.isArray(structuredData.platforms)) {
     blueprint.platforms = structuredData.platforms;
   }
@@ -119,12 +136,17 @@ const constructBlueprintFromWorkflow = (structuredData: any): AutomationBlueprin
         }));
   }
 
-  console.log(`✅ PHASE 2: Created YusrAI blueprint with ${blueprint.steps.length} steps`);
+  // ENHANCED: Additional metadata from YusrAI responses
+  if (structuredData.variables) blueprint.variables = structuredData.variables;
+  if (structuredData.conditions) blueprint.conditions = structuredData.conditions;
+  if (structuredData.agents) blueprint.agents = structuredData.agents;
+
+  console.log(`✅ ENHANCED: Created YusrAI blueprint with ${blueprint.steps.length} steps and comprehensive metadata`);
   return blueprint;
 };
 
 /**
- * PHASE 2: Enhanced blueprint validation and cleaning with workflow support
+ * ENHANCED: Improved blueprint validation with more permissive rules
  */
 const validateAndCleanBlueprint = (blueprint: any): AutomationBlueprint | null => {
   try {
@@ -134,81 +156,83 @@ const validateAndCleanBlueprint = (blueprint: any): AutomationBlueprint | null =
 
     const cleanedBlueprint: AutomationBlueprint = {
       version: blueprint.version || "1.0",
-      description: blueprint.description || "YusrAI-generated automation",
+      description: blueprint.description || blueprint.summary || "YusrAI-generated automation",
       trigger: blueprint.trigger || { type: 'manual' },
       steps: []
     };
 
-    // Handle existing steps format
+    // ENHANCED: Handle existing steps format with better validation
     if (blueprint.steps && Array.isArray(blueprint.steps)) {
       cleanedBlueprint.steps = blueprint.steps.map((step: any, index: number) => ({
         id: step.id || `step-${index + 1}`,
-        name: step.name || step.action || `Step ${index + 1}`,
+        name: step.name || step.action || step.step || `Step ${index + 1}`,
         type: step.type || 'action',
         action: step.action ? step.action : {
-          integration: 'system',
-          method: 'execute',
-          parameters: { description: step.name || `Step ${index + 1}` }
+          integration: step.platform || step.integration || 'system',
+          method: step.method || 'execute',
+          parameters: { 
+            description: step.name || step.action || `Step ${index + 1}`,
+            ...(typeof step.parameters === 'object' && step.parameters !== null ? step.parameters : {})
+          }
         },
         ...(typeof step === 'object' && step !== null ? step : {})
       }));
     } 
-    // CRITICAL: Handle workflow format in blueprint - convert to steps
+    // ENHANCED: Better workflow format handling in blueprint
     else if (blueprint.workflow && Array.isArray(blueprint.workflow)) {
-      console.log('🔧 PHASE 2: Converting blueprint.workflow to steps format');
-      cleanedBlueprint.steps = blueprint.workflow.map((workflowItem: any, index: number) => ({
-        id: `step-${index + 1}`,
-        name: workflowItem.action || workflowItem.step || `Step ${index + 1}`,
-        type: 'action' as const,
-        action: {
-          integration: workflowItem.platform || 'system',
-          method: workflowItem.method || 'execute',
-          parameters: {
-            description: workflowItem.action || workflowItem.step,
-            platform: workflowItem.platform,
-            base_url: workflowItem.base_url,
-            endpoint: workflowItem.endpoint,
-            method: workflowItem.method,
-            headers: workflowItem.headers,
-            data_mapping: workflowItem.data_mapping,
-            ...(typeof workflowItem.parameters === 'object' && workflowItem.parameters !== null ? workflowItem.parameters : {})
-          }
-        },
-        originalWorkflowData: workflowItem,
-        platform: workflowItem.platform,
-        platformDetails: workflowItem.config || workflowItem.headers
-      }));
+      console.log('🔧 ENHANCED: Converting blueprint.workflow to steps format with improved processing');
+      cleanedBlueprint.steps = blueprint.workflow.map((workflowItem: any, index: number) => {
+        const stepName = workflowItem.action || workflowItem.step || workflowItem.name || `Step ${index + 1}`;
+        
+        return {
+          id: workflowItem.id || `step-${index + 1}`,
+          name: stepName,
+          type: 'action' as const,
+          action: {
+            integration: workflowItem.platform || workflowItem.integration || 'system',
+            method: workflowItem.method || workflowItem.action || 'execute',
+            parameters: {
+              description: stepName,
+              platform: workflowItem.platform,
+              base_url: workflowItem.base_url,
+              endpoint: workflowItem.endpoint,
+              method: workflowItem.method,
+              headers: workflowItem.headers,
+              data_mapping: workflowItem.data_mapping,
+              ...(typeof workflowItem.parameters === 'object' && workflowItem.parameters !== null ? workflowItem.parameters : {}),
+              ...(typeof workflowItem.config === 'object' && workflowItem.config !== null ? workflowItem.config : {})
+            }
+          },
+          originalWorkflowData: workflowItem,
+          platform: workflowItem.platform,
+          platformDetails: workflowItem.config || workflowItem.headers
+        };
+      });
     }
 
-    // Preserve additional blueprint data
-    if (blueprint.variables) {
-      cleanedBlueprint.variables = blueprint.variables;
-    }
+    // ENHANCED: Preserve comprehensive blueprint data
+    if (blueprint.variables) cleanedBlueprint.variables = blueprint.variables;
+    if (blueprint.test_payloads) cleanedBlueprint.test_payloads = blueprint.test_payloads;
+    if (blueprint.platforms) cleanedBlueprint.platforms = blueprint.platforms;
+    if (blueprint.conditions) cleanedBlueprint.conditions = blueprint.conditions;
+    if (blueprint.agents) cleanedBlueprint.agents = blueprint.agents;
 
-    if (blueprint.test_payloads) {
-      cleanedBlueprint.test_payloads = blueprint.test_payloads;
-    }
-    
-    if (blueprint.platforms) {
-      cleanedBlueprint.platforms = blueprint.platforms;
-    }
-
-    console.log(`✅ PHASE 2: Validated blueprint with ${cleanedBlueprint.steps.length} steps`);
+    console.log(`✅ ENHANCED: Validated blueprint with ${cleanedBlueprint.steps.length} steps and enhanced metadata`);
     return cleanedBlueprint;
 
   } catch (error) {
-    console.error('❌ PHASE 2: Error validating blueprint:', error);
+    console.error('❌ ENHANCED: Error validating blueprint:', error);
     return null;
   }
 };
 
 /**
- * PHASE 2: Enhanced component-based blueprint construction for YusrAI
+ * ENHANCED: Component-based blueprint construction with better error handling
  */
 const constructBlueprintFromComponents = (structuredData: any): AutomationBlueprint => {
   const blueprint: AutomationBlueprint = {
     version: "1.0",
-    description: structuredData.summary || "YusrAI automation from components",
+    description: structuredData.summary || structuredData.description || "YusrAI automation from components",
     trigger: {
       type: 'manual',
       platform: undefined
@@ -218,7 +242,7 @@ const constructBlueprintFromComponents = (structuredData: any): AutomationBluepr
 
   let stepCounter = 1;
 
-  // Process YusrAI steps array
+  // ENHANCED: Process YusrAI steps array with better type handling
   if (structuredData.steps && Array.isArray(structuredData.steps)) {
     structuredData.steps.forEach((step: string | any, index: number) => {
       if (typeof step === 'string') {
@@ -235,15 +259,23 @@ const constructBlueprintFromComponents = (structuredData: any): AutomationBluepr
       } else if (typeof step === 'object' && step !== null) {
         blueprint.steps.push({
           id: step.id || `step-${stepCounter++}`,
-          name: step.name || step.action || `Step ${index + 1}`,
+          name: step.name || step.action || step.step || `Step ${index + 1}`,
           type: step.type || 'action',
-          ...step
+          action: step.action || {
+            integration: step.platform || step.integration || 'system',
+            method: step.method || 'execute',
+            parameters: { 
+              description: step.name || step.action || `Step ${index + 1}`,
+              ...(typeof step.parameters === 'object' && step.parameters !== null ? step.parameters : {})
+            }
+          },
+          ...(typeof step === 'object' && step !== null ? step : {})
         });
       }
     });
   }
 
-  // Process YusrAI platforms to create integration steps
+  // ENHANCED: Process YusrAI platforms to create integration steps
   if (structuredData.platforms && Array.isArray(structuredData.platforms)) {
     structuredData.platforms.forEach((platform: any) => {
       if (platform?.name) {
@@ -276,8 +308,33 @@ const constructBlueprintFromComponents = (structuredData: any): AutomationBluepr
     blueprint.test_payloads = structuredData.test_payloads;
   }
 
-  console.log(`🔧 PHASE 2: Constructed YusrAI blueprint with ${blueprint.steps.length} steps from components`);
+  console.log(`🔧 ENHANCED: Constructed YusrAI blueprint with ${blueprint.steps.length} steps from components`);
   return blueprint;
+};
+
+/**
+ * ENHANCED: Create minimal blueprint for basic responses
+ */
+const createMinimalBlueprint = (structuredData: any): AutomationBlueprint => {
+  console.log('🔧 ENHANCED: Creating minimal blueprint from basic data');
+  
+  return {
+    version: "1.0",
+    description: structuredData.summary || structuredData.description || "Basic automation structure",
+    trigger: { type: 'manual' },
+    steps: [{
+      id: "step-1",
+      name: "Process Request",
+      type: 'action' as const,
+      action: {
+        integration: 'system',
+        method: 'process',
+        parameters: {
+          description: structuredData.summary || "Basic automation step"
+        }
+      }
+    }]
+  };
 };
 
 /**

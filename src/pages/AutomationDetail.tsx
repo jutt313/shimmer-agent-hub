@@ -1,855 +1,1494 @@
-
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { Send, ArrowLeft, Bot, BarChart3, Code2 } from "lucide-react";
-import ChatCard from "@/components/ChatCard";
-import AutomationDashboard from "@/components/AutomationDashboard";
-import AIAgentForm from "@/components/AIAgentForm";
-import FixedPlatformButtons from "@/components/FixedPlatformButtons";
-import BlueprintCard from "@/components/BlueprintCard";
-import AutomationDiagramDisplay from "@/components/AutomationDiagramDisplay";
-import AutomationExecutionPanel from "@/components/AutomationExecutionPanel";
-import { AutomationBlueprint } from "@/types/automation";
-import { parseStructuredResponse, parseYusrAIStructuredResponse, cleanDisplayText } from "@/utils/jsonParser";
-import { agentStateManager } from '@/utils/agentStateManager';
-import { extractBlueprintFromStructuredData, validateBlueprintForDiagram, ensureBlueprintHasSteps } from '@/utils/blueprintExtractor';
-import { FlagPropagationLogger } from '@/utils/flagPropagationLogger';
-import { GHQ } from '@/utils/GHQ';
-
-interface Automation {
-  id: string;
-  title: string;
-  description: string | null;
-  status: string;
-  created_at: string;
-  automation_blueprint: AutomationBlueprint | null;
-  automation_diagram_data: { nodes: any[]; edges: any[] } | null;
-}
-
-interface ChatMessage {
-  id: string;
-  sender: string;
-  message_content: string;
-  timestamp: string;
-}
-
-const AutomationDetail = () => {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const { toast } = useToast();
-  
-  const [automation, setAutomation] = useState<Automation | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [newMessage, setNewMessage] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [sendingMessage, setSendingMessage] = useState(false);
-  const [showAIAgentForm, setShowAIAgentForm] = useState(false);
-  const [selectedAgent, setSelectedAgent] = useState<any>(null);
-  const [dismissedAgents, setDismissedAgents] = useState<Set<string>>(new Set());
-  const [currentPlatforms, setCurrentPlatforms] = useState<any[]>([]);
-  const [showBlueprint, setShowBlueprint] = useState(false);
-  const [showDashboard, setShowDashboard] = useState(false);
-  const [showDiagram, setShowDiagram] = useState(false);
-  const [generatingDiagram, setGeneratingDiagram] = useState(false);
-
-  useEffect(() => {
-    if (!user || !id) {
-      navigate("/auth");
-      return;
-    }
-    fetchAutomationAndChats();
-  }, [user, id, navigate]);
-
-  const generateAndSaveDiagram = async (automationId: string, blueprint: AutomationBlueprint, forceRegenerate = false, userFeedback?: string) => {
-    console.log('🚀 PHASE 1: Starting diagram generation with properly formatted blueprint');
-    
-    if (!validateBlueprintForDiagram(blueprint)) {
-      console.error('❌ PHASE 1: Blueprint validation failed for diagram generation');
-      FlagPropagationLogger.logFlagState(false, false, 'generateAndSaveDiagram - validation failed', false);
-      toast({
-        title: "Invalid Blueprint",
-        description: "Cannot generate diagram from invalid blueprint structure",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const validatedBlueprint = ensureBlueprintHasSteps(blueprint);
-    
-    setGeneratingDiagram(true);
-    
-    try {
-      console.log('📊 PHASE 1: Sending blueprint to diagram generator:', {
-        steps: validatedBlueprint.steps?.length || 0,
-        triggerType: validatedBlueprint.trigger?.type,
-        hasWorkflow: validatedBlueprint.steps?.some(step => step.originalWorkflowData),
-        forceRegenerate,
-        userFeedback: userFeedback ? 'provided' : 'none'
-      });
-      
-      const requestBody: any = { 
-        automation_blueprint: validatedBlueprint,
-        automation_id: automationId,
-        force_regenerate: forceRegenerate,
-        enhanced_processing: true
-      };
-      
-      if (userFeedback?.trim()) {
-        requestBody.user_feedback = userFeedback.trim();
-        requestBody.improvement_request = true;
-      }
-      
-      const { data, error } = await supabase.functions.invoke('diagram-generator', {
-        body: requestBody,
-      });
-
-      if (error) {
-        console.error('❌ PHASE 1: Diagram generation error:', error);
-        toast({
-          title: "Diagram Generation Failed",
-          description: `Error: ${error.message}`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (!data || !data.nodes || !Array.isArray(data.nodes) || data.nodes.length === 0) {
-        console.error('❌ PHASE 1: Invalid diagram data received:', data);
-        toast({
-          title: "Invalid Diagram Data",
-          description: "Received empty or invalid diagram structure",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      console.log('✅ PHASE 1: Valid diagram data received:', {
-        nodes: data.nodes.length,
-        edges: data.edges?.length || 0,
-        metadata: data.metadata
-      });
-
-      const diagramDataToSave = {
-        ...data,
-        metadata: {
-          ...data.metadata,
-          generatedAt: new Date().toISOString(),
-          source: 'phase1-ai-generator',
-          blueprintSteps: validatedBlueprint.steps?.length || 0
-        }
-      };
-
-      const { error: updateError } = await supabase
-        .from('automations')
-        .update({ automation_diagram_data: diagramDataToSave })
-        .eq('id', automationId);
-
-      if (!updateError) {
-        setAutomation(prev => ({
-          ...prev!,
-          automation_diagram_data: diagramDataToSave
-        }));
-
-        const successMessage = userFeedback 
-          ? `Enhanced diagram with ${data.nodes.length} nodes based on your feedback!`
-          : `Generated comprehensive diagram with ${data.nodes.length} nodes successfully!`;
-        
-        toast({
-          title: "✅ Diagram Generated",
-          description: successMessage,
-        });
-
-        console.log('🎯 PHASE 1: Diagram generation pipeline completed successfully');
-      } else {
-        console.error('❌ PHASE 1: Error saving diagram to database:', updateError);
-        toast({
-          title: "Save Failed", 
-          description: "Generated diagram but failed to save to database",
-          variant: "destructive",
-        });
-      }
-
-    } catch (err) {
-      console.error('💥 PHASE 1: Unexpected error in diagram generation:', err);
-      toast({
-        title: "Generation Error",
-        description: `Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`,
-        variant: "destructive",
-      });
-    } finally {
-      setGeneratingDiagram(false);
-    }
-  };
-
-  const fetchAutomationAndChats = async () => {
-    try {
-      const { data, error: automationError } = await supabase
-        .from('automations')
-        .select('*, automation_diagram_data')
-        .eq('id', id)
-        .single();
-
-      if (automationError) throw automationError;
-
-      const automationData: Automation = {
-        id: data.id,
-        title: data.title,
-        description: data.description,
-        status: data.status,
-        created_at: data.created_at,
-        automation_blueprint: data.automation_blueprint as AutomationBlueprint | null,
-        automation_diagram_data: data.automation_diagram_data as { nodes: any[]; edges: any[] } | null
-      };
-
-      setAutomation(automationData);
-
-      if (automationData.automation_blueprint && !automationData.automation_diagram_data) {
-        console.log('🔄 PHASE 1: No diagram data found, generating new diagram from blueprint...');
-        await generateAndSaveDiagram(automationData.id, automationData.automation_blueprint);
-      } else if (!automationData.automation_blueprint && !automationData.automation_diagram_data) {
-        console.log('⚠️ PHASE 1: No blueprint or diagram data found - waiting for AI response');
-      }
-
-      const { data: chatData, error: chatError } = await supabase
-        .from('automation_chats')
-        .select('*')
-        .eq('automation_id', id)
-        .order('timestamp', { ascending: true });
-
-      if (chatError) throw chatError;
-
-      const formattedMessages = chatData.map((chat: ChatMessage, index: number) => {
-        console.log('🔄 Processing stored chat message:', chat.message_content.substring(0, 100));
-        
-        let structuredData = null;
-        let yusraiPowered = false;
-        let sevenSectionsValidated = false;
-        let platformData = null;
-        
-        if (chat.sender === 'ai') {
-          const parseResult = parseYusrAIStructuredResponse(chat.message_content);
-          structuredData = parseResult.structuredData;
-          yusraiPowered = parseResult.metadata.yusrai_powered || false;
-          sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
-          
-          if (structuredData) {
-            const platformsSource = structuredData.platforms_and_credentials?.platforms || 
-                                   structuredData.platforms_credentials || 
-                                   structuredData.platforms || [];
-            
-            platformData = platformsSource.map(platform => {
-              console.log('🔍 Processing individual platform:', platform);
-              
-              let credentials = [];
-              if (platform.credentials) {
-                if (Array.isArray(platform.credentials)) {
-                  credentials = platform.credentials;
-                } else if (typeof platform.credentials === 'object') {
-                  credentials = Object.entries(platform.credentials).map(([key, value]: [string, any]) => ({
-                    field: key,
-                    placeholder: value.example || value.placeholder || `Enter ${key}`,
-                    link: value.link || value.url || '#',
-                    why_needed: value.description || value.why_needed || `Required for ${key}`
-                  }));
-                }
-              }
-              
-              return {
-                name: platform.name || 'Unknown Platform',
-                credentials: credentials.map(cred => ({
-                  field: cred.field || cred.name || 'api_key',
-                  placeholder: cred.example || cred.placeholder || `Enter ${cred.field}`,
-                  link: cred.link || cred.where_to_get || '#',
-                  why_needed: cred.why_needed || cred.description || 'Authentication required'
-                }))
-              };
-            });
-            
-            console.log('🔗 Extracted platform data with full names:', platformData);
-          }
-          
-          console.log('📦 Enhanced parsing result:', {
-            hasStructuredData: !!structuredData,
-            platformsCount: platformData?.length || 0,
-            platformNames: platformData?.map((p: any) => p.name) || [],
-            yusraiPowered,
-            sevenSectionsValidated
-          });
-        }
-
-        return {
-          id: index + 1,
-          text: chat.message_content,
-          isBot: chat.sender === 'ai',
-          timestamp: new Date(chat.timestamp),
-          structuredData,
-          platformData,
-          yusrai_powered: yusraiPowered,
-          seven_sections_validated: sevenSectionsValidated
-        };
-      });
-
-      const allPlatforms: any[] = [];
-      formattedMessages.forEach(msg => {
-        if (msg.isBot && msg.platformData && Array.isArray(msg.platformData)) {
-          allPlatforms.push(...msg.platformData);
-        }
-      });
-      
-      if (allPlatforms.length > 0) {
-        console.log('🔗 Setting platforms from AI messages:', allPlatforms.map(p => p.name));
-        setCurrentPlatforms(allPlatforms);
-      } else {
-        console.log('⚠️ No platforms found in AI messages');
-      }
-
-      if (formattedMessages.length === 0) {
-        const welcomeMessage = {
-          id: 1,
-          text: `I am YusrAI, how can I help you to build "${automationData.title}"?`,
-          isBot: true,
-          timestamp: new Date()
-        };
-        setMessages([welcomeMessage]);
-      } else {
-        setMessages(formattedMessages);
-      }
-    } catch (error) {
-      console.error('Error fetching automation:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load automation details",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSendMessage = async (messageText: string) => {
-    if (!messageText.trim() || sendingMessage || !automation) return;
-
-    const userMessage = {
-      id: Date.now(),
-      text: messageText,
-      isBot: false,
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setNewMessage("");
-    setSendingMessage(true);
-
-    try {
-      console.log('🚀 ENHANCED: Starting improved blueprint extraction pipeline');
-
-      await supabase
-        .from('automation_chats')
-        .insert({
-          automation_id: automation.id,
-          sender: 'user',
-          message_content: messageText
-        });
-
-      const automationContext = {
-        id: automation.id,
-        title: automation.title,
-        description: automation.description,
-        status: automation.status,
-        automation_blueprint: automation.automation_blueprint,
-        existing_diagram: automation.automation_diagram_data ? 'present' : 'missing'
-      };
-
-      const agentStatusSummary = agentStateManager.getStatusSummary();
-
-      const { data, error } = await supabase.functions.invoke('chat-ai', {
-        body: {
-          message: messageText,
-          messages: messages,
-          automationId: automation.id,
-          automationContext: automationContext,
-          agentStatusSummary: agentStatusSummary,
-          requestDiagramGeneration: true
-        }
-      });
-
-      if (error) {
-        console.error('❌ Chat AI error:', error);
-        throw error;
-      }
-
-      console.log('✅ ENHANCED: Received AI response, starting enhanced blueprint processing');
-
-      let structuredData = null;
-      let aiResponseText = "";
-      let yusraiPowered = false;
-      let sevenSectionsValidated = false;
-
-      // ENHANCED: Improved structured data parsing with multiple fallbacks
-      if (data && (data.response || typeof data === 'string')) {
-        const responseText = data.response || (typeof data === 'string' ? data : JSON.stringify(data));
-        const parseResult = parseYusrAIStructuredResponse(responseText);
-        
-        structuredData = parseResult.structuredData;
-        yusraiPowered = parseResult.metadata.yusrai_powered || false;
-        sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
-        
-        console.log('📋 ENHANCED: Blueprint extraction result:', {
-          hasStructuredData: !!structuredData,
-          yusraiPowered,
-          sevenSectionsValidated,
-          hasExecutionBlueprint: !!(structuredData?.execution_blueprint),
-          hasWorkflow: !!(structuredData?.workflow),
-          workflowLength: structuredData?.workflow?.length || 0,
-          hasTestPayloads: !!(structuredData?.test_payloads),
-          hasPlatforms: !!(structuredData?.platforms)
-        });
-      }
-
-      // ENHANCED: Better AI response text generation
-      if (structuredData) {
-        if (structuredData.clarification_questions?.length > 0) {
-          aiResponseText = "I need clarification:\n\n" + 
-            structuredData.clarification_questions.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n');
-        } else if (structuredData.summary?.trim()) {
-          aiResponseText = structuredData.summary;
-          if (structuredData.workflow?.length > 0) {
-            aiResponseText += "\n\nWorkflow Steps:\n" + 
-              structuredData.workflow.map((item: any, i: number) => 
-                `${i + 1}. ${item.action || item.step} (${item.platform || 'System'})`
-              ).join('\n');
-          }
-        } else if (structuredData.workflow?.length > 0) {
-          aiResponseText = `Created automation with ${structuredData.workflow.length} workflow steps:\n\n` +
-            structuredData.workflow.map((item: any, i: number) => 
-              `${i + 1}. ${item.action || item.step} (${item.platform || 'System'})`
-            ).join('\n');
-        } else {
-          aiResponseText = "I'm creating a comprehensive automation solution for you.";
-        }
-      } else {
-        aiResponseText = typeof data === 'string' ? data : "I'm ready to help you build your automation.";
-      }
-
-      const aiMessage = {
-        id: Date.now() + 1,
-        text: aiResponseText,
-        isBot: true,
-        timestamp: new Date(),
-        structuredData: structuredData,
-        yusrai_powered: yusraiPowered,
-        seven_sections_validated: sevenSectionsValidated
-      };
-
-      setMessages(prev => [...prev, aiMessage]);
-
-      // ENHANCED: Comprehensive blueprint extraction with multiple detection methods
-      if (structuredData) {
-        let blueprintGenerated = false;
-        
-        // Method 1: ENHANCED execution_blueprint processing
-        if (structuredData.execution_blueprint) {
-          console.log('🔧 ENHANCED: Processing execution_blueprint with improved validation');
-          try {
-            const extractedBlueprint = extractBlueprintFromStructuredData(structuredData);
-            if (extractedBlueprint && validateBlueprintForDiagram(extractedBlueprint)) {
-              console.log('✅ ENHANCED: Valid blueprint extracted from execution_blueprint');
-              
-              const { error: updateError } = await supabase
-                .from('automations')
-                .update({ automation_blueprint: extractedBlueprint })
-                .eq('id', automation.id);
-                
-              if (!updateError) {
-                console.log('📋 ENHANCED: Blueprint saved successfully from execution_blueprint');
-                setAutomation(prev => ({ ...prev!, automation_blueprint: extractedBlueprint }));
-                
-                setTimeout(() => {
-                  generateAndSaveDiagram(automation.id, extractedBlueprint);
-                }, 1500);
-                
-                blueprintGenerated = true;
-              }
-            }
-          } catch (error) {
-            console.warn('⚠️ ENHANCED: execution_blueprint processing failed, trying fallbacks:', error);
-          }
-        }
-
-        // Method 2: ENHANCED workflow array processing (fallback)
-        if (!blueprintGenerated && structuredData.workflow && Array.isArray(structuredData.workflow) && structuredData.workflow.length > 0) {
-          console.log('🔧 ENHANCED: Processing workflow array as fallback');
-          try {
-            const fallbackBlueprint = extractBlueprintFromStructuredData({
-              workflow: structuredData.workflow,
-              summary: structuredData.summary,
-              platforms: structuredData.platforms,
-              test_payloads: structuredData.test_payloads
-            });
-            
-            if (fallbackBlueprint && validateBlueprintForDiagram(fallbackBlueprint)) {
-              console.log('✅ ENHANCED: Valid blueprint created from workflow array');
-              
-              const { error: updateError } = await supabase
-                .from('automations')
-                .update({ automation_blueprint: fallbackBlueprint })
-                .eq('id', automation.id);
-                
-              if (!updateError) {
-                console.log('📋 ENHANCED: Fallback blueprint saved successfully');
-                setAutomation(prev => ({ ...prev!, automation_blueprint: fallbackBlueprint }));
-                
-                setTimeout(() => {
-                  generateAndSaveDiagram(automation.id, fallbackBlueprint);
-                }, 1500);
-                
-                blueprintGenerated = true;
-              }
-            }
-          } catch (error) {
-            console.warn('⚠️ ENHANCED: Workflow fallback processing failed:', error);
-          }
-        }
-
-        // Method 3: ENHANCED minimal blueprint creation (final fallback)
-        if (!blueprintGenerated && (structuredData.steps || structuredData.platforms || structuredData.agents)) {
-          console.log('🔧 ENHANCED: Creating minimal blueprint from available components');
-          try {
-            const minimalBlueprint = extractBlueprintFromStructuredData(structuredData);
-            
-            if (minimalBlueprint && minimalBlueprint.steps && minimalBlueprint.steps.length > 0) {
-              console.log('✅ ENHANCED: Minimal blueprint created from components');
-              
-              const { error: updateError } = await supabase
-                .from('automations')
-                .update({ automation_blueprint: minimalBlueprint })
-                .eq('id', automation.id);
-                
-              if (!updateError) {
-                console.log('📋 ENHANCED: Minimal blueprint saved successfully');
-                setAutomation(prev => ({ ...prev!, automation_blueprint: minimalBlueprint }));
-                
-                setTimeout(() => {
-                  generateAndSaveDiagram(automation.id, minimalBlueprint);
-                }, 2000);
-                
-                blueprintGenerated = true;
-              }
-            }
-          } catch (error) {
-            console.warn('⚠️ ENHANCED: Minimal blueprint creation failed:', error);
-          }
-        }
-
-        if (!blueprintGenerated) {
-          console.log('⚠️ ENHANCED: No valid blueprint could be generated from structured data');
-        } else {
-          console.log('🎯 ENHANCED: Blueprint generation pipeline completed successfully');
-        }
-      }
-
-      const responseToSave = data.response || (typeof data === 'string' ? data : JSON.stringify(data));
-      await supabase
-        .from('automation_chats')
-        .insert({
-          automation_id: automation.id,
-          sender: 'ai',
-          message_content: responseToSave
-        });
-
-    } catch (error) {
-      console.error('💥 ENHANCED: Error in message handling:', error);
-      toast({
-        title: "Error",
-        description: "Failed to process message. Please try again.",
-        variant: "destructive",
-      });
-      
-      const errorMessage = {
-        id: Date.now() + 1,
-        text: "I'm having trouble responding. Please try again.",
-        isBot: true,
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setSendingMessage(false);
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !sendingMessage) {
-      handleSendMessage(newMessage);
-      setNewMessage("");
-    }
-  };
-
-  const handleAgentSaved = (agentName: string, agentId: string) => {
-    setShowAIAgentForm(false);
-    setSelectedAgent(null);
-    
-    agentStateManager.addAgent(agentName, { name: agentName, id: agentId });
-    
-    if (automation) {
-      const confirmationMessage = `I've successfully configured your new AI Agent: "${agentName}"!`;
-      
-      setMessages(prev => [...prev, {
-        id: Date.now(),
-        text: confirmationMessage,
-        isBot: false,
-        timestamp: new Date()
-      }]);
-
-      const agentStatusSummary = agentStateManager.getStatusSummary();
-      const enhancedMessage = `Please incorporate the newly configured AI Agent "${agentName}" (ID: ${agentId}) into this automation's blueprint. ${agentStatusSummary} Please update the blueprint and explain its role and impact on the workflow.`;
-
-      handleSendMessage(enhancedMessage).then(() => {
-        setNewMessage("");
-      });
-    }
-  };
-
-  const handleAgentAdd = (agent: any) => {
-    console.log('🤖 Adding agent from chat:', agent.name);
-    agentStateManager.addAgent(agent.name, agent);
-    setSelectedAgent(agent);
-    setShowAIAgentForm(true);
-  };
-
-  const handleAgentDismiss = (agentName: string) => {
-    console.log('❌ Dismissing agent from chat:', agentName);
-    agentStateManager.dismissAgent(agentName);
-    setDismissedAgents(prev => new Set([...prev, agentName]));
-  };
-
-  const handleRegenerateDiagram = (userFeedback?: string) => {
-    if (automation?.automation_blueprint) {
-      generateAndSaveDiagram(automation.id, automation.automation_blueprint, true, userFeedback);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="text-lg text-gray-600">Loading automation...</div>
-      </div>
-    );
-  }
-
-  if (!automation) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">Automation not found</h2>
-          <Button onClick={() => navigate("/automations")}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Automations
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col relative overflow-hidden">
-      <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-blue-300/20 to-purple-300/20 rounded-full blur-3xl animate-pulse"></div>
-      <div className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-r from-purple-300/20 to-blue-300/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-      
-      <div className="sticky top-0 z-20 flex justify-between items-center mx-6 py-4 mb-4">
-        <div className="flex items-center gap-3">
-          <Button 
-            onClick={() => navigate("/automations")}
-            size="sm"
-            className="rounded-full bg-white/90 hover:bg-white text-gray-700 border border-gray-200/50 shadow-lg backdrop-blur-sm"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div className="text-left">
-            <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              {automation?.title}
-            </h1>
-            {automation?.description && (
-              <p className="text-xs text-gray-600 max-w-md truncate">{automation.description}</p>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center bg-white/90 backdrop-blur-sm rounded-full shadow-lg border border-gray-200/50 p-1">
-          <Button
-            onClick={() => {
-              setShowDashboard(!showDashboard);
-              setShowDiagram(false);
-            }}
-            size="sm"
-            className={`rounded-full px-4 py-2 transition-all duration-300 ${
-              showDashboard 
-                ? 'bg-gradient-to-r from-purple-500 to-blue-600 text-white shadow-md' 
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <BarChart3 className="w-4 h-4" />
-          </Button>
-          
-          <Button
-            onClick={() => {
-              setShowDashboard(false);
-              setShowDiagram(false);
-            }}
-            size="sm"
-            className={`rounded-full px-4 py-2 mx-1 transition-all duration-300 ${
-              !showDashboard && !showDiagram
-                ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md' 
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <Bot className="w-4 h-4" />
-          </Button>
-          
-          <Button
-            onClick={() => {
-              setShowDiagram(!showDiagram);
-              setShowDashboard(false);
-            }}
-            size="sm"
-            className={`rounded-full px-4 py-2 transition-all duration-300 ${
-              showDiagram 
-                ? 'bg-gradient-to-r from-purple-500 to-blue-600 text-white shadow-md' 
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-            disabled={generatingDiagram}
-          >
-            <Code2 className={`w-4 h-4 ${generatingDiagram ? 'animate-spin' : ''}`} />
-          </Button>
-        </div>
-
-        <div className="w-32"></div>
-      </div>
-      
-      <div className="flex-1 max-w-7xl mx-auto w-full px-6 relative pb-4">        
-        <div className="relative h-full">
-          <div className={`transition-transform duration-500 ease-in-out ${showDashboard || showDiagram ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'} ${showDashboard || showDiagram ? 'absolute' : 'relative'} w-full`}>
-            <div className="h-[calc(100vh-220px)]">
-              <ChatCard 
-                messages={messages} 
-                onAgentAdd={handleAgentAdd}
-                dismissedAgents={dismissedAgents}
-                onAgentDismiss={handleAgentDismiss}
-                automationId={automation.id}
-                isLoading={sendingMessage}
-                platformCredentialStatus={Object.fromEntries(
-                  currentPlatforms.map(p => [p.name, 'saved'])
-                )}
-                onPlatformCredentialChange={() => {
-                  console.log('🔄 PHASE 1: Credential change detected in AutomationDetail');
-                }}
-              />
-            </div>
-          </div>
-          
-          <div className={`transition-transform duration-500 ease-in-out ${showDashboard ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'} ${showDashboard ? 'relative' : 'absolute'} w-full`}>
-            {showDashboard && (
-              <div className="h-[calc(100vh-160px)]">
-                <AutomationDashboard
-                  automationId={automation.id}
-                  automationTitle={automation.title}
-                  automationBlueprint={automation.automation_blueprint}
-                />
-              </div>
-            )}
-          </div>
-
-          <div className={`transition-transform duration-500 ease-in-out ${showDiagram ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} ${showDiagram ? 'relative' : 'absolute'} w-full`}>
-            {showDiagram && (
-              <div className="h-[calc(100vh-160px)]">
-                <AutomationDiagramDisplay
-                  automationBlueprint={automation?.automation_blueprint}
-                  automationDiagramData={automation?.automation_diagram_data}
-                  messages={messages}
-                  onAgentAdd={handleAgentAdd}
-                  onAgentDismiss={handleAgentDismiss}
-                  dismissedAgents={dismissedAgents}
-                  isGenerating={generatingDiagram}
-                  onRegenerateDiagram={handleRegenerateDiagram}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-      
-      <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-transparent px-6 pt-2 pb-4">
-        <div className="flex gap-3 items-end">
-          <Button
-            onClick={() => setShowAIAgentForm(true)}
-            className="rounded-3xl bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-5 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0 flex-shrink-0"
-            style={{
-              boxShadow: '0 0 25px rgba(147, 51, 234, 0.3)'
-            }}
-          >
-            <Bot className="w-4 h-4 mr-2" />
-            AI Agent
-          </Button>
-          
-          <div className="flex-1 relative min-w-0">
-            <textarea
-              value={newMessage} 
-              onChange={e => setNewMessage(e.target.value)} 
-              onKeyPress={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey && !sendingMessage) {
-                  e.preventDefault();
-                  handleSendMessage(newMessage);
-                  setNewMessage("");
-                }
-              }}
-              placeholder={sendingMessage ? "YusrAI is thinking with full context..." : "Describe the automation you want to build..."} 
-              disabled={sendingMessage}
-              rows={Math.min(Math.max(newMessage.split('\n').length, 1), 4)}
-              className="w-full resize-none rounded-3xl bg-white/90 backdrop-blur-sm border-0 px-5 py-3 text-base focus:outline-none focus:ring-0 shadow-lg min-h-[48px] max-h-32 overflow-y-auto" 
-              style={{
-                boxShadow: '0 0 25px rgba(154, 94, 255, 0.2)'
-              }} 
-            />
-          </div>
-          
-          <Button 
-            onClick={() => handleSendMessage(newMessage)}
-            disabled={sendingMessage || !newMessage.trim()}
-            className="rounded-3xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0 disabled:opacity-50 flex-shrink-0" 
-            style={{
-              boxShadow: '0 0 30px rgba(92, 142, 246, 0.3)'
-            }}
-          >
-            <Send className={`w-5 h-5 ${sendingMessage ? 'animate-pulse' : ''}`} />
-          </Button>
-        </div>
-      </div>
-
-      {showBlueprint && automation?.automation_blueprint && (
-        <BlueprintCard
-          blueprint={automation.automation_blueprint}
-          onClose={() => setShowBlueprint(false)}
-        />
-      )}
-
-      {showAIAgentForm && automation && (
-        <AIAgentForm
-          automationId={automation.id}
-          onClose={() => {
-            setShowAIAgentForm(false);
-            setSelectedAgent(null);
-          }}
-          onAgentSaved={handleAgentSaved}
-          initialAgentData={selectedAgent}
-        />
-      )}
-    </div>
-  );
-};
-
-export default AutomationDetail;
+import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/router';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox"
+import { Switch } from "@/components/ui/switch"
+import { Slider } from "@/components/ui/slider"
+import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
+import {
+  Plus,
+  Edit,
+  Copy,
+  Trash2,
+  Save,
+  X,
+  ArrowLeft,
+  ArrowRight,
+  Play,
+  Pause,
+  Loader2,
+  Zap,
+  Bot,
+  MessageCircle,
+  Settings,
+  HelpCircle,
+  AlertTriangle,
+  CheckCircle,
+  Eye,
+  EyeOff,
+  Code,
+  Download,
+  Upload,
+  Share2,
+  Link2,
+  Link,
+  Cloud,
+  CloudOff,
+  Database,
+  Server,
+  Cpu,
+  Terminal,
+  Monitor,
+  Smartphone,
+  Tablet,
+  Laptop,
+  Desktop,
+  Tv,
+  Watch,
+  Headphones,
+  Speaker,
+  Printer,
+  Camera,
+  Video,
+  Image,
+  File,
+  Folder,
+  Archive,
+  Book,
+  Mail,
+  Phone,
+  MapPin,
+  Calendar,
+  Clock,
+  Lock,
+  Unlock,
+  Key,
+  User,
+  Users,
+  Home,
+  Settings2,
+  Info,
+  QuestionMark,
+  Search,
+  Filter,
+  SortAsc,
+  SortDesc,
+  ChevronDown,
+  ChevronUp,
+  ChevronsLeft,
+  ChevronsRight,
+  Maximize2,
+  Minimize2,
+  RefreshCw,
+  RotateCw,
+  RotateCcw,
+  Move,
+  Crop,
+  Layers,
+  GitBranch,
+  GitCommit,
+  GitMerge,
+  GitPullRequest,
+  Github,
+  Twitter,
+  Facebook,
+  Instagram,
+  Linkedin,
+  Youtube,
+  Twitch,
+  Discord,
+  Slack,
+  Mail2,
+  Send,
+  Inbox,
+  Outbox,
+  Archive2,
+  Trash,
+  Flag,
+  Bookmark,
+  Tag,
+  ShoppingCart,
+  CreditCard,
+  Gift,
+  Heart,
+  Star,
+  Award,
+  BarChart,
+  PieChart,
+  LineChart,
+  AreaChart,
+  Map,
+  Volume1,
+  Volume2,
+  VolumeX,
+  Mic,
+  MicOff,
+  Video2,
+  VideoOff,
+  Maximize,
+  Minimize,
+  PlusCircle,
+  MinusCircle,
+  AlertCircle,
+  Slash,
+  Wifi,
+  WifiOff,
+  Bluetooth,
+  BluetoothOff,
+  BatteryCharging,
+  BatteryFull,
+  BatteryMedium,
+  BatteryLow,
+  BatteryAlert,
+  Sunrise,
+  Sunset,
+  Moon,
+  Sun,
+  CloudRain,
+  CloudSnow,
+  CloudLightning,
+  CloudFog,
+  Wind,
+  Umbrella,
+  Thermometer,
+  Droplet,
+  Waves,
+  Tree,
+  Mountain,
+  Globe,
+  Plane,
+  Car,
+  Bus,
+  Train,
+  Ship,
+  Bicycle,
+  Walking,
+  Running2,
+  Swimming,
+  Skating,
+  Skiing,
+  Snowboarding,
+  Surfing,
+  Sailing,
+  Fishing,
+  Hunting,
+  Golf,
+  Tennis,
+  Basketball,
+  Football,
+  Baseball,
+  Volleyball,
+  Hockey,
+  Cricket,
+  Boxing,
+  Weight,
+  Puzzle,
+  Dice1,
+  Dice2,
+  Dice3,
+  Dice4,
+  Dice5,
+  Dice6,
+  Keyboard,
+  Mouse,
+  Disc,
+  Usb,
+  HardDrive,
+  SdCard,
+  SimCard,
+  Headphones2,
+  GameController2,
+  Radio,
+  Tv2,
+  Camera2,
+  Video22,
+  Image2,
+  File2,
+  Folder2,
+  Archive3,
+  Book2,
+  Mail3,
+  Phone2,
+  MapPin2,
+  Calendar2,
+  Clock2,
+  Lock2,
+  Unlock2,
+  Key2,
+  User2,
+  Users2,
+  Home2,
+  Settings3,
+  Info2,
+  QuestionMark2,
+  Search2,
+  Filter2,
+  SortAsc2,
+  SortDesc2,
+  ChevronDown2,
+  ChevronUp2,
+  ChevronsLeft2,
+  ChevronsRight2,
+  Maximize3,
+  Minimize3,
+  RefreshCw2,
+  RotateCw2,
+  RotateCcw2,
+  Move2,
+  Crop2,
+  Layers2,
+  GitBranch2,
+  GitCommit2,
+  GitMerge2,
+  GitPullRequest2,
+  Github2,
+  Twitter2,
+  Facebook2,
+  Instagram2,
+  Linkedin2,
+  Youtube2,
+  Twitch2,
+  Discord2,
+  Slack2,
+  Mail4,
+  Send2,
+  Inbox2,
+  Outbox2,
+  Archive4,
+  Trash3,
+  Flag2,
+  Bookmark2,
+  Tag2,
+  ShoppingCart2,
+  CreditCard2,
+  Gift2,
+  Heart2,
+  Star2,
+  Award2,
+  BarChart2,
+  PieChart2,
+  LineChart2,
+  AreaChart2,
+  Map2,
+  Volume12,
+  Volume22,
+  VolumeX2,
+  Mic2,
+  MicOff2,
+  Video3,
+  VideoOff3,
+  Maximize4,
+  Minimize4,
+  PlusCircle2,
+  MinusCircle2,
+  AlertCircle2,
+  Slash2,
+  Wifi2,
+  WifiOff2,
+  Bluetooth2,
+  BluetoothOff2,
+  BatteryCharging2,
+  BatteryFull2,
+  BatteryMedium2,
+  BatteryLow2,
+  BatteryAlert2,
+  Sunrise2,
+  Sunset2,
+  Moon2,
+  Sun2,
+  CloudRain2,
+  CloudSnow2,
+  CloudLightning2,
+  CloudFog2,
+  Wind2,
+  Umbrella2,
+  Thermometer2,
+  Droplet2,
+  Waves2,
+  Tree2,
+  Mountain2,
+  Globe2,
+  Plane2,
+  Car2,
+  Bus2,
+  Train2,
+  Ship2,
+  Bicycle2,
+  Walking2,
+  Running3,
+  Swimming2,
+  Skating2,
+  Skiing2,
+  Snowboarding2,
+  Surfing2,
+  Sailing2,
+  Fishing2,
+  Hunting2,
+  Golf2,
+  Tennis2,
+  Basketball2,
+  Football2,
+  Baseball2,
+  Volleyball2,
+  Hockey2,
+  Cricket2,
+  Boxing2,
+  Weight2,
+  Puzzle2,
+  Dice12,
+  Dice22,
+  Dice32,
+  Dice42,
+  Dice52,
+  Dice62,
+  Keyboard2,
+  Mouse2,
+  Disc2,
+  Usb2,
+  HardDrive2,
+  SdCard2,
+  SimCard2,
+  Headphones3,
+  GameController3,
+  Radio2,
+  Tv3,
+  Camera3,
+  Video4,
+  Image3,
+  File3,
+  Folder3,
+  Archive5,
+  Book3,
+  Mail5,
+  Phone3,
+  MapPin3,
+  Calendar3,
+  Clock3,
+  Lock3,
+  Unlock3,
+  Key3,
+  User3,
+  Users3,
+  Home3,
+  Settings4,
+  Info3,
+  QuestionMark3,
+  Search3,
+  Filter3,
+  SortAsc3,
+  SortDesc3,
+  ChevronDown3,
+  ChevronUp3,
+  ChevronsLeft3,
+  ChevronsRight3,
+  Maximize5,
+  Minimize5,
+  RefreshCw3,
+  RotateCw3,
+  RotateCcw3,
+  Move3,
+  Crop3,
+  Layers3,
+  GitBranch3,
+  GitCommit3,
+  GitMerge3,
+  GitPullRequest3,
+  Github3,
+  Twitter3,
+  Facebook3,
+  Instagram3,
+  Linkedin3,
+  Youtube3,
+  Twitch3,
+  Discord3,
+  Slack3,
+  Mail6,
+  Send3,
+  Inbox3,
+  Outbox3,
+  Archive6,
+  Trash4,
+  Flag3,
+  Bookmark3,
+  Tag3,
+  ShoppingCart3,
+  CreditCard3,
+  Gift3,
+  Heart3,
+  Star3,
+  Award3,
+  BarChart3,
+  PieChart3,
+  LineChart3,
+  AreaChart3,
+  Map3,
+  Volume13,
+  Volume23,
+  VolumeX3,
+  Mic3,
+  MicOff3,
+  Video5,
+  VideoOff4,
+  Maximize6,
+  Minimize6,
+  PlusCircle3,
+  MinusCircle3,
+  AlertCircle3,
+  Slash3,
+  Wifi3,
+  WifiOff3,
+  Bluetooth3,
+  BluetoothOff3,
+  BatteryCharging3,
+  BatteryFull3,
+  BatteryMedium3,
+  BatteryLow3,
+  BatteryAlert3,
+  Sunrise3,
+  Sunset3,
+  Moon3,
+  Sun3,
+  CloudRain3,
+  CloudSnow3,
+  CloudLightning3,
+  CloudFog3,
+  Wind3,
+  Umbrella3,
+  Thermometer3,
+  Droplet3,
+  Waves3,
+  Tree3,
+  Mountain3,
+  Globe3,
+  Plane3,
+  Car3,
+  Bus3,
+  Train3,
+  Ship3,
+  Bicycle3,
+  Walking3,
+  Running4,
+  Swimming3,
+  Skating3,
+  Skiing3,
+  Snowboarding3,
+  Surfing3,
+  Sailing3,
+  Fishing3,
+  Hunting3,
+  Golf3,
+  Tennis3,
+  Basketball3,
+  Football3,
+  Baseball3,
+  Volleyball3,
+  Hockey3,
+  Cricket3,
+  Boxing3,
+  Weight3,
+  Puzzle3,
+  Dice13,
+  Dice23,
+  Dice33,
+  Dice43,
+  Dice53,
+  Dice63,
+  Keyboard3,
+  Mouse3,
+  Disc3,
+  Usb3,
+  HardDrive3,
+  SdCard3,
+  SimCard3,
+  Headphones4,
+  GameController4,
+  Radio3,
+  Tv4,
+  Camera4,
+  Video6,
+  Image4,
+  File4,
+  Folder4,
+  Archive7,
+  Book4,
+  Mail7,
+  Phone4,
+  MapPin4,
+  Calendar4,
+  Clock4,
+  Lock4,
+  Unlock4,
+  Key4,
+  User4,
+  Users4,
+  Home4,
+  Settings5,
+  Info4,
+  QuestionMark4,
+  Search4,
+  Filter4,
+  SortAsc4,
+  SortDesc4,
+  ChevronDown4,
+  ChevronUp4,
+  ChevronsLeft4,
+  ChevronsRight4,
+  Maximize7,
+  Minimize7,
+  RefreshCw4,
+  RotateCw4,
+  RotateCcw4,
+  Move4,
+  Crop4,
+  Layers4,
+  GitBranch4,
+  GitCommit4,
+  GitMerge4,
+  GitPullRequest4,
+  Github4,
+  Twitter4,
+  Facebook4,
+  Instagram4,
+  Linkedin4,
+  Youtube4,
+  Twitch4,
+  Discord4,
+  Slack4,
+  Mail8,
+  Send4,
+  Inbox4,
+  Outbox4,
+  Archive8,
+  Trash5,
+  Flag4,
+  Bookmark4,
+  Tag4,
+  ShoppingCart4,
+  CreditCard4,
+  Gift4,
+  Heart4,
+  Star4,
+  Award4,
+  BarChart4,
+  PieChart4,
+  LineChart4,
+  AreaChart4,
+  Map4,
+  Volume14,
+  Volume24,
+  VolumeX4,
+  Mic4,
+  MicOff4,
+  Video7,
+  VideoOff5,
+  Maximize8,
+  Minimize8,
+  PlusCircle4,
+  MinusCircle4,
+  AlertCircle4,
+  Slash4,
+  Wifi4,
+  WifiOff4,
+  Bluetooth4,
+  BluetoothOff4,
+  BatteryCharging4,
+  BatteryFull4,
+  BatteryMedium4,
+  BatteryLow4,
+  BatteryAlert4,
+  Sunrise4,
+  Sunset4,
+  Moon4,
+  Sun4,
+  CloudRain4,
+  CloudSnow4,
+  CloudLightning4,
+  CloudFog4,
+  Wind4,
+  Umbrella4,
+  Thermometer4,
+  Droplet4,
+  Waves4,
+  Tree4,
+  Mountain4,
+  Globe4,
+  Plane4,
+  Car4,
+  Bus4,
+  Train4,
+  Ship4,
+  Bicycle4,
+  Walking4,
+  Running5,
+  Swimming4,
+  Skating4,
+  Skiing4,
+  Snowboarding4,
+  Surfing4,
+  Sailing4,
+  Fishing4,
+  Hunting4,
+  Golf4,
+  Tennis4,
+  Basketball4,
+  Football4,
+  Baseball4,
+  Volleyball4,
+  Hockey4,
+  Cricket4,
+  Boxing4,
+  Weight4,
+  Puzzle4,
+  Dice14,
+  Dice24,
+  Dice34,
+  Dice44,
+  Dice54,
+  Dice64,
+  Keyboard4,
+  Mouse4,
+  Disc4,
+  Usb4,
+  HardDrive4,
+  SdCard4,
+  SimCard4,
+  Headphones5,
+  GameController5,
+  Radio4,
+  Tv5,
+  Camera5,
+  Video8,
+  Image5,
+  File5,
+  Folder5,
+  Archive9,
+  Book5,
+  Mail9,
+  Phone5,
+  MapPin5,
+  Calendar5,
+  Clock5,
+  Lock5,
+  Unlock5,
+  Key5,
+  User5,
+  Users5,
+  Home5,
+  Settings6,
+  Info5,
+  QuestionMark5,
+  Search5,
+  Filter5,
+  SortAsc5,
+  SortDesc5,
+  ChevronDown5,
+  ChevronUp5,
+  ChevronsLeft5,
+  ChevronsRight5,
+  Maximize9,
+  Minimize9,
+  RefreshCw5,
+  RotateCw5,
+  RotateCcw5,
+  Move5,
+  Crop5,
+  Layers5,
+  GitBranch5,
+  GitCommit5,
+  GitMerge5,
+  GitPullRequest5,
+  Github5,
+  Twitter5,
+  Facebook5,
+  Instagram5,
+  Linkedin5,
+  Youtube5,
+  Twitch5,
+  Discord5,
+  Slack5,
+  Mail10,
+  Send5,
+  Inbox5,
+  Outbox5,
+  Archive10,
+  Trash6,
+  Flag5,
+  Bookmark5,
+  Tag5,
+  ShoppingCart5,
+  CreditCard5,
+  Gift5,
+  Heart5,
+  Star5,
+  Award5,
+  BarChart5,
+  PieChart5,
+  LineChart5,
+  AreaChart5,
+  Map5,
+  Volume15,
+  Volume25,
+  VolumeX5,
+  Mic5,
+  MicOff5,
+  Video9,
+  VideoOff6,
+  Maximize10,
+  Minimize10,
+  PlusCircle5,
+  MinusCircle5,
+  AlertCircle5,
+  Slash5,
+  Wifi5,
+  WifiOff5,
+  Bluetooth5,
+  BluetoothOff5,
+  BatteryCharging5,
+  BatteryFull5,
+  BatteryMedium5,
+  BatteryLow5,
+  BatteryAlert5,
+  Sunrise5,
+  Sunset5,
+  Moon5,
+  Sun5,
+  CloudRain5,
+  CloudSnow5,
+  CloudLightning5,
+  CloudFog5,
+  Wind5,
+  Umbrella5,
+  Thermometer5,
+  Droplet5,
+  Waves5,
+  Tree5,
+  Mountain5,
+  Globe5,
+  Plane5,
+  Car5,
+  Bus5,
+  Train5,
+  Ship5,
+  Bicycle5,
+  Walking5,
+  Running6,
+  Swimming5,
+  Skating5,
+  Skiing5,
+  Snowboarding5,
+  Surfing5,
+  Sailing5,
+  Fishing5,
+  Hunting5,
+  Golf5,
+  Tennis5,
+  Basketball5,
+  Football5,
+  Baseball5,
+  Volleyball5,
+  Hockey5,
+  Cricket5,
+  Boxing5,
+  Weight5,
+  Puzzle5,
+  Dice15,
+  Dice25,
+  Dice35,
+  Dice45,
+  Dice55,
+  Dice65,
+  Keyboard5,
+  Mouse5,
+  Disc5,
+  Usb5,
+  HardDrive5,
+  SdCard5,
+  SimCard5,
+  Headphones6,
+  GameController6,
+  Radio5,
+  Tv6,
+  Camera6,
+  Video10,
+  Image6,
+  File6,
+  Folder6,
+  Archive11,
+  Book6,
+  Mail11,
+  Phone6,
+  MapPin6,
+  Calendar6,
+  Clock6,
+  Lock6,
+  Unlock6,
+  Key6,
+  User6,
+  Users6,
+  Home6,
+  Settings7,
+  Info6,
+  QuestionMark6,
+  Search6,
+  Filter6,
+  SortAsc6,
+  SortDesc6,
+  ChevronDown6,
+  ChevronUp6,
+  ChevronsLeft6,
+  ChevronsRight6,
+  Maximize11,
+  Minimize11,
+  RefreshCw6,
+  RotateCw6,
+  RotateCcw6,
+  Move6,
+  Crop6,
+  Layers6,
+  GitBranch6,
+  GitCommit6,
+  GitMerge6,
+  GitPullRequest6,
+  Github6,
+  Twitter6,
+  Facebook6,
+  Instagram6,
+  Linkedin6,
+  Youtube6,
+  Twitch6,
+  Discord6,
+  Slack6,
+  Mail12,
+  Send6,
+  Inbox6,
+  Outbox6,
+  Archive12,
+  Trash7,
+  Flag6,
+  Bookmark6,
+  Tag6,
+  ShoppingCart6,
+  CreditCard6,
+  Gift6,
+  Heart6,
+  Star6,
+  Award6,
+  BarChart6,
+  PieChart6,
+  LineChart6,
+  AreaChart6,
+  Map6,
+  Volume16,
+  Volume26,
+  VolumeX6,
+  Mic6,
+  MicOff6,
+  Video11,
+  VideoOff7,
+  Maximize12,
+  Minimize12,
+  PlusCircle6,
+  MinusCircle6,
+  AlertCircle6,
+  Slash6,
+  Wifi6,
+  WifiOff6,
+  Bluetooth6,
+  BluetoothOff6,
+  BatteryCharging6,
+  BatteryFull6,
+  BatteryMedium6,
+  BatteryLow6,
+  BatteryAlert6,
+  Sunrise6,
+  Sunset6,
+  Moon6,
+  Sun6,
+  CloudRain6,
+  CloudSnow6,
+  CloudLightning6,
+  CloudFog6,
+  Wind6,
+  Umbrella6,
+  Thermometer6,
+  Droplet6,
+  Waves6,
+  Tree6,
+  Mountain6,
+  Globe6,
+  Plane6,
+  Car6,
+  Bus6,
+  Train6,
+  Ship6,
+  Bicycle6,
+  Walking6,
+  Running7,
+  Swimming6,
+  Skating6,
+  Skiing6,
+  Snowboarding7,
+  Surfing6,
+  Sailing6,
+  Fishing6,
+  Hunting6,
+  Golf6,
+  Tennis6,
+  Basketball6,
+  Football6,
+  Baseball6,
+  Volleyball6,
+  Hockey6,
+  Cricket6,
+  Boxing6,
+  Weight6,
+  Puzzle6,
+  Dice16,
+  Dice26,
+  Dice36,
+  Dice46,
+  Dice56,
+  Dice66,
+  Keyboard6,
+  Mouse6,
+  Disc6,
+  Usb6,
+  HardDrive6,
+  SdCard6,
+  SimCard6,
+  Headphones7,
+  GameController7,
+  Radio6,
+  Tv7,
+  Camera7,
+  Video12,
+  Image7,
+  File7,
+  Folder7,
+  Archive13,
+  Book7,
+  Mail13,
+  Phone7,
+  MapPin7,
+  Calendar7,
+  Clock7,
+  Lock7,
+  Unlock7,
+  Key7,
+  User7,
+  Users7,
+  Home7,
+  Settings8,
+  Info7,
+  QuestionMark7,
+  Search7,
+  Filter7,
+  SortAsc7,
+  SortDesc7,
+  ChevronDown7,
+  ChevronUp7,
+  ChevronsLeft7,
+  ChevronsRight7,
+  Maximize13,
+  Minimize13,
+  RefreshCw7,
+  RotateCw7,
+  RotateCcw7,
+  Move7,
+  Crop7,
+  Layers7,
+  GitBranch7,
+  GitCommit7,
+  GitMerge7,
+  GitPullRequest7,
+  Github7,
+  Twitter7,
+  Facebook7,
+  Instagram7,
+  Linkedin7,
+  Youtube7,
+  Twitch7,
+  Discord7,
+  Slack7,
+  Mail14,
+  Send7,
+  Inbox7,
+  Outbox7,
+  Archive14,
+  Trash8,
+  Flag7,
+  Bookmark7,
+  Tag7,
+  ShoppingCart7,
+  CreditCard7,
+  Gift7,
+  Heart7,
+  Star7,
+  Award7,
+  BarChart7,
+  PieChart7,
+  LineChart7,
+  AreaChart7,
+  Map7,
+  Volume17,
+  Volume27,
+  VolumeX7,
+  Mic7,
+  MicOff7,
+  Video13,
+  VideoOff8,
+  Maximize14,
+  Minimize14,
+  PlusCircle7,
+  MinusCircle7,
+  AlertCircle7,
+  Slash7,
+  Wifi7,
+  WifiOff7,
+  Bluetooth7,
+  BluetoothOff7,
+  BatteryCharging7,
+  BatteryFull7,
+  BatteryMedium7,
+  BatteryLow7,
+  BatteryAlert7,
+  Sunrise7,
+  Sunset7,
+  Moon7,
+  Sun7,
+  CloudRain7,
+  CloudSnow7,
+  CloudLightning7,
+  CloudFog7,
+  Wind7,
+  Umbrella7,
+  Thermometer7,
+  Droplet7,
+  Waves7,
+  Tree7,
+  Mountain7,
+  Globe7,
+  Plane7,
+  Car7,
+  Bus7,
+  Train7,
+  Ship7,
+  Bicycle7,
+  Walking7,
+  Running8,
+  Swimming7,
+  Skating7,
+  Skiing7,
+  Snowboarding8,
+  Surfing7,
+  Sailing7,
+  Fishing7,
+  Hunting7,
+  Golf7,
+  Tennis7,
+  Basketball7,
+  Football7,
+  Baseball7,
+  Volleyball7,
+  Hockey7,
+  Cricket7,
+  Boxing7,
+  Weight7,
+  Puzzle7,
+  Dice17,
+  Dice27,
+  Dice37,
+  Dice47,
+  Dice57,
+  Dice67,
+  Keyboard7,
+  Mouse7,
+  Disc7,
+  Usb7,
+  HardDrive7,
+  SdCard7,
+  SimCard7,
+  Headphones8,
+  GameController8,
+  Radio7,
+  Tv8,
+  Camera8,
+  Video14,
+  Image8,
+  File8,
+  Folder8,
+  Archive15,
+  Book8,
+  Mail15,
+  Phone8,
+  MapPin8,
+  Calendar8,
+  Clock8,
+  Lock8,
+  Unlock8,
+  Key8,
+  User8,
+  Users8,
+  Home8,
+  Settings9,
+  Info8,
+  QuestionMark8,
+  Search8,
+  Filter8,
+  SortAsc8,
+  SortDesc8,
+  ChevronDown8,
+  ChevronUp8,
+  ChevronsLeft8,
+  ChevronsRight8,
+  Maximize15,
+  Minimize15,
+  RefreshCw8,
+  RotateCw8,
+  RotateCcw8,
+  Move8,
+  Crop8,
+  Layers8,
+  GitBranch8,
+  GitCommit8,
+  GitMerge8,
+  GitPullRequest8,
+  Github8,
+  Twitter8,
+  Facebook8,
+  Instagram8,
+  Linkedin8,
+  Youtube8,
+  Twitch8,
+  Discord8,
+  Slack8,
+  Mail16,
+  Send8,
+  Inbox8,
+  Outbox8,
+  Archive16,
+  Trash9,
+  Flag8,
+  Bookmark8,
+  Tag8,
+  ShoppingCart8,
+  CreditCard8,
+  Gift8,
+  Heart8,
+  Star8,
+  Award8,
+  BarChart8,
+  PieChart8,
+  LineChart8,
+  AreaChart8,
+  Map8,
+  Volume18,
+  Volume28,
+  VolumeX8,
+  Mic8,
+  MicOff8,
+  Video15,
+  VideoOff9,
+  Maximize16,
+  Minimize16,
+  PlusCircle8,
+  MinusCircle8,
+  AlertCircle8,
+  Slash8,
+  Wifi8,
+  WifiOff8,
+  Bluetooth8,
+  BluetoothOff8,
+  BatteryCharging8,
+  BatteryFull8,
+  BatteryMedium8,
+  BatteryLow8,
+  BatteryAlert8,
+  Sunrise8,
+  Sunset8,
+  Moon8,
+  Sun8,
+  CloudRain8,
+  CloudSnow8,
+  CloudLightning8,
+  CloudFog8,
+  Wind8,
+  Umbrella8,
+  Thermometer8,
+  Droplet8,
+  Waves8,
+  Tree8,
+  Mountain8,
+  Globe8,
+  Plane8,
+  Car8,
+  Bus8,
+  Train8,
+  Ship8,
+  Bicycle8,
+  Walking8,
+  Running9,
+  Swimming8,
+  Skating8,
+  Skiing8,
+  Snowboarding9,
+  Surfing8,
+  Sailing8,
+  Fishing8,
+  Hunting8,
+  Golf8,
+  Tennis8,
+  Basketball8,
+  Football8,
+  Baseball8,
+  Volleyball8,
+  Hockey8,
+  Cricket8,
+  Boxing8,
+  Weight8,
+  Puzzle8,
+  Dice18,
+  Dice28,
+  Dice38,
+  Dice48,
+  Dice58,
+  Dice68,
+  Keyboard8,
+  Mouse8,
+  Disc8,
+  Usb8,
+  HardDrive8,
+  SdCard8,
+  SimCard8,
+  Headphones9,
+  GameController9,
+  Radio8,
+  Tv9,
+  Camera9,
+  Video16,
+  Image9,
+  File9,
+  Folder9,
+  Archive17,
+  Book9,
+  Mail17,
+  Phone9,
+  MapPin9,
+  Calendar9,
+  Clock9,
+  Lock9,
+  Unlock9,
+  Key9,
+  User9,
+  Users9,
+  Home9,
+  Settings10,
+  Info9,
+  QuestionMark9,
+  Search9,
+  Filter9,
+  SortAsc9,
+  SortDesc9,
+  ChevronDown9,
+  ChevronUp9,
+  ChevronsLeft9,
+  ChevronsRight9,
+  Maximize17,
+  Minimize17,
+  RefreshCw9,
+  RotateCw9,
+  RotateCcw9,
+  Move9,
+  Crop9,
+  Layers9,
+  GitBranch9,
+  GitCommit9,
+  GitMerge9,
+  GitPullRequest9,
+  Github9,
+  Twitter9,
+  Facebook9,
+  Instagram9,
+  Linkedin9,
+  Youtube9,
+  Twitch9,
+  Discord9,
+  Slack9,
+  Mail18,
+  Send9,
+  Inbox9,
+  Outbox9,
+  Archive18,
+  Trash10,
+  Flag9,
+  Bookmark9,
+  Tag9,
+  ShoppingCart9,
+  CreditCard9,
+  Gift9,
+  Heart9,
+  Star9,
+  Award9,
+  BarChart9,
+  PieChart9,
+  LineChart9,
+  AreaChart9,
+  Map9,
+  Volume19,
+  Volume29,
+  VolumeX9,
+  Mic9,
+  MicOff9,
+  Video17,
+  VideoOff10,
+  Maximize18,
+  Minimize18,
+  PlusCircle9,
+  MinusCircle9,
+  AlertCircle9,
+  Slash9,
+  Wifi9,
+  WifiOff9,
+  Bluetooth9,
+  BluetoothOff9,
+  BatteryCharging9,
+  BatteryFull9,
+  BatteryMedium9,
+  BatteryLow9,
+  BatteryAlert9,
+  Sunrise9,
+  Sunset9,
+  Moon9,
+  Sun9,
+  CloudRain9,
+  CloudSnow9,
+  CloudLightning9,
+  CloudFog9,
+  Wind9,
+  Umbrella9,
+  Thermometer9,
+  Droplet9,
+  Waves9,
+  Tree9,
+  Mountain9,
+  Globe9,
+  Plane9,
+  Car9,
+  Bus9,
+  Train9,
+  Ship9,
+  Bicycle9,
+  Walking9,
+  Running10,
+  Swimming9,
+  Skating9,
+  Skiing9,
+  Snowboarding10,
+  Surfing9,
+  Sailing9,
+  Fishing9,
+  Hunting9,
+  Golf9,
+  Tennis9,
+  Basketball9,
+  Football9,
+  Baseball9,
+  Volleyball9,
+  Hockey9,
+  Cricket9,
+  Boxing9,
+  Weight9,
+  Puzzle9,
+  Dice19,
+  Dice29,
+  Dice39,
+  Dice49,
+  Dice59,
+  Dice69,
+  Keyboard9,
+  Mouse9,
+  Disc9,
+  Usb9,
+  HardDrive9,
+  SdCard9,
+  SimCard9,
+  Headphones10,
+  GameController10,
+  Radio9,
+  Tv10,
+  Camera10,
+  Video18,
+  Image10,
+  File10,
+  Folder10,
+  Archive19,
+  Book10,
+  Mail19,
+  Phone10,
+  MapPin10,
+  Calendar10,
+  Clock10,
+  Lock10,
+  Unlock10,
+  Key10,
+  User10,
+  Users10,
+  Home10,
+  Settings11,
+  Info10,
+  QuestionMark10,
+  Search10,

@@ -1,71 +1,49 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { 
-  Play, 
-  Pause, 
-  Settings, 
-  Trash2, 
-  Calendar, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  AlertCircle,
-  Bot,
+import {
+  Plus,
+  Key,
   Zap,
-  Activity,
-  Users,
-  Database,
-  Globe,
-  ArrowRight,
-  Eye,
-  Edit,
-  Copy,
-  MoreVertical,
-  RefreshCw,
-  TrendingUp,
   BarChart3,
-  PieChart,
-  Target,
-  Workflow
+  Bot,
+  MessageCircle,
 } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
-import { formatDistanceToNow } from "date-fns";
-import AutomationForm from "./AutomationForm";
-import PlatformCredentialForm from "./PlatformCredentialForm";
-import AIAgentForm from "./AIAgentForm";
-import AgentChatPopup from "./AgentChatPopup";
-import EnhancedAgentChatPopup from "./EnhancedAgentChatPopup";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import AutomationForm from "@/components/AutomationForm";
+import PlatformCredentialForm from "@/components/PlatformCredentialForm";
+import EnhancedAgentChatPopup from "@/components/EnhancedAgentChatPopup";
 
 interface Automation {
   id: string;
-  name: string;
-  description?: string;
-  status: 'active' | 'paused' | 'draft';
-  trigger_type: string;
+  title: string;
+  name: string; // Add missing property
+  description: string | null;
+  status: string;
   created_at: string;
   updated_at: string;
-  last_run?: string;
-  run_count: number;
-  success_rate: number;
-  platform_credentials?: any[];
-  ai_agents?: any[];
-  automation_blueprint?: any;
+  is_pinned: boolean;
+  automation_blueprint: any;
+  trigger_type: string; // Add missing property
+  run_count: number; // Add missing property
+  success_rate: number; // Add missing property
+  ai_agents?: AIAgent[];
 }
 
 interface PlatformCredential {
   id: string;
+  credential_name: string; // Add missing property
   platform_name: string;
-  credential_name: string;
+  credential_type: string;
   is_active: boolean;
   created_at: string;
-  last_tested?: string;
-  test_status?: 'success' | 'failed' | 'pending';
+  updated_at: string;
+  user_id: string;
+  credentials: string;
 }
 
 interface AIAgent {
@@ -73,126 +51,91 @@ interface AIAgent {
   agent_name: string;
   agent_role: string;
   agent_goal: string;
+  agent_rules: string | null;
+  agent_memory: any;
   llm_provider: string;
   model: string;
+  api_key: string;
+  automation_id: string;
+  is_active: boolean; // Add missing property
   created_at: string;
-  is_active: boolean;
+  updated_at: string;
 }
 
 const AutomationDashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-
-  // State management
   const [automations, setAutomations] = useState<Automation[]>([]);
   const [platformCredentials, setPlatformCredentials] = useState<PlatformCredential[]>([]);
-  const [aiAgents, setAIAgents] = useState<AIAgent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedTab, setSelectedTab] = useState("overview");
-  const [currentAutomation, setCurrentAutomation] = useState<Automation | null>(null);
-  
-  // Form states
+  const [aiAgents, setAiAgents] = useState<AIAgent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [totalAutomations, setTotalAutomations] = useState(0);
+  const [runningAutomations, setRunningAutomations] = useState(0);
+  const [averageSuccessRate, setAverageSuccessRate] = useState(0);
   const [showAutomationForm, setShowAutomationForm] = useState(false);
   const [showCredentialForm, setShowCredentialForm] = useState(false);
-  const [showAgentForm, setShowAgentForm] = useState(false);
-  const [editingAutomation, setEditingAutomation] = useState<Automation | null>(null);
-  const [selectedCredentialPlatform, setSelectedCredentialPlatform] = useState<string>("");
-  
-  // Chat states
-  const [chatAgent, setChatAgent] = useState<any>(null);
-
-  // Statistics
-  const [stats, setStats] = useState({
-    totalAutomations: 0,
-    activeAutomations: 0,
-    totalRuns: 0,
-    avgSuccessRate: 0,
-    totalCredentials: 0,
-    totalAgents: 0
-  });
-
-  useEffect(() => {
-    if (user) {
-      fetchDashboardData();
-    }
-  }, [user]);
+  const [selectedAgent, setSelectedAgent] = useState<AIAgent & { automationContext?: any } | null>(null);
 
   const fetchDashboardData = async () => {
+    if (!user?.id) return;
+    
+    setIsLoading(true);
     try {
-      setLoading(true);
-      
-      // Fetch automations with related data
+      // Fetch automations with ai_agents
       const { data: automationsData, error: automationsError } = await supabase
         .from('automations')
         .select(`
           *,
-          platform_credentials (
-            id,
-            platform_name,
-            credential_name,
-            is_active,
-            created_at,
-            last_tested,
-            test_status
-          ),
-          ai_agents (
-            id,
-            agent_name,
-            agent_role,
-            agent_goal,
-            llm_provider,
-            model,
-            created_at,
-            is_active
-          )
+          ai_agents (*)
         `)
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (automationsError) throw automationsError;
 
-      // Fetch standalone platform credentials
+      // Fetch platform credentials
       const { data: credentialsData, error: credentialsError } = await supabase
         .from('platform_credentials')
         .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
+        .eq('user_id', user.id);
 
       if (credentialsError) throw credentialsError;
 
-      // Fetch standalone AI agents
-      const { data: agentsData, error: agentsError } = await supabase
-        .from('ai_agents')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
+      // Transform the data to match our interfaces
+      const transformedAutomations: Automation[] = (automationsData || []).map((auto: any) => ({
+        id: auto.id,
+        title: auto.title,
+        name: auto.title, // Use title as name
+        description: auto.description,
+        status: auto.status,
+        created_at: auto.created_at,
+        updated_at: auto.updated_at,
+        is_pinned: auto.is_pinned,
+        automation_blueprint: auto.automation_blueprint,
+        trigger_type: auto.automation_blueprint?.trigger?.type || 'manual',
+        run_count: 0, // Default value since not in database
+        success_rate: 100, // Default value since not in database
+        ai_agents: (auto.ai_agents || []).map((agent: any) => ({
+          ...agent,
+          is_active: true // Add default value
+        }))
+      }));
 
-      if (agentsError) throw agentsError;
+      const transformedCredentials: PlatformCredential[] = (credentialsData || []).map((cred: any) => ({
+        ...cred,
+        credential_name: `${cred.platform_name} Credential` // Generate name from platform
+      }));
 
-      setAutomations(automationsData || []);
-      setPlatformCredentials(credentialsData || []);
-      setAIAgents(agentsData || []);
+      setAutomations(transformedAutomations);
+      setPlatformCredentials(transformedCredentials);
+      setAiAgents(transformedAutomations.flatMap(auto => auto.ai_agents || []));
 
-      // Calculate statistics
-      const totalAutomations = automationsData?.length || 0;
-      const activeAutomations = automationsData?.filter(a => a.status === 'active').length || 0;
-      const totalRuns = automationsData?.reduce((sum, a) => sum + (a.run_count || 0), 0) || 0;
-      const avgSuccessRate = totalAutomations > 0 
-        ? automationsData.reduce((sum, a) => sum + (a.success_rate || 0), 0) / totalAutomations 
-        : 0;
-      const totalCredentials = credentialsData?.length || 0;
-      const totalAgents = agentsData?.length || 0;
+      // Calculate stats
+      setTotalAutomations(transformedAutomations.length);
+      setRunningAutomations(transformedAutomations.filter(a => a.status === 'active').length);
+      setAverageSuccessRate(transformedAutomations.reduce((acc, auto) => acc + auto.success_rate, 0) / Math.max(transformedAutomations.length, 1));
 
-      setStats({
-        totalAutomations,
-        activeAutomations,
-        totalRuns,
-        avgSuccessRate,
-        totalCredentials,
-        totalAgents
-      });
-
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching dashboard data:', error);
       toast({
         title: "Error",
@@ -200,774 +143,370 @@ const AutomationDashboard = () => {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const handleToggleAutomation = async (automationId: string, currentStatus: string) => {
-    try {
-      const newStatus = currentStatus === 'active' ? 'paused' : 'active';
-      
-      const { error } = await supabase
-        .from('automations')
-        .update({ status: newStatus })
-        .eq('id', automationId);
+  useEffect(() => {
+    fetchDashboardData();
+  }, [user]);
 
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: `Automation ${newStatus === 'active' ? 'activated' : 'paused'}`,
-      });
-
-      fetchDashboardData();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: `Failed to update automation: ${error.message}`,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDeleteAutomation = async (automationId: string) => {
-    if (!confirm('Are you sure you want to delete this automation?')) return;
-
+  const pinAutomation = async (automationId: string, isPinned: boolean) => {
     try {
       const { error } = await supabase
         .from('automations')
-        .delete()
-        .eq('id', automationId);
+        .update({ is_pinned: !isPinned })
+        .eq('id', automationId)
+        .eq('user_id', user!.id);
 
       if (error) throw error;
 
+      setAutomations(automations.map(auto =>
+        auto.id === automationId ? { ...auto, is_pinned: !isPinned } : auto
+      ));
+
       toast({
         title: "Success",
-        description: "Automation deleted successfully",
+        description: `Automation ${isPinned ? 'unpinned' : 'pinned'} successfully!`,
       });
-
-      fetchDashboardData();
     } catch (error: any) {
       toast({
         title: "Error",
-        description: `Failed to delete automation: ${error.message}`,
+        description: `Failed to pin automation: ${error.message}`,
         variant: "destructive",
       });
     }
   };
-
-  const handleRunAutomation = async (automationId: string) => {
-    try {
-      toast({
-        title: "Running Automation",
-        description: "Automation execution started...",
-      });
-
-      // Here you would call your automation execution service
-      // For now, we'll just simulate it
-      setTimeout(() => {
-        toast({
-          title: "Success",
-          description: "Automation completed successfully",
-        });
-        fetchDashboardData();
-      }, 2000);
-
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: `Failed to run automation: ${error.message}`,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleViewAutomation = (automation: Automation) => {
-    setCurrentAutomation(automation);
-    setSelectedTab("details");
-  };
-
-  const handleEditAutomation = (automation: Automation) => {
-    setEditingAutomation(automation);
-    setShowAutomationForm(true);
-  };
-
-  const handleAddCredential = (platformName: string) => {
-    setSelectedCredentialPlatform(platformName);
-    setShowCredentialForm(true);
-  };
-
-  const handleAgentChat = (agent: any) => {
-    console.log(`💬 Opening chat for agent: ${agent.agent_name}`);
-    setChatAgent(agent);
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-green-100 text-green-800';
-      case 'paused': return 'bg-yellow-100 text-yellow-800';
-      case 'draft': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'active': return <CheckCircle className="w-4 h-4" />;
-      case 'paused': return <Pause className="w-4 h-4" />;
-      case 'draft': return <AlertCircle className="w-4 h-4" />;
-      default: return <XCircle className="w-4 h-4" />;
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-gray-600">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Automation Dashboard</h1>
-          <p className="text-gray-600">Manage your automations, credentials, and AI agents</p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50/50 to-purple-50/50">
+      <header className="bg-white/80 backdrop-blur-md py-6 shadow-sm sticky top-0 z-40">
+        <div className="container mx-auto px-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-800">
+              YusrAI Automations
+            </h1>
+            <p className="text-sm text-gray-500">
+              Manage and monitor your automations
+            </p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <Avatar>
+              <AvatarImage src={`https://avatar.vercel.sh/${user?.email}.png`} />
+              <AvatarFallback>{user?.email?.charAt(0).toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <span className="text-gray-700">{user?.email}</span>
+          </div>
         </div>
-
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Automations</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalAutomations}</p>
-                </div>
-                <Workflow className="w-8 h-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Active</p>
-                  <p className="text-2xl font-bold text-green-600">{stats.activeAutomations}</p>
-                </div>
-                <Activity className="w-8 h-8 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Runs</p>
-                  <p className="text-2xl font-bold text-purple-600">{stats.totalRuns}</p>
-                </div>
-                <TrendingUp className="w-8 h-8 text-purple-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Success Rate</p>
-                  <p className="text-2xl font-bold text-blue-600">{stats.avgSuccessRate.toFixed(1)}%</p>
-                </div>
-                <Target className="w-8 h-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Credentials</p>
-                  <p className="text-2xl font-bold text-orange-600">{stats.totalCredentials}</p>
-                </div>
-                <Database className="w-8 h-8 text-orange-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">AI Agents</p>
-                  <p className="text-2xl font-bold text-indigo-600">{stats.totalAgents}</p>
-                </div>
-                <Bot className="w-8 h-8 text-indigo-600" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Content */}
-        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="automations" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              Automations
-            </TabsTrigger>
-            <TabsTrigger value="credentials" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              Credentials
-            </TabsTrigger>
-            <TabsTrigger value="agents" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              AI Agents
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Recent Automations */}
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+      </header>
+      
+      <main className="container mx-auto px-4 py-8 space-y-8">
+        {isLoading ? (
+          <div className="text-center py-16 text-gray-500">
+            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p>Loading automations...</p>
+          </div>
+        ) : (
+          <>
+            {/* Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Workflow className="w-5 h-5" />
-                    Recent Automations
-                  </CardTitle>
+                  <CardTitle>Total Automations</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ScrollArea className="h-64">
-                    <div className="space-y-3">
-                      {automations.slice(0, 5).map((automation) => (
-                        <div key={automation.id} className="flex items-center justify-between p-3 bg-gray-50/80 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            {getStatusIcon(automation.status)}
-                            <div>
-                              <p className="font-medium text-gray-900">{automation.name}</p>
-                              <p className="text-sm text-gray-600">
-                                {formatDistanceToNow(new Date(automation.created_at), { addSuffix: true })}
-                              </p>
-                            </div>
-                          </div>
-                          <Badge className={getStatusColor(automation.status)}>
-                            {automation.status}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
+                  <div className="text-2xl font-bold">{totalAutomations}</div>
                 </CardContent>
               </Card>
-
-              {/* Quick Actions */}
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+              <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Zap className="w-5 h-5" />
-                    Quick Actions
-                  </CardTitle>
+                  <CardTitle>Running Automations</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent>
+                  <div className="text-2xl font-bold">{runningAutomations}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Average Success Rate</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{averageSuccessRate.toFixed(1)}%</div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Zap className="w-5 h-5 text-blue-600" />
+                  Quick Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-4">
                   <Button 
                     onClick={() => setShowAutomationForm(true)}
-                    className="w-full justify-start bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
+                    className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
                   >
-                    <Workflow className="w-4 h-4 mr-2" />
-                    Create New Automation
+                    <Plus className="w-4 h-4 mr-2" />
+                    New Automation
                   </Button>
                   <Button 
+                    variant="outline"
                     onClick={() => setShowCredentialForm(true)}
-                    variant="outline" 
-                    className="w-full justify-start"
                   >
-                    <Database className="w-4 h-4 mr-2" />
+                    <Key className="w-4 h-4 mr-2" />
                     Add Platform Credential
                   </Button>
-                  <Button 
-                    onClick={() => setShowAgentForm(true)}
-                    variant="outline" 
-                    className="w-full justify-start"
-                  >
-                    <Bot className="w-4 h-4 mr-2" />
-                    Create AI Agent
+                  <Button variant="outline">
+                    <BarChart3 className="w-4 h-4 mr-2" />
+                    View Analytics
                   </Button>
-                  <Button 
-                    onClick={fetchDashboardData}
-                    variant="outline" 
-                    className="w-full justify-start"
-                  >
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Refresh Data
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
+                </div>
+              </CardContent>
+            </Card>
 
-          {/* Automations Tab */}
-          <TabsContent value="automations" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-900">Automations</h2>
-              <Button 
-                onClick={() => setShowAutomationForm(true)}
-                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
-              >
-                <Workflow className="w-4 h-4 mr-2" />
-                Create Automation
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              {automations.map((automation) => (
-                <Card key={automation.id} className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow">
-                  <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-lg">{automation.name}</CardTitle>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {automation.description || 'No description'}
-                        </p>
+            {/* Recent Automations */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ListOrdered className="w-5 h-5 text-gray-600" />
+                  Recent Automations ({automations.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <ScrollArea className="h-[300px]">
+                  <div className="divide-y divide-gray-200">
+                    {automations.length > 0 ? (
+                      automations.map((auto) => (
+                        <div key={auto.id} className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
+                          <div>
+                            <h3 className="font-semibold text-gray-800">{auto.title}</h3>
+                            <p className="text-sm text-gray-600">{auto.description || 'No description'}</p>
+                            <p className="text-xs text-gray-500">Created at {new Date(auto.created_at).toLocaleDateString()}</p>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => pinAutomation(auto.id, auto.is_pinned)}
+                              className="bg-white/80 hover:bg-white border-gray-200 text-gray-700 hover:text-gray-800"
+                            >
+                              {auto.is_pinned ? <Unpin className="w-4 h-4 mr-1" /> : <Pin className="w-4 h-4 mr-1" />}
+                              {auto.is_pinned ? 'Unpin' : 'Pin'}
+                            </Button>
+                            <Link href={`/automation/${auto.id}`} passHref>
+                              <Button size="sm" className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white">
+                                <Edit className="w-4 h-4 mr-1" />
+                                Edit
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <ClipboardList className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p>No automations created yet</p>
                       </div>
-                      <Badge className={getStatusColor(automation.status)}>
-                        {automation.status}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-gray-600">Trigger</p>
-                        <p className="font-medium">{automation.trigger_type}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Runs</p>
-                        <p className="font-medium">{automation.run_count || 0}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Success Rate</p>
-                        <p className="font-medium">{automation.success_rate || 0}%</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Last Run</p>
-                        <p className="font-medium">
-                          {automation.last_run 
-                            ? formatDistanceToNow(new Date(automation.last_run), { addSuffix: true })
-                            : 'Never'
-                          }
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        onClick={() => handleRunAutomation(automation.id)}
-                        size="sm"
-                        className="flex-1 bg-green-500 hover:bg-green-600 text-white"
-                      >
-                        <Play className="w-4 h-4 mr-1" />
-                        Run
-                      </Button>
-                      <Button
-                        onClick={() => handleToggleAutomation(automation.id, automation.status)}
-                        size="sm"
-                        variant="outline"
-                        className="flex-1"
-                      >
-                        {automation.status === 'active' ? (
-                          <>
-                            <Pause className="w-4 h-4 mr-1" />
-                            Pause
-                          </>
-                        ) : (
-                          <>
-                            <Play className="w-4 h-4 mr-1" />
-                            Activate
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        onClick={() => handleViewAutomation(automation)}
-                        size="sm"
-                        variant="outline"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        onClick={() => handleEditAutomation(automation)}
-                        size="sm"
-                        variant="outline"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        onClick={() => handleDeleteAutomation(automation.id)}
-                        size="sm"
-                        variant="outline"
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {automations.length === 0 && (
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-                <CardContent className="text-center py-12">
-                  <Workflow className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Automations Yet</h3>
-                  <p className="text-gray-600 mb-4">Create your first automation to get started</p>
-                  <Button 
-                    onClick={() => setShowAutomationForm(true)}
-                    className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
-                  >
-                    <Workflow className="w-4 h-4 mr-2" />
-                    Create Automation
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          {/* Credentials Tab */}
-          <TabsContent value="credentials" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-900">Platform Credentials</h2>
-              <Button 
-                onClick={() => setShowCredentialForm(true)}
-                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
-              >
-                <Database className="w-4 h-4 mr-2" />
-                Add Credential
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {platformCredentials.map((credential) => (
-                <Card key={credential.id} className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <h4 className="font-semibold text-gray-800">{credential.credential_name}</h4>
-                        <p className="text-sm text-gray-600">{credential.platform_name}</p>
-                      </div>
-                      <Badge className={credential.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                        {credential.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </div>
-                    <div className="text-xs text-gray-500 space-y-1">
-                      <p>Created: {formatDistanceToNow(new Date(credential.created_at), { addSuffix: true })}</p>
-                      {credential.last_tested && (
-                        <p>Last tested: {formatDistanceToNow(new Date(credential.last_tested), { addSuffix: true })}</p>
-                      )}
-                      {credential.test_status && (
-                        <p className={`font-medium ${
-                          credential.test_status === 'success' ? 'text-green-600' : 
-                          credential.test_status === 'failed' ? 'text-red-600' : 'text-yellow-600'
-                        }`}>
-                          Status: {credential.test_status}
-                        </p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {platformCredentials.length === 0 && (
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-                <CardContent className="text-center py-12">
-                  <Database className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Credentials Yet</h3>
-                  <p className="text-gray-600 mb-4">Add platform credentials to connect your automations</p>
-                  <Button 
-                    onClick={() => setShowCredentialForm(true)}
-                    className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
-                  >
-                    <Database className="w-4 h-4 mr-2" />
-                    Add Credential
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          {/* AI Agents Tab */}
-          <TabsContent value="agents" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-900">AI Agents</h2>
-              <Button 
-                onClick={() => setShowAgentForm(true)}
-                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
-              >
-                <Bot className="w-4 h-4 mr-2" />
-                Create Agent
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {aiAgents.map((agent) => (
-                <Card key={agent.id} className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <h4 className="font-semibold text-gray-800">{agent.agent_name}</h4>
-                        <p className="text-sm text-gray-600">{agent.agent_role}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={() => handleAgentChat(agent)}
-                          size="sm"
-                          className="bg-blue-500 hover:bg-blue-600 text-white rounded-xl px-3 py-1 text-xs"
-                        >
-                          Chat
-                        </Button>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          agent.llm_provider === 'OpenAI' ? 'bg-green-100 text-green-800' :
-                          agent.llm_provider === 'Claude' ? 'bg-purple-100 text-purple-800' :
-                          agent.llm_provider === 'Gemini' ? 'bg-yellow-100 text-yellow-800' :
-                          agent.llm_provider === 'Grok' ? 'bg-blue-100 text-blue-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {agent.llm_provider}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="text-sm text-gray-700 mb-2">{agent.agent_goal}</p>
-                    <div className="text-xs text-gray-500">
-                      <p>Model: {agent.model}</p>
-                      <p>Created: {formatDistanceToNow(new Date(agent.created_at), { addSuffix: true })}</p>
-                      <p>Status: {agent.is_active ? 'Active' : 'Inactive'}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {aiAgents.length === 0 && (
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-                <CardContent className="text-center py-12">
-                  <Bot className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No AI Agents Yet</h3>
-                  <p className="text-gray-600 mb-4">Create AI agents to enhance your automations</p>
-                  <Button 
-                    onClick={() => setShowAgentForm(true)}
-                    className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
-                  >
-                    <Bot className="w-4 h-4 mr-2" />
-                    Create Agent
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          {/* Details Tab */}
-          <TabsContent value="details" className="space-y-6">
-            {currentAutomation && (
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-2xl">{currentAutomation.name}</CardTitle>
-                      <p className="text-gray-600 mt-2">{currentAutomation.description}</p>
-                    </div>
-                    <Badge className={getStatusColor(currentAutomation.status)}>
-                      {currentAutomation.status}
-                    </Badge>
+                    )}
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Automation Details */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-gray-50/80 p-4 rounded-lg">
-                      <p className="text-sm text-gray-600">Trigger Type</p>
-                      <p className="font-semibold">{currentAutomation.trigger_type}</p>
-                    </div>
-                    <div className="bg-gray-50/80 p-4 rounded-lg">
-                      <p className="text-sm text-gray-600">Total Runs</p>
-                      <p className="font-semibold">{currentAutomation.run_count || 0}</p>
-                    </div>
-                    <div className="bg-gray-50/80 p-4 rounded-lg">
-                      <p className="text-sm text-gray-600">Success Rate</p>
-                      <p className="font-semibold">{currentAutomation.success_rate || 0}%</p>
-                    </div>
-                    <div className="bg-gray-50/80 p-4 rounded-lg">
-                      <p className="text-sm text-gray-600">Last Run</p>
-                      <p className="font-semibold">
-                        {currentAutomation.last_run 
-                          ? formatDistanceToNow(new Date(currentAutomation.last_run), { addSuffix: true })
-                          : 'Never'
-                        }
-                      </p>
-                    </div>
-                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
 
-                  {/* Platform Credentials Section */}
-                  {currentAutomation?.platform_credentials && currentAutomation.platform_credentials.length > 0 && (
-                    <div className="mt-8">
-                      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                        <Database className="w-5 h-5" />
-                        Platform Credentials ({currentAutomation.platform_credentials.length})
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {currentAutomation.platform_credentials.map((credential: any, index: number) => (
-                          <Card key={credential.id || index} className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-                            <CardContent className="p-4">
-                              <div className="flex justify-between items-start mb-2">
-                                <div>
-                                  <h4 className="font-semibold text-gray-800">{credential.credential_name}</h4>
-                                  <p className="text-sm text-gray-600">{credential.platform_name}</p>
-                                </div>
-                                <Badge className={credential.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                                  {credential.is_active ? 'Active' : 'Inactive'}
-                                </Badge>
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                Created: {formatDistanceToNow(new Date(credential.created_at), { addSuffix: true })}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
+            {/* AI Agents Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bot className="w-5 h-5 text-purple-600" />
+                  AI Agents ({aiAgents.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {aiAgents.length > 0 ? (
+                  <div className="space-y-4">
+                    {aiAgents.map((agent) => (
+                      <div key={agent.id} className="flex items-center justify-between p-4 border rounded-lg bg-gradient-to-r from-purple-50/50 to-blue-50/50">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-blue-600 flex items-center justify-center text-white font-semibold">
+                            {agent.agent_name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-gray-800">{agent.agent_name}</h3>
+                            <p className="text-sm text-gray-600">{agent.agent_role}</p>
+                            <p className="text-xs text-gray-500">{agent.llm_provider}/{agent.model}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const automation = automations.find(a => a.id === agent.automation_id);
+                              if (automation) {
+                                setSelectedAgent({
+                                  ...agent,
+                                  automationContext: {
+                                    id: automation.id,
+                                    name: automation.title,
+                                    description: automation.description || undefined
+                                  }
+                                });
+                              }
+                            }}
+                            className="bg-white/80 hover:bg-white border-purple-200 text-purple-700 hover:text-purple-800"
+                          >
+                            <MessageCircle className="w-4 h-4 mr-1" />
+                            Chat
+                          </Button>
+                          <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <Bot className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>No AI agents configured yet</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-                          {/* AI Agents Section */}
-                          {currentAutomation?.ai_agents && currentAutomation.ai_agents.length > 0 && (
-                            <div className="mt-8">
-                              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                                <Bot className="w-5 h-5" />
-                                AI Agents ({currentAutomation.ai_agents.length})
-                              </h3>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {currentAutomation.ai_agents.map((agent: any, index: number) => (
-                                  <Card key={agent.id || index} className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-                                    <CardContent className="p-4">
-                                      <div className="flex justify-between items-start mb-2">
-                                        <div>
-                                          <h4 className="font-semibold text-gray-800">{agent.agent_name}</h4>
-                                          <p className="text-sm text-gray-600">{agent.agent_role}</p>
-                                        </div>
-                                        <div className="flex gap-2">
-                                          <Button
-                                            onClick={() => handleAgentChat(agent)}
-                                            size="sm"
-                                            className="bg-blue-500 hover:bg-blue-600 text-white rounded-xl px-3 py-1 text-xs"
-                                          >
-                                            Chat
-                                          </Button>
-                                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                            agent.llm_provider === 'OpenAI' ? 'bg-green-100 text-green-800' :
-                                            agent.llm_provider === 'Claude' ? 'bg-purple-100 text-purple-800' :
-                                            agent.llm_provider === 'Gemini' ? 'bg-yellow-100 text-yellow-800' :
-                                            agent.llm_provider === 'Grok' ? 'bg-blue-100 text-blue-800' :
-                                            'bg-gray-100 text-gray-800'
-                                          }`}>
-                                            {agent.llm_provider}
-                                          </span>
-                                        </div>
-                                      </div>
-                                      <p className="text-sm text-gray-700 mb-2">{agent.agent_goal}</p>
-                                      <div className="text-xs text-gray-500">
-                                        Model: {agent.model} | Memory: {agent.agent_memory ? '✓' : '✗'}
-                                      </div>
-                                    </CardContent>
-                                  </Card>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+            {/* Platform Credentials */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Key className="w-5 h-5 text-orange-600" />
+                  Platform Credentials ({platformCredentials.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <ScrollArea className="h-[300px]">
+                  <div className="divide-y divide-gray-200">
+                    {platformCredentials.length > 0 ? (
+                      platformCredentials.map((cred) => (
+                        <div key={cred.id} className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
+                          <div>
+                            <h3 className="font-semibold text-gray-800">{cred.credential_name}</h3>
+                            <p className="text-sm text-gray-600">{cred.platform_name}</p>
+                            <p className="text-xs text-gray-500">Created at {new Date(cred.created_at).toLocaleDateString()}</p>
+                          </div>
+                          <div>
+                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <KeyRound className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p>No platform credentials added yet</p>
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </main>
 
-                  {/* Automation Blueprint */}
-                  {currentAutomation.automation_blueprint && (
-                    <div className="mt-8">
-                      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                        <Settings className="w-5 h-5" />
-                        Automation Blueprint
-                      </h3>
-                      <Card className="bg-gray-50/80 backdrop-blur-sm border-0">
-                        <CardContent className="p-4">
-                          <pre className="text-sm text-gray-700 whitespace-pre-wrap overflow-auto max-h-64">
-                            {JSON.stringify(currentAutomation.automation_blueprint, null, 2)}
-                          </pre>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      {/* Forms */}
+      {/* Modals */}
       {showAutomationForm && (
         <AutomationForm
-          onClose={() => {
-            setShowAutomationForm(false);
-            setEditingAutomation(null);
+          onClose={() => setShowAutomationForm(false)}
+          onSubmit={async (data) => {
+            try {
+              const { error } = await supabase
+                .from('automations')
+                .insert([{
+                  user_id: user!.id,
+                  title: data.title,
+                  description: data.description || null,
+                  status: 'draft'
+                }]);
+
+              if (error) throw error;
+
+              toast({
+                title: "Success",
+                description: "Automation created successfully!",
+              });
+              
+              setShowAutomationForm(false);
+              fetchDashboardData();
+            } catch (error: any) {
+              toast({
+                title: "Error",
+                description: `Failed to create automation: ${error.message}`,
+                variant: "destructive",
+              });
+            }
           }}
-          onAutomationSaved={() => {
-            fetchDashboardData();
-            setShowAutomationForm(false);
-            setEditingAutomation(null);
-          }}
-          editingAutomation={editingAutomation}
         />
       )}
 
       {showCredentialForm && (
         <PlatformCredentialForm
-          onClose={() => {
-            setShowCredentialForm(false);
-            setSelectedCredentialPlatform("");
-          }}
-          onCredentialSaved={() => {
-            fetchDashboardData();
-            setShowCredentialForm(false);
-            setSelectedCredentialPlatform("");
-          }}
-          preselectedPlatform={selectedCredentialPlatform}
-        />
-      )}
+          onClose={() => setShowCredentialForm(false)}
+          onSubmit={async (data) => {
+            try {
+              const { error } = await supabase
+                .from('platform_credentials')
+                .insert([{
+                  user_id: user!.id,
+                  credential_name: data.credential_name,
+                  platform_name: data.platform_name,
+                  credential_type: data.credential_type,
+                  credentials: JSON.stringify(data.credentials),
+                  is_active: true
+                }]);
 
-      {showAgentForm && (
-        <AIAgentForm
-          onClose={() => setShowAgentForm(false)}
-          onAgentSaved={() => {
-            fetchDashboardData();
-            setShowAgentForm(false);
+              if (error) throw error;
+
+              toast({
+                title: "Success",
+                description: "Platform credential added successfully!",
+              });
+              
+              setShowCredentialForm(false);
+              fetchDashboardData();
+            } catch (error: any) {
+              toast({
+                title: "Error",
+                description: `Failed to add credential: ${error.message}`,
+                variant: "destructive",
+              });
+            }
           }}
         />
       )}
 
       {/* Enhanced Agent Chat Popup */}
-      {chatAgent && (
+      {selectedAgent && (
         <EnhancedAgentChatPopup
-          agent={chatAgent}
-          automationContext={{
-            id: currentAutomation?.id || '',
-            name: currentAutomation?.name,
-            description: currentAutomation?.description
-          }}
-          onClose={() => setChatAgent(null)}
+          agent={selectedAgent}
+          automationContext={selectedAgent.automationContext}
+          onClose={() => setSelectedAgent(null)}
         />
       )}
-
     </div>
   );
 };
 
 export default AutomationDashboard;
+import {
+  ListOrdered,
+  Pin,
+  Unpin,
+  Edit,
+  ClipboardList,
+  KeyRound,
+} from "lucide-react";
+import Link from 'next/link';

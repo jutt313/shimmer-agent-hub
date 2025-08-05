@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
+import { supabase } from "@/integrations/supabase/client";
 import {
   Card,
   CardContent,
@@ -75,15 +75,44 @@ const AutomationDetail = () => {
       setLoading(true);
       setError(null);
       try {
-        // Fetch automation details from API or database
-        const response = await fetch(`/api/automations/${id}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch automation details');
+        console.log('Fetching automation with ID:', id);
+        
+        // Fetch automation from Supabase
+        const { data, error: supabaseError } = await supabase
+          .from('automations')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (supabaseError) {
+          console.error('Supabase error:', supabaseError);
+          throw new Error(`Failed to fetch automation: ${supabaseError.message}`);
         }
-        const data = await response.json();
-        setAutomation(data);
+
+        if (!data) {
+          throw new Error('No automation found with this ID');
+        }
+
+        console.log('Fetched automation data:', data);
+        
+        // Transform data to match expected format
+        const transformedData = {
+          id: data.id,
+          name: data.title,
+          description: data.description,
+          isActive: data.status === 'active',
+          triggers: data.automation_blueprint?.triggers || [],
+          actions: data.automation_blueprint?.actions || [],
+          variables: data.automation_blueprint?.variables || {},
+          lastRun: data.updated_at,
+          runCount: 0, // This would need to be calculated from automation_runs table
+          errorCount: 0, // This would need to be calculated from error logs
+        };
+
+        setAutomation(transformedData);
       } catch (err: any) {
-        setError(err.message || 'Unknown error');
+        console.error('Error fetching automation:', err);
+        setError(err.message || 'Unknown error occurred');
       } finally {
         setLoading(false);
       }

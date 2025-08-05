@@ -95,15 +95,18 @@ const AutomationDetail = () => {
 
         console.log('Fetched automation data:', data);
         
+        // Safely parse the automation_blueprint JSON
+        const blueprint = data.automation_blueprint as any;
+        
         // Transform data to match expected format
         const transformedData = {
           id: data.id,
           name: data.title,
           description: data.description,
           isActive: data.status === 'active',
-          triggers: data.automation_blueprint?.triggers || [],
-          actions: data.automation_blueprint?.actions || [],
-          variables: data.automation_blueprint?.variables || {},
+          triggers: (blueprint && typeof blueprint === 'object' && blueprint.triggers) ? blueprint.triggers : [],
+          actions: (blueprint && typeof blueprint === 'object' && blueprint.actions) ? blueprint.actions : [],
+          variables: (blueprint && typeof blueprint === 'object' && blueprint.variables) ? blueprint.variables : {},
           lastRun: data.updated_at,
           runCount: 0, // This would need to be calculated from automation_runs table
           errorCount: 0, // This would need to be calculated from error logs
@@ -169,7 +172,7 @@ const AutomationDetail = () => {
                   </div>
                   <div>
                     <Label htmlFor="automation-description">Description</Label>
-                    <Textarea id="automation-description" value={automation.description} readOnly />
+                    <Textarea id="automation-description" value={automation.description || ''} readOnly />
                   </div>
                   <div>
                     <Label>Active</Label>

@@ -93,7 +93,7 @@ export class AutomationCredentialManager {
   }
 
   /**
-   * DYNAMIC: Save credentials with AI validation
+   * CRITICAL FIX: Save credentials with explicit conflict resolution
    */
   static async saveCredentials(
     automationId: string,
@@ -102,7 +102,7 @@ export class AutomationCredentialManager {
     userId: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log(`💾 Saving DYNAMIC credentials for ${platformName} in automation ${automationId}`);
+      console.log(`💾 CRITICAL FIX: Saving credentials for ${platformName} in automation ${automationId}`);
 
       const { data, error } = await supabase
         .from('automation_platform_credentials')
@@ -116,6 +116,8 @@ export class AutomationCredentialManager {
           test_status: 'success',
           test_message: `Fully dynamic AI-powered testing successful for ${platformName}`,
           credential_type: 'ai_dynamic_multi_field'
+        }, {
+          onConflict: 'automation_id, platform_name, user_id'
         })
         .select()
         .single();
@@ -124,11 +126,11 @@ export class AutomationCredentialManager {
         throw error;
       }
 
-      console.log(`✅ Dynamic credentials saved for ${platformName}`);
+      console.log(`✅ CRITICAL FIX: Credentials saved successfully for ${platformName}`);
       return { success: true };
 
     } catch (error: any) {
-      console.error(`❌ Failed to save dynamic credentials:`, error);
+      console.error(`❌ CRITICAL FIX: Failed to save credentials:`, error);
       return { success: false, error: error.message };
     }
   }

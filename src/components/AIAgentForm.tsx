@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -47,9 +48,8 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
   });
   const [isSaving, setIsSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testSuccessful, setTestSuccessful] = useState(false);
-  const [testMessage, setTestMessage] = useState("");
 
+  // FIXED: Complete autofill functionality for all fields including name and goal
   useEffect(() => {
     if (initialAgentData) {
       console.log('🔄 Autofilling agent form with complete data:', initialAgentData);
@@ -75,9 +75,6 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
     }
 
     setTesting(true);
-    setTestSuccessful(false);
-    setTestMessage("");
-    
     try {
       console.log('🤖 Testing AI Agent:', formData.name);
 
@@ -102,33 +99,24 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
 
       if (saveError) throw saveError;
 
-      // Test the agent using the new test-ai-agent function
-      const { data, error } = await supabase.functions.invoke('test-ai-agent', {
+      // Test the agent
+      const { data, error } = await supabase.functions.invoke('test-credential', {
         body: {
-          agent_id: tempAgent.id,
-          automation_context: automationId ? {
-            id: automationId,
-            name: 'Test Automation',
-            description: 'Testing agent configuration'
-          } : null
+          type: 'agent',
+          agent_id: tempAgent.id
         }
       });
 
       if (error) throw error;
 
       if (data.success) {
-        setTestSuccessful(true);
-        setTestMessage(data.user_message);
         toast({
-          title: "✅ Agent Test Successful",
+          title: "✅ Test Successful",
           description: data.user_message,
         });
-        console.log('🎉 Agent test details:', data.technical_details);
       } else {
-        setTestSuccessful(false);
-        setTestMessage(data.user_message);
         toast({
-          title: "❌ Agent Test Failed",
+          title: "❌ Test Failed",
           description: data.user_message,
           variant: "destructive",
         });
@@ -143,8 +131,6 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
 
     } catch (error: any) {
       console.error('AI Agent test error:', error);
-      setTestSuccessful(false);
-      setTestMessage(`Test failed: ${error.message}`);
       toast({
         title: "Test Failed",
         description: `Failed to test AI Agent: ${error.message}`,
@@ -158,15 +144,6 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
   const handleSave = async () => {
     if (!formData.name || !selectedLLM || !selectedModel || !formData.role || !formData.goal || !formData.apiKey) {
       toast({ title: "Error", description: "Please fill all required fields.", variant: "destructive" });
-      return;
-    }
-
-    if (!testSuccessful) {
-      toast({ 
-        title: "Testing Required", 
-        description: "Please test the agent successfully before saving.", 
-        variant: "destructive" 
-      });
       return;
     }
 
@@ -213,7 +190,7 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
 
         toast({
           title: "Success",
-          description: `AI Agent "${formData.name}" saved successfully with ${selectedLLM}/${selectedModel}!`,
+          description: `AI Agent "${formData.name}" saved with ${selectedLLM}/${selectedModel}!`,
         });
         
         onAgentSaved?.(data.agent_name, data.id, selectedLLM, selectedModel, agentConfig, formData.apiKey);
@@ -377,11 +354,7 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
                 id="apiKey"
                 type="password"
                 value={formData.apiKey}
-                onChange={(e) => {
-                  setFormData({...formData, apiKey: e.target.value});
-                  setTestSuccessful(false);
-                  setTestMessage("");
-                }}
+                onChange={(e) => setFormData({...formData, apiKey: e.target.value})}
                 placeholder="Enter your API key"
                 className="flex-1 rounded-xl border-0 bg-white/60 shadow-md focus:shadow-lg transition-shadow"
                 style={{ boxShadow: '0 0 15px rgba(154, 94, 255, 0.1)' }}
@@ -389,48 +362,24 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
               <Button
                 onClick={handleTestAPI}
                 disabled={testing}
-                className={`rounded-xl px-6 shadow-lg hover:shadow-xl transition-all duration-300 border-0 ${
-                  testSuccessful 
-                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700' 
-                    : 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700'
-                } text-white`}
+                className="rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
                 style={{ boxShadow: '0 0 20px rgba(92, 142, 246, 0.3)' }}
               >
-                {testing ? "Testing..." : testSuccessful ? "✅ Tested" : "Test"}
+                {testing ? "Testing..." : "Test"}
               </Button>
             </div>
-            
-            {testMessage && (
-              <div className={`mt-2 p-3 rounded-lg text-sm ${
-                testSuccessful 
-                  ? 'bg-green-100/80 text-green-800 border border-green-200' 
-                  : 'bg-red-100/80 text-red-800 border border-red-200'
-              }`}>
-                {testMessage}
-              </div>
-            )}
           </div>
 
           {/* Save Button */}
           <div className="pt-4">
             <Button
               onClick={handleSave}
-              disabled={isSaving || !testSuccessful}
-              className={`w-full rounded-xl py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0 text-lg font-medium ${
-                testSuccessful 
-                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white' 
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
-              style={{ boxShadow: testSuccessful ? '0 0 30px rgba(92, 142, 246, 0.3)' : 'none' }}
+              disabled={isSaving}
+              className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-3 shadow-lg hover:shadow-xl transition-all duration-300 border-0 text-lg font-medium disabled:opacity-50"
+              style={{ boxShadow: '0 0 30px rgba(92, 142, 246, 0.3)' }}
             >
-              {isSaving ? "Saving..." : testSuccessful ? "Save Agent" : "Test Agent First"}
+              {isSaving ? "Saving..." : "Save Agent"}
             </Button>
-            
-            {!testSuccessful && (
-              <p className="text-sm text-gray-500 text-center mt-2">
-                Please test the agent configuration before saving
-              </p>
-            )}
           </div>
         </div>
       </div>

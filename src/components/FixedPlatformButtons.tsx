@@ -34,12 +34,6 @@ const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: F
     setSelectedPlatform(platformName);
   };
 
-  const handleCredentialsSubmit = (credentials: Record<string, string>) => {
-    console.log('🔐 Credentials submitted:', Object.keys(credentials));
-    // Handle credential submission logic here if needed
-    // This is the required prop that was missing
-  };
-
   if (!platforms || platforms.length === 0) {
     return null;
   }
@@ -66,7 +60,6 @@ const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: F
             name: selectedPlatform,
             credentials: platforms.find(p => p.name === selectedPlatform)?.credentials || []
           }}
-          onCredentialsSubmit={handleCredentialsSubmit}
           automationId={automationId}
           onCredentialSaved={(platformName: string) => {
             console.log(`✅ NEW UNIFIED credentials saved for ${platformName}`);

@@ -13,24 +13,19 @@ serve(async (req) => {
   }
 
   try {
-    const { platformName, credentials, testConfig, authPattern, userId } = await req.json();
+    const { platformName, credentials, testConfig, userId } = await req.json();
     
-    console.log('🧪 UNIVERSAL AUTH TESTING:', { 
-      platformName, 
-      userId, 
-      authPattern: authPattern?.type,
-      hasTestConfig: !!testConfig 
-    });
+    console.log('🧪 TESTING CREDENTIALS:', { platformName, userId, hasTestConfig: !!testConfig });
 
-    // UNIVERSAL: Validate AI-generated or universal test config
+    // CRITICAL: Use ONLY AI-generated test config (no hardcoded fallbacks)
     if (!testConfig || !testConfig.base_url || !testConfig.test_endpoint) {
-      console.error('❌ NO CONFIG: Missing test configuration');
+      console.error('❌ NO AI CONFIG: Missing AI-generated test configuration');
       return new Response(JSON.stringify({
         success: false,
-        message: 'No test configuration provided',
+        message: 'No AI-generated test configuration provided',
         details: {
           platform: platformName,
-          error: 'Test configuration is required',
+          error: 'AI test configuration is required',
           received_config: testConfig
         }
       }), {
@@ -39,43 +34,54 @@ serve(async (req) => {
       });
     }
 
-    // UNIVERSAL: Build configuration from provided config
+    // Build configuration from AI-generated test config ONLY
     const config = {
       base_url: testConfig.base_url,
       test_endpoint: testConfig.test_endpoint.path || testConfig.test_endpoint,
       method: testConfig.test_endpoint.method || 'GET',
-      authentication: testConfig.authentication || {
-        type: 'bearer',
-        location: 'header',
-        parameter_name: 'Authorization',
-        format: 'Bearer {api_key}'
-      }
+      auth_header: testConfig.authentication?.parameter_name || 'Authorization',
+      auth_format: testConfig.authentication?.format || 'Bearer {api_key}',
+      success_indicators: testConfig.success_indicators?.response_patterns || ['success'],
+      error_patterns: testConfig.error_patterns || { 401: 'Unauthorized' }
     };
 
     // Build test URL
     const testUrl = `${config.base_url}${config.test_endpoint}`;
-    console.log('🎯 UNIVERSAL TESTING URL:', testUrl);
+    console.log('🎯 TESTING URL:', testUrl);
 
-    // UNIVERSAL: Build headers with dynamic authentication
+    // Build headers
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'User-Agent': 'YusrAI-Universal-Auth-Test/4.0'
+      'User-Agent': 'YusrAI-Test/1.0'
     };
 
-    // UNIVERSAL AUTH: Apply authentication based on detected pattern
-    if (config.authentication.location === 'header') {
-      const credentialValue = getUniversalCredentialValue(credentials, config.authentication);
+    // Add authentication header
+    if (config.auth_header && config.auth_format) {
+      // Find the credential field to use
+      let credentialValue = null;
       
+      // Try common patterns
+      const commonFields = ['api_key', 'access_token', 'token', 'bot_token', 'integration_token', 'personal_access_token'];
+      for (const field of commonFields) {
+        if (credentials[field]) {
+          credentialValue = credentials[field];
+          break;
+        }
+      }
+
+      // Use first available credential if no common pattern found
+      if (!credentialValue) {
+        const credentialKeys = Object.keys(credentials);
+        if (credentialKeys.length > 0) {
+          credentialValue = credentials[credentialKeys[0]];
+        }
+      }
+
       if (credentialValue) {
-        // Apply authentication format (supports both Bearer and custom headers like xi-api-key)
-        const authValue = config.authentication.format.replace(/\{[\w_]+\}/g, credentialValue);
-        headers[config.authentication.parameter_name] = authValue;
-        
-        console.log('🔐 UNIVERSAL AUTH APPLIED:', {
-          header_name: config.authentication.parameter_name,
-          auth_type: config.authentication.type,
-          format: config.authentication.format
-        });
+        // Replace placeholder in auth format
+        const authValue = config.auth_format.replace(/\{[^}]+\}/g, credentialValue);
+        headers[config.auth_header] = authValue;
+        console.log('🔐 AUTH HEADER:', config.auth_header, 'set');
       } else {
         console.error('❌ NO CREDENTIAL: No valid credential found');
         return new Response(JSON.stringify({
@@ -84,8 +90,7 @@ serve(async (req) => {
           details: {
             platform: platformName,
             available_fields: Object.keys(credentials),
-            expected_field: config.authentication.credential_field || 'api_key',
-            auth_pattern: config.authentication
+            expected_fields: commonFields
           }
         }), {
           status: 400,
@@ -95,7 +100,7 @@ serve(async (req) => {
     }
 
     // Make the test request
-    console.log('📡 UNIVERSAL REQUEST:', config.method, testUrl);
+    console.log('📡 MAKING REQUEST:', config.method, testUrl);
     const response = await fetch(testUrl, {
       method: config.method,
       headers: headers
@@ -110,38 +115,34 @@ serve(async (req) => {
       responseData = { raw_response: responseText };
     }
 
-    console.log('📥 UNIVERSAL RESPONSE:', response.status, typeof responseData);
+    console.log('📥 RESPONSE:', response.status, typeof responseData);
 
-    // Check for success using universal patterns
-    const successIndicators = testConfig.success_indicators?.response_patterns || ['success', 'id', 'user', 'data'];
+    // Check for success
     const isSuccess = response.ok && (
-      successIndicators.some(indicator => 
+      config.success_indicators.some(indicator => 
         responseData && typeof responseData === 'object' && responseData[indicator] !== undefined
       ) || response.status === 200
     );
 
     if (isSuccess) {
-      console.log('✅ UNIVERSAL TEST SUCCESS:', platformName);
+      console.log('✅ TEST SUCCESS:', platformName);
       return new Response(JSON.stringify({
         success: true,
-        message: `${platformName} credentials verified with Universal Authentication!`,
+        message: `${platformName} credentials are valid and working`,
         details: {
           status: response.status,
           platform: platformName,
           endpoint_tested: testUrl,
-          auth_method: config.authentication.type,
-          auth_header: config.authentication.parameter_name,
           response_preview: Object.keys(responseData).slice(0, 3),
-          universal_auth_success: true,
-          config_source: testConfig.ai_generated ? 'ai_generated' : 'universal_fallback'
+          config_source: 'ai_generated_only',
+          ai_driven: true
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     } else {
-      console.log('❌ UNIVERSAL TEST FAILED:', response.status, platformName);
-      const errorPatterns = testConfig.error_patterns || {};
-      const errorMessage = errorPatterns[response.status] || 
+      console.log('❌ TEST FAILED:', response.status, platformName);
+      const errorMessage = config.error_patterns[response.status] || 
                           (responseData?.error || responseData?.message) || 
                           `HTTP ${response.status}`;
       
@@ -153,11 +154,9 @@ serve(async (req) => {
           platform: platformName,
           endpoint_tested: testUrl,
           error: errorMessage,
-          auth_method: config.authentication.type,
-          auth_header: config.authentication.parameter_name,
           response: responseData,
-          universal_auth_applied: true,
-          troubleshooting: `Check if ${config.authentication.parameter_name} header format is correct for ${platformName}`
+          config_source: 'ai_generated_only',
+          ai_driven: true
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -165,14 +164,14 @@ serve(async (req) => {
     }
 
   } catch (error: any) {
-    console.error('💥 UNIVERSAL TEST ERROR:', error);
+    console.error('💥 TEST ERROR:', error);
     return new Response(JSON.stringify({
       success: false,
-      message: `Universal test failed: ${error.message}`,
+      message: `Test failed: ${error.message}`,
       details: {
         error: error.message,
         stack: error.stack?.substring(0, 500),
-        universal_auth_system: true
+        ai_driven_only: true
       }
     }), {
       status: 500,
@@ -180,35 +179,3 @@ serve(async (req) => {
     });
   }
 });
-
-/**
- * UNIVERSAL: Get credential value using smart detection
- */
-function getUniversalCredentialValue(
-  credentials: Record<string, string>, 
-  authentication: any
-): string | null {
-  // Try the specified credential field first
-  if (authentication.credential_field && credentials[authentication.credential_field]) {
-    return credentials[authentication.credential_field];
-  }
-  
-  // Try common credential fields
-  const commonFields = ['api_key', 'access_token', 'token', 'bot_token', 'integration_token', 'personal_access_token', 'secret_key'];
-  
-  for (const field of commonFields) {
-    if (credentials[field]) {
-      return credentials[field];
-    }
-  }
-  
-  // Try first available credential
-  const credentialKeys = Object.keys(credentials);
-  if (credentialKeys.length > 0) {
-    return credentials[credentialKeys[0]];
-  }
-  
-  return null;
-}
-
-console.log('✅ Universal Authentication Test System Active - Supports ALL platforms dynamically');

@@ -1,6 +1,4 @@
 
-import { UniversalAuthDetector } from './universalAuthDetector';
-
 interface PlatformTestConfig {
   base_url: string;
   test_endpoint: {
@@ -33,36 +31,33 @@ interface Platform {
 }
 
 /**
- * Extract clean, executable test script with UNIVERSAL AUTH DEBUGGING
+ * Extract clean, executable test script from platform configuration
  */
-export const extractTestScript = async (platform: Platform, credentials: Record<string, string>): Promise<string> => {
-  // Use existing platform testConfig or create universal fallback
-  const config = platform.testConfig || await createUniversalFallbackConfig(platform.name);
+export const extractTestScript = (platform: Platform, credentials: Record<string, string>): string => {
+  // Use existing platform testConfig or create fallback
+  const config = platform.testConfig || createFallbackConfig(platform.name);
   
-  // Generate clean API call script with AUTHENTICATION DEBUGGING
-  const script = await generateExecutableScriptWithAuthDebug(config, platform.name, credentials);
+  // Generate clean API call script as structured JSON
+  const script = generateExecutableScript(config, platform.name, credentials);
   return script;
 };
 
 /**
- * ENHANCED: Inject credentials with AUTH DEBUG MODE
+ * Dynamically inject credentials into test script
  */
 export const injectCredentials = (baseScript: string, credentials: Record<string, string>): string => {
   let updatedScript = baseScript;
   
-  // ENHANCED: Show more credential characters for debugging (but still secure)
+  // Replace credential placeholders with actual values (masked for security)
   Object.entries(credentials).forEach(([key, value]) => {
     if (value && value !== '' && value !== '••••••••••••••••') {
-      // DEBUGGING MODE: Show more characters for auth debugging
-      const debugValue = value.length > 12 ? 
-        value.substring(0, 8) + '••••' + value.substring(value.length-4) : 
-        value.substring(0, 4) + '••••••••';
+      const maskedValue = value.length > 8 ? value.substring(0, 4) + '••••••••' : '••••••••';
       
       // Replace various placeholder formats
-      updatedScript = updatedScript.replace(new RegExp(`\\{${key}\\}`, 'g'), debugValue);
-      updatedScript = updatedScript.replace(new RegExp(`\\$\\{${key}\\}`, 'g'), debugValue);
-      updatedScript = updatedScript.replace(new RegExp(`<${key}>`, 'g'), debugValue);
-      updatedScript = updatedScript.replace(new RegExp(`YOUR_${key.toUpperCase()}`, 'g'), debugValue);
+      updatedScript = updatedScript.replace(new RegExp(`\\{${key}\\}`, 'g'), maskedValue);
+      updatedScript = updatedScript.replace(new RegExp(`\\$\\{${key}\\}`, 'g'), maskedValue);
+      updatedScript = updatedScript.replace(new RegExp(`<${key}>`, 'g'), maskedValue);
+      updatedScript = updatedScript.replace(new RegExp(`YOUR_${key.toUpperCase()}`, 'g'), maskedValue);
     }
   });
   
@@ -78,24 +73,17 @@ export const formatExecutableScript = (script: string): string => {
 };
 
 /**
- * UNIVERSAL: Generate executable script with authentication debugging info
+ * Generate executable API call script as structured JSON from test configuration
  */
-const generateExecutableScriptWithAuthDebug = async (
-  config: PlatformTestConfig, 
-  platformName: string, 
-  credentials: Record<string, string>
-): Promise<string> => {
+const generateExecutableScript = (config: PlatformTestConfig, platformName: string, credentials: Record<string, string>): string => {
   const { base_url, test_endpoint, authentication } = config;
   const url = `${base_url}${test_endpoint.path}`;
   const method = test_endpoint.method || 'GET';
   
-  // Get universal authentication pattern
-  const authPattern = await UniversalAuthDetector.detectAuthPattern(platformName);
-  
-  // Build headers with UNIVERSAL AUTHENTICATION
+  // Build headers object
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'User-Agent': 'YusrAI-Universal-Auth-Tester/4.0'
+    'User-Agent': 'YusrAI-Test/1.0'
   };
   
   // Add any additional headers from test_endpoint
@@ -103,43 +91,31 @@ const generateExecutableScriptWithAuthDebug = async (
     Object.assign(headers, test_endpoint.headers);
   }
   
-  // UNIVERSAL: Add authentication header using detected pattern
-  const credentialValue = UniversalAuthDetector.getCredentialValue(credentials, authPattern);
-  if (credentialValue) {
-    const authHeaders = UniversalAuthDetector.buildAuthHeader(authPattern, `{${authPattern.credential_field}}`);
-    Object.assign(headers, authHeaders);
+  // Add authentication header
+  if (authentication.location === 'header') {
+    const credentialKey = findCredentialKey(credentials, authentication);
+    const authValue = authentication.format.replace(/\{[\w_]+\}/g, `{${credentialKey}}`);
+    headers[authentication.parameter_name] = authValue;
   }
   
-  // Create enhanced structured JSON payload with AUTH DEBUGGING
+  // Create structured JSON payload
   const testPayload = {
     platform: platformName,
-    universal_auth_detection: {
-      detected_pattern: authPattern.type,
-      header_name: authPattern.parameter_name,
-      header_format: authPattern.format,
-      credential_field: authPattern.credential_field,
-      auth_location: authPattern.location
-    },
     request: {
       method: method,
       url: url,
       headers: headers,
-      authentication_debug: {
-        detected_auth_type: authPattern.type,
-        using_header: authPattern.parameter_name,
-        credential_source: authPattern.credential_field,
-        format_template: authPattern.format
+      authentication: {
+        type: authentication.type,
+        location: authentication.location,
+        parameter: authentication.parameter_name
       }
     },
     expected_response: {
       status_codes: config.success_indicators.status_codes,
       response_patterns: config.success_indicators.response_patterns
     },
-    error_handling: config.error_patterns,
-    debugging_info: {
-      note: "Shows authentication method being used for debugging",
-      credential_visibility: "Partial credentials shown for debugging (secure masking applied)"
-    }
+    error_handling: config.error_patterns
   };
 
   // Return formatted JSON string
@@ -164,23 +140,28 @@ const findCredentialKey = (credentials: Record<string, string>, authentication: 
 };
 
 /**
- * UNIVERSAL: Create dynamic fallback configuration without hardcoding
+ * Create dynamic fallback configuration with intelligent TLD detection
  */
-const createUniversalFallbackConfig = async (platformName: string): Promise<PlatformTestConfig> => {
-  // Get universal authentication pattern
-  const authPattern = await UniversalAuthDetector.detectAuthPattern(platformName);
+const createFallbackConfig = (platformName: string): PlatformTestConfig => {
+  const lowerPlatform = platformName.toLowerCase();
+  
+  // Intelligent base URL generation with proper TLD detection
+  const baseUrl = generateIntelligentBaseUrl(lowerPlatform);
+  
+  // Dynamic endpoint path based on platform patterns
+  const endpointPath = generateIntelligentEndpoint(lowerPlatform);
   
   return {
-    base_url: generateIntelligentBaseUrl(platformName),
+    base_url: baseUrl,
     test_endpoint: { 
-      path: generateIntelligentEndpoint(platformName), 
+      path: endpointPath, 
       method: 'GET' 
     },
     authentication: {
-      type: authPattern.type,
-      location: authPattern.location,
-      parameter_name: authPattern.parameter_name,
-      format: authPattern.format
+      type: 'bearer',
+      location: 'header',
+      parameter_name: 'Authorization',
+      format: 'Bearer {api_key}'
     },
     success_indicators: { 
       status_codes: [200], 
@@ -198,7 +179,7 @@ const createUniversalFallbackConfig = async (platformName: string): Promise<Plat
  * Generate intelligent base URL with proper TLD detection
  */
 const generateIntelligentBaseUrl = (platformName: string): string => {
-  const cleanPlatform = platformName.toLowerCase().replace(/\s+/g, '');
+  const cleanPlatform = platformName.replace(/\s+/g, '').toLowerCase();
   
   // Specific platform TLD mappings
   if (cleanPlatform.includes('elevenlabs') || cleanPlatform.includes('11labs')) {

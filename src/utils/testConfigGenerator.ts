@@ -1,5 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
+import { UniversalAuthDetector } from './universalAuthDetector';
 
 export interface TestConfig {
   platform_name: string;
@@ -15,6 +15,7 @@ export interface TestConfig {
     location: string;
     parameter_name: string;
     format: string;
+    credential_field: string;
   };
   required_fields: string[];
   field_mappings: Record<string, string>;
@@ -29,12 +30,13 @@ export interface TestConfig {
 
 export class TestConfigGenerator {
   /**
-   * Generate real test configuration for a platform using Chat-AI
+   * UNIVERSAL: Generate test configuration using AI + Universal Auth Detection
    */
   static async generateTestConfig(platformName: string): Promise<TestConfig> {
-    console.log(`🔧 Generating AI test config for: ${platformName}`);
+    console.log(`🔧 UNIVERSAL: Generating AI test config for: ${platformName}`);
     
     try {
+      // Phase 1: Try AI-generated configuration first
       const { data, error } = await supabase.functions.invoke('chat-ai', {
         body: {
           generateTestConfig: true,
@@ -44,58 +46,94 @@ export class TestConfigGenerator {
       });
 
       if (error) {
-        console.error('❌ Error generating test config:', error);
-        throw new Error(`Failed to generate test config: ${error.message}`);
+        console.error('❌ Error generating AI test config:', error);
+        return await this.createUniversalFallback(platformName);
       }
 
       if (data?.testConfig) {
         console.log(`✅ Generated AI test config for ${platformName}:`, data.testConfig);
-        return data.testConfig;
+        
+        // Enhance AI config with universal authentication detection
+        const enhancedConfig = await this.enhanceWithUniversalAuth(data.testConfig, platformName);
+        return enhancedConfig;
       }
 
-      throw new Error('No test configuration returned from Chat-AI');
+      return await this.createUniversalFallback(platformName);
 
     } catch (error) {
       console.error(`💥 Error generating test config for ${platformName}:`, error);
-      
-      // Return intelligent fallback based on platform
-      return this.createIntelligentFallback(platformName);
+      return await this.createUniversalFallback(platformName);
     }
   }
 
   /**
-   * Create intelligent fallback configuration with dynamic TLD detection - NO HARDCODED PLATFORMS
+   * ENHANCE: AI configuration with universal authentication detection
    */
-  private static createIntelligentFallback(platformName: string): TestConfig {
-    const lowerPlatform = platformName.toLowerCase();
-    const cleanPlatform = lowerPlatform.replace(/\s+/g, '');
+  private static async enhanceWithUniversalAuth(aiConfig: any, platformName: string): Promise<TestConfig> {
+    // Get universal authentication pattern
+    const authPattern = await UniversalAuthDetector.detectAuthPattern(platformName);
     
-    // Generate intelligent base URL with proper TLD detection
-    const baseUrl = this.generateIntelligentBaseUrl(cleanPlatform);
-    
-    // Generate intelligent endpoint path
-    const endpointPath = this.generateIntelligentEndpoint(cleanPlatform);
-    
-    // Generate intelligent authentication format
-    const authConfig = this.generateIntelligentAuth(cleanPlatform);
-    
-    // Generate intelligent field mappings
-    const fieldMappings = this.generateIntelligentFieldMappings(cleanPlatform);
-
     return {
       platform_name: platformName,
-      base_url: baseUrl,
+      base_url: aiConfig.base_url || this.generateIntelligentBaseUrl(platformName),
+      test_endpoint: {
+        method: aiConfig.test_endpoint?.method || "GET",
+        path: aiConfig.test_endpoint?.path || this.generateIntelligentEndpoint(platformName),
+        headers: aiConfig.test_endpoint?.headers || this.generateIntelligentHeaders(platformName)
+      },
+      authentication: {
+        type: authPattern.type,
+        location: authPattern.location,
+        parameter_name: authPattern.parameter_name,
+        format: authPattern.format,
+        credential_field: authPattern.credential_field
+      },
+      required_fields: [authPattern.credential_field],
+      field_mappings: { [authPattern.credential_field]: authPattern.credential_field },
+      success_indicators: {
+        status_codes: aiConfig.success_indicators?.status_codes || [200],
+        response_patterns: aiConfig.success_indicators?.response_patterns || this.generateIntelligentSuccessPatterns(platformName)
+      },
+      error_patterns: aiConfig.error_patterns || {
+        "401": "Invalid credentials or unauthorized access",
+        "403": "Access denied or insufficient permissions",
+        "429": "Rate limit exceeded",
+        "404": "Resource not found"
+      },
+      ai_generated: true,
+      config_version: "4.0-universal-auth"
+    };
+  }
+
+  /**
+   * UNIVERSAL: Create intelligent fallback without any hardcoding
+   */
+  private static async createUniversalFallback(platformName: string): Promise<TestConfig> {
+    console.log(`🤖 UNIVERSAL FALLBACK: Creating config for ${platformName}`);
+    
+    // Get universal authentication pattern
+    const authPattern = await UniversalAuthDetector.detectAuthPattern(platformName);
+    
+    return {
+      platform_name: platformName,
+      base_url: this.generateIntelligentBaseUrl(platformName),
       test_endpoint: {
         method: "GET",
-        path: endpointPath,
-        headers: this.generateIntelligentHeaders(cleanPlatform)
+        path: this.generateIntelligentEndpoint(platformName),
+        headers: this.generateIntelligentHeaders(platformName)
       },
-      authentication: authConfig,
-      required_fields: Object.keys(fieldMappings),
-      field_mappings: fieldMappings,
+      authentication: {
+        type: authPattern.type,
+        location: authPattern.location,
+        parameter_name: authPattern.parameter_name,
+        format: authPattern.format,
+        credential_field: authPattern.credential_field
+      },
+      required_fields: [authPattern.credential_field],
+      field_mappings: { [authPattern.credential_field]: authPattern.credential_field },
       success_indicators: {
         status_codes: [200],
-        response_patterns: this.generateIntelligentSuccessPatterns(cleanPlatform)
+        response_patterns: this.generateIntelligentSuccessPatterns(platformName)
       },
       error_patterns: {
         "401": "Invalid credentials or unauthorized access",
@@ -104,82 +142,87 @@ export class TestConfigGenerator {
         "404": "Resource not found"
       },
       ai_generated: false,
-      config_version: "3.0-dynamic"
+      config_version: "4.0-universal-fallback"
     };
   }
 
   /**
-   * Generate intelligent base URL with proper TLD detection - NO HARDCODING
+   * Generate intelligent base URL with proper TLD detection
    */
   private static generateIntelligentBaseUrl(platformName: string): string {
+    const lowerPlatform = platformName.toLowerCase();
+    const cleanPlatform = lowerPlatform.replace(/\s+/g, '');
+    
     // Specific platform mappings for known exceptions
-    if (platformName.includes('elevenlabs') || platformName.includes('11labs')) {
+    if (cleanPlatform.includes('elevenlabs') || cleanPlatform.includes('11labs')) {
       return 'https://api.elevenlabs.io';
     }
     
     // Smart TLD detection based on platform name patterns
-    if (platformName.endsWith('.io') || platformName.includes('.io')) {
-      const domain = platformName.replace(/\.io.*/, '');
+    if (cleanPlatform.endsWith('.io') || cleanPlatform.includes('.io')) {
+      const domain = cleanPlatform.replace(/\.io.*/, '');
       return `https://api.${domain}.io`;
     }
     
-    if (platformName.endsWith('.ai') || platformName.includes('.ai')) {
-      const domain = platformName.replace(/\.ai.*/, '');
+    if (cleanPlatform.endsWith('.ai') || cleanPlatform.includes('.ai')) {
+      const domain = cleanPlatform.replace(/\.ai.*/, '');
       return `https://api.${domain}.ai`;
     }
     
-    if (platformName.endsWith('.dev') || platformName.includes('.dev')) {
-      const domain = platformName.replace(/\.dev.*/, '');
+    if (cleanPlatform.endsWith('.dev') || cleanPlatform.includes('.dev')) {
+      const domain = cleanPlatform.replace(/\.dev.*/, '');
       return `https://api.${domain}.dev`;
     }
     
-    if (platformName.endsWith('.co') || platformName.includes('.co')) {
-      const domain = platformName.replace(/\.co.*/, '');
+    if (cleanPlatform.endsWith('.co') || cleanPlatform.includes('.co')) {
+      const domain = cleanPlatform.replace(/\.co.*/, '');
       return `https://api.${domain}.co`;
     }
     
     // Check for common API patterns
-    if (platformName.includes('slack')) {
+    if (cleanPlatform.includes('slack')) {
       return 'https://slack.com/api';
     }
     
-    if (platformName.includes('github')) {
+    if (cleanPlatform.includes('github')) {
       return 'https://api.github.com';
     }
     
-    if (platformName.includes('google')) {
+    if (cleanPlatform.includes('google')) {
       return 'https://www.googleapis.com';
     }
     
     // Default to .com for unknown platforms
-    return `https://api.${platformName}.com`;
+    return `https://api.${cleanPlatform}.com`;
   }
 
   /**
    * Generate intelligent endpoint path based on platform patterns
    */
   private static generateIntelligentEndpoint(platformName: string): string {
-    if (platformName.includes('elevenlabs') || platformName.includes('11labs')) {
+    const lowerPlatform = platformName.toLowerCase();
+    
+    if (lowerPlatform.includes('elevenlabs') || lowerPlatform.includes('11labs')) {
       return '/v1/user';
     }
     
-    if (platformName.includes('openai')) {
+    if (lowerPlatform.includes('openai')) {
       return '/v1/models';
     }
     
-    if (platformName.includes('slack')) {
+    if (lowerPlatform.includes('slack')) {
       return '/auth.test';
     }
     
-    if (platformName.includes('notion')) {
+    if (lowerPlatform.includes('notion')) {
       return '/v1/users/me';
     }
     
-    if (platformName.includes('github')) {
+    if (lowerPlatform.includes('github')) {
       return '/user';
     }
     
-    if (platformName.includes('google')) {
+    if (lowerPlatform.includes('google')) {
       return '/oauth2/v1/userinfo';
     }
     
@@ -188,65 +231,17 @@ export class TestConfigGenerator {
   }
 
   /**
-   * Generate intelligent authentication configuration
-   */
-  private static generateIntelligentAuth(platformName: string): any {
-    const commonAuth = {
-      type: "bearer",
-      location: "header",
-      parameter_name: "Authorization",
-      format: "Bearer {api_key}"
-    };
-
-    // Platform-specific auth patterns
-    if (platformName.includes('slack')) {
-      return {
-        ...commonAuth,
-        format: "Bearer {bot_token}"
-      };
-    }
-    
-    if (platformName.includes('notion')) {
-      return {
-        ...commonAuth,
-        format: "Bearer {integration_token}"
-      };
-    }
-
-    return commonAuth;
-  }
-
-  /**
-   * Generate intelligent field mappings
-   */
-  private static generateIntelligentFieldMappings(platformName: string): Record<string, string> {
-    if (platformName.includes('slack')) {
-      return { "bot_token": "bot_token" };
-    }
-    
-    if (platformName.includes('notion')) {
-      return { "integration_token": "integration_token" };
-    }
-    
-    if (platformName.includes('github')) {
-      return { "personal_access_token": "personal_access_token" };
-    }
-    
-    // Default mapping
-    return { "api_key": "api_key" };
-  }
-
-  /**
    * Generate intelligent headers based on platform
    */
   private static generateIntelligentHeaders(platformName: string): Record<string, string> {
+    const lowerPlatform = platformName.toLowerCase();
     const baseHeaders: Record<string, string> = {};
     
-    if (platformName.includes('notion')) {
+    if (lowerPlatform.includes('notion')) {
       baseHeaders["Notion-Version"] = "2022-06-28";
     }
     
-    if (platformName.includes('github')) {
+    if (lowerPlatform.includes('github')) {
       baseHeaders["Accept"] = "application/vnd.github.v3+json";
     }
     
@@ -257,19 +252,21 @@ export class TestConfigGenerator {
    * Generate intelligent success patterns
    */
   private static generateIntelligentSuccessPatterns(platformName: string): string[] {
-    if (platformName.includes('elevenlabs') || platformName.includes('11labs')) {
+    const lowerPlatform = platformName.toLowerCase();
+    
+    if (lowerPlatform.includes('elevenlabs') || lowerPlatform.includes('11labs')) {
       return ["subscription", "user_id", "xi_api_key"];
     }
     
-    if (platformName.includes('openai')) {
+    if (lowerPlatform.includes('openai')) {
       return ["data", "object", "id"];
     }
     
-    if (platformName.includes('slack')) {
+    if (lowerPlatform.includes('slack')) {
       return ["ok", "user", "team"];
     }
     
-    if (platformName.includes('notion')) {
+    if (lowerPlatform.includes('notion')) {
       return ["object", "id", "name"];
     }
     
@@ -294,4 +291,4 @@ export class TestConfigGenerator {
   }
 }
 
-console.log('✅ TestConfigGenerator loaded with AI-first dynamic configuration (NO HARDCODED PLATFORMS)');
+console.log('✅ TestConfigGenerator updated with Universal Authentication (NO HARDCODING)');

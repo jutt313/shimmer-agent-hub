@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { UnifiedCredentialManager } from '@/utils/unifiedCredentialManager';
 import { extractTestScript, injectCredentials, formatExecutableScript } from '@/utils/platformTestScriptExtractor';
+import { UniversalAuthDetector } from '@/utils/universalAuthDetector';
 
 interface Platform {
   name: string;
@@ -248,41 +249,44 @@ const ChatAICredentialForm = ({
     setTestResponse(null);
 
     try {
-      console.log(`🧪 Testing credentials for ${platform.name} using INTELLIGENT platform configuration`);
+      console.log(`🧪 UNIVERSAL TESTING: ${platform.name} using Universal Auth Detection`);
       
-      // CRITICAL FIX: Use INTELLIGENT configuration (NO MORE HARDCODING)
+      // UNIVERSAL FIX: Remove all hardcoded authentication - use Universal Auth Detector
+      const authPattern = await UniversalAuthDetector.detectAuthPattern(platform.name);
+      console.log(`🔍 DETECTED AUTH PATTERN for ${platform.name}:`, authPattern);
+
       const testConfig = platform.testConfig || {
         platform_name: platform.name,
-        base_url: generateIntelligentBaseUrl(platform.name), // FIXED: Intelligent TLD detection
+        base_url: generateIntelligentBaseUrl(platform.name),
         test_endpoint: { 
-          path: generateIntelligentEndpoint(platform.name), // FIXED: Intelligent endpoint
+          path: generateIntelligentEndpoint(platform.name),
           method: 'GET' 
         },
-        authentication: { 
-          type: 'bearer',
-          location: 'header',
-          parameter_name: 'Authorization',
-          format: 'Bearer {api_key}'
+        authentication: {
+          type: authPattern.type,
+          location: authPattern.location,
+          parameter_name: authPattern.parameter_name,
+          format: authPattern.format,
+          credential_field: authPattern.credential_field
         },
         success_indicators: { 
           status_codes: [200], 
-          response_patterns: ['data', 'id', 'user', 'success'] 
+          response_patterns: generateIntelligentSuccessPatterns(platform.name)
         },
         error_patterns: { 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found' }
       };
 
-      console.log(`✅ Using INTELLIGENT testConfig for ${platform.name}:`, testConfig);
+      console.log(`✅ UNIVERSAL TEST CONFIG for ${platform.name}:`, testConfig);
 
-      // Call test-credential with the INTELLIGENT testConfig
+      // Call test-credential with the UNIVERSAL testConfig
       const { data: result, error } = await supabase.functions.invoke('test-credential', {
         body: {
           platformName: platform.name,
           credentials,
-          testConfig, // Use INTELLIGENT configuration
+          testConfig,
           userId: user.id,
-          unified_testing: true,
-          chatai_integration: true,
-          intelligent_platform_config: true // CRITICAL: Mark as intelligent
+          universal_auth_testing: true,
+          auth_pattern: authPattern
         }
       });
 
@@ -296,16 +300,16 @@ const ChatAICredentialForm = ({
       saveTestResponseToPersistence(result, finalStatus);
 
       if (result.success) {
-        toast.success(`✅ ${platform.name} credentials verified successfully!`);
+        toast.success(`✅ ${platform.name} credentials verified with Universal Auth!`);
         onCredentialTested(platform.name);
       } else {
         toast.error(`❌ Test failed: ${result.message}`);
       }
     } catch (error: any) {
-      console.error('Test failed:', error);
+      console.error('Universal test failed:', error);
       const errorResponse = {
         success: false,
-        message: error.message || 'Test failed',
+        message: error.message || 'Universal test failed',
         details: { error: error.message }
       };
       
@@ -315,7 +319,7 @@ const ChatAICredentialForm = ({
       // Save error to localStorage for persistence
       saveTestResponseToPersistence(errorResponse, 'error');
       
-      toast.error('Test failed. Please try again.');
+      toast.error('Universal test failed. Please try again.');
     } finally {
       setIsTesting(false);
     }
@@ -379,6 +383,29 @@ const ChatAICredentialForm = ({
       </Dialog>
     );
   }
+
+  // HELPER FUNCTIONS: Move intelligent generation functions to component level
+  const generateIntelligentSuccessPatterns = (platformName: string): string[] => {
+    const lowerPlatform = platformName.toLowerCase();
+    
+    if (lowerPlatform.includes('elevenlabs') || lowerPlatform.includes('11labs')) {
+      return ["subscription", "user_id", "xi_api_key"];
+    }
+    
+    if (lowerPlatform.includes('openai')) {
+      return ["data", "object", "id"];
+    }
+    
+    if (lowerPlatform.includes('slack')) {
+      return ["ok", "user", "team"];
+    }
+    
+    if (lowerPlatform.includes('notion')) {
+      return ["object", "id", "name"];
+    }
+    
+    return ["id", "name", "data", "user"];
+  };
 
   return (
     <Dialog open={true} onOpenChange={onClose}>

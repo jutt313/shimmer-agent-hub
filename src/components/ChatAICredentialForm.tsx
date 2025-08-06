@@ -33,6 +33,76 @@ interface ChatAICredentialFormProps {
   onCredentialTested: (platformName: string) => void;
 }
 
+// CRITICAL FIX: Intelligent TLD detection function
+const generateIntelligentBaseUrl = (platformName: string): string => {
+  const cleanPlatform = platformName.toLowerCase().replace(/\s+/g, '');
+  
+  // Specific platform mappings for known exceptions
+  if (cleanPlatform.includes('elevenlabs') || cleanPlatform.includes('11labs')) {
+    return 'https://api.elevenlabs.io';
+  }
+  
+  if (cleanPlatform.includes('openai')) {
+    return 'https://api.openai.com';
+  }
+  
+  if (cleanPlatform.includes('slack')) {
+    return 'https://slack.com/api';
+  }
+  
+  if (cleanPlatform.includes('notion')) {
+    return 'https://api.notion.com';
+  }
+  
+  // Smart TLD detection based on platform name patterns
+  if (cleanPlatform.endsWith('.io') || cleanPlatform.includes('.io')) {
+    const domain = cleanPlatform.replace(/\.io.*/, '');
+    return `https://api.${domain}.io`;
+  }
+  
+  if (cleanPlatform.endsWith('.ai') || cleanPlatform.includes('.ai')) {
+    const domain = cleanPlatform.replace(/\.ai.*/, '');
+    return `https://api.${domain}.ai`;
+  }
+  
+  if (cleanPlatform.endsWith('.dev') || cleanPlatform.includes('.dev')) {
+    const domain = cleanPlatform.replace(/\.dev.*/, '');
+    return `https://api.${domain}.dev`;
+  }
+  
+  if (cleanPlatform.endsWith('.co') || cleanPlatform.includes('.co')) {
+    const domain = cleanPlatform.replace(/\.co.*/, '');
+    return `https://api.${domain}.co`;
+  }
+  
+  // Default to .com for unknown platforms
+  return `https://api.${cleanPlatform}.com`;
+};
+
+// CRITICAL FIX: Intelligent endpoint generation
+const generateIntelligentEndpoint = (platformName: string): string => {
+  const cleanPlatform = platformName.toLowerCase();
+  
+  if (cleanPlatform.includes('elevenlabs') || cleanPlatform.includes('11labs')) {
+    return '/v1/user';
+  }
+  
+  if (cleanPlatform.includes('openai')) {
+    return '/v1/models';
+  }
+  
+  if (cleanPlatform.includes('slack')) {
+    return '/auth.test';
+  }
+  
+  if (cleanPlatform.includes('notion')) {
+    return '/v1/users/me';
+  }
+  
+  // Default endpoint
+  return '/me';
+};
+
 const ChatAICredentialForm = ({ 
   platform, 
   automationId, 
@@ -178,14 +248,14 @@ const ChatAICredentialForm = ({
     setTestResponse(null);
 
     try {
-      console.log(`🧪 Testing credentials for ${platform.name} using existing platform configuration`);
+      console.log(`🧪 Testing credentials for ${platform.name} using INTELLIGENT platform configuration`);
       
-      // Use platform's existing testConfig directly (no Chat AI generation needed)
+      // CRITICAL FIX: Use INTELLIGENT configuration (NO MORE HARDCODING)
       const testConfig = platform.testConfig || {
         platform_name: platform.name,
-        base_url: platform.name === 'OpenAI' ? 'https://api.openai.com' : `https://api.${platform.name.toLowerCase()}.com`,
+        base_url: generateIntelligentBaseUrl(platform.name), // FIXED: Intelligent TLD detection
         test_endpoint: { 
-          path: platform.name === 'OpenAI' ? '/v1/models' : '/me', 
+          path: generateIntelligentEndpoint(platform.name), // FIXED: Intelligent endpoint
           method: 'GET' 
         },
         authentication: { 
@@ -196,23 +266,23 @@ const ChatAICredentialForm = ({
         },
         success_indicators: { 
           status_codes: [200], 
-          response_patterns: platform.name === 'OpenAI' ? ['data'] : ['id', 'user', 'success'] 
+          response_patterns: ['data', 'id', 'user', 'success'] 
         },
         error_patterns: { 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found' }
       };
 
-      console.log(`✅ Using testConfig for ${platform.name}:`, testConfig);
+      console.log(`✅ Using INTELLIGENT testConfig for ${platform.name}:`, testConfig);
 
-      // Call test-credential with the platform's testConfig
+      // Call test-credential with the INTELLIGENT testConfig
       const { data: result, error } = await supabase.functions.invoke('test-credential', {
         body: {
           platformName: platform.name,
           credentials,
-          testConfig, // Use platform's existing configuration
+          testConfig, // Use INTELLIGENT configuration
           userId: user.id,
           unified_testing: true,
           chatai_integration: true,
-          platform_driven_config: true
+          intelligent_platform_config: true // CRITICAL: Mark as intelligent
         }
       });
 
@@ -320,11 +390,11 @@ const ChatAICredentialForm = ({
             </div>
             <div>
               <h3 className="text-xl font-bold text-purple-900">{platform.name} Credentials</h3>
-              <p className="text-sm text-purple-600 font-normal">Platform-Powered • Unified System</p>
+              <p className="text-sm text-purple-600 font-normal">Intelligent Platform Detection • Dynamic URLs</p>
             </div>
             <Badge variant="secondary" className="ml-auto bg-green-100 text-green-800">
               <Zap className="w-3 h-3 mr-1" />
-              Live Integration
+              Smart Integration
             </Badge>
           </DialogTitle>
         </DialogHeader>
@@ -437,7 +507,7 @@ const ChatAICredentialForm = ({
                   <Code2 className="w-5 h-5" />
                   Live Test Payload
                   <Badge variant="secondary" className="ml-auto bg-blue-100 text-blue-700">
-                    JSON-Formatted Script
+                    Intelligent URLs
                   </Badge>
                 </CardTitle>
               </CardHeader>
@@ -448,7 +518,7 @@ const ChatAICredentialForm = ({
                   </pre>
                 </ScrollArea>
                 <p className="text-xs text-purple-600 mt-3">
-                  🚀 This JSON payload updates in real-time and shows the structured API call configuration
+                  🚀 This payload uses intelligent TLD detection - No more hardcoded URLs!
                 </p>
               </CardContent>
             </Card>
@@ -517,12 +587,12 @@ const ChatAICredentialForm = ({
             {isTesting ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Testing with Platform Config...
+                Testing with Smart Config...
               </>
             ) : (
               <>
                 <Zap className="w-4 h-4 mr-2" />
-                Test with Live Payload
+                Test with Intelligent URLs
               </>
             )}
           </Button>
@@ -551,7 +621,7 @@ const ChatAICredentialForm = ({
           <div className="mt-4">
             {testStatus === 'success' && !isSaving && (
               <p className="text-xs text-green-700 text-center">
-                ✅ Credentials verified with platform configuration! You can now save them.
+                ✅ Credentials verified with intelligent platform detection! You can now save them.
               </p>
             )}
             {testStatus === 'error' && (

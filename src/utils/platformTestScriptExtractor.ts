@@ -1,3 +1,4 @@
+
 interface PlatformTestConfig {
   base_url: string;
   test_endpoint: {
@@ -139,46 +140,104 @@ const findCredentialKey = (credentials: Record<string, string>, authentication: 
 };
 
 /**
- * Create fallback configuration for platforms without testConfig
+ * Create dynamic fallback configuration with intelligent TLD detection
  */
 const createFallbackConfig = (platformName: string): PlatformTestConfig => {
-  const configs: Record<string, PlatformTestConfig> = {
-    'OpenAI': {
-      base_url: 'https://api.openai.com',
-      test_endpoint: { path: '/v1/models', method: 'GET' },
-      authentication: {
-        type: 'bearer',
-        location: 'header',
-        parameter_name: 'Authorization',
-        format: 'Bearer {api_key}'
-      },
-      success_indicators: { status_codes: [200], response_patterns: ['data'] },
-      error_patterns: { '401': 'Invalid API key', '429': 'Rate limit exceeded' }
-    },
-    'Slack': {
-      base_url: 'https://slack.com/api',
-      test_endpoint: { path: '/auth.test', method: 'POST' },
-      authentication: {
-        type: 'bearer',
-        location: 'header',
-        parameter_name: 'Authorization',
-        format: 'Bearer {bot_token}'
-      },
-      success_indicators: { status_codes: [200], response_patterns: ['ok'] },
-      error_patterns: { '401': 'Invalid token', '403': 'Insufficient permissions' }
-    }
-  };
+  const lowerPlatform = platformName.toLowerCase();
   
-  return configs[platformName] || {
-    base_url: `https://api.${platformName.toLowerCase()}.com`,
-    test_endpoint: { path: '/me', method: 'GET' },
+  // Intelligent base URL generation with proper TLD detection
+  const baseUrl = generateIntelligentBaseUrl(lowerPlatform);
+  
+  // Dynamic endpoint path based on platform patterns
+  const endpointPath = generateIntelligentEndpoint(lowerPlatform);
+  
+  return {
+    base_url: baseUrl,
+    test_endpoint: { 
+      path: endpointPath, 
+      method: 'GET' 
+    },
     authentication: {
       type: 'bearer',
       location: 'header',
       parameter_name: 'Authorization',
       format: 'Bearer {api_key}'
     },
-    success_indicators: { status_codes: [200], response_patterns: ['id', 'user'] },
-    error_patterns: { '401': 'Unauthorized', '404': 'Not Found' }
+    success_indicators: { 
+      status_codes: [200], 
+      response_patterns: ['id', 'user', 'data', 'ok'] 
+    },
+    error_patterns: { 
+      '401': 'Unauthorized', 
+      '404': 'Not Found',
+      '403': 'Forbidden'
+    }
   };
+};
+
+/**
+ * Generate intelligent base URL with proper TLD detection
+ */
+const generateIntelligentBaseUrl = (platformName: string): string => {
+  const cleanPlatform = platformName.replace(/\s+/g, '').toLowerCase();
+  
+  // Specific platform TLD mappings
+  if (cleanPlatform.includes('elevenlabs') || cleanPlatform.includes('11labs')) {
+    return 'https://api.elevenlabs.io';
+  }
+  
+  if (cleanPlatform.includes('openai')) {
+    return 'https://api.openai.com';
+  }
+  
+  if (cleanPlatform.includes('slack')) {
+    return 'https://slack.com/api';
+  }
+  
+  if (cleanPlatform.includes('notion')) {
+    return 'https://api.notion.com';
+  }
+  
+  // Smart TLD detection based on common patterns
+  if (cleanPlatform.endsWith('.io') || cleanPlatform.includes('.io')) {
+    const domain = cleanPlatform.replace('.io', '');
+    return `https://api.${domain}.io`;
+  }
+  
+  if (cleanPlatform.endsWith('.ai') || cleanPlatform.includes('.ai')) {
+    const domain = cleanPlatform.replace('.ai', '');
+    return `https://api.${domain}.ai`;
+  }
+  
+  if (cleanPlatform.endsWith('.dev') || cleanPlatform.includes('.dev')) {
+    const domain = cleanPlatform.replace('.dev', '');
+    return `https://api.${domain}.dev`;
+  }
+  
+  // Default to .com for unknown platforms
+  return `https://api.${cleanPlatform}.com`;
+};
+
+/**
+ * Generate intelligent endpoint path based on platform patterns
+ */
+const generateIntelligentEndpoint = (platformName: string): string => {
+  if (platformName.includes('elevenlabs') || platformName.includes('11labs')) {
+    return '/v1/user';
+  }
+  
+  if (platformName.includes('openai')) {
+    return '/v1/models';
+  }
+  
+  if (platformName.includes('slack')) {
+    return '/auth.test';
+  }
+  
+  if (platformName.includes('notion')) {
+    return '/v1/users/me';
+  }
+  
+  // Common API patterns
+  return '/me';
 };

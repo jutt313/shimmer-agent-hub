@@ -1,3 +1,4 @@
+
 import { UniversalAuthDetector } from './universalAuthDetector';
 
 interface PlatformTestConfig {
@@ -34,12 +35,12 @@ interface Platform {
 /**
  * Extract clean, executable test script with UNIVERSAL AUTH DEBUGGING
  */
-export const extractTestScript = (platform: Platform, credentials: Record<string, string>): string => {
+export const extractTestScript = async (platform: Platform, credentials: Record<string, string>): Promise<string> => {
   // Use existing platform testConfig or create universal fallback
-  const config = platform.testConfig || createUniversalFallbackConfig(platform.name);
+  const config = platform.testConfig || await createUniversalFallbackConfig(platform.name);
   
   // Generate clean API call script with AUTHENTICATION DEBUGGING
-  const script = generateExecutableScriptWithAuthDebug(config, platform.name, credentials);
+  const script = await generateExecutableScriptWithAuthDebug(config, platform.name, credentials);
   return script;
 };
 

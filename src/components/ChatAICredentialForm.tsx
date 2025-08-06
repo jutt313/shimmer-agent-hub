@@ -67,11 +67,14 @@ const ChatAICredentialForm = ({
   const form = useForm<Record<string, string>>({
     resolver: platform ? zodResolver(credentialSchema.extend(
       platform.credentials.reduce((acc, credential) => {
-        acc[credential.field] = z.string().optional();
+        acc[credential.field] = z.string().min(1, `${credential.field} is required`);
         return acc;
       }, {} as Record<string, z.ZodString>)
     )) : zodResolver(credentialSchema),
-    defaultValues: {},
+    defaultValues: platform ? platform.credentials.reduce((acc, credential) => {
+      acc[credential.field] = "";
+      return acc;
+    }, {} as Record<string, string>) : {},
     mode: "onChange"
   });
 
@@ -80,7 +83,7 @@ const ChatAICredentialForm = ({
   const onSubmit = (values: Record<string, string>) => {
     // Filter out undefined values and ensure all are strings
     const cleanValues = Object.entries(values)
-      .filter(([_, value]) => value !== undefined)
+      .filter(([_, value]) => value !== undefined && value !== "")
       .reduce((acc, [key, value]) => {
         acc[key] = String(value);
         return acc;

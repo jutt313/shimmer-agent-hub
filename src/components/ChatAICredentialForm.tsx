@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -36,6 +37,10 @@ import { Skeleton } from "@/components/ui/skeleton"
 interface ChatAICredentialFormProps {
   platform: Platform | null;
   onCredentialsSubmit: (credentials: Record<string, string>) => void;
+  automationId?: string;
+  onCredentialSaved?: (platformName: string) => void;
+  onCredentialTested?: (platformName: string) => void;
+  onClose?: () => void;
   isGeneratingToken?: boolean;
   isSubmitting?: boolean;
 }
@@ -49,18 +54,22 @@ type CredentialSchemaType = z.infer<typeof credentialSchema>;
 const ChatAICredentialForm = ({ 
   platform, 
   onCredentialsSubmit, 
+  automationId,
+  onCredentialSaved,
+  onCredentialTested,
+  onClose,
   isGeneratingToken = false,
   isSubmitting = false
 }: ChatAICredentialFormProps) => {
   const [testPayload, setTestPayload] = useState<string>("");
   const [isGeneratingPayload, setIsGeneratingPayload] = useState<boolean>(false);
 
-  const form = useForm<CredentialSchemaType>({
+  const form = useForm<Record<string, string>>({
     resolver: platform ? zodResolver(credentialSchema.extend(
       platform.credentials.reduce((acc, credential) => {
         acc[credential.field] = z.string().optional();
         return acc;
-      }, {} as { [key: string]: z.ZodString })
+      }, {} as Record<string, z.ZodString>)
     )) : zodResolver(credentialSchema),
     defaultValues: {},
     mode: "onChange"
@@ -68,8 +77,20 @@ const ChatAICredentialForm = ({
 
   const { watch } = form;
 
-  const onSubmit = (values: CredentialSchemaType) => {
-    onCredentialsSubmit(values);
+  const onSubmit = (values: Record<string, string>) => {
+    // Filter out undefined values and ensure all are strings
+    const cleanValues = Object.entries(values)
+      .filter(([_, value]) => value !== undefined)
+      .reduce((acc, [key, value]) => {
+        acc[key] = String(value);
+        return acc;
+      }, {} as Record<string, string>);
+      
+    onCredentialsSubmit(cleanValues);
+    
+    if (onCredentialSaved && platform) {
+      onCredentialSaved(platform.name);
+    }
   };
 
   const generateTestPayload = useCallback(async () => {
@@ -79,11 +100,14 @@ const ChatAICredentialForm = ({
       setIsGeneratingPayload(true);
       const formData = watch();
       
-      // Filter out empty credentials
+      // Filter out empty credentials with proper type handling
       const validCredentials = Object.entries(formData)
-        .filter(([_, value]) => value && value.trim() !== '')
+        .filter(([_, value]) => {
+          const stringValue = String(value || '');
+          return stringValue && stringValue.trim() !== '';
+        })
         .reduce((acc, [key, value]) => {
-          acc[key] = value;
+          acc[key] = String(value || '');
           return acc;
         }, {} as Record<string, string>);
 
@@ -112,26 +136,44 @@ const ChatAICredentialForm = ({
       const finalScript = injectCredentials(script, validCredentials);
       setTestPayload(finalScript);
 
+      if (onCredentialTested && platform) {
+        onCredentialTested(platform.name);
+      }
+
     } catch (error) {
       console.error('❌ Error generating test payload:', error);
       setTestPayload(`Error generating test payload: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsGeneratingPayload(false);
     }
-  }, [platform, watch]);
+  }, [platform, watch, onCredentialTested]);
+
+  if (!platform) {
+    return null;
+  }
 
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle>Enter Credentials</CardTitle>
         <CardDescription>
-          Provide the necessary credentials to connect to {platform?.name}.
+          Provide the necessary credentials to connect to {platform.name}.
         </CardDescription>
+        {onClose && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute right-2 top-2"
+            onClick={onClose}
+          >
+            ✕
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {platform?.credentials.map((credential) => (
+            {platform.credentials.map((credential) => (
               <FormField
                 key={credential.field}
                 control={form.control}

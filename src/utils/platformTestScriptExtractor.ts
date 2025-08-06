@@ -36,7 +36,7 @@ export const extractTestScript = (platform: Platform, credentials: Record<string
   // Use existing platform testConfig or create fallback
   const config = platform.testConfig || createFallbackConfig(platform.name);
   
-  // Generate clean API call script
+  // Generate clean API call script as structured JSON
   const script = generateExecutableScript(config, platform.name, credentials);
   return script;
 };
@@ -67,54 +67,58 @@ export const injectCredentials = (baseScript: string, credentials: Record<string
  * Format script for clean display in Live Test Payload
  */
 export const formatExecutableScript = (script: string): string => {
-  // Remove any explanatory text, keep only the executable part
-  const lines = script.split('\n');
-  const executableLines = lines.filter(line => {
-    const trimmed = line.trim();
-    return trimmed && 
-           !trimmed.startsWith('To ') && 
-           !trimmed.startsWith('This ') && 
-           !trimmed.startsWith('Below ') &&
-           !trimmed.startsWith('Generate ') &&
-           !trimmed.includes('explanation') &&
-           !trimmed.includes('detailed');
-  });
-  
-  return executableLines.join('\n');
+  // Return the script as-is since it's already formatted as JSON
+  return script;
 };
 
 /**
- * Generate executable API call script from test configuration
+ * Generate executable API call script as structured JSON from test configuration
  */
 const generateExecutableScript = (config: PlatformTestConfig, platformName: string, credentials: Record<string, string>): string => {
   const { base_url, test_endpoint, authentication } = config;
   const url = `${base_url}${test_endpoint.path}`;
   const method = test_endpoint.method || 'GET';
   
-  // Build headers
-  const headers: string[] = [
-    'Content-Type: application/json',
-    'User-Agent: YusrAI-Test/1.0'
-  ];
+  // Build headers object
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'User-Agent': 'YusrAI-Test/1.0'
+  };
+  
+  // Add any additional headers from test_endpoint
+  if (test_endpoint.headers) {
+    Object.assign(headers, test_endpoint.headers);
+  }
   
   // Add authentication header
   if (authentication.location === 'header') {
     const credentialKey = findCredentialKey(credentials, authentication);
     const authValue = authentication.format.replace(/\{[\w_]+\}/g, `{${credentialKey}}`);
-    headers.push(`${authentication.parameter_name}: ${authValue}`);
+    headers[authentication.parameter_name] = authValue;
   }
   
-  // Generate curl command
-  const curlScript = `# ${platformName} API Test Call
+  // Create structured JSON payload
+  const testPayload = {
+    platform: platformName,
+    request: {
+      method: method,
+      url: url,
+      headers: headers,
+      authentication: {
+        type: authentication.type,
+        location: authentication.location,
+        parameter: authentication.parameter_name
+      }
+    },
+    expected_response: {
+      status_codes: config.success_indicators.status_codes,
+      response_patterns: config.success_indicators.response_patterns
+    },
+    error_handling: config.error_patterns
+  };
 
-curl -X ${method} "${url}" \\
-${headers.map(header => `  -H "${header}"`).join(' \\\n')}
-
-# Expected Response:
-# Status: 200 OK
-# Response: Platform-specific data`;
-
-  return curlScript;
+  // Return formatted JSON string
+  return JSON.stringify(testPayload, null, 2);
 };
 
 /**

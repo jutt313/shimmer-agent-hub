@@ -51,10 +51,46 @@ const ChatAICredentialForm = ({
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [existingCredentials, setExistingCredentials] = useState<boolean>(false);
 
+  // Create storage key for this platform's test response
+  const getStorageKey = () => `testResponse_${platform.name}_${automationId}`;
+
+  // Load persisted test response from localStorage
+  const loadPersistedTestResponse = () => {
+    try {
+      const storageKey = getStorageKey();
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        console.log(`📱 Loading persisted test response for ${platform.name}:`, parsed);
+        setTestResponse(parsed.testResponse);
+        setTestStatus(parsed.testStatus);
+      }
+    } catch (error) {
+      console.error('Failed to load persisted test response:', error);
+    }
+  };
+
+  // Save test response to localStorage for persistence
+  const saveTestResponseToPersistence = (response: any, status: string) => {
+    try {
+      const storageKey = getStorageKey();
+      const dataToStore = {
+        testResponse: response,
+        testStatus: status,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(storageKey, JSON.stringify(dataToStore));
+      console.log(`💾 Saved test response to localStorage for ${platform.name}:`, dataToStore);
+    } catch (error) {
+      console.error('Failed to save test response to persistence:', error);
+    }
+  };
+
   // Load existing credentials and initialize test script
   useEffect(() => {
     if (user && automationId && platform.name) {
       loadExistingCredentials();
+      loadPersistedTestResponse(); // Load persisted test response
     }
   }, [user, automationId, platform.name]);
 
@@ -183,7 +219,11 @@ const ChatAICredentialForm = ({
       if (error) throw error;
 
       setTestResponse(result);
-      setTestStatus(result.success ? 'success' : 'error');
+      const finalStatus = result.success ? 'success' : 'error';
+      setTestStatus(finalStatus);
+      
+      // Save to localStorage for persistence
+      saveTestResponseToPersistence(result, finalStatus);
 
       if (result.success) {
         toast.success(`✅ ${platform.name} credentials verified successfully!`);
@@ -193,12 +233,18 @@ const ChatAICredentialForm = ({
       }
     } catch (error: any) {
       console.error('Test failed:', error);
-      setTestStatus('error');
-      setTestResponse({
+      const errorResponse = {
         success: false,
         message: error.message || 'Test failed',
         details: { error: error.message }
-      });
+      };
+      
+      setTestStatus('error');
+      setTestResponse(errorResponse);
+      
+      // Save error to localStorage for persistence
+      saveTestResponseToPersistence(errorResponse, 'error');
+      
       toast.error('Test failed. Please try again.');
     } finally {
       setIsTesting(false);
@@ -391,7 +437,7 @@ const ChatAICredentialForm = ({
                   <Code2 className="w-5 h-5" />
                   Live Test Payload
                   <Badge variant="secondary" className="ml-auto bg-blue-100 text-blue-700">
-                    Platform-Generated Script
+                    JSON-Formatted Script
                   </Badge>
                 </CardTitle>
               </CardHeader>
@@ -402,7 +448,7 @@ const ChatAICredentialForm = ({
                   </pre>
                 </ScrollArea>
                 <p className="text-xs text-purple-600 mt-3">
-                  🚀 This script updates in real-time as you enter credentials and shows the exact API call for testing
+                  🚀 This JSON payload updates in real-time and shows the structured API call configuration
                 </p>
               </CardContent>
             </Card>
@@ -414,6 +460,11 @@ const ChatAICredentialForm = ({
                 <CardTitle className="flex items-center gap-2 text-lg text-purple-900">
                   <TestTube className="w-5 h-5" />
                   Test Response
+                  {testResponse && (
+                    <Badge variant="secondary" className="ml-auto bg-amber-100 text-amber-700">
+                      Persisted Result
+                    </Badge>
+                  )}
                   {testStatus === 'success' && <CheckCircle className="w-5 h-5 text-green-600" />}
                   {testStatus === 'error' && <AlertCircle className="w-5 h-5 text-red-600" />}
                 </CardTitle>

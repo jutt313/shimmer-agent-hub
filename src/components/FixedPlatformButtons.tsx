@@ -13,7 +13,9 @@ interface Platform {
     link: string;
     why_needed: string;
   }>;
+  testConfig?: any;
   test_payloads?: any[];
+  chatai_data?: any;
 }
 
 interface FixedPlatformButtonsProps {
@@ -23,15 +25,17 @@ interface FixedPlatformButtonsProps {
 }
 
 const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: FixedPlatformButtonsProps) => {
-  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
   const { user } = useAuth();
 
-  console.log('🚀 FixedPlatformButtons using NEW UNIFIED ChatAI form for platforms:', platforms);
+  console.log('🚀 FixedPlatformButtons using COMPLETE platform objects with ChatAI data:', platforms);
   console.log('🧪 Automation ID:', automationId);
 
-  const handlePlatformSetup = (platformName: string) => {
-    console.log(`🔧 Opening NEW UNIFIED ChatAI credential setup for platform: ${platformName}`);
-    setSelectedPlatform(platformName);
+  const handlePlatformSetup = (platform: Platform) => {
+    console.log(`🔧 Opening ChatAI credential setup for platform:`, platform);
+    console.log(`🔧 Platform includes ChatAI testConfig:`, !!platform.testConfig);
+    console.log(`🔧 Platform includes test_payloads:`, platform.test_payloads?.length || 0);
+    setSelectedPlatform(platform);
   };
 
   if (!platforms || platforms.length === 0) {
@@ -44,7 +48,7 @@ const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: F
         {platforms.map((platform, index) => (
           <Button
             key={index}
-            onClick={() => handlePlatformSetup(platform.name)}
+            onClick={() => handlePlatformSetup(platform)}
             size="sm"
             className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white border-0 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 text-xs px-4 py-2"
           >
@@ -56,18 +60,15 @@ const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: F
 
       {selectedPlatform && (
         <ChatAICredentialForm
-          platform={{
-            name: selectedPlatform,
-            credentials: platforms.find(p => p.name === selectedPlatform)?.credentials || []
-          }}
+          platform={selectedPlatform}
           automationId={automationId}
           onCredentialSaved={(platformName: string) => {
-            console.log(`✅ NEW UNIFIED credentials saved for ${platformName}`);
+            console.log(`✅ ChatAI credentials saved for ${platformName}`);
             onCredentialChange?.();
             setSelectedPlatform(null);
           }}
           onCredentialTested={(platformName: string) => {
-            console.log(`🧪 NEW UNIFIED credential tested successfully for ${platformName}`);
+            console.log(`🧪 ChatAI credential tested successfully for ${platformName}`);
           }}
           onClose={() => setSelectedPlatform(null)}
         />

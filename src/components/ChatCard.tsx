@@ -81,6 +81,53 @@ const ChatCard = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
+  // CRITICAL FIX: Enhanced platform name cleaning function
+  const cleanPlatformName = (rawName: string | undefined | null): string => {
+    if (!rawName || typeof rawName !== 'string') return 'Unknown Platform';
+    
+    // Remove all markdown formatting and clean the string
+    return rawName
+      .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove **bold**
+      .replace(/\*(.*?)\*/g, '$1')      // Remove *italic*
+      .replace(/`(.*?)`/g, '$1')        // Remove `code`
+      .replace(/__(.*?)__/g, '$1')      // Remove __underline__
+      .replace(/_(.*?)_/g, '$1')        // Remove _emphasis_
+      .replace(/[*_`#]/g, '')           // Remove remaining markdown symbols
+      .replace(/^\d+\.\s*/, '')         // Remove numbered list prefixes
+      .replace(/^[-•]\s*/, '')          // Remove bullet points
+      .trim() || 'Unknown Platform';
+  };
+
+  // CRITICAL FIX: Enhanced step text extraction with better markdown cleaning
+  const extractStepText = (step: any): string => {
+    if (typeof step === 'string') {
+      return cleanPlatformName(step.replace(/^\d+\.\s*/, ''));
+    }
+    
+    if (typeof step === 'object' && step !== null) {
+      const stepText = step.description || 
+                     step.action || 
+                     step.step || 
+                     step.instruction || 
+                     step.text ||
+                     step.summary ||
+                     step.task ||
+                     step.name;
+      
+      if (stepText && typeof stepText === 'string') {
+        return cleanPlatformName(stepText.replace(/^\d+\.\s*/, ''));
+      }
+      
+      if (step.platform && step.method) {
+        return `${step.method} request to ${cleanPlatformName(step.platform)}`;
+      }
+      
+      return 'Processing automation step...';
+    }
+    
+    return 'Step information unavailable';
+  };
+
   useEffect(() => {
     const processMessages = () => {
       try {
@@ -93,20 +140,26 @@ const ChatCard = ({
               if (parseResult.structuredData && !parseResult.isPlainText) {
                 console.log('✅ Structured data found from YusrAI:', parseResult.structuredData);
                 
-                // FIXED: Enhanced platform data extraction with better name handling
-                const platformsSource = parseResult.structuredData.platforms || parseResult.structuredData.platforms_and_credentials || [];
+                // CRITICAL FIX: Enhanced platform data extraction with complete ChatAI data preservation
+                const platformsSource = parseResult.structuredData.platforms || 
+                                       parseResult.structuredData.platforms_and_credentials || 
+                                       parseResult.structuredData.required_platforms ||
+                                       [];
                 
-                const platformData = platformsSource.map(platform => {
-                  console.log('🔍 Processing platform:', platform);
+                const platformData = platformsSource.map((platform: any, index: number) => {
+                  console.log(`🔍 Processing platform ${index + 1}:`, platform);
                   
-                  // FIXED: Better platform name extraction
-                  let platformName = platform.name || platform.platform || platform.platform_name || 'Unknown Platform';
+                  // CRITICAL FIX: Better platform name extraction and cleaning
+                  const rawPlatformName = platform.name || 
+                                         platform.platform || 
+                                         platform.platform_name ||
+                                         platform.service ||
+                                         `Platform ${index + 1}`;
                   
-                  // Clean up platform name if it has extra formatting
-                  if (typeof platformName === 'string') {
-                    platformName = platformName.replace(/[*_`]/g, '').trim();
-                  }
+                  const cleanedPlatformName = cleanPlatformName(rawPlatformName);
+                  console.log(`🔧 Platform name cleaned: "${rawPlatformName}" → "${cleanedPlatformName}"`);
                   
+                  // CRITICAL FIX: Extract credentials with multiple format support
                   let credentials = [];
                   if (platform.credentials) {
                     if (Array.isArray(platform.credentials)) {
@@ -119,23 +172,56 @@ const ChatCard = ({
                         why_needed: value.description || value.why_needed || `Required for ${key}`
                       }));
                     }
+                  } else if (platform.required_credentials) {
+                    credentials = Array.isArray(platform.required_credentials) ? platform.required_credentials : [];
+                  } else if (platform.authentication) {
+                    // Handle authentication object format
+                    credentials = [{
+                      field: platform.authentication.field || 'api_key',
+                      placeholder: platform.authentication.placeholder || 'Enter API key',
+                      link: platform.authentication.link || '#',
+                      why_needed: platform.authentication.description || 'Authentication required'
+                    }];
                   }
                   
+                  // CRITICAL FIX: Preserve complete ChatAI test configuration
+                  const testConfig = platform.testConfig || 
+                                   platform.test_config || 
+                                   platform.testing || 
+                                   platform.test_setup ||
+                                   null;
+                  
+                  const testPayloads = platform.test_payloads || 
+                                     platform.test_payload || 
+                                     platform.test_data ||
+                                     platform.testing_payload ||
+                                     [];
+                  
                   const finalPlatform = {
-                    name: platformName,
-                    credentials: credentials.map(cred => ({
+                    name: cleanedPlatformName,
+                    credentials: credentials.map((cred: any) => ({
                       field: cred.field || cred.name || 'api_key',
-                      placeholder: cred.example || cred.placeholder || `Enter ${cred.field}`,
+                      placeholder: cred.example || cred.placeholder || `Enter ${cred.field || 'credential'}`,
                       link: cred.link || cred.where_to_get || cred.url || '#',
                       why_needed: cred.why_needed || cred.description || 'Authentication required'
-                    }))
+                    })),
+                    // CRITICAL: Preserve ChatAI test configuration
+                    testConfig: testConfig,
+                    test_payloads: Array.isArray(testPayloads) ? testPayloads : (testPayloads ? [testPayloads] : []),
+                    // Preserve additional ChatAI metadata
+                    chatai_data: {
+                      original_platform: platform,
+                      base_url: platform.base_url || platform.api_base || platform.endpoint,
+                      api_version: platform.api_version || platform.version,
+                      authentication_type: platform.authentication_type || platform.auth_type
+                    }
                   };
                   
-                  console.log('🔗 Final processed platform:', finalPlatform);
+                  console.log('🔗 Final processed platform with ChatAI data:', finalPlatform);
                   return finalPlatform;
                 });
                 
-                console.log('🔗 Extracted platform data:', platformData);
+                console.log('🔗 Extracted platform data with ChatAI preservation:', platformData);
                 
                 const diagramData = automationDiagramData ||
                                   parseResult.structuredData.execution_blueprint || 
@@ -164,7 +250,7 @@ const ChatCard = ({
         });
         
         setEnhancedMessages(processed);
-        console.log('✅ Enhanced messages processed:', processed.length);
+        console.log('✅ Enhanced messages processed with ChatAI data preservation:', processed.length);
       } catch (error) {
         console.log('❌ Message processing error:', error);
         setEnhancedMessages(messages);
@@ -175,56 +261,6 @@ const ChatCard = ({
   }, [messages, automationDiagramData]);
 
   const optimizedMessages = enhancedMessages.slice(-50);
-
-  // FIXED: Enhanced extractStepText function to clean markdown formatting
-  const extractStepText = (step: any): string => {
-    if (typeof step === 'string') {
-      return cleanMarkdownFormatting(step.replace(/^\d+\.\s*/, '').trim());
-    }
-    
-    if (typeof step === 'object' && step !== null) {
-      const stepText = step.description || 
-                     step.action || 
-                     step.step || 
-                     step.instruction || 
-                     step.text ||
-                     step.summary ||
-                     step.task ||
-                     step.name;
-      
-      if (stepText && typeof stepText === 'string') {
-        return cleanMarkdownFormatting(stepText.replace(/^\d+\.\s*/, '').trim());
-      }
-      
-      if (step.platform && step.method) {
-        return `${step.method} request to ${step.platform}`;
-      }
-      
-      return 'Processing automation step...';
-    }
-    
-    return 'Step information unavailable';
-  };
-
-  // FIXED: New function to clean markdown formatting
-  const cleanMarkdownFormatting = (text: string): string => {
-    if (!text || typeof text !== 'string') return text;
-    
-    return text
-      // Remove bold formatting **text** and __text__
-      .replace(/\*\*(.*?)\*\*/g, '$1')
-      .replace(/__(.*?)__/g, '$1')
-      // Remove italic formatting *text* and _text_
-      .replace(/\*(.*?)\*/g, '$1')
-      .replace(/_(.*?)_/g, '$1')
-      // Remove code formatting `text`
-      .replace(/`(.*?)`/g, '$1')
-      // Remove any remaining markdown symbols
-      .replace(/[*_`]/g, '')
-      // Clean up extra whitespace
-      .replace(/\s+/g, ' ')
-      .trim();
-  };
 
   const safeFormatMessageText = (inputText: string | undefined | null, structuredData?: YusrAIStructuredResponse): React.ReactNode[] => {
     try {
@@ -239,12 +275,12 @@ const ChatCard = ({
           sections.push(
             <div key="summary" className="mb-4">
               <div className="font-semibold text-gray-800 mb-2">Summary:</div>
-              <div className="text-gray-700 leading-relaxed">{cleanMarkdownFormatting(structuredData.summary)}</div>
+              <div className="text-gray-700 leading-relaxed">{cleanPlatformName(structuredData.summary)}</div>
             </div>
           );
         }
         
-        // Handle both step_by_step_explanation and steps
+        // Handle both step_by_step_explanation and steps with FIXED markdown cleaning
         const stepsData = structuredData.step_by_step_explanation || structuredData.steps;
         if (stepsData && Array.isArray(stepsData) && stepsData.length > 0) {
           sections.push(
@@ -261,16 +297,18 @@ const ChatCard = ({
           );
         }
         
-        // FIXED: Enhanced platforms display with proper credential information
-        const platformsData = structuredData.platforms_and_credentials || structuredData.platforms;
+        // CRITICAL FIX: Enhanced platforms display with proper credential information and cleaned names
+        const platformsData = structuredData.platforms_and_credentials || 
+                             structuredData.platforms ||
+                             structuredData.required_platforms;
         if (platformsData && Array.isArray(platformsData) && platformsData.length > 0) {
           sections.push(
             <div key="platforms" className="mb-4">
               <div className="font-semibold text-gray-800 mb-2">Platforms:</div>
               <div className="text-gray-700 leading-relaxed">
                 {platformsData.map((platform, index) => {
-                  // FIXED: Better platform name extraction and cleaning
-                  const platformName = cleanMarkdownFormatting(
+                  // CRITICAL FIX: Use the same cleaning function for consistency
+                  const platformName = cleanPlatformName(
                     platform?.name || platform?.platform || platform?.platform_name || `Platform ${index + 1}`
                   );
                   
@@ -280,15 +318,15 @@ const ChatCard = ({
                       {platform?.credentials && (
                         <div className="space-y-2">
                           <div className="text-sm font-medium text-gray-600">Required credentials:</div>
-                          {/* FIXED: Handle both array and object credential formats */}
+                          {/* Handle both array and object credential formats */}
                           {Array.isArray(platform.credentials) ? (
                             platform.credentials.map((cred, credIndex) => (
                               <div key={credIndex} className="text-sm bg-white p-2 rounded border-l-4 border-blue-200">
                                 <div className="font-medium text-gray-800">{cred.field || cred.name || 'API Key'}</div>
                                 <div className="text-gray-600 text-xs mt-1">{cred.why_needed || cred.description || 'Required for authentication'}</div>
-                                {(cred.link || cred.where_to_get || cred.url) && (
+                                {(cred.link || cred.where_to_get || cred.url) && cred.link !== '#' && (
                                   <div className="text-blue-600 text-xs mt-1">
-                                    <a href={cred.link || cred.where_to_get || cred.url || '#'} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                    <a href={cred.link || cred.where_to_get || cred.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
                                       Get it from: {cred.where_to_get || 'Documentation'}
                                     </a>
                                   </div>
@@ -300,9 +338,9 @@ const ChatCard = ({
                               <div key={credIndex} className="text-sm bg-white p-2 rounded border-l-4 border-blue-200">
                                 <div className="font-medium text-gray-800">{key}</div>
                                 <div className="text-gray-600 text-xs mt-1">{value?.description || value?.why_needed || `Required for ${key}`}</div>
-                                {(value?.link || value?.where_to_get || value?.url) && (
+                                {(value?.link || value?.where_to_get || value?.url) && value.link !== '#' && (
                                   <div className="text-blue-600 text-xs mt-1">
-                                    <a href={value.link || value.where_to_get || value.url || '#'} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                    <a href={value.link || value.where_to_get || value.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
                                       Get it from: {value.where_to_get || 'Documentation'}
                                     </a>
                                   </div>
@@ -345,7 +383,7 @@ const ChatCard = ({
                 {agentsData.map((agent, index) => (
                   <div key={index} className="mb-3 p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="font-medium text-gray-800">{cleanMarkdownFormatting(String(agent?.name || agent?.agent_name || `Agent ${index + 1}`))}</div>
+                      <div className="font-medium text-gray-800">{cleanPlatformName(String(agent?.name || agent?.agent_name || `Agent ${index + 1}`))}</div>
                       <div className="flex gap-2">
                         <Button
                           size="sm"
@@ -366,11 +404,11 @@ const ChatCard = ({
                       </div>
                     </div>
                     <div className="text-sm text-gray-600 space-y-1">
-                      <div><strong>Role:</strong> {cleanMarkdownFormatting(agent?.role || 'Assistant')}</div>
-                      <div><strong>Goal:</strong> {cleanMarkdownFormatting(agent?.goal || 'General assistance')}</div>
-                      {agent?.rule && <div><strong>Rule:</strong> {cleanMarkdownFormatting(agent.rule)}</div>}
-                      {agent?.why_needed && <div><strong>Why needed:</strong> {cleanMarkdownFormatting(agent.why_needed)}</div>}
-                      {agent?.memory && <div><strong>Memory:</strong> {cleanMarkdownFormatting(agent.memory)}</div>}
+                      <div><strong>Role:</strong> {cleanPlatformName(agent?.role || 'Assistant')}</div>
+                      <div><strong>Goal:</strong> {cleanPlatformName(agent?.goal || 'General assistance')}</div>
+                      {agent?.rule && <div><strong>Rule:</strong> {cleanPlatformName(agent.rule)}</div>}
+                      {agent?.why_needed && <div><strong>Why needed:</strong> {cleanPlatformName(agent.why_needed)}</div>}
+                      {agent?.memory && <div><strong>Memory:</strong> {cleanPlatformName(agent.memory)}</div>}
                     </div>
                   </div>
                 ))}
@@ -385,7 +423,7 @@ const ChatCard = ({
       const lines = inputText.split('\n');
       return lines.map((line, index) => (
         <span key={`line-${index}`}>
-          {cleanMarkdownFormatting(line)}
+          {cleanPlatformName(line)}
           {index < lines.length - 1 && <br />}
         </span>
       ));
@@ -550,19 +588,20 @@ const ChatCard = ({
   const getLatestPlatforms = () => {
     const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.platformData).pop();
     if (latestBotMessage?.platformData) {
-      console.log('🔍 Found platforms from enhanced processing:', latestBotMessage.platformData);
+      console.log('🔍 Found platforms from enhanced processing with ChatAI data:', latestBotMessage.platformData);
       return latestBotMessage.platformData;
     }
     
     const latestStructuredMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
     if (latestStructuredMessage?.structuredData) {
       const platformsSource = latestStructuredMessage.structuredData.platforms || 
-                             latestStructuredMessage.structuredData.platforms_and_credentials || [];
+                             latestStructuredMessage.structuredData.platforms_and_credentials ||
+                             latestStructuredMessage.structuredData.required_platforms || [];
       
-      const transformedPlatforms = platformsSource.map((platform: any) => {
-        // FIXED: Better platform name handling
-        const platformName = cleanMarkdownFormatting(
-          platform.name || platform.platform || platform.platform_name || 'Unknown Platform'
+      const transformedPlatforms = platformsSource.map((platform: any, index: number) => {
+        // Use the same cleaning function for consistency
+        const platformName = cleanPlatformName(
+          platform.name || platform.platform || platform.platform_name || `Platform ${index + 1}`
         );
         
         let credentials = [];
@@ -586,11 +625,19 @@ const ChatCard = ({
             placeholder: cred.example || cred.placeholder || `Enter ${cred.field}`,
             link: cred.link || cred.where_to_get || cred.url || '#',
             why_needed: cred.why_needed || cred.description || 'Authentication required'
-          }))
+          })),
+          // CRITICAL: Include ChatAI test configuration
+          testConfig: platform.testConfig || platform.test_config,
+          test_payloads: platform.test_payloads || platform.test_payload || [],
+          chatai_data: {
+            original_platform: platform,
+            base_url: platform.base_url || platform.api_base,
+            api_version: platform.api_version
+          }
         };
       });
       
-      console.log('🔄 Transformed platforms from structured data:', transformedPlatforms);
+      console.log('🔄 Transformed platforms from structured data with ChatAI data:', transformedPlatforms);
       return transformedPlatforms;
     }
     
@@ -604,7 +651,7 @@ const ChatCard = ({
   };
 
   const transformPlatformsForButtons = (yusraiPlatforms: any[]) => {
-    console.log('🔄 Transforming platforms for buttons:', yusraiPlatforms);
+    console.log('🔄 Transforming platforms for buttons with ChatAI data preservation:', yusraiPlatforms);
     
     if (!Array.isArray(yusraiPlatforms)) {
       console.log('⚠️ No platforms array found, returning empty array');
@@ -612,7 +659,7 @@ const ChatCard = ({
     }
     
     const transformedPlatforms = yusraiPlatforms.map((platform, index) => {
-      console.log(`🔄 Processing platform ${index + 1}:`, platform);
+      console.log(`🔄 Processing platform ${index + 1} for buttons:`, platform);
       
       const credentials = platform.credentials || 
                          platform.required_credentials || 
@@ -628,14 +675,17 @@ const ChatCard = ({
           link: cred.link || cred.where_to_get || cred.documentation_url || cred.url || '#',
           why_needed: cred.why_needed || cred.description || cred.purpose || 'Authentication required'
         })) : [],
-        test_payloads: platform.test_payloads || platform.test_payload || platform.test_data || []
+        // CRITICAL: Preserve all ChatAI test data
+        testConfig: platform.testConfig || platform.test_config,
+        test_payloads: platform.test_payloads || platform.test_payload || platform.test_data || [],
+        chatai_data: platform.chatai_data || {}
       };
       
-      console.log(`✅ Transformed platform:`, transformedPlatform);
+      console.log(`✅ Transformed platform with ChatAI data:`, transformedPlatform);
       return transformedPlatform;
     });
     
-    console.log('🎯 Final transformed platforms:', transformedPlatforms);
+    console.log('🎯 Final transformed platforms with ChatAI data:', transformedPlatforms);
     return transformedPlatforms;
   };
 

@@ -69,11 +69,13 @@ const Index = () => {
     try {
       console.log('🚀 Sending message to YusrAI:', currentMessage);
       
-      // Format conversation history properly for OpenAI API
-      const conversationHistory = messages.slice(-10).map(msg => ({
-        role: msg.isBot ? 'assistant' : 'user',
-        content: msg.text
-      }));
+      // Convert frontend message format to OpenAI format
+      const conversationHistory: Array<{role: 'user' | 'assistant'; content: string}> = messages
+        .slice(-10)
+        .map(msg => ({
+          role: (msg.isBot ? 'assistant' : 'user') as 'user' | 'assistant',
+          content: msg.text
+        }));
 
       console.log('📋 Formatted conversation history:', conversationHistory);
 

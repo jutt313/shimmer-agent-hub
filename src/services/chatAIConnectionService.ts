@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ChatAIRequest {
@@ -27,11 +26,8 @@ class ChatAIConnectionService {
     try {
       console.log('🚀 Processing YusrAI request:', request.message);
       
-      // Transform messages to proper OpenAI format
-      const formattedMessages = request.messages?.map(msg => ({
-        role: msg.role || (msg.isBot ? 'assistant' : 'user'),
-        content: msg.content || msg.text || msg.message_content || ''
-      })).filter(msg => msg.content.trim() !== '') || [];
+      // Messages are already in correct OpenAI format from frontend
+      const formattedMessages = request.messages || [];
 
       console.log('📤 Sending formatted messages:', formattedMessages);
 

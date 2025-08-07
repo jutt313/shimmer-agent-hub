@@ -1,4 +1,3 @@
-
 interface YusrAIResponseMetadata {
   hasStructuredData: boolean;
   yusraiPowered: boolean;
@@ -31,6 +30,7 @@ export interface YusrAIStructuredResponse {
   clarification_questions?: string[];
   ai_agents?: any[];
   agents?: any[]; // Add for compatibility
+  automation_agents?: any[]; // Add this missing property
   test_payloads?: any;
   execution_blueprint?: any;
 }

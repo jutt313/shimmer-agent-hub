@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,21 +11,41 @@ import { PlatformPersistenceManager } from '@/utils/platformPersistenceManager';
 import { DataFlowValidator } from '@/utils/dataFlowValidator';
 
 interface ChatCardProps {
-  response: string;
-  onRetry: () => void;
+  response?: string;
+  messages?: Array<{
+    id: number;
+    text: string;
+    isBot: boolean;
+    timestamp: Date;
+    structuredData?: any;
+  }>;
+  onRetry?: () => void;
   isLoading: boolean;
-  onExecuteAutomation: (blueprint: any) => void;
-  isExecuting: boolean;
+  onExecuteAutomation?: (blueprint: any) => void;
+  isExecuting?: boolean;
   automationId?: string;
+  onSendMessage?: (message: string) => void;
+  onAgentAdd?: (agent: any) => void;
+  dismissedAgents?: Set<string>;
+  onAgentDismiss?: (agentName: string) => void;
+  platformCredentialStatus?: any;
+  onPlatformCredentialChange?: () => void;
 }
 
 const ChatCard = ({ 
   response, 
+  messages,
   onRetry, 
   isLoading, 
   onExecuteAutomation, 
-  isExecuting, 
-  automationId 
+  isExecuting = false, 
+  automationId,
+  onSendMessage,
+  onAgentAdd,
+  dismissedAgents,
+  onAgentDismiss,
+  platformCredentialStatus,
+  onPlatformCredentialChange
 }: ChatCardProps) => {
   const [parsedResult, setParsedResult] = useState({
     structuredData: null as any,
@@ -34,13 +55,37 @@ const ChatCard = ({
   });
   const [executionBlueprint, setExecutionBlueprint] = useState<any>(null);
 
+  // Handle both single response and messages array
+  const currentResponse = response || (messages && messages.length > 0 ? messages[messages.length - 1]?.text : '');
+  const currentStructuredData = messages && messages.length > 0 ? messages[messages.length - 1]?.structuredData : null;
+
   useEffect(() => {
-    if (response) {
-      const parsed = parseYusrAIStructuredResponse(response);
+    if (currentResponse) {
+      const parsed = parseYusrAIStructuredResponse(currentResponse);
       setParsedResult(parsed);
       setExecutionBlueprint(parsed.structuredData?.execution_blueprint);
+    } else if (currentStructuredData) {
+      setParsedResult({
+        structuredData: currentStructuredData,
+        metadata: {
+          hasStructuredData: true,
+          yusraiPowered: true,
+          yusrai_powered: true,
+          sevenSectionsValidated: true,
+          seven_sections_validated: true,
+          hasExecutionBlueprint: !!currentStructuredData.execution_blueprint,
+          platformsCount: 0,
+          workflowSteps: 0,
+          score: 100,
+          isPlainText: false,
+          error_help_available: false
+        },
+        platformNames: [],
+        isPlainText: false
+      });
+      setExecutionBlueprint(currentStructuredData.execution_blueprint);
     }
-  }, [response]);
+  }, [currentResponse, currentStructuredData]);
 
   // CRITICAL FIX: Extract and save platform data with persistence
   const extractAndSavePlatformData = useCallback((structuredData: YusrAIStructuredResponse) => {
@@ -166,7 +211,7 @@ const ChatCard = ({
   }, []);
 
   const handleExecuteAutomation = () => {
-    if (executionBlueprint) {
+    if (executionBlueprint && onExecuteAutomation) {
       onExecuteAutomation(executionBlueprint);
     } else {
       toast.error("No execution blueprint available.");
@@ -191,6 +236,64 @@ const ChatCard = ({
     );
   }
 
+  // Handle messages array display
+  if (messages && messages.length > 0) {
+    return (
+      <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+        {messages.map((message) => (
+          <Card 
+            key={message.id} 
+            className={`${message.isBot 
+              ? 'bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200' 
+              : 'bg-white border-gray-200'} shadow-lg`}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                {message.isBot && <Bot className="w-5 h-5 text-blue-600" />}
+                {message.isBot ? 'YusrAI' : 'You'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm">{message.text}</p>
+              {message.timestamp && (
+                <p className="text-xs text-gray-500 mt-2">
+                  {message.timestamp.toLocaleTimeString()}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+        
+        {/* Help Message Generator */}
+        {onSendMessage && (
+          <div className="flex gap-2 flex-wrap mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onSendMessage("How can I create an automation?")}
+            >
+              Get Started
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onSendMessage("What platforms can you integrate?")}
+            >
+              View Platforms
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onSendMessage("Show me automation examples")}
+            >
+              Examples
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (parsedResult.isPlainText) {
     return (
       <Card className="bg-white/80 backdrop-blur-sm border border-gray-200 shadow-lg">
@@ -198,14 +301,16 @@ const ChatCard = ({
           <CardTitle className="text-2xl font-semibold">
             AI Response
           </CardTitle>
-          <Button variant="outline" size="sm" onClick={onRetry} disabled={isLoading}>
-            <RefreshCcw className="mr-2 h-4 w-4" />
-            Retry
-          </Button>
+          {onRetry && (
+            <Button variant="outline" size="sm" onClick={onRetry} disabled={isLoading}>
+              <RefreshCcw className="mr-2 h-4 w-4" />
+              Retry
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            {response}
+            {currentResponse}
           </p>
         </CardContent>
       </Card>
@@ -291,6 +396,26 @@ const ChatCard = ({
                         </div>
                       )}
                     </div>
+                    {onAgentAdd && (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onAgentAdd(agent)}
+                        >
+                          Add
+                        </Button>
+                        {onAgentDismiss && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onAgentDismiss(agent.name || `Agent ${index + 1}`)}
+                          >
+                            Dismiss
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -318,6 +443,7 @@ const ChatCard = ({
               automationId={automationId || ''}
               onCredentialChange={() => {
                 console.log('🔄 Credentials changed, platform data persisted');
+                onPlatformCredentialChange?.();
               }}
             />
           </CardContent>
@@ -325,7 +451,7 @@ const ChatCard = ({
       )}
 
       {/* Execute Automation Button */}
-      {executionBlueprint && (
+      {executionBlueprint && onExecuteAutomation && (
         <Button
           variant="default"
           size="lg"

@@ -121,8 +121,11 @@ const ChatAICredentialForm = ({
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [existingCredentials, setExistingCredentials] = useState<boolean>(false);
 
+  // FIXED: Ensure platform name is properly displayed and cleaned
+  const platformName = platform?.name?.replace(/[*_`]/g, '').trim() || 'Unknown Platform';
+
   // Create storage key for this platform's test response
-  const getStorageKey = () => `testResponse_${platform.name}_${automationId}`;
+  const getStorageKey = () => `testResponse_${platformName}_${automationId}`;
 
   // Load persisted test response from localStorage
   const loadPersistedTestResponse = () => {
@@ -131,7 +134,7 @@ const ChatAICredentialForm = ({
       const stored = localStorage.getItem(storageKey);
       if (stored) {
         const parsed = JSON.parse(stored);
-        console.log(`📱 Loading persisted test response for ${platform.name}:`, parsed);
+        console.log(`📱 Loading persisted test response for ${platformName}:`, parsed);
         setTestResponse(parsed.testResponse);
         setTestStatus(parsed.testStatus);
       }
@@ -150,7 +153,7 @@ const ChatAICredentialForm = ({
         timestamp: Date.now()
       };
       localStorage.setItem(storageKey, JSON.stringify(dataToStore));
-      console.log(`💾 Saved test response to localStorage for ${platform.name}:`, dataToStore);
+      console.log(`💾 Saved test response to localStorage for ${platformName}:`, dataToStore);
     } catch (error) {
       console.error('Failed to save test response to persistence:', error);
     }
@@ -158,11 +161,11 @@ const ChatAICredentialForm = ({
 
   // Load existing credentials and initialize test script
   useEffect(() => {
-    if (user && automationId && platform.name) {
+    if (user && automationId && platformName && platformName !== 'Unknown Platform') {
       loadExistingCredentials();
       loadPersistedTestResponse(); // Load persisted test response
     }
-  }, [user, automationId, platform.name]);
+  }, [user, automationId, platformName]);
 
   // Update test script when credentials change
   useEffect(() => {
@@ -179,7 +182,7 @@ const ChatAICredentialForm = ({
       const existingCreds = await UnifiedCredentialManager.getCredentials(
         user.id,
         automationId,
-        platform.name
+        platformName
       );
 
       if (existingCreds) {
@@ -190,7 +193,7 @@ const ChatAICredentialForm = ({
         });
         setCredentials(maskedCreds);
         setExistingCredentials(true);
-        toast.success(`Found existing credentials for ${platform.name}`);
+        toast.success(`Found existing credentials for ${platformName}`);
       } else {
         // Initialize empty credentials
         const initialCreds: Record<string, string> = {};
@@ -248,14 +251,14 @@ const ChatAICredentialForm = ({
     setTestResponse(null);
 
     try {
-      console.log(`🧪 Testing credentials for ${platform.name} using INTELLIGENT platform configuration`);
+      console.log(`🧪 Testing credentials for ${platformName} using INTELLIGENT platform configuration`);
       
       // CRITICAL FIX: Use INTELLIGENT configuration (NO MORE HARDCODING)
       const testConfig = platform.testConfig || {
-        platform_name: platform.name,
-        base_url: generateIntelligentBaseUrl(platform.name), // FIXED: Intelligent TLD detection
+        platform_name: platformName,
+        base_url: generateIntelligentBaseUrl(platformName), // FIXED: Intelligent TLD detection
         test_endpoint: { 
-          path: generateIntelligentEndpoint(platform.name), // FIXED: Intelligent endpoint
+          path: generateIntelligentEndpoint(platformName), // FIXED: Intelligent endpoint
           method: 'GET' 
         },
         authentication: { 
@@ -271,12 +274,12 @@ const ChatAICredentialForm = ({
         error_patterns: { 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found' }
       };
 
-      console.log(`✅ Using INTELLIGENT testConfig for ${platform.name}:`, testConfig);
+      console.log(`✅ Using INTELLIGENT testConfig for ${platformName}:`, testConfig);
 
       // Call test-credential with the INTELLIGENT testConfig
       const { data: result, error } = await supabase.functions.invoke('test-credential', {
         body: {
-          platformName: platform.name,
+          platformName: platformName,
           credentials,
           testConfig, // Use INTELLIGENT configuration
           userId: user.id,
@@ -296,8 +299,8 @@ const ChatAICredentialForm = ({
       saveTestResponseToPersistence(result, finalStatus);
 
       if (result.success) {
-        toast.success(`✅ ${platform.name} credentials verified successfully!`);
-        onCredentialTested(platform.name);
+        toast.success(`✅ ${platformName} credentials verified successfully!`);
+        onCredentialTested(platformName);
       } else {
         toast.error(`❌ Test failed: ${result.message}`);
       }
@@ -338,13 +341,13 @@ const ChatAICredentialForm = ({
       const result = await UnifiedCredentialManager.saveCredentials(
         user.id,
         automationId,
-        platform.name,
+        platformName,
         credentials
       );
 
       if (result.success) {
         toast.success(result.message);
-        onCredentialSaved(platform.name);
+        onCredentialSaved(platformName);
         setTimeout(onClose, 1000);
       } else {
         toast.error(result.message);
@@ -389,7 +392,8 @@ const ChatAICredentialForm = ({
               <Settings className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-purple-900">{platform.name} Credentials</h3>
+              {/* FIXED: Display actual platform name instead of "Unknown Platform" */}
+              <h3 className="text-xl font-bold text-purple-900">{platformName} Credentials</h3>
               <p className="text-sm text-purple-600 font-normal">Intelligent Platform Detection • Dynamic URLs</p>
             </div>
             <Badge variant="secondary" className="ml-auto bg-green-100 text-green-800">
@@ -418,7 +422,8 @@ const ChatAICredentialForm = ({
           <TabsContent value="credentials" className="mt-6">
             <Card className="bg-white/70 backdrop-blur-sm border border-purple-200/50 rounded-2xl shadow-lg">
               <CardHeader>
-                <CardTitle className="text-lg text-purple-900">Configure Your {platform.name} Credentials</CardTitle>
+                {/* FIXED: Display actual platform name in card header */}
+                <CardTitle className="text-lg text-purple-900">Configure Your {platformName} Credentials</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 {platform.credentials.map((cred, index) => {
@@ -438,7 +443,7 @@ const ChatAICredentialForm = ({
                             </Badge>
                           )}
                         </Label>
-                        {cred.link && (
+                        {cred.link && cred.link !== '#' && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -587,12 +592,12 @@ const ChatAICredentialForm = ({
             {isTesting ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Testing with Smart Config...
+                Testing Connection...
               </>
             ) : (
               <>
                 <Zap className="w-4 h-4 mr-2" />
-                Test with Intelligent URLs
+                Test Your Connection
               </>
             )}
           </Button>

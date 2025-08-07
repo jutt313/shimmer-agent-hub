@@ -93,11 +93,19 @@ const ChatCard = ({
               if (parseResult.structuredData && !parseResult.isPlainText) {
                 console.log('✅ Structured data found from YusrAI:', parseResult.structuredData);
                 
-                // FIXED: Enhanced platform data extraction
+                // FIXED: Enhanced platform data extraction with better name handling
                 const platformsSource = parseResult.structuredData.platforms || parseResult.structuredData.platforms_and_credentials || [];
                 
                 const platformData = platformsSource.map(platform => {
                   console.log('🔍 Processing platform:', platform);
+                  
+                  // FIXED: Better platform name extraction
+                  let platformName = platform.name || platform.platform || platform.platform_name || 'Unknown Platform';
+                  
+                  // Clean up platform name if it has extra formatting
+                  if (typeof platformName === 'string') {
+                    platformName = platformName.replace(/[*_`]/g, '').trim();
+                  }
                   
                   let credentials = [];
                   if (platform.credentials) {
@@ -107,21 +115,24 @@ const ChatCard = ({
                       credentials = Object.entries(platform.credentials).map(([key, value]: [string, any]) => ({
                         field: key,
                         placeholder: value.example || value.placeholder || `Enter ${key}`,
-                        link: value.link || value.url || '#',
+                        link: value.link || value.url || value.where_to_get || '#',
                         why_needed: value.description || value.why_needed || `Required for ${key}`
                       }));
                     }
                   }
                   
-                  return {
-                    name: platform.name || platform.platform || 'Unknown Platform',
+                  const finalPlatform = {
+                    name: platformName,
                     credentials: credentials.map(cred => ({
                       field: cred.field || cred.name || 'api_key',
                       placeholder: cred.example || cred.placeholder || `Enter ${cred.field}`,
-                      link: cred.link || cred.where_to_get || '#',
+                      link: cred.link || cred.where_to_get || cred.url || '#',
                       why_needed: cred.why_needed || cred.description || 'Authentication required'
                     }))
                   };
+                  
+                  console.log('🔗 Final processed platform:', finalPlatform);
+                  return finalPlatform;
                 });
                 
                 console.log('🔗 Extracted platform data:', platformData);
@@ -165,9 +176,10 @@ const ChatCard = ({
 
   const optimizedMessages = enhancedMessages.slice(-50);
 
+  // FIXED: Enhanced extractStepText function to clean markdown formatting
   const extractStepText = (step: any): string => {
     if (typeof step === 'string') {
-      return step.replace(/^\d+\.\s*/, '').trim();
+      return cleanMarkdownFormatting(step.replace(/^\d+\.\s*/, '').trim());
     }
     
     if (typeof step === 'object' && step !== null) {
@@ -181,7 +193,7 @@ const ChatCard = ({
                      step.name;
       
       if (stepText && typeof stepText === 'string') {
-        return stepText.replace(/^\d+\.\s*/, '').trim();
+        return cleanMarkdownFormatting(stepText.replace(/^\d+\.\s*/, '').trim());
       }
       
       if (step.platform && step.method) {
@@ -192,6 +204,26 @@ const ChatCard = ({
     }
     
     return 'Step information unavailable';
+  };
+
+  // FIXED: New function to clean markdown formatting
+  const cleanMarkdownFormatting = (text: string): string => {
+    if (!text || typeof text !== 'string') return text;
+    
+    return text
+      // Remove bold formatting **text** and __text__
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/__(.*?)__/g, '$1')
+      // Remove italic formatting *text* and _text_
+      .replace(/\*(.*?)\*/g, '$1')
+      .replace(/_(.*?)_/g, '$1')
+      // Remove code formatting `text`
+      .replace(/`(.*?)`/g, '$1')
+      // Remove any remaining markdown symbols
+      .replace(/[*_`]/g, '')
+      // Clean up extra whitespace
+      .replace(/\s+/g, ' ')
+      .trim();
   };
 
   const safeFormatMessageText = (inputText: string | undefined | null, structuredData?: YusrAIStructuredResponse): React.ReactNode[] => {
@@ -207,7 +239,7 @@ const ChatCard = ({
           sections.push(
             <div key="summary" className="mb-4">
               <div className="font-semibold text-gray-800 mb-2">Summary:</div>
-              <div className="text-gray-700 leading-relaxed">{structuredData.summary}</div>
+              <div className="text-gray-700 leading-relaxed">{cleanMarkdownFormatting(structuredData.summary)}</div>
             </div>
           );
         }
@@ -229,36 +261,62 @@ const ChatCard = ({
           );
         }
         
-        // Handle both platforms_and_credentials and platforms
+        // FIXED: Enhanced platforms display with proper credential information
         const platformsData = structuredData.platforms_and_credentials || structuredData.platforms;
         if (platformsData && Array.isArray(platformsData) && platformsData.length > 0) {
           sections.push(
             <div key="platforms" className="mb-4">
               <div className="font-semibold text-gray-800 mb-2">Platforms:</div>
               <div className="text-gray-700 leading-relaxed">
-                {platformsData.map((platform, index) => (
-                  <div key={index} className="mb-3 p-3 bg-gray-50 rounded-lg">
-                    <div className="font-medium text-gray-800 mb-2">{String(platform?.name || platform?.platform || `Platform ${index + 1}`)}</div>
-                    {platform?.credentials && Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="text-sm font-medium text-gray-600">Required credentials:</div>
-                        {platform.credentials.map((cred, credIndex) => (
-                          <div key={credIndex} className="text-sm bg-white p-2 rounded border-l-4 border-blue-200">
-                            <div className="font-medium text-gray-800">{cred.field}</div>
-                            <div className="text-gray-600 text-xs mt-1">{cred.why_needed}</div>
-                            {cred.where_to_get && (
-                              <div className="text-blue-600 text-xs mt-1">
-                                <a href={cred.link || '#'} target="_blank" rel="noopener noreferrer">
-                                  Get it from: {cred.where_to_get}
-                                </a>
+                {platformsData.map((platform, index) => {
+                  // FIXED: Better platform name extraction and cleaning
+                  const platformName = cleanMarkdownFormatting(
+                    platform?.name || platform?.platform || platform?.platform_name || `Platform ${index + 1}`
+                  );
+                  
+                  return (
+                    <div key={index} className="mb-3 p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-800 mb-2">{platformName}</div>
+                      {platform?.credentials && (
+                        <div className="space-y-2">
+                          <div className="text-sm font-medium text-gray-600">Required credentials:</div>
+                          {/* FIXED: Handle both array and object credential formats */}
+                          {Array.isArray(platform.credentials) ? (
+                            platform.credentials.map((cred, credIndex) => (
+                              <div key={credIndex} className="text-sm bg-white p-2 rounded border-l-4 border-blue-200">
+                                <div className="font-medium text-gray-800">{cred.field || cred.name || 'API Key'}</div>
+                                <div className="text-gray-600 text-xs mt-1">{cred.why_needed || cred.description || 'Required for authentication'}</div>
+                                {(cred.link || cred.where_to_get || cred.url) && (
+                                  <div className="text-blue-600 text-xs mt-1">
+                                    <a href={cred.link || cred.where_to_get || cred.url || '#'} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                      Get it from: {cred.where_to_get || 'Documentation'}
+                                    </a>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                            ))
+                          ) : typeof platform.credentials === 'object' ? (
+                            Object.entries(platform.credentials).map(([key, value]: [string, any], credIndex) => (
+                              <div key={credIndex} className="text-sm bg-white p-2 rounded border-l-4 border-blue-200">
+                                <div className="font-medium text-gray-800">{key}</div>
+                                <div className="text-gray-600 text-xs mt-1">{value?.description || value?.why_needed || `Required for ${key}`}</div>
+                                {(value?.link || value?.where_to_get || value?.url) && (
+                                  <div className="text-blue-600 text-xs mt-1">
+                                    <a href={value.link || value.where_to_get || value.url || '#'} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                      Get it from: {value.where_to_get || 'Documentation'}
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-sm text-gray-500">Credential information not available</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
@@ -287,7 +345,7 @@ const ChatCard = ({
                 {agentsData.map((agent, index) => (
                   <div key={index} className="mb-3 p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="font-medium text-gray-800">{String(agent?.name || agent?.agent_name || `Agent ${index + 1}`)}</div>
+                      <div className="font-medium text-gray-800">{cleanMarkdownFormatting(String(agent?.name || agent?.agent_name || `Agent ${index + 1}`))}</div>
                       <div className="flex gap-2">
                         <Button
                           size="sm"
@@ -308,11 +366,11 @@ const ChatCard = ({
                       </div>
                     </div>
                     <div className="text-sm text-gray-600 space-y-1">
-                      <div><strong>Role:</strong> {agent?.role || 'Assistant'}</div>
-                      <div><strong>Goal:</strong> {agent?.goal || 'General assistance'}</div>
-                      {agent?.rule && <div><strong>Rule:</strong> {agent.rule}</div>}
-                      {agent?.why_needed && <div><strong>Why needed:</strong> {agent.why_needed}</div>}
-                      {agent?.memory && <div><strong>Memory:</strong> {agent.memory}</div>}
+                      <div><strong>Role:</strong> {cleanMarkdownFormatting(agent?.role || 'Assistant')}</div>
+                      <div><strong>Goal:</strong> {cleanMarkdownFormatting(agent?.goal || 'General assistance')}</div>
+                      {agent?.rule && <div><strong>Rule:</strong> {cleanMarkdownFormatting(agent.rule)}</div>}
+                      {agent?.why_needed && <div><strong>Why needed:</strong> {cleanMarkdownFormatting(agent.why_needed)}</div>}
+                      {agent?.memory && <div><strong>Memory:</strong> {cleanMarkdownFormatting(agent.memory)}</div>}
                     </div>
                   </div>
                 ))}
@@ -327,7 +385,7 @@ const ChatCard = ({
       const lines = inputText.split('\n');
       return lines.map((line, index) => (
         <span key={`line-${index}`}>
-          {line}
+          {cleanMarkdownFormatting(line)}
           {index < lines.length - 1 && <br />}
         </span>
       ));
@@ -501,15 +559,36 @@ const ChatCard = ({
       const platformsSource = latestStructuredMessage.structuredData.platforms || 
                              latestStructuredMessage.structuredData.platforms_and_credentials || [];
       
-      const transformedPlatforms = platformsSource.map((platform: any) => ({
-        name: platform.name || platform.platform || 'Unknown Platform',
-        credentials: platform.credentials ? Object.entries(platform.credentials).map(([key, value]: [string, any]) => ({
-          field: key,
-          placeholder: value.example || value.placeholder || `Enter ${key}`,
-          link: value.link || value.url || '#',
-          why_needed: value.description || value.why_needed || `Required for ${key}`
-        })) : []
-      }));
+      const transformedPlatforms = platformsSource.map((platform: any) => {
+        // FIXED: Better platform name handling
+        const platformName = cleanMarkdownFormatting(
+          platform.name || platform.platform || platform.platform_name || 'Unknown Platform'
+        );
+        
+        let credentials = [];
+        if (platform.credentials) {
+          if (Array.isArray(platform.credentials)) {
+            credentials = platform.credentials;
+          } else if (typeof platform.credentials === 'object') {
+            credentials = Object.entries(platform.credentials).map(([key, value]: [string, any]) => ({
+              field: key,
+              placeholder: value.example || value.placeholder || `Enter ${key}`,
+              link: value.link || value.url || value.where_to_get || '#',
+              why_needed: value.description || value.why_needed || `Required for ${key}`
+            }));
+          }
+        }
+        
+        return {
+          name: platformName,
+          credentials: credentials.map((cred: any) => ({
+            field: cred.field || cred.name || 'api_key',
+            placeholder: cred.example || cred.placeholder || `Enter ${cred.field}`,
+            link: cred.link || cred.where_to_get || cred.url || '#',
+            why_needed: cred.why_needed || cred.description || 'Authentication required'
+          }))
+        };
+      });
       
       console.log('🔄 Transformed platforms from structured data:', transformedPlatforms);
       return transformedPlatforms;

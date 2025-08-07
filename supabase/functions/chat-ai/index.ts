@@ -230,6 +230,77 @@ CRITICAL: When generating authentication headers for platforms, use the exact fo
 
 RESPOND ONLY IN VALID JSON FORMAT. Always structure your response as a JSON object with the appropriate sections based on the request type.`;
 
+// Message validation and transformation functions
+function validateAndTransformMessages(messages: any[]): Array<{role: string, content: string}> {
+  console.log('🔍 Raw messages received:', JSON.stringify(messages, null, 2));
+  
+  if (!Array.isArray(messages)) {
+    console.log('⚠️ Messages is not an array, returning empty array');
+    return [];
+  }
+
+  const validMessages = messages
+    .filter(msg => {
+      // Filter out null, undefined, or non-object messages
+      if (!msg || typeof msg !== 'object') {
+        console.log('❌ Invalid message object:', msg);
+        return false;
+      }
+      
+      // Check if message has text/content
+      const hasContent = msg.text || msg.content || msg.message_content;
+      if (!hasContent || hasContent.trim() === '') {
+        console.log('❌ Message has no content:', msg);
+        return false;
+      }
+      
+      return true;
+    })
+    .map(msg => {
+      // Transform frontend format to OpenAI format
+      const content = msg.text || msg.content || msg.message_content || '';
+      const role = msg.isBot === true ? 'assistant' : 
+                  msg.isBot === false ? 'user' :
+                  msg.role || 'user';
+      
+      const transformedMsg = {
+        role: role,
+        content: content.toString().trim()
+      };
+      
+      console.log('✅ Transformed message:', transformedMsg);
+      return transformedMsg;
+    })
+    // Remove duplicates and ensure alternating user/assistant pattern
+    .filter((msg, index, array) => {
+      if (index === 0) return true;
+      // Prevent consecutive messages from same role
+      return msg.role !== array[index - 1]?.role;
+    });
+
+  console.log('📋 Final validated messages for OpenAI:', JSON.stringify(validMessages, null, 2));
+  return validMessages;
+}
+
+function validateYusrAIResponse(response: string): { isValid: boolean; data: any; error?: string } {
+  try {
+    // Try to parse as JSON first
+    const parsed = JSON.parse(response);
+    
+    // Basic structure validation
+    if (typeof parsed === 'object' && parsed !== null) {
+      console.log('✅ YusrAI JSON response is valid');
+      return { isValid: true, data: parsed };
+    } else {
+      console.log('⚠️ YusrAI response is not a valid object');
+      return { isValid: false, data: response, error: 'Response is not a valid JSON object' };
+    }
+  } catch (parseError) {
+    console.log('⚠️ YusrAI response is not JSON, treating as text:', parseError);
+    return { isValid: false, data: response, error: 'Response is not valid JSON' };
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -238,7 +309,11 @@ serve(async (req) => {
 
   try {
     const { message, messages = [], requestType } = await req.json();
-    console.log('🤖 YusrAI Processing:', { message: message?.substring(0, 100) + '...', requestType });
+    console.log('🤖 YusrAI Processing:', { 
+      message: message?.substring(0, 100) + '...', 
+      requestType,
+      messageCount: messages?.length || 0
+    });
 
     // Determine if this is a test configuration request or full automation request
     const isTestConfigRequest = requestType === 'test_config_generation' || 
@@ -254,12 +329,15 @@ serve(async (req) => {
 
     console.log('🚀 Calling OpenAI with YusrAI system prompt...');
 
+    // Validate and transform messages
+    const validatedMessages = validateAndTransformMessages(messages);
+
     const openAIMessages = [
       {
         role: 'system',
         content: YUSRAI_SYSTEM_PROMPT
       },
-      ...messages.slice(-10), // Keep last 10 messages for context
+      ...validatedMessages.slice(-10), // Keep last 10 messages for context
       {
         role: 'user', 
         content: isTestConfigRequest 
@@ -267,6 +345,12 @@ serve(async (req) => {
           : message
       }
     ];
+
+    console.log('📤 Sending to OpenAI:', {
+      messageCount: openAIMessages.length,
+      systemPromptLength: YUSRAI_SYSTEM_PROMPT.length,
+      lastUserMessage: message?.substring(0, 50) + '...'
+    });
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -299,22 +383,27 @@ serve(async (req) => {
     console.log('✅ YusrAI Response Generated:', {
       length: aiResponse.length,
       isTestConfig: isTestConfigRequest,
-      hasJSON: aiResponse.includes('{')
+      preview: aiResponse.substring(0, 200) + '...'
     });
 
-    // Try to parse as JSON first, if it fails return as text
-    try {
-      const parsedResponse = JSON.parse(aiResponse);
-      return new Response(JSON.stringify(parsedResponse), {
+    // Validate YusrAI response format
+    const validation = validateYusrAIResponse(aiResponse);
+    
+    if (validation.isValid) {
+      // Return structured JSON response
+      console.log('📊 Returning structured YusrAI response');
+      return new Response(JSON.stringify(validation.data), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
-    } catch (parseError) {
-      console.log('📝 Response is not JSON, returning as text');
+    } else {
+      // Return wrapped text response with metadata
+      console.log('📝 Returning text YusrAI response with metadata');
       return new Response(JSON.stringify({
-        response: aiResponse,
+        response: validation.data,
         timestamp: new Date().toISOString(),
         yusrai_powered: true,
-        response_type: isTestConfigRequest ? 'test_configuration' : 'automation_blueprint'
+        response_type: isTestConfigRequest ? 'test_configuration' : 'automation_blueprint',
+        validation_error: validation.error || null
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -325,7 +414,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       error: error.message,
       timestamp: new Date().toISOString(),
-      system: 'YusrAI Enhanced'
+      system: 'YusrAI Enhanced',
+      details: 'Check message format and OpenAI API connectivity'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

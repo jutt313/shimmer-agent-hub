@@ -5,9 +5,8 @@ export interface ChatAIRequest {
   userId: string;
   message: string;
   messages?: Array<{
-    text: string;
-    isBot: boolean;
-    message_content: string;
+    role: 'user' | 'assistant';
+    content: string;
   }>;
   context?: string;
   automationContext?: any;
@@ -28,11 +27,19 @@ class ChatAIConnectionService {
     try {
       console.log('🚀 Processing YusrAI request:', request.message);
       
+      // Transform messages to proper OpenAI format
+      const formattedMessages = request.messages?.map(msg => ({
+        role: msg.role || (msg.isBot ? 'assistant' : 'user'),
+        content: msg.content || msg.text || msg.message_content || ''
+      })).filter(msg => msg.content.trim() !== '') || [];
+
+      console.log('📤 Sending formatted messages:', formattedMessages);
+
       const { data, error } = await supabase.functions.invoke('chat-ai', {
         body: {
           message: request.message,
           userId: request.userId,
-          messages: request.messages || [],
+          messages: formattedMessages,
           context: request.context || 'yusrai_automation_creation',
           automationContext: request.automationContext
         }
@@ -79,24 +86,25 @@ class ChatAIConnectionService {
         };
       }
 
-      // SURGICAL FIX: Simplified parsing for direct OpenAI JSON response
+      // Handle both direct JSON objects and JSON strings
       let structuredData = null;
+      let responseText = data.response;
+
       try {
-        // Handle both string and object responses from chat-ai
-        if (typeof data.response === 'string') {
-          // Try to parse as JSON first
+        // If data.response is already an object (from successful JSON parsing in edge function)
+        if (typeof data.response === 'object' && data.response !== null) {
+          structuredData = data.response;
+          responseText = JSON.stringify(data.response);
+          console.log('📊 Using direct structured data object:', structuredData);
+        } else if (typeof data.response === 'string') {
+          // Try to parse as JSON if it's a string
           try {
             structuredData = JSON.parse(data.response);
             console.log('📊 Successfully parsed YusrAI structured data from JSON string:', structuredData);
           } catch (parseError) {
-            // If parsing fails, it's likely plain text
-            console.log('⚠️ Response is plain text, not JSON structure');
+            console.log('📝 Response is plain text, not JSON structure');
             structuredData = null;
           }
-        } else if (typeof data.response === 'object' && data.response !== null) {
-          // Direct object response
-          structuredData = data.response;
-          console.log('📊 Using direct structured data object:', structuredData);
         }
       } catch (parseError) {
         console.log('⚠️ Error processing YusrAI response:', parseError);
@@ -104,7 +112,7 @@ class ChatAIConnectionService {
       }
 
       return {
-        response: data.response,
+        response: responseText,
         structuredData: structuredData,
         yusrai_powered: data.yusrai_powered || true,
         seven_sections_validated: data.seven_sections_validated || false,
@@ -127,7 +135,8 @@ class ChatAIConnectionService {
         body: {
           generateTestConfig: true,
           platformName: platformName,
-          message: `Generate test configuration for ${platformName} with real API endpoints and exact headers`
+          message: `Generate test configuration for ${platformName} with real API endpoints and exact headers`,
+          requestType: 'test_config_generation'
         }
       });
 
@@ -137,7 +146,7 @@ class ChatAIConnectionService {
       }
 
       console.log('✅ YusrAI test config generated:', data);
-      return data.testConfig || null;
+      return data.testConfig || data;
 
     } catch (error: any) {
       console.error('💥 YusrAI test config generation failed:', error);

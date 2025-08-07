@@ -69,15 +69,19 @@ const Index = () => {
     try {
       console.log('🚀 Sending message to YusrAI:', currentMessage);
       
+      // Format conversation history properly for OpenAI API
+      const conversationHistory = messages.slice(-10).map(msg => ({
+        role: msg.isBot ? 'assistant' : 'user',
+        content: msg.text
+      }));
+
+      console.log('📋 Formatted conversation history:', conversationHistory);
+
       const result = await executeChatRequest(async () => {
         const response = await chatAIConnectionService.processConnectionRequest({
           userId: user?.id || 'anonymous',
           message: currentMessage,
-          messages: messages.slice(-10).map(msg => ({
-            text: msg.text,
-            isBot: msg.isBot,
-            message_content: msg.text
-          })),
+          messages: conversationHistory,
           context: 'yusrai_automation_creation',
           automationContext: currentAgentConfig ? {
             agentConfig: currentAgentConfig.config || {},

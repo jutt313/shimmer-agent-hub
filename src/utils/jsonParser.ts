@@ -31,6 +31,7 @@ export interface YusrAIStructuredResponse {
   clarification_questions?: string[];
   ai_agents?: any[];
   agents?: any[]; // Add for compatibility
+  automation_agents?: any[]; // FIXED: Add missing automation_agents field
   test_payloads?: any;
   execution_blueprint?: any;
 }

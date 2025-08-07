@@ -159,7 +159,7 @@ const ChatCard = ({
                   const cleanedPlatformName = cleanPlatformName(rawPlatformName);
                   console.log(`🔧 Platform name cleaned: "${rawPlatformName}" → "${cleanedPlatformName}"`);
                   
-                  // CRITICAL FIX: Extract credentials with multiple format support
+                  // CRITICAL FIX: Extract credentials with multiple format support - REMOVE HARDCODED FALLBACKS
                   let credentials = [];
                   if (platform.credentials) {
                     if (Array.isArray(platform.credentials)) {
@@ -168,8 +168,8 @@ const ChatCard = ({
                       credentials = Object.entries(platform.credentials).map(([key, value]: [string, any]) => ({
                         field: key,
                         placeholder: value.example || value.placeholder || `Enter ${key}`,
-                        link: value.link || value.url || value.where_to_get || '#',
-                        why_needed: value.description || value.why_needed || `Required for ${key}`
+                        link: value.link || value.url || value.where_to_get,
+                        why_needed: value.description || value.why_needed
                       }));
                     }
                   } else if (platform.required_credentials) {
@@ -179,8 +179,8 @@ const ChatCard = ({
                     credentials = [{
                       field: platform.authentication.field || 'api_key',
                       placeholder: platform.authentication.placeholder || 'Enter API key',
-                      link: platform.authentication.link || '#',
-                      why_needed: platform.authentication.description || 'Authentication required'
+                      link: platform.authentication.link,
+                      why_needed: platform.authentication.description
                     }];
                   }
                   
@@ -202,8 +202,8 @@ const ChatCard = ({
                     credentials: credentials.map((cred: any) => ({
                       field: cred.field || cred.name || 'api_key',
                       placeholder: cred.example || cred.placeholder || `Enter ${cred.field || 'credential'}`,
-                      link: cred.link || cred.where_to_get || cred.url || '#',
-                      why_needed: cred.why_needed || cred.description || 'Authentication required'
+                      link: cred.link || cred.where_to_get || cred.url, // FIXED: Remove hardcoded '#' fallback
+                      why_needed: cred.why_needed || cred.description // FIXED: Remove hardcoded 'Authentication required' fallback
                     })),
                     // CRITICAL: Preserve ChatAI test configuration
                     testConfig: testConfig,
@@ -373,8 +373,8 @@ const ChatCard = ({
           );
         }
         
-        // Handle both ai_agents and agents
-        const agentsData = structuredData.ai_agents || structuredData.agents;
+        // FIXED: Handle all agent field variants including automation_agents
+        const agentsData = structuredData.ai_agents || structuredData.agents || structuredData.automation_agents;
         if (agentsData && Array.isArray(agentsData) && agentsData.length > 0) {
           sections.push(
             <div key="agents" className="mb-4">
@@ -612,8 +612,8 @@ const ChatCard = ({
             credentials = Object.entries(platform.credentials).map(([key, value]: [string, any]) => ({
               field: key,
               placeholder: value.example || value.placeholder || `Enter ${key}`,
-              link: value.link || value.url || value.where_to_get || '#',
-              why_needed: value.description || value.why_needed || `Required for ${key}`
+              link: value.link || value.url || value.where_to_get,
+              why_needed: value.description || value.why_needed
             }));
           }
         }
@@ -623,7 +623,7 @@ const ChatCard = ({
           credentials: credentials.map((cred: any) => ({
             field: cred.field || cred.name || 'api_key',
             placeholder: cred.example || cred.placeholder || `Enter ${cred.field}`,
-            link: cred.link || cred.where_to_get || cred.url || '#',
+            link: cred.link || cred.where_to_get || cred.url,
             why_needed: cred.why_needed || cred.description || 'Authentication required'
           })),
           // CRITICAL: Include ChatAI test configuration

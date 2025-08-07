@@ -105,6 +105,41 @@ const generateIntelligentEndpoint = (platformName: string): string => {
   return '/me';
 };
 
+// CRITICAL FIX: Smart platform name extraction from various sources
+const extractPlatformName = (platform: Platform): string => {
+  console.log('🔍 Extracting platform name from:', platform);
+  
+  // Try to extract from various possible sources in the platform object
+  const possibleNames = [
+    platform?.name,
+    platform?.chatai_data?.platform_name,
+    platform?.chatai_data?.name,
+    platform?.testConfig?.platform_name,
+    // Extract from credentials link if available
+    platform?.credentials?.[0]?.link ? 
+      platform.credentials[0].link.split('/')[2]?.replace('api.', '').replace('.com', '').replace('.io', '').replace('.ai', '') : 
+      null
+  ].filter(Boolean);
+
+  console.log('🔍 Possible platform names found:', possibleNames);
+
+  for (const name of possibleNames) {
+    if (name && typeof name === 'string') {
+      // FIXED: Less aggressive cleanup - only remove markdown and excessive special chars
+      const cleaned = name.replace(/[*_`]/g, '').replace(/#{1,6}\s*/, '').trim();
+      console.log('🔍 Cleaned name:', name, '->', cleaned);
+      
+      if (cleaned && cleaned.length > 0 && cleaned !== 'undefined') {
+        console.log('✅ Using platform name:', cleaned);
+        return cleaned;
+      }
+    }
+  }
+  
+  console.log('⚠️ No valid platform name found, using Unknown Platform');
+  return 'Unknown Platform';
+};
+
 const ChatAICredentialForm = ({ 
   platform, 
   automationId, 
@@ -123,21 +158,54 @@ const ChatAICredentialForm = ({
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [existingCredentials, setExistingCredentials] = useState<boolean>(false);
 
-  // CRITICAL FIX: Ensure platform name is properly cleaned and displayed
-  const platformName = platform?.name?.replace(/[*_`#]/g, '').trim() || 'Unknown Platform';
+  // CRITICAL FIX: Use smart platform name extraction
+  const platformName = extractPlatformName(platform);
   
   console.log('🔍 ChatAI Credential Form initialized for platform:', platformName);
   console.log('🔍 Platform object received:', platform);
   console.log('🔍 ChatAI testConfig available:', !!platform.testConfig);
   console.log('🔍 ChatAI test_payloads available:', platform.test_payloads?.length || 0);
 
-  // Create storage key for this platform's test response
-  const getStorageKey = () => `testResponse_${platformName}_${automationId}`;
+  // CRITICAL FIX: Enhanced storage functions for platform persistence
+  const getPlatformStorageKey = () => `platformData_${platformName}_${automationId}`;
+  const getTestResponseStorageKey = () => `testResponse_${platformName}_${automationId}`;
+
+  // CRITICAL FIX: Save complete platform data for persistence
+  const savePlatformDataToPersistence = (platformData: Platform, platformName: string) => {
+    try {
+      const storageKey = getPlatformStorageKey();
+      const dataToStore = {
+        platformData: platformData,
+        platformName: platformName,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(storageKey, JSON.stringify(dataToStore));
+      console.log(`💾 Saved platform data to localStorage for ${platformName}:`, dataToStore);
+    } catch (error) {
+      console.error('Failed to save platform data to persistence:', error);
+    }
+  };
+
+  // CRITICAL FIX: Load persisted platform data
+  const loadPersistedPlatformData = () => {
+    try {
+      const storageKey = getPlatformStorageKey();
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        console.log(`📱 Loading persisted platform data for ${platformName}:`, parsed);
+        return parsed;
+      }
+    } catch (error) {
+      console.error('Failed to load persisted platform data:', error);
+    }
+    return null;
+  };
 
   // Load persisted test response from localStorage
   const loadPersistedTestResponse = () => {
     try {
-      const storageKey = getStorageKey();
+      const storageKey = getTestResponseStorageKey();
       const stored = localStorage.getItem(storageKey);
       if (stored) {
         const parsed = JSON.parse(stored);
@@ -153,7 +221,7 @@ const ChatAICredentialForm = ({
   // Save test response to localStorage for persistence
   const saveTestResponseToPersistence = (response: any, status: string) => {
     try {
-      const storageKey = getStorageKey();
+      const storageKey = getTestResponseStorageKey();
       const dataToStore = {
         testResponse: response,
         testStatus: status,
@@ -169,8 +237,10 @@ const ChatAICredentialForm = ({
   // Load existing credentials and initialize test script
   useEffect(() => {
     if (user && automationId && platformName && platformName !== 'Unknown Platform') {
+      // CRITICAL FIX: Save platform data on mount for persistence
+      savePlatformDataToPersistence(platform, platformName);
       loadExistingCredentials();
-      loadPersistedTestResponse(); // Load persisted test response
+      loadPersistedTestResponse();
     }
   }, [user, automationId, platformName]);
 
@@ -224,42 +294,88 @@ const ChatAICredentialForm = ({
     }
   };
 
-  // CRITICAL FIX: Use ChatAI test data when available
+  // CRITICAL FIX: Handle ChatAI data structure with _type and value properties
+  const extractChatAIValue = (data: any) => {
+    console.log('🔧 Extracting ChatAI value from:', data);
+    
+    if (!data) return null;
+    
+    // Handle ChatAI wrapped structure
+    if (typeof data === 'object' && data._type && data.value) {
+      console.log('🔧 Found ChatAI wrapped structure:', data);
+      
+      // If value is "undefined" string, return null
+      if (data.value === "undefined" || data.value === undefined) {
+        console.log('🔧 ChatAI value is undefined, returning null');
+        return null;
+      }
+      
+      // Try to parse if it's a JSON string
+      if (typeof data.value === 'string') {
+        try {
+          const parsed = JSON.parse(data.value);
+          console.log('🔧 Parsed ChatAI JSON value:', parsed);
+          return parsed;
+        } catch {
+          console.log('🔧 Using ChatAI string value:', data.value);
+          return data.value;
+        }
+      }
+      
+      console.log('🔧 Using ChatAI direct value:', data.value);
+      return data.value;
+    }
+    
+    // Handle direct data
+    console.log('🔧 Using direct data:', data);
+    return data;
+  };
+
+  // CRITICAL FIX: Use ChatAI data with proper structure handling
   const updateTestScriptWithChatAIData = () => {
     console.log('🔧 Updating test script with ChatAI data for:', platformName);
     
-    // CRITICAL: Check if ChatAI test_payloads are available
-    if (platform.test_payloads && platform.test_payloads.length > 0) {
-      console.log('🎯 Using ChatAI test_payloads:', platform.test_payloads);
+    // CRITICAL FIX: Extract ChatAI test_payloads properly
+    const extractedTestPayloads = extractChatAIValue(platform.test_payloads);
+    const extractedTestConfig = extractChatAIValue(platform.testConfig);
+    
+    console.log('🔧 Extracted test_payloads:', extractedTestPayloads);
+    console.log('🔧 Extracted testConfig:', extractedTestConfig);
+    
+    // CRITICAL: Check if ChatAI test_payloads are available after extraction
+    if (extractedTestPayloads && Array.isArray(extractedTestPayloads) && extractedTestPayloads.length > 0) {
+      console.log('🎯 Using extracted ChatAI test_payloads:', extractedTestPayloads);
       
       // Use the first test payload from ChatAI
-      const chatAIPayload = platform.test_payloads[0];
+      const chatAIPayload = extractedTestPayloads[0];
       
       // Format the ChatAI payload as a readable test script
       const chatAIScript = JSON.stringify({
         platform: platformName,
         source: "ChatAI Generated Test Payload",
         request: chatAIPayload,
-        note: "This test payload was generated by ChatAI based on the platform requirements"
+        note: "This test payload was generated by ChatAI based on the platform requirements",
+        chatai_extraction: "Successfully extracted from ChatAI wrapped structure"
       }, null, 2);
       
-      console.log('✅ Generated ChatAI test script:', chatAIScript);
+      console.log('✅ Generated ChatAI test script from extracted data:', chatAIScript);
       setTestScript(chatAIScript);
-    } else if (platform.testConfig) {
-      console.log('🎯 Using ChatAI testConfig:', platform.testConfig);
+    } else if (extractedTestConfig && typeof extractedTestConfig === 'object') {
+      console.log('🎯 Using extracted ChatAI testConfig:', extractedTestConfig);
       
       // Use ChatAI testConfig to generate script
       const configScript = JSON.stringify({
         platform: platformName,
         source: "ChatAI Test Configuration",
-        config: platform.testConfig,
-        note: "This configuration was provided by ChatAI for testing platform connectivity"
+        config: extractedTestConfig,
+        note: "This configuration was provided by ChatAI for testing platform connectivity",
+        chatai_extraction: "Successfully extracted from ChatAI wrapped structure"
       }, null, 2);
       
-      console.log('✅ Generated ChatAI config script:', configScript);
+      console.log('✅ Generated ChatAI config script from extracted data:', configScript);
       setTestScript(configScript);
     } else {
-      console.log('⚠️ No ChatAI test data available, using generic script generator');
+      console.log('⚠️ No valid ChatAI test data available after extraction, using generic script generator');
       // Fall back to generic script generation
       const baseScript = extractTestScript(platform, credentials);
       const updatedScript = injectCredentials(baseScript, credentials);
@@ -296,14 +412,16 @@ const ChatAICredentialForm = ({
     try {
       console.log(`🧪 Testing credentials for ${platformName} using ChatAI configuration`);
       
-      // CRITICAL FIX: Prioritize ChatAI testConfig, then fall back to intelligent config
+      // CRITICAL FIX: Prioritize extracted ChatAI testConfig, then fall back to intelligent config
       let testConfig;
       
-      if (platform.testConfig) {
-        console.log('✅ Using ChatAI provided testConfig:', platform.testConfig);
-        testConfig = platform.testConfig;
+      const extractedTestConfig = extractChatAIValue(platform.testConfig);
+      
+      if (extractedTestConfig && typeof extractedTestConfig === 'object') {
+        console.log('✅ Using extracted ChatAI provided testConfig:', extractedTestConfig);
+        testConfig = extractedTestConfig;
       } else {
-        console.log('⚠️ No ChatAI testConfig found, using intelligent configuration');
+        console.log('⚠️ No valid ChatAI testConfig found after extraction, using intelligent configuration');
         testConfig = {
           platform_name: platformName,
           base_url: generateIntelligentBaseUrl(platformName),
@@ -336,7 +454,7 @@ const ChatAICredentialForm = ({
           userId: user.id,
           unified_testing: true,
           chatai_integration: true,
-          chatai_provided_config: !!platform.testConfig
+          chatai_provided_config: !!extractedTestConfig
         }
       });
 
@@ -443,15 +561,15 @@ const ChatAICredentialForm = ({
               <Settings className="w-6 h-6" />
             </div>
             <div>
-              {/* CRITICAL FIX: Display actual platform name */}
+              {/* CRITICAL FIX: Display extracted platform name */}
               <h3 className="text-xl font-bold text-purple-900">{platformName} Credentials</h3>
               <p className="text-sm text-purple-600 font-normal">
-                {platform.testConfig || platform.test_payloads?.length ? 'ChatAI Configuration' : 'Intelligent Platform Detection'} • Dynamic URLs
+                {extractChatAIValue(platform.testConfig) || extractChatAIValue(platform.test_payloads) ? 'ChatAI Configuration' : 'Intelligent Platform Detection'} • Dynamic URLs
               </p>
             </div>
             <Badge variant="secondary" className="ml-auto bg-green-100 text-green-800">
               <Zap className="w-3 h-3 mr-1" />
-              {platform.testConfig || platform.test_payloads?.length ? 'ChatAI' : 'Smart'} Integration
+              {extractChatAIValue(platform.testConfig) || extractChatAIValue(platform.test_payloads) ? 'ChatAI' : 'Smart'} Integration
             </Badge>
           </DialogTitle>
         </DialogHeader>
@@ -475,7 +593,7 @@ const ChatAICredentialForm = ({
           <TabsContent value="credentials" className="mt-6">
             <Card className="bg-white/70 backdrop-blur-sm border border-purple-200/50 rounded-2xl shadow-lg">
               <CardHeader>
-                {/* CRITICAL FIX: Display actual platform name in card header */}
+                {/* CRITICAL FIX: Display extracted platform name in card header */}
                 <CardTitle className="text-lg text-purple-900">Configure Your {platformName} Credentials</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -565,7 +683,7 @@ const ChatAICredentialForm = ({
                   <Code2 className="w-5 h-5" />
                   Live Test Payload
                   <Badge variant="secondary" className="ml-auto bg-blue-100 text-blue-700">
-                    {platform.testConfig || platform.test_payloads?.length ? 'ChatAI Generated' : 'Intelligent URLs'}
+                    {extractChatAIValue(platform.testConfig) || extractChatAIValue(platform.test_payloads) ? 'ChatAI Generated' : 'Intelligent URLs'}
                   </Badge>
                 </CardTitle>
               </CardHeader>
@@ -573,11 +691,11 @@ const ChatAICredentialForm = ({
                 {/* CRITICAL FIX: Ensure test script is displayed properly */}
                 <ScrollArea className="h-96 w-full rounded-xl border border-purple-200/50 bg-gray-900 p-4">
                   <pre className="text-sm text-green-400 font-mono whitespace-pre-wrap">
-                    {testScript || 'Loading test payload...'}
+                    {testScript || 'Generating test payload from ChatAI data...'}
                   </pre>
                 </ScrollArea>
                 <p className="text-xs text-purple-600 mt-3">
-                  🚀 {platform.testConfig || platform.test_payloads?.length ? 
+                  🚀 {extractChatAIValue(platform.testConfig) || extractChatAIValue(platform.test_payloads) ? 
                     'This payload was generated by ChatAI for your specific platform!' : 
                     'This payload uses intelligent TLD detection - No more hardcoded URLs!'}
                 </p>
@@ -682,7 +800,7 @@ const ChatAICredentialForm = ({
           <div className="mt-4">
             {testStatus === 'success' && !isSaving && (
               <p className="text-xs text-green-700 text-center">
-                ✅ Credentials verified with {platform.testConfig || platform.test_payloads?.length ? 'ChatAI' : 'intelligent platform'} detection! You can now save them.
+                ✅ Credentials verified with {extractChatAIValue(platform.testConfig) || extractChatAIValue(platform.test_payloads) ? 'ChatAI' : 'intelligent platform'} detection! You can now save them.
               </p>
             )}
             {testStatus === 'error' && (

@@ -24,8 +24,8 @@ interface Message {
   timestamp: Date;
   structuredData?: YusrAIStructuredResponse;
   error_help_available?: boolean;
-  yusrai_powered?: boolean;
-  seven_sections_validated?: boolean;
+  yusraiPowered?: boolean;
+  sevenSectionsValidated?: boolean;
   platformData?: Array<{
     name: string;
     credentials: Array<{
@@ -94,7 +94,7 @@ const ChatCard = ({
                 console.log('✅ Structured data found from YusrAI:', parseResult.structuredData);
                 
                 // FIXED: Enhanced platform data extraction
-                const platformsSource = parseResult.structuredData.platforms || [];
+                const platformsSource = parseResult.structuredData.platforms || parseResult.structuredData.platforms_and_credentials || [];
                 
                 const platformData = platformsSource.map(platform => {
                   console.log('🔍 Processing platform:', platform);
@@ -114,7 +114,7 @@ const ChatCard = ({
                   }
                   
                   return {
-                    name: platform.name || 'Unknown Platform',
+                    name: platform.name || platform.platform || 'Unknown Platform',
                     credentials: credentials.map(cred => ({
                       field: cred.field || cred.name || 'api_key',
                       placeholder: cred.example || cred.placeholder || `Enter ${cred.field}`,
@@ -137,8 +137,8 @@ const ChatCard = ({
                   ...message,
                   structuredData: parseResult.structuredData,
                   platformData: platformData,
-                  yusrai_powered: parseResult.metadata.yusrai_powered,
-                  seven_sections_validated: parseResult.metadata.seven_sections_validated,
+                  yusraiPowered: parseResult.metadata.yusraiPowered,
+                  sevenSectionsValidated: parseResult.metadata.sevenSectionsValidated,
                   automationDiagramData: diagramData,
                   executionBlueprint: parseResult.structuredData.execution_blueprint
                 };
@@ -212,12 +212,14 @@ const ChatCard = ({
           );
         }
         
-        if (structuredData.steps && Array.isArray(structuredData.steps) && structuredData.steps.length > 0) {
+        // Handle both step_by_step_explanation and steps
+        const stepsData = structuredData.step_by_step_explanation || structuredData.steps;
+        if (stepsData && Array.isArray(stepsData) && stepsData.length > 0) {
           sections.push(
             <div key="steps" className="mb-4">
               <div className="font-semibold text-gray-800 mb-2">Steps:</div>
               <div className="text-gray-700 leading-relaxed">
-                {structuredData.steps.map((step, index) => (
+                {stepsData.map((step, index) => (
                   <div key={index} className="mb-1">
                     Step {index + 1}: {extractStepText(step)}
                   </div>
@@ -227,14 +229,16 @@ const ChatCard = ({
           );
         }
         
-        if (structuredData.platforms && Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0) {
+        // Handle both platforms_and_credentials and platforms
+        const platformsData = structuredData.platforms_and_credentials || structuredData.platforms;
+        if (platformsData && Array.isArray(platformsData) && platformsData.length > 0) {
           sections.push(
             <div key="platforms" className="mb-4">
               <div className="font-semibold text-gray-800 mb-2">Platforms:</div>
               <div className="text-gray-700 leading-relaxed">
-                {structuredData.platforms.map((platform, index) => (
+                {platformsData.map((platform, index) => (
                   <div key={index} className="mb-3 p-3 bg-gray-50 rounded-lg">
-                    <div className="font-medium text-gray-800 mb-2">{String(platform?.name || `Platform ${index + 1}`)}</div>
+                    <div className="font-medium text-gray-800 mb-2">{String(platform?.name || platform?.platform || `Platform ${index + 1}`)}</div>
                     {platform?.credentials && Array.isArray(platform.credentials) && platform.credentials.length > 0 && (
                       <div className="space-y-2">
                         <div className="text-sm font-medium text-gray-600">Required credentials:</div>
@@ -273,15 +277,17 @@ const ChatCard = ({
           );
         }
         
-        if (structuredData.agents && Array.isArray(structuredData.agents) && structuredData.agents.length > 0) {
+        // Handle both ai_agents and agents
+        const agentsData = structuredData.ai_agents || structuredData.agents;
+        if (agentsData && Array.isArray(agentsData) && agentsData.length > 0) {
           sections.push(
             <div key="agents" className="mb-4">
               <div className="font-semibold text-gray-800 mb-2">AI Agents:</div>
               <div className="text-gray-700 leading-relaxed">
-                {structuredData.agents.map((agent, index) => (
+                {agentsData.map((agent, index) => (
                   <div key={index} className="mb-3 p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="font-medium text-gray-800">{String(agent?.name || `Agent ${index + 1}`)}</div>
+                      <div className="font-medium text-gray-800">{String(agent?.name || agent?.agent_name || `Agent ${index + 1}`)}</div>
                       <div className="flex gap-2">
                         <Button
                           size="sm"
@@ -293,7 +299,7 @@ const ChatCard = ({
                         </Button>
                         <Button
                           size="sm"
-                          onClick={() => handleAgentDismiss(agent?.name || `Agent ${index + 1}`)}
+                          onClick={() => handleAgentDismiss(agent?.name || agent?.agent_name || `Agent ${index + 1}`)}
                           className="bg-red-100 hover:bg-red-200 text-red-700 border-red-300 text-xs px-3 py-1"
                           variant="outline"
                         >
@@ -412,16 +418,18 @@ const ChatCard = ({
 
     const structuredData = latestBotMessage.structuredData;
     
-    const platforms = Array.isArray(structuredData.platforms) ? structuredData.platforms : [];
-    const agents = Array.isArray(structuredData.agents) ? structuredData.agents : [];
+    const platforms = Array.isArray(structuredData.platforms) ? structuredData.platforms : 
+                     Array.isArray(structuredData.platforms_and_credentials) ? structuredData.platforms_and_credentials : [];
+    const agents = Array.isArray(structuredData.agents) ? structuredData.agents : 
+                  Array.isArray(structuredData.ai_agents) ? structuredData.ai_agents : [];
     
     const allPlatformsConfigured = platforms.length === 0 || platforms.every(platform => 
-      platformCredentialStatus[platform.name] === 'saved' || 
-      platformCredentialStatus[platform.name] === 'tested'
+      platformCredentialStatus[platform.name || platform.platform] === 'saved' || 
+      platformCredentialStatus[platform.name || platform.platform] === 'tested'
     );
 
     const allAgentsHandled = agents.length === 0 || agents.every(agent => 
-      dismissedAgents.has(agent.name)
+      dismissedAgents.has(agent.name || agent.agent_name)
     );
 
     console.log('🔍 Execution readiness check:', {
@@ -448,8 +456,8 @@ const ChatCard = ({
       automation_id: automationId,
       created_at: new Date().toISOString(),
       yusrai_response: latestBotMessage.structuredData,
-      yusrai_powered: latestBotMessage.yusrai_powered || true,
-      seven_sections_validated: latestBotMessage.seven_sections_validated || true,
+      yusraiPowered: latestBotMessage.yusraiPowered || true,
+      sevenSectionsValidated: latestBotMessage.sevenSectionsValidated || true,
       ready_for_execution: checkReadyForExecution(),
       credential_status: platformCredentialStatus
     };
@@ -465,8 +473,8 @@ const ChatCard = ({
           chat_message_id: messageData.id,
           response_text: messageData.text,
           structured_data: messageData.structuredData as any,
-          yusrai_powered: messageData.yusrai_powered || false,
-          seven_sections_validated: messageData.seven_sections_validated || false,
+          yusraiPowered: messageData.yusraiPowered || false,
+          sevenSectionsValidated: messageData.sevenSectionsValidated || false,
           error_help_available: messageData.error_help_available || false,
           is_ready_for_execution: checkReadyForExecution()
         });
@@ -490,10 +498,11 @@ const ChatCard = ({
     
     const latestStructuredMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
     if (latestStructuredMessage?.structuredData) {
-      const platformsSource = latestStructuredMessage.structuredData.platforms || [];
+      const platformsSource = latestStructuredMessage.structuredData.platforms || 
+                             latestStructuredMessage.structuredData.platforms_and_credentials || [];
       
       const transformedPlatforms = platformsSource.map((platform: any) => ({
-        name: platform.name || 'Unknown Platform',
+        name: platform.name || platform.platform || 'Unknown Platform',
         credentials: platform.credentials ? Object.entries(platform.credentials).map(([key, value]: [string, any]) => ({
           field: key,
           placeholder: value.example || value.placeholder || `Enter ${key}`,
@@ -581,9 +590,9 @@ const ChatCard = ({
                           className="w-5 h-5 object-contain"
                         />
                         <span className="text-sm font-medium text-blue-600">
-                          YusrAI {message.yusrai_powered ? (message.seven_sections_validated ? '(Complete)' : '(Processing)') : '(Basic)'}
+                          YusrAI {message.yusraiPowered ? (message.sevenSectionsValidated ? '(Complete)' : '(Processing)') : '(Basic)'}
                         </span>
-                        {message.seven_sections_validated && (
+                        {message.sevenSectionsValidated && (
                           <CheckCircle2 className="w-4 h-4 text-green-500" />
                         )}
                         {message.structuredData && (

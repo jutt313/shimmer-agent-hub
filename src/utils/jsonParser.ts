@@ -2,7 +2,9 @@
 interface YusrAIResponseMetadata {
   hasStructuredData: boolean;
   yusraiPowered: boolean;
+  yusrai_powered: boolean; // Keep both for compatibility
   sevenSectionsValidated: boolean;
+  seven_sections_validated: boolean; // Keep both for compatibility
   hasExecutionBlueprint: boolean;
   platformsCount: number;
   workflowSteps: number;
@@ -18,13 +20,16 @@ interface ParseResult {
   isPlainText: boolean;
 }
 
-// Export the YusrAIStructuredResponse interface for compatibility
+// Export the YusrAIStructuredResponse interface with all possible properties
 export interface YusrAIStructuredResponse {
   summary?: string;
   step_by_step_explanation?: string[];
+  steps?: any[]; // Add for compatibility
   platforms_and_credentials?: any[];
+  platforms?: any[]; // Add for compatibility
   clarification_questions?: string[];
   ai_agents?: any[];
+  agents?: any[]; // Add for compatibility
   test_payloads?: any;
   execution_blueprint?: any;
 }
@@ -37,6 +42,15 @@ function extractPlatformNames(data: any): string[] {
     data.platforms_and_credentials.forEach((platform: any) => {
       if (platform?.platform && typeof platform.platform === 'string') {
         platforms.push(platform.platform);
+      }
+    });
+  }
+  
+  // Also check for platforms array
+  if (data?.platforms && Array.isArray(data.platforms)) {
+    data.platforms.forEach((platform: any) => {
+      if (platform?.name && typeof platform.name === 'string') {
+        platforms.push(platform.name);
       }
     });
   }
@@ -155,11 +169,14 @@ export function parseYusrAIStructuredResponse(response: string): ParseResult {
     hasStructuredData: !!bestStructuredData,
     score: bestScore,
     yusraiPowered,
+    yusrai_powered: yusraiPowered, // Compatibility
     sevenSectionsValidated,
+    seven_sections_validated: sevenSectionsValidated, // Compatibility
     hasExecutionBlueprint,
     workflowSteps,
     isPlainText,
-    error_help_available
+    error_help_available,
+    platformsCount: platformNames.length
   };
 
   console.log('🎯 ENHANCED: Final parsing result:', finalResult);
@@ -234,6 +251,19 @@ function attemptPartialExtraction(response: string): any | null {
 }
 
 function normalizeStructuredData(data: any): any {
+  // Normalize property names for compatibility
+  if (data.step_by_step_explanation && !data.steps) {
+    data.steps = data.step_by_step_explanation;
+  }
+  
+  if (data.platforms_and_credentials && !data.platforms) {
+    data.platforms = data.platforms_and_credentials;
+  }
+  
+  if (data.ai_agents && !data.agents) {
+    data.agents = data.ai_agents;
+  }
+  
   // Ensure arrays are properly formatted
   if (data.step_by_step_explanation && !Array.isArray(data.step_by_step_explanation)) {
     if (typeof data.step_by_step_explanation === 'string') {

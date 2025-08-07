@@ -22,13 +22,13 @@ const DebugCodeModal = ({ structuredData, isOpen, onOpenChange }: DebugCodeModal
     },
     {
       title: "Steps Code", 
-      data: structuredData.steps,
-      show: Array.isArray(structuredData.steps) && structuredData.steps.length > 0
+      data: structuredData.step_by_step_explanation || structuredData.steps,
+      show: Array.isArray(structuredData.step_by_step_explanation || structuredData.steps) && (structuredData.step_by_step_explanation || structuredData.steps).length > 0
     },
     {
       title: "Platforms Code",
-      data: structuredData.platforms, 
-      show: Array.isArray(structuredData.platforms) && structuredData.platforms.length > 0
+      data: structuredData.platforms_and_credentials || structuredData.platforms, 
+      show: Array.isArray(structuredData.platforms_and_credentials || structuredData.platforms) && (structuredData.platforms_and_credentials || structuredData.platforms).length > 0
     },
     {
       title: "Clarification Questions Code",
@@ -37,8 +37,8 @@ const DebugCodeModal = ({ structuredData, isOpen, onOpenChange }: DebugCodeModal
     },
     {
       title: "Agents Code",
-      data: structuredData.agents,
-      show: Array.isArray(structuredData.agents) && structuredData.agents.length > 0
+      data: structuredData.ai_agents || structuredData.agents,
+      show: Array.isArray(structuredData.ai_agents || structuredData.agents) && (structuredData.ai_agents || structuredData.agents).length > 0
     },
     {
       title: "Execution Blueprint Code", 

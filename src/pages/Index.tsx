@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useMemo } from "react";
 import { Send, Bot } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -14,19 +13,41 @@ import { useAsyncOperation } from "@/hooks/useAsyncOperation";
 import { chatAIConnectionService } from "@/services/chatAIConnectionService";
 import { parseYusrAIStructuredResponse } from "@/utils/jsonParser";
 
+interface Message {
+  id: number;
+  text: string;
+  isBot: boolean;
+  timestamp: Date;
+  structuredData?: any;
+  error_help_available?: boolean;
+  yusraiPowered?: boolean;
+  sevenSectionsValidated?: boolean;
+  platformData?: Array<{
+    name: string;
+    credentials: Array<{
+      field: string;
+      placeholder: string;
+      link: string;
+      why_needed: string;
+    }>;
+  }>;
+  automationDiagramData?: any;
+  executionBlueprint?: any;
+}
+
 const Index = () => {
   const [message, setMessage] = useState("");
   const [showAgentForm, setShowAgentForm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [currentAgentConfig, setCurrentAgentConfig] = useState<any>(null);
-  const [messages, setMessages] = useState([{
+  const [messages, setMessages] = useState<Message[]>([{
     id: 1,
     text: "I am YusrAI, your AI assistant powered by OpenAI. I'll help you create comprehensive automations with specific platform integrations. How can I help you today?",
     isBot: true,
     timestamp: new Date(),
     structuredData: null,
-    yusrai_powered: true,
-    seven_sections_validated: false,
+    yusraiPowered: true,
+    sevenSectionsValidated: false,
     error_help_available: false
   }]);
   
@@ -51,7 +72,7 @@ const Index = () => {
       return;
     }
 
-    const newMessage = {
+    const newMessage: Message = {
       id: Date.now(),
       text: message.trim(),
       isBot: false,
@@ -123,7 +144,7 @@ const Index = () => {
         } else if (result.response) {
           // Parse structured data from response text with smart validation
           const parseResult = parseYusrAIStructuredResponse(result.response);
-          // Only accept structured data if it has meaningful content
+          // Accept structured data if it has meaningful content
           if (parseResult.structuredData && parseResult.metadata.yusraiPowered) {
             structuredData = parseResult.structuredData;
             console.log('✅ YusrAI structured data parsed and validated:', !!structuredData);
@@ -148,7 +169,7 @@ const Index = () => {
         structuredData = fallbackParseResult.structuredData;
       }
       
-      const botResponse = {
+      const botResponse: Message = {
         id: Date.now() + 1,
         text: responseText,
         isBot: true,
@@ -172,7 +193,7 @@ const Index = () => {
       console.error('❌ Error in YusrAI chat request:', error);
       handleError(error, 'YusrAI Chat message sending');
       
-      const errorResponse = {
+      const errorResponse: Message = {
         id: Date.now() + 1,
         text: JSON.stringify({
           summary: "I encountered a technical issue, but I'm YusrAI and ready to help you create your automation. Please rephrase your request and I'll provide a complete solution."

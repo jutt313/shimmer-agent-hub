@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,8 +13,6 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { UnifiedCredentialManager } from '@/utils/unifiedCredentialManager';
 import { extractTestScript, injectCredentials, formatExecutableScript } from '@/utils/platformTestScriptExtractor';
-import { PlatformPersistenceManager } from '@/utils/platformPersistenceManager';
-import { DataFlowValidator } from '@/utils/dataFlowValidator';
 
 interface Platform {
   name: string;
@@ -125,39 +123,13 @@ const ChatAICredentialForm = ({
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [existingCredentials, setExistingCredentials] = useState<boolean>(false);
 
-  // CRITICAL FIX: Enhanced platform name resolution with persistence
-  const getPlatformName = useCallback(() => {
-    // First, try to get name from props
-    if (platform?.name) {
-      const cleanName = platform.name.replace(/[*_`#]/g, '').trim();
-      if (cleanName && cleanName !== '') {
-        console.log('✅ Platform name from props:', cleanName);
-        return cleanName;
-      }
-    }
-
-    // Second, try to load from persistence
-    if (automationId) {
-      console.log('🔍 Attempting to load platform name from persistence');
-      const persistedData = PlatformPersistenceManager.loadAllPlatformsData(automationId);
-      if (persistedData.length > 0) {
-        const firstPlatform = persistedData[0];
-        console.log('✅ Platform name from persistence:', firstPlatform.name);
-        return firstPlatform.name;
-      }
-    }
-
-    // Last resort fallback
-    console.warn('⚠️ Using fallback platform name');
-    return 'Platform';
-  }, [platform?.name, automationId]);
-
-  const platformName = getPlatformName();
+  // CRITICAL FIX: Ensure platform name is properly cleaned and displayed
+  const platformName = platform?.name?.replace(/[*_`#]/g, '').trim() || 'Unknown Platform';
   
   console.log('🔍 ChatAI Credential Form initialized for platform:', platformName);
   console.log('🔍 Platform object received:', platform);
-  console.log('🔍 ChatAI testConfig available:', !!platform?.testConfig);
-  console.log('🔍 ChatAI test_payloads available:', platform?.test_payloads?.length || 0);
+  console.log('🔍 ChatAI testConfig available:', !!platform.testConfig);
+  console.log('🔍 ChatAI test_payloads available:', platform.test_payloads?.length || 0);
 
   // Create storage key for this platform's test response
   const getStorageKey = () => `testResponse_${platformName}_${automationId}`;
@@ -194,30 +166,6 @@ const ChatAICredentialForm = ({
     }
   };
 
-  // CRITICAL FIX: Enhanced platform data loading with persistence fallback
-  const loadPlatformData = useCallback(async () => {
-    if (!automationId) return null;
-
-    // First try to use the platform prop
-    if (platform && platform.name) {
-      console.log('✅ Using platform data from props');
-      return platform;
-    }
-
-    // Fallback to persistence
-    console.log('🔍 Loading platform data from persistence');
-    const persistedPlatforms = PlatformPersistenceManager.loadAllPlatformsData(automationId);
-    
-    if (persistedPlatforms.length > 0) {
-      console.log('✅ Platform data loaded from persistence:', persistedPlatforms.length, 'platforms');
-      // Return the first platform or find by name
-      return persistedPlatforms[0];
-    }
-
-    console.warn('⚠️ No platform data available');
-    return null;
-  }, [platform, automationId]);
-
   // Load existing credentials and initialize test script
   useEffect(() => {
     if (user && automationId && platformName && platformName !== 'Unknown Platform') {
@@ -226,23 +174,18 @@ const ChatAICredentialForm = ({
     }
   }, [user, automationId, platformName]);
 
-  // CRITICAL FIX: Enhanced existing credentials loading
+  // CRITICAL FIX: Update test script when credentials change using ChatAI data
+  useEffect(() => {
+    if (platform && Object.keys(credentials).length > 0) {
+      updateTestScriptWithChatAIData();
+    }
+  }, [credentials, platform]);
+
   const loadExistingCredentials = async () => {
-    if (!user || !automationId || !platformName) return;
+    if (!user) return;
     
     setIsLoading(true);
     try {
-      // Load platform data first
-      const platformData = await loadPlatformData();
-      
-      // Validate platform data
-      if (platformData) {
-        const validation = DataFlowValidator.validatePlatformForCredentialForm(platformData);
-        if (validation.warnings.length > 0) {
-          console.warn('Platform data warnings:', validation.warnings);
-        }
-      }
-
       const existingCreds = await UnifiedCredentialManager.getCredentials(
         user.id,
         automationId,
@@ -259,46 +202,69 @@ const ChatAICredentialForm = ({
         setExistingCredentials(true);
         toast.success(`Found existing credentials for ${platformName}`);
       } else {
-        // Initialize empty credentials based on platform data
+        // Initialize empty credentials
         const initialCreds: Record<string, string> = {};
-        const credentialFields = platformData?.credentials || platform?.credentials || [];
-        
-        credentialFields.forEach((cred: any) => {
+        platform.credentials.forEach(cred => {
           initialCreds[cred.field] = '';
         });
         setCredentials(initialCreds);
       }
 
-      // CRITICAL FIX: Initialize test script with platform data priority system
-      updateTestScriptWithPlatformData(platformData || platform);
+      // CRITICAL FIX: Initialize test script with ChatAI data
+      const baseScript = extractTestScript(platform, existingCreds || {});
+      setTestScript(baseScript);
 
     } catch (error) {
       console.error('Failed to load existing credentials:', error);
       // Still initialize test script even if credentials fail to load
-      updateTestScriptWithPlatformData(platform);
+      const baseScript = extractTestScript(platform, {});
+      setTestScript(baseScript);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // CRITICAL FIX: Enhanced test script update with ChatAI data priority
-  const updateTestScriptWithPlatformData = (platformData: any) => {
-    console.log('🔧 Updating test script with platform data for:', platformName);
+  // CRITICAL FIX: Use ChatAI test data when available
+  const updateTestScriptWithChatAIData = () => {
+    console.log('🔧 Updating test script with ChatAI data for:', platformName);
     
-    if (!platformData) {
-      console.warn('⚠️ No platform data available for test script');
-      setTestScript('// No platform data available');
-      return;
+    // CRITICAL: Check if ChatAI test_payloads are available
+    if (platform.test_payloads && platform.test_payloads.length > 0) {
+      console.log('🎯 Using ChatAI test_payloads:', platform.test_payloads);
+      
+      // Use the first test payload from ChatAI
+      const chatAIPayload = platform.test_payloads[0];
+      
+      // Format the ChatAI payload as a readable test script
+      const chatAIScript = JSON.stringify({
+        platform: platformName,
+        source: "ChatAI Generated Test Payload",
+        request: chatAIPayload,
+        note: "This test payload was generated by ChatAI based on the platform requirements"
+      }, null, 2);
+      
+      console.log('✅ Generated ChatAI test script:', chatAIScript);
+      setTestScript(chatAIScript);
+    } else if (platform.testConfig) {
+      console.log('🎯 Using ChatAI testConfig:', platform.testConfig);
+      
+      // Use ChatAI testConfig to generate script
+      const configScript = JSON.stringify({
+        platform: platformName,
+        source: "ChatAI Test Configuration",
+        config: platform.testConfig,
+        note: "This configuration was provided by ChatAI for testing platform connectivity"
+      }, null, 2);
+      
+      console.log('✅ Generated ChatAI config script:', configScript);
+      setTestScript(configScript);
+    } else {
+      console.log('⚠️ No ChatAI test data available, using generic script generator');
+      // Fall back to generic script generation
+      const baseScript = extractTestScript(platform, credentials);
+      const updatedScript = injectCredentials(baseScript, credentials);
+      setTestScript(updatedScript);
     }
-
-    // Validate platform data
-    const validation = DataFlowValidator.validatePlatformForCredentialForm(platformData);
-    
-    // Use the enhanced test script extractor with priority system
-    const baseScript = extractTestScript(platformData, credentials);
-    setTestScript(baseScript);
-
-    console.log('✅ Test script updated with priority system');
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -309,13 +275,6 @@ const ChatAICredentialForm = ({
     setCredentials(newCredentials);
     // Test script will update via useEffect
   };
-
-  // CRITICAL FIX: Update test script when credentials change
-  useEffect(() => {
-    if (platformName && platformName !== 'Platform' && Object.keys(credentials).length > 0) {
-      updateTestScriptWithPlatformData(platform);
-    }
-  }, [credentials, platform, platformName]);
 
   const togglePasswordVisibility = (field: string) => {
     setShowPasswords(prev => ({
@@ -460,95 +419,6 @@ const ChatAICredentialForm = ({
            lowerField.includes('token') ? 'password' : 'text';
   };
 
-  // CRITICAL FIX: Enhanced credential field rendering with link validation
-  const renderCredentialField = (cred: any, index: number) => {
-    const inputType = getInputType(cred.field);
-    const showPassword = showPasswords[cred.field];
-    const currentValue = credentials[cred.field] || '';
-    
-    // CRITICAL FIX: Validate and clean the link
-    const getValidLink = (link: string) => {
-      if (!link || link === '#') return null;
-      
-      // Check if it's a valid URL
-      try {
-        const url = new URL(link);
-        // Only allow http and https protocols
-        if (url.protocol === 'http:' || url.protocol === 'https:') {
-          return link;
-        }
-      } catch (e) {
-        console.warn('Invalid link detected:', link);
-      }
-      
-      return null;
-    };
-
-    const validLink = getValidLink(cred.link);
-
-    return (
-      <div key={index} className="space-y-3">
-        <div className="flex items-center justify-between">
-          <Label className="text-sm font-semibold text-purple-800 flex items-center gap-2">
-            {cred.field}
-            {existingCredentials && currentValue === '••••••••••••••••' && (
-              <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs">
-                <CheckCircle className="w-3 h-3 mr-1" />
-                Saved
-              </Badge>
-            )}
-          </Label>
-          {/* CRITICAL FIX: Only show Get Key button for valid links */}
-          {validLink && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                console.log('🔗 Opening valid link:', validLink);
-                window.open(validLink, '_blank', 'noopener,noreferrer');
-              }}
-              className="text-purple-600 hover:text-purple-800 hover:bg-purple-100 rounded-lg transition-all duration-200"
-            >
-              <ExternalLink className="w-3 h-3 mr-1" />
-              Get Key
-            </Button>
-          )}
-        </div>
-        
-        <div className="relative">
-          <Input
-            type={inputType === 'password' && !showPassword ? 'password' : 'text'}
-            placeholder={cred.placeholder}
-            value={currentValue}
-            onChange={(e) => handleInputChange(cred.field, e.target.value)}
-            className="rounded-xl border-purple-200 focus:border-purple-400 focus:ring-purple-200 bg-white/80 backdrop-blur-sm transition-all duration-200 pr-12"
-            disabled={existingCredentials && currentValue === '••••••••••••••••'}
-          />
-          
-          {inputType === 'password' && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 rounded-lg hover:bg-purple-100"
-              onClick={() => togglePasswordVisibility(cred.field)}
-            >
-              {showPassword ? (
-                <EyeOff className="h-3 w-3" />
-              ) : (
-                <Eye className="h-3 w-3" />
-              )}
-            </Button>
-          )}
-        </div>
-
-        <p className="text-xs text-purple-600 bg-purple-50/50 p-2 rounded-lg">
-          <span className="font-medium">Why needed:</span> {cred.why_needed}
-        </p>
-      </div>
-    );
-  };
-
   if (isLoading) {
     return (
       <Dialog open={true} onOpenChange={onClose}>
@@ -573,15 +443,15 @@ const ChatAICredentialForm = ({
               <Settings className="w-6 h-6" />
             </div>
             <div>
-              {/* CRITICAL FIX: Display actual platform name from persistence */}
+              {/* CRITICAL FIX: Display actual platform name */}
               <h3 className="text-xl font-bold text-purple-900">{platformName} Credentials</h3>
               <p className="text-sm text-purple-600 font-normal">
-                {platform?.testConfig || platform?.test_payloads?.length ? 'ChatAI Configuration' : 'Intelligent Platform Detection'} • Real API Links
+                {platform.testConfig || platform.test_payloads?.length ? 'ChatAI Configuration' : 'Intelligent Platform Detection'} • Dynamic URLs
               </p>
             </div>
             <Badge variant="secondary" className="ml-auto bg-green-100 text-green-800">
               <Zap className="w-3 h-3 mr-1" />
-              {platform?.testConfig || platform?.test_payloads?.length ? 'ChatAI' : 'Smart'} Integration
+              {platform.testConfig || platform.test_payloads?.length ? 'ChatAI' : 'Smart'} Integration
             </Badge>
           </DialogTitle>
         </DialogHeader>
@@ -605,13 +475,73 @@ const ChatAICredentialForm = ({
           <TabsContent value="credentials" className="mt-6">
             <Card className="bg-white/70 backdrop-blur-sm border border-purple-200/50 rounded-2xl shadow-lg">
               <CardHeader>
+                {/* CRITICAL FIX: Display actual platform name in card header */}
                 <CardTitle className="text-lg text-purple-900">Configure Your {platformName} Credentials</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* CRITICAL FIX: Only render actual credential fields, no hardcoded extras */}
-                {(platform?.credentials || []).map((cred: any, index: number) => 
-                  renderCredentialField(cred, index)
-                )}
+                {platform.credentials.map((cred, index) => {
+                  const inputType = getInputType(cred.field);
+                  const showPassword = showPasswords[cred.field];
+                  const currentValue = credentials[cred.field] || '';
+                  
+                  return (
+                    <div key={index} className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-semibold text-purple-800 flex items-center gap-2">
+                          {cred.field}
+                          {existingCredentials && currentValue === '••••••••••••••••' && (
+                            <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              Saved
+                            </Badge>
+                          )}
+                        </Label>
+                        {cred.link && cred.link !== '#' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(cred.link, '_blank')}
+                            className="text-purple-600 hover:text-purple-800 hover:bg-purple-100 rounded-lg transition-all duration-200"
+                          >
+                            <ExternalLink className="w-3 h-3 mr-1" />
+                            Get Key
+                          </Button>
+                        )}
+                      </div>
+                      
+                      <div className="relative">
+                        <Input
+                          type={inputType === 'password' && !showPassword ? 'password' : 'text'}
+                          placeholder={cred.placeholder}
+                          value={currentValue}
+                          onChange={(e) => handleInputChange(cred.field, e.target.value)}
+                          className="rounded-xl border-purple-200 focus:border-purple-400 focus:ring-purple-200 bg-white/80 backdrop-blur-sm transition-all duration-200 pr-12"
+                          disabled={existingCredentials && currentValue === '••••••••••••••••'}
+                        />
+                        
+                        {inputType === 'password' && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 rounded-lg hover:bg-purple-100"
+                            onClick={() => togglePasswordVisibility(cred.field)}
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-3 w-3" />
+                            ) : (
+                              <Eye className="h-3 w-3" />
+                            )}
+                          </Button>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-purple-600 bg-purple-50/50 p-2 rounded-lg">
+                        <span className="font-medium">Why needed:</span> {cred.why_needed}
+                      </p>
+                    </div>
+                  );
+                })}
 
                 {existingCredentials && (
                   <div className="bg-green-50/50 border border-green-200 rounded-xl p-4">
@@ -635,20 +565,21 @@ const ChatAICredentialForm = ({
                   <Code2 className="w-5 h-5" />
                   Live Test Payload
                   <Badge variant="secondary" className="ml-auto bg-blue-100 text-blue-700">
-                    {platform?.testConfig || platform?.test_payloads?.length ? 'ChatAI Generated' : 'Intelligent Detection'}
+                    {platform.testConfig || platform.test_payloads?.length ? 'ChatAI Generated' : 'Intelligent URLs'}
                   </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                {/* CRITICAL FIX: Ensure test script is displayed properly */}
                 <ScrollArea className="h-96 w-full rounded-xl border border-purple-200/50 bg-gray-900 p-4">
                   <pre className="text-sm text-green-400 font-mono whitespace-pre-wrap">
-                    {testScript || '// Loading test payload from ChatAI data...'}
+                    {testScript || 'Loading test payload...'}
                   </pre>
                 </ScrollArea>
                 <p className="text-xs text-purple-600 mt-3">
-                  🚀 {platform?.testConfig || platform?.test_payloads?.length ? 
+                  🚀 {platform.testConfig || platform.test_payloads?.length ? 
                     'This payload was generated by ChatAI for your specific platform!' : 
-                    'This payload uses intelligent platform detection with real API endpoints!'}
+                    'This payload uses intelligent TLD detection - No more hardcoded URLs!'}
                 </p>
               </CardContent>
             </Card>
@@ -751,7 +682,7 @@ const ChatAICredentialForm = ({
           <div className="mt-4">
             {testStatus === 'success' && !isSaving && (
               <p className="text-xs text-green-700 text-center">
-                ✅ Credentials verified with {platform?.testConfig || platform?.test_payloads?.length ? 'ChatAI' : 'intelligent platform'} detection! You can now save them.
+                ✅ Credentials verified with {platform.testConfig || platform.test_payloads?.length ? 'ChatAI' : 'intelligent platform'} detection! You can now save them.
               </p>
             )}
             {testStatus === 'error' && (

@@ -27,6 +27,7 @@ export interface YusrAIStructuredResponse {
   steps?: any[]; // Add for compatibility
   platforms_and_credentials?: any[];
   platforms?: any[]; // Add for compatibility
+  required_platforms?: any[]; // Add this missing property
   clarification_questions?: string[];
   ai_agents?: any[];
   agents?: any[]; // Add for compatibility

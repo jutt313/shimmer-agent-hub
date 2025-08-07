@@ -7,12 +7,26 @@ interface YusrAIResponseMetadata {
   platformsCount: number;
   workflowSteps: number;
   score: number;
+  isPlainText: boolean;
+  error_help_available: boolean;
 }
 
 interface ParseResult {
   structuredData: any;
   metadata: YusrAIResponseMetadata;
   platformNames: string[];
+  isPlainText: boolean;
+}
+
+// Export the YusrAIStructuredResponse interface for compatibility
+export interface YusrAIStructuredResponse {
+  summary?: string;
+  step_by_step_explanation?: string[];
+  platforms_and_credentials?: any[];
+  clarification_questions?: string[];
+  ai_agents?: any[];
+  test_payloads?: any;
+  execution_blueprint?: any;
 }
 
 // Enhanced platform extraction
@@ -30,6 +44,30 @@ function extractPlatformNames(data: any): string[] {
   return platforms;
 }
 
+// Clean display text utility function
+export function cleanDisplayText(text: string): string {
+  if (!text) return '';
+  
+  // Remove JSON wrapper if present
+  if (text.startsWith('```json') && text.endsWith('```')) {
+    text = text.slice(7, -3).trim();
+  } else if (text.startsWith('```') && text.endsWith('```')) {
+    text = text.slice(3, -3).trim();
+  }
+  
+  // If it's JSON, try to extract summary
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed.summary) {
+      return parsed.summary;
+    }
+  } catch (e) {
+    // Not JSON, return as is
+  }
+  
+  return text;
+}
+
 export function parseYusrAIStructuredResponse(response: string): ParseResult {
   console.log('🔍 ENHANCED: Starting advanced YusrAI response parsing');
   
@@ -39,6 +77,8 @@ export function parseYusrAIStructuredResponse(response: string): ParseResult {
   let sevenSectionsValidated = false;
   let hasExecutionBlueprint = false;
   let workflowSteps = 0;
+  let isPlainText = false;
+  let error_help_available = false;
 
   // Handle markdown-wrapped JSON
   let jsonString = response.trim();
@@ -63,11 +103,12 @@ export function parseYusrAIStructuredResponse(response: string): ParseResult {
       bestStructuredData = parsed;
     }
   } catch (parseError) {
-    console.log('⚠️ ENHANCED: JSON parsing failed for pattern, trying next');
+    console.log('⚠️ ENHANCED: JSON parsing failed, treating as plain text');
+    isPlainText = true;
   }
 
   // If no complete JSON found, try partial extraction
-  if (!bestStructuredData) {
+  if (!bestStructuredData && !isPlainText) {
     console.log('🔧 ENHANCED: No complete JSON found, attempting partial extraction');
     bestStructuredData = attemptPartialExtraction(response);
     if (bestStructuredData) {
@@ -85,14 +126,14 @@ export function parseYusrAIStructuredResponse(response: string): ParseResult {
     const requiredSections = ['summary', 'step_by_step_explanation', 'platforms_and_credentials', 'clarification_questions', 'ai_agents', 'test_payloads', 'execution_blueprint'];
     const presentSections = requiredSections.filter(section => bestStructuredData[section]);
     
-    // Smart validation - not requiring all 7 sections
+    // Smart validation - check for YusrAI powered responses
     if (bestStructuredData.summary) {
       yusraiPowered = true;
       
       // Check if it's a comprehensive automation response
       if (presentSections.includes('step_by_step_explanation') && 
           presentSections.includes('platforms_and_credentials') && 
-          presentSections.length >= 3) {
+          presentSections.length >= 4) {
         sevenSectionsValidated = true;
       }
       
@@ -116,18 +157,18 @@ export function parseYusrAIStructuredResponse(response: string): ParseResult {
     yusraiPowered,
     sevenSectionsValidated,
     hasExecutionBlueprint,
-    workflowSteps
+    workflowSteps,
+    isPlainText,
+    error_help_available
   };
 
   console.log('🎯 ENHANCED: Final parsing result:', finalResult);
 
   return {
     structuredData: bestStructuredData,
-    metadata: {
-      ...finalResult,
-      platformsCount: platformNames.length
-    },
-    platformNames
+    metadata: finalResult,
+    platformNames,
+    isPlainText
   };
 }
 
@@ -146,6 +187,16 @@ function calculateStructureScore(data: any): number {
   if (data.clarification_questions) score += 10;
   if (data.ai_agents) score += 10;
   if (data.test_payloads) score += 10;
+  
+  // ENHANCED: Seven sections validation
+  const requiredSections = ['summary', 'step_by_step_explanation', 'platforms_and_credentials', 'clarification_questions', 'ai_agents', 'test_payloads', 'execution_blueprint'];
+  const presentSections = requiredSections.filter(section => data[section]);
+
+  if (presentSections.length === 7) {
+    score += 100; // Bonus for complete 7-section structure
+  } else if (presentSections.length >= 4) {
+    score += 50; // Partial credit for most sections
+  }
   
   // Quality bonuses
   if (data.execution_blueprint?.workflow && Array.isArray(data.execution_blueprint.workflow)) {
@@ -206,3 +257,6 @@ function normalizeStructuredData(data: any): any {
   
   return data;
 }
+
+// Export parseStructuredResponse as an alias for compatibility
+export const parseStructuredResponse = parseYusrAIStructuredResponse;

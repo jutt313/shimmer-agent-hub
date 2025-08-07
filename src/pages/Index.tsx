@@ -57,8 +57,8 @@ const Index = () => {
       isBot: false,
       timestamp: new Date(),
       structuredData: null,
-      yusrai_powered: false,
-      seven_sections_validated: false,
+      yusraiPowered: false,
+      sevenSectionsValidated: false,
       error_help_available: false
     };
     
@@ -123,6 +123,7 @@ const Index = () => {
         } else if (result.response) {
           // Parse structured data from response text with smart validation
           const parseResult = parseYusrAIStructuredResponse(result.response);
+          // Only accept structured data if it has meaningful content
           if (parseResult.structuredData && parseResult.metadata.yusraiPowered) {
             structuredData = parseResult.structuredData;
             console.log('✅ YusrAI structured data parsed and validated:', !!structuredData);
@@ -154,8 +155,8 @@ const Index = () => {
         timestamp: new Date(),
         structuredData: structuredData,
         error_help_available: errorHelpAvailable,
-        yusrai_powered: !!structuredData,
-        seven_sections_validated: !!(structuredData?.step_by_step_explanation && structuredData?.platforms_and_credentials)
+        yusraiPowered: !!structuredData,
+        sevenSectionsValidated: !!(structuredData?.step_by_step_explanation && structuredData?.platforms_and_credentials)
       };
       
       console.log('📤 Adding YusrAI bot response:', {
@@ -180,8 +181,8 @@ const Index = () => {
         timestamp: new Date(),
         structuredData: null,
         error_help_available: true,
-        yusrai_powered: true,
-        seven_sections_validated: false
+        yusraiPowered: true,
+        sevenSectionsValidated: false
       };
       
       // Parse the error response as structured data

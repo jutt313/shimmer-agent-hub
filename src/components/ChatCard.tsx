@@ -373,9 +373,19 @@ const ChatCard = ({
           );
         }
         
-        // FIXED: Handle all agent field variants including automation_agents
+        // FIXED: Handle all agent field variants including automation_agents with DEBUG LOGGING
         const agentsData = structuredData.ai_agents || structuredData.agents || structuredData.automation_agents;
+        console.log('🤖 AGENT DEBUG - Checking agent data:', {
+          ai_agents: structuredData.ai_agents,
+          agents: structuredData.agents,
+          automation_agents: structuredData.automation_agents,
+          agentsData: agentsData,
+          isArray: Array.isArray(agentsData),
+          length: agentsData?.length
+        });
+        
         if (agentsData && Array.isArray(agentsData) && agentsData.length > 0) {
+          console.log('✅ AGENT DEBUG - Displaying agents section with data:', agentsData);
           sections.push(
             <div key="agents" className="mb-4">
               <div className="font-semibold text-gray-800 mb-2">AI Agents:</div>
@@ -415,6 +425,13 @@ const ChatCard = ({
               </div>
             </div>
           );
+        } else {
+          console.log('❌ AGENT DEBUG - No agents to display. Data:', {
+            structuredData: !!structuredData,
+            agentsData: agentsData,
+            isArray: Array.isArray(agentsData),
+            hasLength: agentsData?.length > 0
+          });
         }
         
         return sections.length > 0 ? sections : [<span key="no-sections">AI response processed successfully.</span>];
@@ -623,8 +640,8 @@ const ChatCard = ({
           credentials: credentials.map((cred: any) => ({
             field: cred.field || cred.name || 'api_key',
             placeholder: cred.example || cred.placeholder || `Enter ${cred.field}`,
-            link: cred.link || cred.where_to_get || cred.url,
-            why_needed: cred.why_needed || cred.description || 'Authentication required'
+            link: cred.link || cred.where_to_get || cred.url, // FIXED: Remove hardcoded '#' fallback
+            why_needed: cred.why_needed || cred.description // FIXED: Remove hardcoded 'Authentication required' fallback
           })),
           // CRITICAL: Include ChatAI test configuration
           testConfig: platform.testConfig || platform.test_config,
@@ -672,8 +689,8 @@ const ChatCard = ({
         credentials: Array.isArray(credentials) ? credentials.map((cred: any) => ({
           field: cred.field || cred.name || cred.key || 'api_key',
           placeholder: cred.example || cred.placeholder || cred.description || `Enter ${cred.field || 'credential'}`,
-          link: cred.link || cred.where_to_get || cred.documentation_url || cred.url || '#',
-          why_needed: cred.why_needed || cred.description || cred.purpose || 'Authentication required'
+          link: cred.link || cred.where_to_get || cred.documentation_url || cred.url, // FIXED: Remove hardcoded '#' fallback
+          why_needed: cred.why_needed || cred.description || cred.purpose // FIXED: Remove hardcoded 'Authentication required' fallback
         })) : [],
         // CRITICAL: Preserve all ChatAI test data
         testConfig: platform.testConfig || platform.test_config,

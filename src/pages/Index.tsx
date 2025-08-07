@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useMemo } from "react";
 import { Send, Bot } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -101,7 +102,7 @@ const Index = () => {
 
       console.log('🔍 Processing YusrAI result:', result);
       
-      // Process the response
+      // Process the response with smart validation
       let responseText = "I'm YusrAI, ready to help you create comprehensive automations with the right platforms and credentials.";
       let structuredData = null;
       let errorHelpAvailable = false;
@@ -120,52 +121,25 @@ const Index = () => {
           structuredData = result.structuredData;
           console.log('✅ YusrAI structured data available from service');
         } else if (result.response) {
-          // Try to parse structured data from response text
+          // Parse structured data from response text with smart validation
           const parseResult = parseYusrAIStructuredResponse(result.response);
-          structuredData = parseResult.structuredData;
-          console.log('✅ Parsed YusrAI structured data from response text:', !!structuredData);
+          if (parseResult.structuredData && parseResult.metadata.yusraiPowered) {
+            structuredData = parseResult.structuredData;
+            console.log('✅ YusrAI structured data parsed and validated:', !!structuredData);
+          }
         }
 
         errorHelpAvailable = result.error_help_available || false;
       }
       
-      // Final validation
+      // Fallback handling only for genuine failures
       if (!responseText || 
           responseText.trim() === '' || 
           responseText.toLowerCase().includes('null') || 
           responseText === 'null') {
-        console.warn('⚠️ Safety check triggered - using fallback response');
+        console.warn('⚠️ Safety fallback triggered - using default response');
         responseText = JSON.stringify({
-          summary: "I'm YusrAI, ready to help you create comprehensive automations. Please specify the platforms you'd like to integrate and I'll provide complete setup instructions with real credentials and testing.",
-          steps: [
-            "Tell me what automation you want to create",
-            "I'll analyze your requirements and provide a complete blueprint",
-            "Configure platform credentials with my detailed guidance",
-            "Test integrations with real API calls",
-            "Execute your automation with monitoring and error handling"
-          ],
-          platforms: [],
-          clarification_questions: [
-            "What specific automation workflow would you like me to create?",
-            "Which platforms should be integrated (e.g., Gmail, Slack, Salesforce, OpenAI)?"
-          ],
-          agents: [],
-          test_payloads: {},
-          execution_blueprint: {
-            trigger: { type: "manual", configuration: {} },
-            workflow: [],
-            error_handling: {
-              retry_attempts: 3,
-              fallback_actions: ["log_error"],
-              notification_rules: [],
-              critical_failure_actions: ["pause_automation"]
-            },
-            performance_optimization: {
-              rate_limit_handling: "exponential_backoff",
-              concurrency_limit: 5,
-              timeout_seconds_per_step: 60
-            }
-          }
+          summary: "I'm YusrAI, ready to help you create comprehensive automations. Please specify what you'd like to automate and I'll provide detailed guidance."
         });
         
         // Parse the fallback as structured data
@@ -181,7 +155,7 @@ const Index = () => {
         structuredData: structuredData,
         error_help_available: errorHelpAvailable,
         yusrai_powered: !!structuredData,
-        seven_sections_validated: !!structuredData
+        seven_sections_validated: !!(structuredData?.step_by_step_explanation && structuredData?.platforms_and_credentials)
       };
       
       console.log('📤 Adding YusrAI bot response:', {
@@ -200,36 +174,7 @@ const Index = () => {
       const errorResponse = {
         id: Date.now() + 1,
         text: JSON.stringify({
-          summary: "I encountered a technical issue, but I'm YusrAI and ready to help you create your automation. Please rephrase your request with specific platform names and I'll provide a complete solution.",
-          steps: [
-            "Specify the platforms you want to integrate",
-            "Describe your automation workflow",
-            "I'll provide complete setup instructions",
-            "Test credentials with real API calls",
-            "Execute with full monitoring"
-          ],
-          platforms: [],
-          clarification_questions: [
-            "Which platforms would you like to integrate?",
-            "What should the automation accomplish?"
-          ],
-          agents: [],
-          test_payloads: {},
-          execution_blueprint: {
-            trigger: { type: "manual", configuration: {} },
-            workflow: [],
-            error_handling: {
-              retry_attempts: 3,
-              fallback_actions: ["log_error"],
-              notification_rules: [],
-              critical_failure_actions: ["pause_automation"]
-            },
-            performance_optimization: {
-              rate_limit_handling: "exponential_backoff",
-              concurrency_limit: 5,
-              timeout_seconds_per_step: 60
-            }
-          }
+          summary: "I encountered a technical issue, but I'm YusrAI and ready to help you create your automation. Please rephrase your request and I'll provide a complete solution."
         }),
         isBot: true,
         timestamp: new Date(),

@@ -179,56 +179,67 @@ DON'T: Omit base_url, endpoint paths, or authentication details from workflow st
 Inclusion Logic: Included ONLY IF the request is for a complete, executable automation blueprint or a detailed technical specification of a workflow.
 Frontend Display: This blueprint is sent to an execute-automation function for live execution and monitoring. The user interface can display execution progress, status updates, and potentially a visual workflow diagram reflecting the steps.
 
-=== OVERALL SYSTEM THINKING & SELF-CONTROL ===
+=== INTELLIGENT RESPONSE STRUCTURE LOGIC ===
 
-Response Type Detection Logic:
-At the very beginning of processing any user request, I first determine the type of request to intelligently tailor my response. This guides which JSON sections are relevant and populated:
+SMART CONDITIONAL REQUIREMENTS:
 
-Type 1: Full Automation Blueprint Request: (e.g., "Automate X," "Build a workflow for Y") - This implies a need for a comprehensive solution, and I will aim to include all relevant sections: summary, steps, platforms, agents, test_payloads, and execution_blueprint. clarification_questions will be included if needed.
+FOR SIMPLE QUESTIONS (e.g., "What is a webhook?", "How does authentication work?"):
+- ONLY include: summary
+- NO other sections needed
 
-Type 2: Conceptual/Informational Query: (e.g., "Explain webhooks," "What is an API key?") - I will provide a direct, concise answer, likely only including a summary and potentially steps if explaining a concept. Other sections will be omitted as irrelevant.
+FOR CONCEPTUAL REQUESTS (e.g., "Explain how to integrate with Slack"):
+- Include: summary, step_by_step_explanation
+- Optional: platforms_and_credentials (if specific platform mentioned)
 
-Type 3: Partial Blueprint/Specific Component Request: (e.g., "Show me how to get credentials for X," "Suggest AI agents for Y," "Provide a test payload for Z") - I will focus my response on the explicitly requested section(s), while still providing a summary and steps if a mini-workflow is implied.
+FOR AUTOMATION REQUESTS WITH PLATFORMS:
+- ALWAYS include: summary, step_by_step_explanation, platforms_and_credentials
+- Include test_payloads IF platforms_and_credentials exists
+- Include execution_blueprint IF it's a complete automation workflow
 
-Before Every Response, I Rigorously Verify:
-Contextual Relevance: Are the included JSON sections appropriate for the detected request type?
-Data Completeness (for included sections): Is every included section fully populated according to its defined structure and rules?
-Platform Accuracy & API Veracity: All platform names are EXACT and REAL, matching my simulated internal knowledge, and all API endpoints are REAL and appropriate for their context (testing vs. execution).
-Credential Precision: All credential field names are EXACT as platforms expect.
-AI Configuration Integrity: For AI platforms, all available model options are listed, and system_prompt is provided. All AI agents are properly defined with test_scenarios and justified by why_needed.
-Testability & Executability (for relevant sections): test_payloads are genuinely testable, and the execution_blueprint is complete, detailed, and truly executable.
-Performance Readiness: Performance optimization considerations are included where appropriate.
-Error Robustness: Error handling is comprehensive and actionable at both step and global levels (if execution_blueprint is included).
+FOR AUTOMATION REQUESTS NEEDING AI INTELLIGENCE:
+- Include ai_agents section ONLY if the workflow requires:
+  * Complex decision-making
+  * Data analysis/processing beyond simple mapping
+  * Intelligent monitoring or classification
+  * Natural language processing
 
-Self-Control & Core Principles:
-✅ ALWAYS respond in the exact JSON format, intelligently including only the relevant sections.
-✅ ALWAYS use real platforms and APIs from my simulated internal knowledge base.
-✅ ALWAYS include complete and precise technical details for every component of the relevant sections.
-✅ ALWAYS provide fully executable, robust, and production-ready solutions when a blueprint is requested.
-✅ ALWAYS align the solution with the user's actual business need and desired outcome.
-✅ ALWAYS include AI agent recommendations or detailed custom agent definitions when intelligent decision-making is beneficial and relevant.
-✅ ALWAYS provide comprehensive test_scenarios for all defined AI agents when included.
-✅ ALWAYS be prepared to define and explain custom_agent_creation when the user's needs exceed standard agent types.
-❌ NEVER provide partial or incomplete data within included sections.
-❌ NEVER use fake platform names, invented endpoints, or incorrect credential fields.
-❌ NEVER omit technical details crucial for proper execution or troubleshooting from included sections.
-❌ NEVER assume the user possesses specific technical knowledge or common practices.
-❌ NEVER offer untestable, non-executable, or poorly defined solutions.
+FOR INCOMPLETE/AMBIGUOUS REQUESTS:
+- Include clarification_questions ONLY if genuinely needed to complete the automation
 
-Knowledge Saving & Continuous Improvement:
-Remember: Store and recall successful patterns and automation blueprints from similar requests for efficient future responses.
-Save: Persistently store effective API configurations for reuse across different user automations.
-Learn: Continuously adapt and refine internal knowledge based on user feedback, corrections, and evolving API landscapes.
-Update: Proactively update platform knowledge whenever APIs change, new features emerge, or best practices evolve.
+EXECUTION BLUEPRINT RULES:
+- Include ONLY for complete automation workflows
+- Must have at least 2 workflow steps
+- Must include proper error handling
+- Must include data mapping between steps
 
-CRITICAL: When generating authentication headers for platforms, use the exact format that platform expects:
-- For ElevenLabs: {"xi-api-key": "{api_key}"}
-- For OpenAI: {"Authorization": "Bearer {api_key}"}  
-- For platforms with Bearer tokens: {"Authorization": "Bearer {token}"}
-- For platforms with API keys in headers: {"X-API-Key": "{api_key}"}
-- Always use the platform's documented authentication method, not hardcoded "Authorization: Bearer"
+JSON RESPONSE SCHEMA EXAMPLES:
 
-RESPOND ONLY IN VALID JSON FORMAT. Always structure your response as a JSON object with the appropriate sections based on the request type.`;
+Simple Question Response:
+{
+  "summary": "Brief explanation of the concept"
+}
+
+Conceptual Platform Integration:
+{
+  "summary": "How the integration works",
+  "step_by_step_explanation": ["Step 1", "Step 2", "Step 3"],
+  "platforms_and_credentials": [/* platform details */]
+}
+
+Complete Automation Blueprint:
+{
+  "summary": "What the automation accomplishes",
+  "step_by_step_explanation": ["Step 1", "Step 2", "Step 3"],
+  "platforms_and_credentials": [/* platform details */],
+  "test_payloads": {/* test configurations */},
+  "execution_blueprint": {
+    "trigger": {"type": "webhook", "configuration": {}},
+    "workflow": [/* workflow steps */],
+    "error_handling": {/* error handling config */}
+  }
+}
+
+CRITICAL: Always structure response as valid JSON. Never use markdown code blocks. Include only the sections that are relevant to the user's specific request type.`;
 
 // Message validation and transformation functions
 function validateAndTransformMessages(messages: any[]): Array<{role: string, content: string}> {
@@ -283,20 +294,32 @@ function validateAndTransformMessages(messages: any[]): Array<{role: string, con
 }
 
 function validateYusrAIResponse(response: string): { isValid: boolean; data: any; error?: string } {
+  console.log('🔧 Validating YusrAI response structure');
+  
+  // First, handle markdown-wrapped JSON
+  let jsonString = response.trim();
+  if (jsonString.startsWith('```json') && jsonString.endsWith('```')) {
+    jsonString = jsonString.slice(7, -3).trim();
+    console.log('🔧 Removed ```json markdown wrapper');
+  } else if (jsonString.startsWith('```') && jsonString.endsWith('```')) {
+    jsonString = jsonString.slice(3, -3).trim();
+    console.log('🔧 Removed ``` markdown wrapper');
+  }
+  
   try {
-    // Try to parse as JSON first
-    const parsed = JSON.parse(response);
+    const parsed = JSON.parse(jsonString);
     
-    // Basic structure validation
-    if (typeof parsed === 'object' && parsed !== null) {
-      console.log('✅ YusrAI JSON response is valid');
+    // Basic structure validation - must be an object with at least summary
+    if (typeof parsed === 'object' && parsed !== null && parsed.summary) {
+      console.log('✅ YusrAI response has valid JSON structure with summary');
       return { isValid: true, data: parsed };
     } else {
-      console.log('⚠️ YusrAI response is not a valid object');
-      return { isValid: false, data: response, error: 'Response is not a valid JSON object' };
+      console.log('⚠️ YusrAI response missing summary section');
+      return { isValid: false, data: parsed, error: 'Response must contain at least a summary section' };
     }
+    
   } catch (parseError) {
-    console.log('⚠️ YusrAI response is not JSON, treating as text:', parseError);
+    console.log('⚠️ YusrAI response is not valid JSON:', parseError);
     return { isValid: false, data: response, error: 'Response is not valid JSON' };
   }
 }
@@ -392,7 +415,13 @@ serve(async (req) => {
     if (validation.isValid) {
       // Return structured JSON response
       console.log('📊 Returning structured YusrAI response');
-      return new Response(JSON.stringify(validation.data), {
+      return new Response(JSON.stringify({
+        response: JSON.stringify(validation.data),
+        structuredData: validation.data,
+        yusrai_powered: true,
+        seven_sections_validated: !!(validation.data.summary && validation.data.step_by_step_explanation && validation.data.platforms_and_credentials),
+        error_help_available: !!validation.data.clarification_questions
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     } else {

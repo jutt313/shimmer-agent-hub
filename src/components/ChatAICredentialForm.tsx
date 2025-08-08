@@ -105,15 +105,16 @@ const generateIntelligentEndpoint = (platformName: string): string => {
   return '/me';
 };
 
-// CRITICAL FIX: COMPREHENSIVE platform name extraction from ALL possible ChatAI structures
+// CRITICAL FIX: ROBUST platform name extraction - NEVER returns "Unknown Platform"
 const extractPlatformName = (platform: Platform): string => {
-  console.log('🔍 DEEP ANALYSIS: Extracting platform name from full structure:', JSON.stringify(platform, null, 2));
+  console.log('🔍 ROBUST EXTRACTION: Full platform structure:', JSON.stringify(platform, null, 2));
   
-  // STEP 1: Try direct platform.name
-  if (platform?.name && typeof platform.name === 'string' && platform.name.trim() !== '' && platform.name !== 'undefined') {
-    const cleaned = platform.name.replace(/[*_`]/g, '').trim(); // Less aggressive cleanup
-    if (cleaned && cleaned !== 'undefined') {
-      console.log('✅ FOUND platform name from platform.name:', cleaned);
+  // STEP 1: Try direct platform.name - LESS AGGRESSIVE CLEANING
+  if (platform?.name && typeof platform.name === 'string' && platform.name.trim() !== '') {
+    // CRITICAL FIX: Only remove markdown characters, keep everything else
+    const cleaned = platform.name.replace(/[*_`]/g, '').trim();
+    if (cleaned && cleaned !== 'undefined' && cleaned !== '') {
+      console.log('✅ ROBUST: Found platform name from platform.name:', cleaned);
       return cleaned;
     }
   }
@@ -134,8 +135,8 @@ const extractPlatformName = (platform: Platform): string => {
     for (const name of possibleNames) {
       if (name && typeof name === 'string' && name.trim() !== '' && name !== 'undefined') {
         const cleaned = name.replace(/[*_`]/g, '').trim();
-        if (cleaned && cleaned !== 'undefined') {
-          console.log('✅ FOUND platform name from chatai_data:', cleaned);
+        if (cleaned && cleaned !== 'undefined' && cleaned !== '') {
+          console.log('✅ ROBUST: Found platform name from chatai_data:', cleaned);
           return cleaned;
         }
       }
@@ -167,8 +168,8 @@ const extractPlatformName = (platform: Platform): string => {
       for (const name of possibleNames) {
         if (name && typeof name === 'string' && name.trim() !== '' && name !== 'undefined') {
           const cleaned = name.replace(/[*_`]/g, '').trim();
-          if (cleaned && cleaned !== 'undefined') {
-            console.log('✅ FOUND platform name from testConfig:', cleaned);
+          if (cleaned && cleaned !== 'undefined' && cleaned !== '') {
+            console.log('✅ ROBUST: Found platform name from testConfig:', cleaned);
             return cleaned;
           }
         }
@@ -201,8 +202,8 @@ const extractPlatformName = (platform: Platform): string => {
       for (const name of possibleNames) {
         if (name && typeof name === 'string' && name.trim() !== '' && name !== 'undefined') {
           const cleaned = name.replace(/[*_`]/g, '').trim();
-          if (cleaned && cleaned !== 'undefined') {
-            console.log('✅ FOUND platform name from test_payloads:', cleaned);
+          if (cleaned && cleaned !== 'undefined' && cleaned !== '') {
+            console.log('✅ ROBUST: Found platform name from test_payloads:', cleaned);
             return cleaned;
           }
         }
@@ -215,16 +216,17 @@ const extractPlatformName = (platform: Platform): string => {
     for (const cred of platform.credentials) {
       if (cred.link && typeof cred.link === 'string' && cred.link !== '#') {
         const extracted = extractDomainFromUrl(cred.link);
-        if (extracted && extracted !== 'undefined') {
-          console.log('✅ FOUND platform name from credential link:', extracted);
+        if (extracted && extracted !== 'undefined' && extracted !== '') {
+          console.log('✅ ROBUST: Found platform name from credential link:', extracted);
           return extracted;
         }
       }
     }
   }
 
-  console.log('⚠️ NO VALID platform name found in any structure, using fallback');
-  return 'Platform'; // More generic fallback
+  // CRITICAL FIX: NEVER return "Unknown Platform" - use "API Platform" as safe fallback
+  console.log('⚠️ ROBUST: No valid platform name found, using safe fallback');
+  return 'API Platform';
 };
 
 // Helper function to extract domain name from URL
@@ -258,7 +260,7 @@ const ChatAICredentialForm = ({
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [existingCredentials, setExistingCredentials] = useState<boolean>(false);
 
-  // CRITICAL FIX: Use comprehensive platform name extraction
+  // CRITICAL FIX: Use robust platform name extraction - NEVER "Unknown Platform"
   const platformName = extractPlatformName(platform);
   
   console.log('🔍 ChatAI Credential Form initialized for platform:', platformName);
@@ -336,7 +338,7 @@ const ChatAICredentialForm = ({
 
   // Load existing credentials and initialize test script
   useEffect(() => {
-    if (user && automationId && platformName && platformName !== 'Unknown Platform') {
+    if (user && automationId && platformName && platformName !== 'API Platform') {
       // CRITICAL FIX: Save platform data on mount for persistence
       savePlatformDataToPersistence(platform, platformName);
       
@@ -381,7 +383,7 @@ const ChatAICredentialForm = ({
         setExistingCredentials(true);
         toast.success(`Found existing credentials for ${platformName}`);
       } else {
-        // Initialize empty credentials
+        // Initialize empty credentials - CRITICAL FIX: Filter out undefined placeholders
         const initialCreds: Record<string, string> = {};
         platform.credentials.forEach(cred => {
           initialCreds[cred.field] = '';
@@ -666,6 +668,14 @@ const ChatAICredentialForm = ({
            lowerField.includes('token') ? 'password' : 'text';
   };
 
+  // CRITICAL FIX: Sanitize credential placeholders to remove "undefined" strings
+  const sanitizePlaceholder = (placeholder: string): string => {
+    if (!placeholder || placeholder === 'undefined' || placeholder.trim() === '') {
+      return 'Enter your credential';
+    }
+    return placeholder;
+  };
+
   if (isLoading) {
     return (
       <Dialog open={true} onOpenChange={onClose}>
@@ -690,7 +700,7 @@ const ChatAICredentialForm = ({
               <Settings className="w-6 h-6" />
             </div>
             <div>
-              {/* CRITICAL FIX: Display extracted platform name */}
+              {/* CRITICAL FIX: Display extracted platform name - NEVER "Unknown Platform" */}
               <h3 className="text-xl font-bold text-purple-900">{platformName} Credentials</h3>
               <p className="text-sm text-purple-600 font-normal">
                 {extractChatAIValue(platform.testConfig) || extractChatAIValue(platform.test_payloads) ? 'ChatAI Configuration' : 'Intelligent Platform Detection'} • Dynamic URLs
@@ -722,7 +732,7 @@ const ChatAICredentialForm = ({
           <TabsContent value="credentials" className="mt-6">
             <Card className="bg-white/70 backdrop-blur-sm border border-purple-200/50 rounded-2xl shadow-lg">
               <CardHeader>
-                {/* CRITICAL FIX: Display extracted platform name in card header */}
+                {/* CRITICAL FIX: Display extracted platform name in card header - NEVER "Unknown Platform" */}
                 <CardTitle className="text-lg text-purple-900">Configure Your {platformName} Credentials</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -759,7 +769,7 @@ const ChatAICredentialForm = ({
                       <div className="relative">
                         <Input
                           type={inputType === 'password' && !showPassword ? 'password' : 'text'}
-                          placeholder={cred.placeholder}
+                          placeholder={sanitizePlaceholder(cred.placeholder)}
                           value={currentValue}
                           onChange={(e) => handleInputChange(cred.field, e.target.value)}
                           className="rounded-xl border-purple-200 focus:border-purple-400 focus:ring-purple-200 bg-white/80 backdrop-blur-sm transition-all duration-200 pr-12"

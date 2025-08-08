@@ -34,6 +34,10 @@ interface Message {
       link: string;
       why_needed: string;
     }>;
+    // FIXED: Add ChatAI test configuration properties to prevent TypeScript errors
+    testConfig?: any;
+    test_payloads?: any[];
+    chatai_data?: any;
   }>;
   automationDiagramData?: any;
   executionBlueprint?: any;
@@ -81,7 +85,7 @@ const ChatCard = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // CRITICAL FIX: Enhanced platform name cleaning function - NO hardcoded 'Unknown Platform'
+  // CRITICAL FIX: Enhanced platform name cleaning function - NO hardcoded fallbacks
   const cleanPlatformName = (rawName: string | undefined | null): string => {
     if (!rawName || typeof rawName !== 'string') return 'API Platform';
     
@@ -96,7 +100,7 @@ const ChatCard = ({
       .replace(/^[-•]\s*/, '')
       .trim();
       
-    return cleaned || 'API Platform'; // FIXED: No more 'Unknown Platform'
+    return cleaned || 'API Platform';
   };
 
   // CRITICAL FIX: Enhanced step text extraction with better markdown cleaning
@@ -202,11 +206,11 @@ const ChatCard = ({
                     name: cleanedPlatformName,
                     credentials: credentials.map((cred: any) => ({
                       field: cred.field || cred.name || 'api_key',
-                      placeholder: cred.example || cred.placeholder || `Enter ${cred.field || 'credential'}`,
-                      link: cred.link || cred.where_to_get || cred.url, // FIXED: Remove hardcoded '#' fallback
-                      why_needed: cred.why_needed || cred.description // FIXED: Remove hardcoded 'Authentication required' fallback
+                      placeholder: cred.example || cred.placeholder || `Enter ${cred.field}`,
+                      link: cred.link || cred.where_to_get || cred.url,
+                      why_needed: cred.why_needed || cred.description
                     })),
-                    // CRITICAL: Preserve ChatAI test configuration
+                    // CRITICAL: Preserve ChatAI test configuration with proper types
                     testConfig: testConfig,
                     test_payloads: Array.isArray(testPayloads) ? testPayloads : (testPayloads ? [testPayloads] : []),
                     // Preserve additional ChatAI metadata
@@ -603,11 +607,11 @@ const ChatCard = ({
     }
   };
 
-  // CRITICAL FIX: Get latest platforms with structuredData FIRST priority
+  // PHASE 2: FIXED - Priority 1: structuredData FIRST, fallback to platformData
   const getLatestPlatforms = () => {
     console.log('🔍 FIXED: Getting platforms with structuredData FIRST priority');
     
-    // PHASE 2: Priority 1 - Rich structuredData extraction (preserves ChatAI data)
+    // Priority 1: Rich structuredData extraction (preserves ChatAI data)
     const latestStructuredMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
     if (latestStructuredMessage?.structuredData) {
       const platformsSource = latestStructuredMessage.structuredData.platforms || 
@@ -669,16 +673,17 @@ const ChatCard = ({
       }
     }
     
-    // PHASE 2: Priority 2 - Fallback to platformData (but filter out "Unknown Platform")
+    // Priority 2: Fallback to platformData (but filter out rejected platforms)
     const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.platformData).pop();
     if (latestBotMessage?.platformData) {
       const filteredPlatforms = latestBotMessage.platformData.filter(platform => {
-        const isUnknownPlatform = platform.name === 'Unknown Platform' || platform.name === 'API Platform';
+        // FIXED: Reject API Platform with no useful data
+        const isGenericPlatform = platform.name === 'API Platform';
         const hasUsefulData = (platform.credentials && platform.credentials.length > 0) || 
                              platform.testConfig || 
                              (platform.test_payloads && platform.test_payloads.length > 0);
         
-        if (isUnknownPlatform && !hasUsefulData) {
+        if (isGenericPlatform && !hasUsefulData) {
           console.log('⚠️ FILTERED: Rejecting platform with generic name and no data:', platform.name);
           return false;
         }

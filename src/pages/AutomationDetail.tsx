@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -52,7 +51,6 @@ const AutomationDetail = () => {
   const [showAIAgentForm, setShowAIAgentForm] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<any>(null);
   const [dismissedAgents, setDismissedAgents] = useState<Set<string>>(new Set());
-  const [currentPlatforms, setCurrentPlatforms] = useState<any[]>([]);
   const [showBlueprint, setShowBlueprint] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showDiagram, setShowDiagram] = useState(false);
@@ -225,12 +223,11 @@ const AutomationDetail = () => {
       if (chatError) throw chatError;
 
       const formattedMessages = chatData.map((chat: ChatMessage, index: number) => {
-        console.log('🔄 Processing stored chat message:', chat.message_content.substring(0, 100));
+        console.log('🔄 Processing stored chat message - preserving raw structuredData:', chat.message_content.substring(0, 100));
         
         let structuredData = null;
         let yusraiPowered = false;
         let sevenSectionsValidated = false;
-        let platformData = null;
         
         if (chat.sender === 'ai') {
           const parseResult = parseYusrAIStructuredResponse(chat.message_content);
@@ -238,46 +235,10 @@ const AutomationDetail = () => {
           yusraiPowered = parseResult.metadata.yusrai_powered || false;
           sevenSectionsValidated = parseResult.metadata.seven_sections_validated || false;
           
-          if (structuredData) {
-            const platformsSource = structuredData.platforms_and_credentials?.platforms || 
-                                   structuredData.platforms_credentials || 
-                                   structuredData.platforms || [];
-            
-            platformData = platformsSource.map(platform => {
-              console.log('🔍 Processing individual platform:', platform);
-              
-              let credentials = [];
-              if (platform.credentials) {
-                if (Array.isArray(platform.credentials)) {
-                  credentials = platform.credentials;
-                } else if (typeof platform.credentials === 'object') {
-                  credentials = Object.entries(platform.credentials).map(([key, value]: [string, any]) => ({
-                    field: key,
-                    placeholder: value.example || value.placeholder || `Enter ${key}`,
-                    link: value.link || value.url || '#',
-                    why_needed: value.description || value.why_needed || `Required for ${key}`
-                  }));
-                }
-              }
-              
-              return {
-                name: platform.name || 'Unknown Platform',
-                credentials: credentials.map(cred => ({
-                  field: cred.field || cred.name || 'api_key',
-                  placeholder: cred.example || cred.placeholder || `Enter ${cred.field}`,
-                  link: cred.link || cred.where_to_get || '#',
-                  why_needed: cred.why_needed || cred.description || 'Authentication required'
-                }))
-              };
-            });
-            
-            console.log('🔗 Extracted platform data with full names:', platformData);
-          }
-          
-          console.log('📦 Enhanced parsing result:', {
+          console.log('📦 Raw structuredData preserved without transformation:', {
             hasStructuredData: !!structuredData,
-            platformsCount: platformData?.length || 0,
-            platformNames: platformData?.map((p: any) => p.name) || [],
+            hasPlatforms: !!(structuredData?.platforms || structuredData?.platforms_and_credentials),
+            hasTestConfig: !!(structuredData?.test_payloads || structuredData?.testConfig),
             yusraiPowered,
             sevenSectionsValidated
           });
@@ -289,25 +250,12 @@ const AutomationDetail = () => {
           isBot: chat.sender === 'ai',
           timestamp: new Date(chat.timestamp),
           structuredData,
-          platformData,
           yusrai_powered: yusraiPowered,
           seven_sections_validated: sevenSectionsValidated
         };
       });
 
-      const allPlatforms: any[] = [];
-      formattedMessages.forEach(msg => {
-        if (msg.isBot && msg.platformData && Array.isArray(msg.platformData)) {
-          allPlatforms.push(...msg.platformData);
-        }
-      });
-      
-      if (allPlatforms.length > 0) {
-        console.log('🔗 Setting platforms from AI messages:', allPlatforms.map(p => p.name));
-        setCurrentPlatforms(allPlatforms);
-      } else {
-        console.log('⚠️ No platforms found in AI messages');
-      }
+      console.log('✅ FIXED: Messages preserved with raw structuredData only - no upstream pollution');
 
       if (formattedMessages.length === 0) {
         const welcomeMessage = {
@@ -742,9 +690,7 @@ const AutomationDetail = () => {
                 onAgentDismiss={handleAgentDismiss}
                 automationId={automation.id}
                 isLoading={sendingMessage}
-                platformCredentialStatus={Object.fromEntries(
-                  currentPlatforms.map(p => [p.name, 'saved'])
-                )}
+                platformCredentialStatus={{}}
                 onPlatformCredentialChange={() => {
                   console.log('🔄 PHASE 1: Credential change detected in AutomationDetail');
                 }}

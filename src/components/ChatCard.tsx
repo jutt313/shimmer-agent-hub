@@ -81,21 +81,22 @@ const ChatCard = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // CRITICAL FIX: Enhanced platform name cleaning function
+  // CRITICAL FIX: Enhanced platform name cleaning function - NO hardcoded 'Unknown Platform'
   const cleanPlatformName = (rawName: string | undefined | null): string => {
-    if (!rawName || typeof rawName !== 'string') return 'Unknown Platform';
+    if (!rawName || typeof rawName !== 'string') return 'API Platform';
     
-    // Remove all markdown formatting and clean the string
-    return rawName
-      .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove **bold**
-      .replace(/\*(.*?)\*/g, '$1')      // Remove *italic*
-      .replace(/`(.*?)`/g, '$1')        // Remove `code`
-      .replace(/__(.*?)__/g, '$1')      // Remove __underline__
-      .replace(/_(.*?)_/g, '$1')        // Remove _emphasis_
-      .replace(/[*_`#]/g, '')           // Remove remaining markdown symbols
-      .replace(/^\d+\.\s*/, '')         // Remove numbered list prefixes
-      .replace(/^[-•]\s*/, '')          // Remove bullet points
-      .trim() || 'Unknown Platform';
+    const cleaned = rawName
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/\*(.*?)\*/g, '$1')
+      .replace(/`(.*?)`/g, '$1')
+      .replace(/__(.*?)__/g, '$1')
+      .replace(/_(.*?)_/g, '$1')
+      .replace(/[*_`#]/g, '')
+      .replace(/^\d+\.\s*/, '')
+      .replace(/^[-•]\s*/, '')
+      .trim();
+      
+    return cleaned || 'API Platform'; // FIXED: No more 'Unknown Platform'
   };
 
   // CRITICAL FIX: Enhanced step text extraction with better markdown cleaning
@@ -602,63 +603,95 @@ const ChatCard = ({
     }
   };
 
+  // CRITICAL FIX: Get latest platforms with structuredData FIRST priority
   const getLatestPlatforms = () => {
-    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.platformData).pop();
-    if (latestBotMessage?.platformData) {
-      console.log('🔍 Found platforms from enhanced processing with ChatAI data:', latestBotMessage.platformData);
-      return latestBotMessage.platformData;
-    }
+    console.log('🔍 FIXED: Getting platforms with structuredData FIRST priority');
     
+    // PHASE 2: Priority 1 - Rich structuredData extraction (preserves ChatAI data)
     const latestStructuredMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
     if (latestStructuredMessage?.structuredData) {
       const platformsSource = latestStructuredMessage.structuredData.platforms || 
                              latestStructuredMessage.structuredData.platforms_and_credentials ||
                              latestStructuredMessage.structuredData.required_platforms || [];
       
-      const transformedPlatforms = platformsSource.map((platform: any, index: number) => {
-        // Use the same cleaning function for consistency
-        const platformName = cleanPlatformName(
-          platform.name || platform.platform || platform.platform_name || `Platform ${index + 1}`
-        );
-        
-        let credentials = [];
-        if (platform.credentials) {
-          if (Array.isArray(platform.credentials)) {
-            credentials = platform.credentials;
-          } else if (typeof platform.credentials === 'object') {
-            credentials = Object.entries(platform.credentials).map(([key, value]: [string, any]) => ({
-              field: key,
-              placeholder: value.example || value.placeholder || `Enter ${key}`,
-              link: value.link || value.url || value.where_to_get,
-              why_needed: value.description || value.why_needed
-            }));
+      if (platformsSource.length > 0) {
+        const transformedPlatforms = platformsSource.map((platform: any, index: number) => {
+          const platformName = cleanPlatformName(
+            platform.name || platform.platform || platform.platform_name
+          );
+          
+          // CRITICAL: Skip if name becomes generic fallback AND no useful data
+          if (platformName === 'API Platform' && (!platform.credentials || platform.credentials.length === 0) && !platform.testConfig && !platform.test_payloads) {
+            console.log('⚠️ FILTERED: Skipping platform with no useful data');
+            return null;
           }
+          
+          let credentials = [];
+          if (platform.credentials) {
+            if (Array.isArray(platform.credentials)) {
+              credentials = platform.credentials;
+            } else if (typeof platform.credentials === 'object') {
+              credentials = Object.entries(platform.credentials).map(([key, value]: [string, any]) => ({
+                field: key,
+                placeholder: value.example || value.placeholder || `Enter ${key}`,
+                link: value.link || value.url || value.where_to_get,
+                why_needed: value.description || value.why_needed
+              }));
+            }
+          }
+          
+          const finalPlatform = {
+            name: platformName,
+            credentials: credentials.map((cred: any) => ({
+              field: cred.field || cred.name || 'api_key',
+              placeholder: cred.example || cred.placeholder || `Enter ${cred.field}`,
+              link: cred.link || cred.where_to_get || cred.url,
+              why_needed: cred.why_needed || cred.description
+            })),
+            // CRITICAL: Preserve ALL ChatAI test configuration
+            testConfig: platform.testConfig || platform.test_config,
+            test_payloads: platform.test_payloads || platform.test_payload || [],
+            chatai_data: {
+              original_platform: platform,
+              base_url: platform.base_url || platform.api_base,
+              api_version: platform.api_version
+            }
+          };
+          
+          console.log('✅ FIXED: Rich platform extraction with ChatAI data:', finalPlatform.name);
+          return finalPlatform;
+        }).filter(Boolean); // Remove null entries
+        
+        if (transformedPlatforms.length > 0) {
+          console.log('🎯 FIXED: Using rich structuredData extraction with ChatAI data:', transformedPlatforms.map(p => p.name));
+          return transformedPlatforms;
         }
-        
-        return {
-          name: platformName,
-          credentials: credentials.map((cred: any) => ({
-            field: cred.field || cred.name || 'api_key',
-            placeholder: cred.example || cred.placeholder || `Enter ${cred.field}`,
-            link: cred.link || cred.where_to_get || cred.url, // FIXED: Remove hardcoded '#' fallback
-            why_needed: cred.why_needed || cred.description // FIXED: Remove hardcoded 'Authentication required' fallback
-          })),
-          // CRITICAL: Include ChatAI test configuration
-          testConfig: platform.testConfig || platform.test_config,
-          test_payloads: platform.test_payloads || platform.test_payload || [],
-          chatai_data: {
-            original_platform: platform,
-            base_url: platform.base_url || platform.api_base,
-            api_version: platform.api_version
-          }
-        };
-      });
-      
-      console.log('🔄 Transformed platforms from structured data with ChatAI data:', transformedPlatforms);
-      return transformedPlatforms;
+      }
     }
     
-    console.log('⚠️ No platforms found in messages');
+    // PHASE 2: Priority 2 - Fallback to platformData (but filter out "Unknown Platform")
+    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.platformData).pop();
+    if (latestBotMessage?.platformData) {
+      const filteredPlatforms = latestBotMessage.platformData.filter(platform => {
+        const isUnknownPlatform = platform.name === 'Unknown Platform' || platform.name === 'API Platform';
+        const hasUsefulData = (platform.credentials && platform.credentials.length > 0) || 
+                             platform.testConfig || 
+                             (platform.test_payloads && platform.test_payloads.length > 0);
+        
+        if (isUnknownPlatform && !hasUsefulData) {
+          console.log('⚠️ FILTERED: Rejecting platform with generic name and no data:', platform.name);
+          return false;
+        }
+        return true;
+      });
+      
+      if (filteredPlatforms.length > 0) {
+        console.log('🔄 FIXED: Using filtered platformData as fallback:', filteredPlatforms.map(p => p.name));
+        return filteredPlatforms;
+      }
+    }
+    
+    console.log('⚠️ FIXED: No valid platforms found');
     return [];
   };
 
@@ -689,8 +722,8 @@ const ChatCard = ({
         credentials: Array.isArray(credentials) ? credentials.map((cred: any) => ({
           field: cred.field || cred.name || cred.key || 'api_key',
           placeholder: cred.example || cred.placeholder || cred.description || `Enter ${cred.field || 'credential'}`,
-          link: cred.link || cred.where_to_get || cred.documentation_url || cred.url, // FIXED: Remove hardcoded '#' fallback
-          why_needed: cred.why_needed || cred.description || cred.purpose // FIXED: Remove hardcoded 'Authentication required' fallback
+          link: cred.link || cred.where_to_get || cred.documentation_url || cred.url,
+          why_needed: cred.why_needed || cred.description || cred.purpose
         })) : [],
         // CRITICAL: Preserve all ChatAI test data
         testConfig: platform.testConfig || platform.test_config,

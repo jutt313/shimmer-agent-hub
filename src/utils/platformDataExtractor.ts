@@ -58,7 +58,7 @@ export function extractPlatformCredentials(automationBlueprint: any): ExtractedP
             {
               field: "api_key",
               placeholder: `Enter ${platformName} API key`,
-              link: `https://${platformName.toLowerCase()}.com/developers`,
+              link: "", // FIXED: No hardcoded '#' - leave empty if unknown
               why_needed: `Required for ${platformName} API authentication`
             }
           ]
@@ -76,7 +76,7 @@ export function extractPlatformCredentials(automationBlueprint: any): ExtractedP
             {
               field: "api_key",
               placeholder: `Enter ${platformName} API key`,
-              link: `https://${platformName.toLowerCase()}.com/developers`,
+              link: "", // FIXED: No hardcoded '#' - leave empty if unknown
               why_needed: `Required for ${platformName} API authentication`
             }
           ]
@@ -106,4 +106,4 @@ export function getPlatformCredentials(automationBlueprint: any, platformName: s
   return platform?.credentials || [];
 }
 
-console.log('✅ Platform Data Extractor loaded with missing extractPlatformCredentials function');
+console.log('✅ Platform Data Extractor loaded - no hardcoded fallbacks');

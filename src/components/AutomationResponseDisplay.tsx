@@ -165,16 +165,6 @@ const AutomationResponseDisplay = ({ response, automationId, onSave }: Automatio
                   {response.platforms.map((platform, index) => (
                     <div key={index} className="border rounded-lg p-4 bg-gray-50">
                       <h4 className="font-semibold text-gray-800 mb-2">{platform.name}</h4>
-                      {platform.api_config && (
-                        <div className="mb-3">
-                          <Badge variant="secondary" className="mb-2">Dynamic API Config Generated</Badge>
-                          <div className="text-sm text-gray-600">
-                            <p><strong>Base URL:</strong> {platform.api_config.base_url}</p>
-                            <p><strong>Auth Type:</strong> {platform.api_config.auth_type}</p>
-                            <p><strong>Methods:</strong> {Object.keys(platform.api_config.methods || {}).length} available</p>
-                          </div>
-                        </div>
-                      )}
                       {platform.credentials && platform.credentials.length > 0 && (
                         <div>
                           <p className="text-sm font-medium text-gray-700 mb-2">Required Credentials:</p>

@@ -180,7 +180,7 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
     },
     {
       key: 'platforms',
-      title: 'Platforms & Credentials',
+      title: 'Platforms',
       icon: Database,
       color: 'text-purple-600',
       bgColor: 'bg-purple-50',
@@ -188,73 +188,13 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       show: Array.isArray(data.platforms) && data.platforms.length > 0,
       component: (
         <div className="space-y-4">
-          <div className="text-gray-700 leading-relaxed space-y-4">
+          <div className="text-gray-700 leading-relaxed space-y-2">
             {(Array.isArray(data.platforms) ? data.platforms : []).map((platform, index) => (
               <div key={index} className="bg-white p-5 rounded-xl border border-purple-100 shadow-sm">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 pb-3 border-b border-purple-100">
-                    <Database className="w-5 h-5 text-purple-600" />
-                    <div className="font-bold text-purple-800 text-xl">
-                      {platform.name || platform.platform_name || platform.platform || `Platform ${index + 1}`}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <div className="font-semibold text-gray-900 text-base mb-3 flex items-center gap-2">
-                      <span>🔑 Required Credentials</span>
-                    </div>
-                    <div className="space-y-3">
-                      {(Array.isArray((platform as any).credentials) ? (platform as any).credentials : 
-                        Array.isArray((platform as any).required_credentials) ? (platform as any).required_credentials :
-                        Array.isArray((platform as any).credential_requirements) ? (platform as any).credential_requirements : []
-                      ).map((cred: any, credIndex: number) => (
-                        <div key={credIndex} className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-200">
-                          <div className="font-semibold text-purple-900 text-base mb-2 flex items-center gap-2">
-                            <span className="bg-purple-600 text-white px-2 py-1 rounded text-xs font-medium">
-                              {cred.field || cred.name || cred.key || 'API Key'}
-                            </span>
-                          </div>
-                          
-                          <div className="text-gray-700 text-sm mb-3 leading-relaxed">
-                            <span className="font-medium text-gray-900">Why needed:</span> {cred.why_needed || cred.description || cred.purpose || 'Authentication required for platform access'}
-                          </div>
-                          
-                          {(cred.where_to_get || cred.link || cred.documentation_url || cred.url) && (
-                            <div className="mt-2">
-                              <a 
-                                href={cred.where_to_get || cred.link || cred.documentation_url || cred.url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium hover:underline"
-                              >
-                                📖 Get this credential here
-                              </a>
-                            </div>
-                          )}
-                          
-                          {(cred.example || cred.placeholder) && (
-                            <div className="mt-2 text-xs text-gray-600 bg-gray-100 p-2 rounded">
-                              <span className="font-medium">Example:</span> {cred.example || cred.placeholder}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                      
-                      {(!(platform as any).credentials || (platform as any).credentials.length === 0) && 
-                       (!(platform as any).required_credentials || (platform as any).required_credentials.length === 0) && 
-                       (!(platform as any).credential_requirements || (platform as any).credential_requirements.length === 0) && (
-                        <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-200">
-                          <div className="font-semibold text-purple-900 text-base mb-2 flex items-center gap-2">
-                            <span className="bg-purple-600 text-white px-2 py-1 rounded text-xs font-medium">
-                              API Key
-                            </span>
-                          </div>
-                          <div className="text-gray-700 text-sm leading-relaxed">
-                            <span className="font-medium text-gray-900">Why needed:</span> Authentication required for platform access
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                <div className="flex items-center gap-3">
+                  <Database className="w-5 h-5 text-purple-600" />
+                  <div className="font-bold text-purple-800 text-xl">
+                    {platform.name || platform.platform_name || platform.platform || `Platform ${index + 1}`}
                   </div>
                 </div>
               </div>

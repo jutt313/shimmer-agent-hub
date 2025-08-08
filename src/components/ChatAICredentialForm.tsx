@@ -250,15 +250,16 @@ const ChatAICredentialForm = ({
   onCredentialTested 
 }: ChatAICredentialFormProps) => {
   const { user } = useAuth();
-  const [credentials, setCredentials] = useState<Record<string, string>>({});
-  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
-  const [isLoading, setIsLoading] = useState(false);
-  const [isTesting, setIsTesting] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [testScript, setTestScript] = useState<string>('');
-  const [testResponse, setTestResponse] = useState<any>(null);
-  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
-  const [existingCredentials, setExistingCredentials] = useState<boolean>(false);
+const [credentials, setCredentials] = useState<Record<string, string>>({});
+const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+const [isLoading, setIsLoading] = useState(false);
+const [isTesting, setIsTesting] = useState(false);
+const [isSaving, setIsSaving] = useState(false);
+const [testScript, setTestScript] = useState<string>('');
+const [testResponse, setTestResponse] = useState<any>(null);
+const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+const [existingCredentials, setExistingCredentials] = useState<boolean>(false);
+const [renderCredentials, setRenderCredentials] = useState(platform.credentials && Array.isArray(platform.credentials) ? platform.credentials : []);
 
   // CRITICAL FIX: Use robust platform name extraction - NEVER "Unknown Platform"
   const platformName = extractPlatformName(platform);
@@ -381,11 +382,17 @@ const ChatAICredentialForm = ({
         });
         setCredentials(maskedCreds);
         setExistingCredentials(true);
+        setRenderCredentials((Array.isArray(platform.credentials) && platform.credentials.length > 0) ? platform.credentials : deriveFallbackCredentials());
         toast.success(`Found existing credentials for ${platformName}`);
       } else {
-        // Initialize empty credentials - CRITICAL FIX: Filter out undefined placeholders
+        // Initialize credentials using provided or derived fields
+        const credsList = (Array.isArray(platform.credentials) && platform.credentials.length > 0)
+          ? platform.credentials
+          : deriveFallbackCredentials();
+        setRenderCredentials(credsList);
+
         const initialCreds: Record<string, string> = {};
-        platform.credentials.forEach(cred => {
+        credsList.forEach(cred => {
           initialCreds[cred.field] = '';
         });
         setCredentials(initialCreds);
@@ -442,6 +449,49 @@ const ChatAICredentialForm = ({
     // Handle direct data
     console.log('🔧 Using direct data:', data);
     return data;
+  };
+
+  const deriveFallbackCredentials = (): Array<{ field: string; placeholder: string; link: string; why_needed: string }> => {
+    const derived: Array<{ field: string; placeholder: string; link: string; why_needed: string }> = [];
+    const extractedConfig = extractChatAIValue(platform.testConfig);
+
+    try {
+      const auth = extractedConfig?.authentication || extractedConfig?.auth || null;
+      if (auth) {
+        const paramName = auth.parameter_name || auth.key || auth.field || 'api_key';
+        const normalizedField = (paramName === 'Authorization' || String(paramName).toLowerCase().includes('bearer')) ? 'api_key' : String(paramName);
+        derived.push({
+          field: normalizedField,
+          placeholder: `Enter ${normalizedField}`,
+          link: '',
+          why_needed: 'Required for authentication'
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    if (derived.length === 0) {
+      const payloads = extractChatAIValue(platform.test_payloads);
+      const headers = Array.isArray(payloads) && payloads[0]?.headers ? payloads[0].headers : null;
+      if (headers && typeof headers === 'object') {
+        const headerKeys = Object.keys(headers);
+        const keyCandidate = headerKeys.find(k => /api[-_]?key|authorization|token/i.test(k));
+        const field = keyCandidate?.toLowerCase().includes('authorization') ? 'api_key' : (keyCandidate || 'api_key');
+        derived.push({
+          field,
+          placeholder: `Enter ${field}`,
+          link: '',
+          why_needed: 'Required for authentication'
+        });
+      }
+    }
+
+    if (derived.length === 0) {
+      derived.push({ field: 'api_key', placeholder: 'Enter API key', link: '', why_needed: 'Required for authentication' });
+    }
+
+    return derived;
   };
 
   // CRITICAL FIX: IMMEDIATELY display actual ChatAI data instead of loading message
@@ -736,7 +786,7 @@ const ChatAICredentialForm = ({
                 <CardTitle className="text-lg text-purple-900">Configure Your {platformName} Credentials</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                {platform.credentials.map((cred, index) => {
+                {renderCredentials.map((cred, index) => {
                   const inputType = getInputType(cred.field);
                   const showPassword = showPasswords[cred.field];
                   const currentValue = credentials[cred.field] || '';

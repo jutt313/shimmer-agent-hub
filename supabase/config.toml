@@ -55,3 +55,19 @@ verify_jwt = false
 
 [functions.create-subscription]
 verify_jwt = false
+
+# Newly added specialist AI functions
+[functions.ai-intent-analyzer]
+verify_jwt = false
+
+[functions.ai-platform-detector]
+verify_jwt = false
+
+[functions.ai-workflow-builder]
+verify_jwt = false
+
+[functions.ai-agent-recommender]
+verify_jwt = false
+
+[functions.ai-blueprint-generator]
+verify_jwt = false

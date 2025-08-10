@@ -421,6 +421,7 @@ serve(async (req) => {
     // Validate YusrAI response format
     const validation = validateYusrAIResponse(aiResponse);
     
+    if (validation.isValid) {
       // Orchestrate specialist functions if needed
       let mergedData = validation.data;
       if (requiresDeepAnalysis(validation.data, message)) {

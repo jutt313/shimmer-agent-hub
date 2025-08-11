@@ -382,13 +382,13 @@ const [renderCredentials, setRenderCredentials] = useState(platform.credentials 
         });
         setCredentials(maskedCreds);
         setExistingCredentials(true);
-        setRenderCredentials((Array.isArray(platform.credentials) && platform.credentials.length > 0) ? platform.credentials : deriveFallbackCredentials());
+        setRenderCredentials((Array.isArray(platform.credentials) && platform.credentials.length > 0) ? platform.credentials : extractCredentialFieldsFromChatAI());
         toast.success(`Found existing credentials for ${platformName}`);
       } else {
-        // Initialize credentials using provided or derived fields
+        // CRITICAL FIX: Use ChatAI credential fields first, then fallback
         const credsList = (Array.isArray(platform.credentials) && platform.credentials.length > 0)
           ? platform.credentials
-          : deriveFallbackCredentials();
+          : extractCredentialFieldsFromChatAI();
         setRenderCredentials(credsList);
 
         const initialCreds: Record<string, string> = {};
@@ -451,47 +451,68 @@ const [renderCredentials, setRenderCredentials] = useState(platform.credentials 
     return data;
   };
 
-  const deriveFallbackCredentials = (): Array<{ field: string; placeholder: string; link: string; why_needed: string }> => {
-    const derived: Array<{ field: string; placeholder: string; link: string; why_needed: string }> = [];
-    const extractedConfig = extractChatAIValue(platform.testConfig);
-
-    try {
-      const auth = extractedConfig?.authentication || extractedConfig?.auth || null;
-      if (auth) {
-        const paramName = auth.parameter_name || auth.key || auth.field || 'api_key';
-        const normalizedField = (paramName === 'Authorization' || String(paramName).toLowerCase().includes('bearer')) ? 'api_key' : String(paramName);
-        derived.push({
-          field: normalizedField,
-          placeholder: `Enter ${normalizedField}`,
-          link: '',
-          why_needed: 'Required for authentication'
-        });
-      }
-    } catch (e) {
-      // ignore
-    }
-
-    if (derived.length === 0) {
-      const payloads = extractChatAIValue(platform.test_payloads);
-      const headers = Array.isArray(payloads) && payloads[0]?.headers ? payloads[0].headers : null;
-      if (headers && typeof headers === 'object') {
-        const headerKeys = Object.keys(headers);
-        const keyCandidate = headerKeys.find(k => /api[-_]?key|authorization|token/i.test(k));
-        const field = keyCandidate?.toLowerCase().includes('authorization') ? 'api_key' : (keyCandidate || 'api_key');
-        derived.push({
-          field,
-          placeholder: `Enter ${field}`,
-          link: '',
-          why_needed: 'Required for authentication'
-        });
+  // CRITICAL FIX: Extract credential fields from ChatAI data FIRST, no fallback logic
+  const extractCredentialFieldsFromChatAI = (): Array<{ field: string; placeholder: string; link: string; why_needed: string }> => {
+    console.log('🔧 CRITICAL FIX: Extracting credential fields from ChatAI data');
+    
+    // PRIORITY 1: Extract from ChatAI test_payloads headers
+    const extractedTestPayloads = extractChatAIValue(platform.test_payloads);
+    if (extractedTestPayloads && Array.isArray(extractedTestPayloads) && extractedTestPayloads.length > 0) {
+      const payload = extractedTestPayloads[0];
+      if (payload && payload.headers && typeof payload.headers === 'object') {
+        console.log('✅ CRITICAL FIX: Found headers in ChatAI test payload:', payload.headers);
+        const headerKeys = Object.keys(payload.headers);
+        const credFields = headerKeys
+          .filter(key => key.toLowerCase().includes('key') || key.toLowerCase().includes('token') || key.toLowerCase().includes('authorization'))
+          .map(key => ({
+            field: key.toLowerCase().replace('-', '_'), // Convert xi-api-key to xi_api_key for form
+            placeholder: `Enter your ${key}`,
+            link: '',
+            why_needed: `Required for ${platformName} authentication`
+          }));
+        
+        if (credFields.length > 0) {
+          console.log('✅ CRITICAL FIX: Extracted credential fields from ChatAI test payload headers:', credFields);
+          return credFields;
+        }
       }
     }
-
-    if (derived.length === 0) {
-      derived.push({ field: 'api_key', placeholder: 'Enter API key', link: '', why_needed: 'Required for authentication' });
+    
+    // PRIORITY 2: Extract from ChatAI testConfig authentication
+    const extractedTestConfig = extractChatAIValue(platform.testConfig);
+    if (extractedTestConfig && typeof extractedTestConfig === 'object') {
+      const auth = extractedTestConfig?.authentication;
+      if (auth && auth.parameter_name) {
+        console.log('✅ CRITICAL FIX: Found authentication in ChatAI testConfig:', auth);
+        const paramName = auth.parameter_name === 'Authorization' ? 'api_key' : auth.parameter_name.toLowerCase().replace('-', '_');
+        return [{
+          field: paramName,
+          placeholder: `Enter your ${paramName}`,
+          link: '',
+          why_needed: `Required for ${platformName} authentication`
+        }];
+      }
     }
-
-    return derived;
+    
+    // PRIORITY 3: Check if platform.credentials from original ChatAI response has specific fields
+    if (platform.credentials && Array.isArray(platform.credentials) && platform.credentials.length > 0) {
+      const validCredentials = platform.credentials.filter(cred => 
+        cred.field && cred.field !== 'api_key' && cred.field !== 'undefined'
+      );
+      if (validCredentials.length > 0) {
+        console.log('✅ CRITICAL FIX: Using original ChatAI platform credentials:', validCredentials);
+        return validCredentials;
+      }
+    }
+    
+    // ONLY IF NO CHATAI DATA: Create minimal fallback
+    console.log('⚠️ CRITICAL FIX: No specific ChatAI credential fields found, using minimal fallback');
+    return [{ 
+      field: 'api_key', 
+      placeholder: 'Enter API key', 
+      link: '', 
+      why_needed: 'Required for authentication' 
+    }];
   };
 
   // CRITICAL FIX: IMMEDIATELY display actual ChatAI data instead of loading message

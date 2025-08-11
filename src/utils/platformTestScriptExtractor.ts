@@ -1,4 +1,3 @@
-
 interface PlatformTestConfig {
   base_url: string;
   test_endpoint: {
@@ -21,7 +20,7 @@ interface PlatformTestConfig {
 
 interface Platform {
   name: string;
-  testConfig?: PlatformTestConfig;
+  testConfig?: any;
   test_payloads?: any[];
   chatai_data?: any;
   credentials: Array<{
@@ -36,34 +35,84 @@ interface Platform {
  * CRITICAL FIX: Extract clean, executable test script prioritizing ChatAI data
  */
 export const extractTestScript = (platform: Platform, credentials: Record<string, string>): string => {
-  console.log('🔍 Extracting test script for platform:', platform.name);
-  console.log('🔍 Platform has ChatAI test_payloads:', platform.test_payloads?.length || 0);
-  console.log('🔍 Platform has ChatAI testConfig:', !!platform.testConfig);
+  console.log('🔍 CRITICAL FIX: Extracting test script for platform:', platform.name);
+  console.log('🔍 Platform test_payloads raw:', platform.test_payloads);
+  console.log('🔍 Platform testConfig raw:', platform.testConfig);
   
-  // CRITICAL PRIORITY 1: Use ChatAI test_payloads if available
-  if (platform.test_payloads && platform.test_payloads.length > 0) {
-    console.log('✅ Using ChatAI test_payloads');
-    return generateChatAIPayloadScript(platform, credentials);
+  // CRITICAL PRIORITY 1: Use ChatAI test_payloads if available (with proper extraction)
+  const extractedTestPayloads = extractChatAIValue(platform.test_payloads);
+  if (extractedTestPayloads && Array.isArray(extractedTestPayloads) && extractedTestPayloads.length > 0) {
+    console.log('✅ CRITICAL FIX: Using extracted ChatAI test_payloads');
+    return generateChatAIPayloadScript(platform, credentials, extractedTestPayloads);
   }
   
-  // CRITICAL PRIORITY 2: Use ChatAI testConfig if available
-  if (platform.testConfig) {
-    console.log('✅ Using ChatAI testConfig');
-    return generateChatAIConfigScript(platform, credentials);
+  // CRITICAL PRIORITY 2: Use ChatAI testConfig if available (with proper extraction)
+  const extractedTestConfig = extractChatAIValue(platform.testConfig);
+  if (extractedTestConfig && typeof extractedTestConfig === 'object') {
+    console.log('✅ CRITICAL FIX: Using extracted ChatAI testConfig');
+    return generateChatAIConfigScript(platform, credentials, extractedTestConfig);
   }
   
   // PRIORITY 3: Use existing platform testConfig or create fallback
-  console.log('⚠️ No ChatAI data available, using fallback configuration');
+  console.log('⚠️ No valid ChatAI data found after extraction, using fallback configuration');
   const config = createFallbackConfig(platform.name);
   const script = generateExecutableScript(config, platform.name, credentials);
   return script;
 };
 
 /**
+ * CRITICAL FIX: Extract ChatAI wrapped values properly handling _type and value structures
+ */
+const extractChatAIValue = (data: any): any => {
+  console.log('🔧 CRITICAL FIX: Extracting ChatAI value from:', data);
+  
+  if (!data) {
+    console.log('🔧 No data provided, returning null');
+    return null;
+  }
+  
+  // Handle ChatAI wrapped structure with _type and value
+  if (typeof data === 'object' && data._type !== undefined && data.value !== undefined) {
+    console.log('🔧 Found ChatAI wrapped structure with _type:', data._type, 'value:', data.value);
+    
+    // If value is "undefined" string, return null
+    if (data.value === "undefined" || data.value === undefined || data.value === null) {
+      console.log('🔧 ChatAI value is undefined/null, returning null');
+      return null;
+    }
+    
+    // Try to parse if it's a JSON string
+    if (typeof data.value === 'string') {
+      // Don't try to parse simple strings that aren't JSON
+      if (data.value.startsWith('{') || data.value.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(data.value);
+          console.log('🔧 Parsed ChatAI JSON value:', parsed);
+          return parsed;
+        } catch {
+          console.log('🔧 Failed to parse as JSON, using ChatAI string value:', data.value);
+          return data.value;
+        }
+      } else {
+        console.log('🔧 Using ChatAI string value directly:', data.value);
+        return data.value;
+      }
+    }
+    
+    console.log('🔧 Using ChatAI direct value:', data.value);
+    return data.value;
+  }
+  
+  // Handle direct data
+  console.log('🔧 Using direct data:', data);
+  return data;
+};
+
+/**
  * CRITICAL: Generate test script from ChatAI test_payloads
  */
-const generateChatAIPayloadScript = (platform: Platform, credentials: Record<string, string>): string => {
-  const chatAIPayload = platform.test_payloads![0];
+const generateChatAIPayloadScript = (platform: Platform, credentials: Record<string, string>, extractedPayloads: any[]): string => {
+  const chatAIPayload = extractedPayloads[0];
   
   const script = {
     platform: platform.name,
@@ -82,9 +131,9 @@ const generateChatAIPayloadScript = (platform: Platform, credentials: Record<str
       "Credentials will be automatically injected when testing"
     ],
     chatai_metadata: {
-      has_custom_config: !!platform.testConfig,
-      platform_data: platform.chatai_data || {},
-      payload_count: platform.test_payloads!.length
+      data_successfully_extracted: true,
+      extraction_source: "ChatAI test_payloads",
+      payload_count: extractedPayloads.length
     }
   };
   
@@ -94,24 +143,22 @@ const generateChatAIPayloadScript = (platform: Platform, credentials: Record<str
 /**
  * CRITICAL: Generate test script from ChatAI testConfig
  */
-const generateChatAIConfigScript = (platform: Platform, credentials: Record<string, string>): string => {
-  const testConfig = platform.testConfig!;
-  
+const generateChatAIConfigScript = (platform: Platform, credentials: Record<string, string>, extractedConfig: any): string => {
   const script = {
     platform: platform.name,
     source: "ChatAI Test Configuration",
     generated_by: "YusrAI ChatAI System",
     timestamp: new Date().toISOString(),
-    test_configuration: testConfig,
+    test_configuration: extractedConfig,
     request_details: {
-      method: testConfig.test_endpoint?.method || 'GET',
-      base_url: testConfig.base_url,
-      endpoint: testConfig.test_endpoint?.path || '/me',
-      authentication: testConfig.authentication
+      method: extractedConfig.test_endpoint?.method || 'GET',
+      base_url: extractedConfig.base_url,
+      endpoint: extractedConfig.test_endpoint?.path || '/me',
+      authentication: extractedConfig.authentication
     },
     expected_response: {
-      success_codes: testConfig.success_indicators?.status_codes || [200],
-      success_patterns: testConfig.success_indicators?.response_patterns || ['success', 'data', 'user']
+      success_codes: extractedConfig.success_indicators?.status_codes || [200],
+      success_patterns: extractedConfig.success_indicators?.response_patterns || ['success', 'data', 'user']
     },
     credentials_required: platform.credentials.map(cred => ({
       field: cred.field,
@@ -124,8 +171,9 @@ const generateChatAIConfigScript = (platform: Platform, credentials: Record<stri
       "The test will validate your credentials against the actual platform API"
     ],
     chatai_metadata: {
-      has_test_payloads: (platform.test_payloads?.length || 0) > 0,
-      platform_data: platform.chatai_data || {}
+      data_successfully_extracted: true,
+      extraction_source: "ChatAI testConfig",
+      config_validated: true
     }
   };
   

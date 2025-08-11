@@ -250,16 +250,16 @@ const ChatAICredentialForm = ({
   onCredentialTested 
 }: ChatAICredentialFormProps) => {
   const { user } = useAuth();
-const [credentials, setCredentials] = useState<Record<string, string>>({});
-const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
-const [isLoading, setIsLoading] = useState(false);
-const [isTesting, setIsTesting] = useState(false);
-const [isSaving, setIsSaving] = useState(false);
-const [testScript, setTestScript] = useState<string>('');
-const [testResponse, setTestResponse] = useState<any>(null);
-const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
-const [existingCredentials, setExistingCredentials] = useState<boolean>(false);
-const [renderCredentials, setRenderCredentials] = useState(platform.credentials && Array.isArray(platform.credentials) ? platform.credentials : []);
+  const [credentials, setCredentials] = useState<Record<string, string>>({});
+  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [testScript, setTestScript] = useState<string>('');
+  const [testResponse, setTestResponse] = useState<any>(null);
+  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [existingCredentials, setExistingCredentials] = useState<boolean>(false);
+  const [renderCredentials, setRenderCredentials] = useState(platform.credentials && Array.isArray(platform.credentials) ? platform.credentials : []);
 
   // CRITICAL FIX: Use robust platform name extraction - NEVER "Unknown Platform"
   const platformName = extractPlatformName(platform);
@@ -451,11 +451,24 @@ const [renderCredentials, setRenderCredentials] = useState(platform.credentials 
     return data;
   };
 
-  // CRITICAL FIX: Extract credential fields from ChatAI data FIRST, no fallback logic
+  // CRITICAL FIX: Extract credential fields from ChatAI original_platform data FIRST
   const extractCredentialFieldsFromChatAI = (): Array<{ field: string; placeholder: string; link: string; why_needed: string }> => {
-    console.log('🔧 CRITICAL FIX: Extracting credential fields from ChatAI data');
+    console.log('🔧 CRITICAL FIX: Extracting credential fields from ChatAI original_platform data FIRST');
     
-    // PRIORITY 1: Extract from ChatAI test_payloads headers
+    // HIGHEST PRIORITY: Extract from ChatAI original_platform.required_credentials
+    if (platform.chatai_data?.original_platform?.required_credentials) {
+      const requiredCredentials = platform.chatai_data.original_platform.required_credentials;
+      console.log('✅ CRITICAL FIX: Found ChatAI original_platform.required_credentials:', requiredCredentials);
+      
+      return requiredCredentials.map((cred: any) => ({
+        field: cred.field_name || 'api_key',
+        placeholder: `Enter your ${cred.field_name || 'API key'}`,
+        link: cred.obtain_link || '',
+        why_needed: cred.purpose || `Required for ${platformName} authentication`
+      }));
+    }
+    
+    // PRIORITY 2: Extract from ChatAI test_payloads headers
     const extractedTestPayloads = extractChatAIValue(platform.test_payloads);
     if (extractedTestPayloads && Array.isArray(extractedTestPayloads) && extractedTestPayloads.length > 0) {
       const payload = extractedTestPayloads[0];
@@ -478,7 +491,7 @@ const [renderCredentials, setRenderCredentials] = useState(platform.credentials 
       }
     }
     
-    // PRIORITY 2: Extract from ChatAI testConfig authentication
+    // PRIORITY 3: Extract from ChatAI testConfig authentication
     const extractedTestConfig = extractChatAIValue(platform.testConfig);
     if (extractedTestConfig && typeof extractedTestConfig === 'object') {
       const auth = extractedTestConfig?.authentication;
@@ -494,7 +507,7 @@ const [renderCredentials, setRenderCredentials] = useState(platform.credentials 
       }
     }
     
-    // PRIORITY 3: Check if platform.credentials from original ChatAI response has specific fields
+    // PRIORITY 4: Check if platform.credentials from original ChatAI response has specific fields
     if (platform.credentials && Array.isArray(platform.credentials) && platform.credentials.length > 0) {
       const validCredentials = platform.credentials.filter(cred => 
         cred.field && cred.field !== 'api_key' && cred.field !== 'undefined'
@@ -520,15 +533,33 @@ const [renderCredentials, setRenderCredentials] = useState(platform.credentials 
     console.log('🔧 CRITICAL FIX: Immediate test script generation for:', platformName);
     console.log('🔧 Platform data:', platform);
     
-    // STEP 1: Extract ChatAI test_payloads properly
+    // STEP 1: Check ChatAI original_platform data FIRST
+    if (platform.chatai_data?.original_platform?.required_credentials) {
+      console.log('🎯 DISPLAYING actual ChatAI original_platform data:', platform.chatai_data.original_platform);
+      
+      const actualChatAIScript = JSON.stringify({
+        platform: platformName,
+        source: "ChatAI Original Platform Configuration",
+        timestamp: new Date().toISOString(),
+        chatai_original_platform: platform.chatai_data.original_platform,
+        chatai_extraction: "Successfully extracted and displayed actual ChatAI original_platform data",
+        note: "This configuration was generated from ChatAI original_platform.required_credentials"
+      }, null, 2);
+      
+      console.log('✅ Setting REAL ChatAI original_platform script:', actualChatAIScript);
+      setTestScript(actualChatAIScript);
+      return;
+    }
+    
+    // STEP 2: Extract ChatAI test_payloads properly
     const extractedTestPayloads = extractChatAIValue(platform.test_payloads);
     console.log('🔧 Extracted test_payloads:', extractedTestPayloads);
     
-    // STEP 2: Extract ChatAI testConfig properly  
+    // STEP 3: Extract ChatAI testConfig properly  
     const extractedTestConfig = extractChatAIValue(platform.testConfig);
     console.log('🔧 Extracted testConfig:', extractedTestConfig);
     
-    // CRITICAL FIX: PRIORITY 1 - Show actual ChatAI test_payloads if available
+    // CRITICAL FIX: PRIORITY 2 - Show actual ChatAI test_payloads if available
     if (extractedTestPayloads && Array.isArray(extractedTestPayloads) && extractedTestPayloads.length > 0) {
       console.log('🎯 DISPLAYING actual ChatAI test_payloads:', extractedTestPayloads);
       
@@ -547,7 +578,7 @@ const [renderCredentials, setRenderCredentials] = useState(platform.credentials 
       return;
     }
     
-    // CRITICAL FIX: PRIORITY 2 - Show actual ChatAI testConfig if available
+    // CRITICAL FIX: PRIORITY 3 - Show actual ChatAI testConfig if available
     if (extractedTestConfig && typeof extractedTestConfig === 'object' && extractedTestConfig !== null) {
       console.log('🎯 DISPLAYING actual ChatAI testConfig:', extractedTestConfig);
       
@@ -565,7 +596,7 @@ const [renderCredentials, setRenderCredentials] = useState(platform.credentials 
       return;
     }
     
-    // PRIORITY 3: Generate intelligent fallback (no ChatAI data available)
+    // PRIORITY 4: Generate intelligent fallback (no ChatAI data available)
     console.log('⚠️ No valid ChatAI test data available, generating intelligent fallback');
     const fallbackScript = JSON.stringify({
       platform: platformName,
@@ -578,7 +609,7 @@ const [renderCredentials, setRenderCredentials] = useState(platform.credentials 
         authentication: "Bearer token"
       },
       note: "No ChatAI data available - using intelligent platform detection",
-      fallback_reason: "Neither test_payloads nor testConfig found in ChatAI response"
+      fallback_reason: "Neither original_platform nor test_payloads nor testConfig found in ChatAI response"
     }, null, 2);
     
     console.log('✅ Setting intelligent fallback script:', fallbackScript);

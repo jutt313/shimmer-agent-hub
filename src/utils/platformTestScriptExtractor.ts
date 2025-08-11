@@ -1,3 +1,4 @@
+
 interface PlatformTestConfig {
   base_url: string;
   test_endpoint: {
@@ -32,84 +33,218 @@ interface Platform {
 }
 
 /**
- * CRITICAL FIX: Extract clean, executable test script prioritizing ChatAI data
+ * SIMPLIFIED: Extract clean test script with basic authentication objects
  */
 export const extractTestScript = (platform: Platform, credentials: Record<string, string>): string => {
-  console.log('🔍 CRITICAL FIX: Extracting test script for platform:', platform.name);
-  console.log('🔍 Platform test_payloads raw:', platform.test_payloads);
-  console.log('🔍 Platform testConfig raw:', platform.testConfig);
+  console.log('🔍 SIMPLIFIED: Extracting test script for platform:', platform.name);
   
-  // CRITICAL PRIORITY 1: Use ChatAI test_payloads if available (with proper extraction)
-  const extractedTestPayloads = extractChatAIValue(platform.test_payloads);
-  if (extractedTestPayloads && Array.isArray(extractedTestPayloads) && extractedTestPayloads.length > 0) {
-    console.log('✅ CRITICAL FIX: Using extracted ChatAI test_payloads');
-    return generateChatAIPayloadScript(platform, credentials, extractedTestPayloads);
+  try {
+    // PRIORITY 1: Use ChatAI original_platform.required_credentials if available
+    if (platform.chatai_data?.original_platform?.required_credentials) {
+      console.log('✅ SIMPLIFIED: Using ChatAI original_platform.required_credentials');
+      return generateSimplifiedOriginalPlatformScript(platform, credentials, platform.chatai_data.original_platform);
+    }
+    
+    // PRIORITY 2: Use ChatAI test_payloads if available
+    const extractedTestPayloads = extractChatAIValue(platform.test_payloads);
+    if (extractedTestPayloads && Array.isArray(extractedTestPayloads) && extractedTestPayloads.length > 0) {
+      console.log('✅ SIMPLIFIED: Using extracted ChatAI test_payloads');
+      return generateChatAIPayloadScript(platform, credentials, extractedTestPayloads);
+    }
+    
+    // PRIORITY 3: Use ChatAI testConfig if available
+    const extractedTestConfig = extractChatAIValue(platform.testConfig);
+    if (extractedTestConfig && typeof extractedTestConfig === 'object') {
+      console.log('✅ SIMPLIFIED: Using extracted ChatAI testConfig');
+      return generateChatAIConfigScript(platform, credentials, extractedTestConfig);
+    }
+    
+    // PRIORITY 4: Use basic fallback configuration
+    console.log('⚠️ Using simplified fallback configuration');
+    const config = createBasicFallbackConfig(platform.name);
+    const script = generateExecutableScript(config, platform.name, credentials);
+    return script;
+  } catch (error) {
+    console.error('💥 Error in extractTestScript:', error);
+    return generateBasicFallbackScript(platform.name, credentials);
   }
-  
-  // CRITICAL PRIORITY 2: Use ChatAI testConfig if available (with proper extraction)
-  const extractedTestConfig = extractChatAIValue(platform.testConfig);
-  if (extractedTestConfig && typeof extractedTestConfig === 'object') {
-    console.log('✅ CRITICAL FIX: Using extracted ChatAI testConfig');
-    return generateChatAIConfigScript(platform, credentials, extractedTestConfig);
-  }
-  
-  // PRIORITY 3: Use existing platform testConfig or create fallback
-  console.log('⚠️ No valid ChatAI data found after extraction, using fallback configuration');
-  const config = createFallbackConfig(platform.name);
-  const script = generateExecutableScript(config, platform.name, credentials);
-  return script;
 };
 
 /**
- * CRITICAL FIX: Extract ChatAI wrapped values properly handling _type and value structures
+ * SIMPLIFIED: Generate test script from ChatAI original_platform data with basic objects
+ */
+const generateSimplifiedOriginalPlatformScript = (platform: Platform, credentials: Record<string, string>, originalPlatform: any): string => {
+  try {
+    const requiredCredentials = originalPlatform.required_credentials || [];
+    
+    // SIMPLIFIED: Basic authentication configuration
+    let authConfig = null;
+    if (requiredCredentials.length > 0) {
+      const firstCred = requiredCredentials[0];
+      authConfig = {
+        field_name: firstCred.field_name || 'api_key',
+        obtain_link: firstCred.obtain_link || '',
+        purpose: firstCred.purpose || 'API authentication'
+      };
+    }
+    
+    // SIMPLIFIED: Basic authentication header determination
+    const authHeader = getBasicAuthHeader(authConfig?.field_name, platform.name);
+    const authFormat = getBasicAuthFormat(authConfig?.field_name, platform.name);
+    
+    const script = {
+      platform: platform.name,
+      source: "ChatAI Original Platform Configuration - SIMPLIFIED",
+      generated_by: "YusrAI ChatAI System - Basic Mode",
+      timestamp: new Date().toISOString(),
+      chatai_original_platform: originalPlatform,
+      authentication_config: authConfig ? {
+        field_name: authConfig.field_name,
+        authentication_header: authHeader,
+        format: authFormat
+      } : null,
+      test_configuration: {
+        method: "GET",
+        base_url: getBasicBaseUrl(platform.name),
+        endpoint: getBasicEndpoint(platform.name),
+        authentication: {
+          parameter_name: authHeader,
+          format: authFormat,
+          type: "header"
+        },
+        headers: {
+          [authHeader]: authFormat
+        }
+      },
+      credentials_required: requiredCredentials.map((cred: any) => ({
+        field_name: cred.field_name || 'api_key',
+        obtain_link: cred.obtain_link || '',
+        purpose: cred.purpose || 'API authentication'
+      })),
+      instructions: [
+        "SIMPLIFIED: This test configuration uses basic authentication objects",
+        "It contains clean field names and authentication requirements",
+        "Credentials will be automatically injected when testing"
+      ]
+    };
+    
+    return JSON.stringify(script, null, 2);
+  } catch (error) {
+    console.error('💥 Error in generateSimplifiedOriginalPlatformScript:', error);
+    return generateBasicFallbackScript(platform.name, credentials);
+  }
+};
+
+/**
+ * SIMPLIFIED: Basic authentication header determination
+ */
+const getBasicAuthHeader = (fieldName: string, platformName: string): string => {
+  const lowerField = (fieldName || '').toLowerCase();
+  const lowerPlatform = (platformName || '').toLowerCase();
+  
+  if (lowerPlatform.includes('elevenlabs') || lowerPlatform.includes('11labs')) {
+    return 'xi-api-key';
+  }
+  
+  if (lowerField.includes('xi') && lowerField.includes('api')) {
+    return 'xi-api-key';
+  }
+  
+  return 'Authorization';
+};
+
+/**
+ * SIMPLIFIED: Basic authentication format determination
+ */
+const getBasicAuthFormat = (fieldName: string, platformName: string): string => {
+  const lowerField = (fieldName || '').toLowerCase();
+  const lowerPlatform = (platformName || '').toLowerCase();
+  
+  if (lowerPlatform.includes('elevenlabs') || lowerPlatform.includes('11labs')) {
+    return `{${fieldName || 'api_key'}}`;
+  }
+  
+  if (lowerField.includes('xi') && lowerField.includes('api')) {
+    return `{${fieldName}}`;
+  }
+  
+  return `Bearer {${fieldName || 'api_key'}}`;
+};
+
+/**
+ * SIMPLIFIED: Basic fallback script when everything fails
+ */
+const generateBasicFallbackScript = (platformName: string, credentials: Record<string, string>): string => {
+  const script = {
+    platform: platformName,
+    source: "BASIC FALLBACK CONFIGURATION",
+    generated_by: "YusrAI Basic Recovery System",
+    timestamp: new Date().toISOString(),
+    test_configuration: {
+      method: "GET",
+      base_url: getBasicBaseUrl(platformName),
+      endpoint: getBasicEndpoint(platformName),
+      authentication: {
+        parameter_name: "Authorization",
+        format: "Bearer {api_key}",
+        type: "header"
+      },
+      headers: {
+        "Authorization": "Bearer {api_key}",
+        "Content-Type": "application/json"
+      }
+    },
+    instructions: [
+      "BASIC FALLBACK: This configuration was generated during system recovery",
+      "Simple authentication setup should work for most platforms",
+      "Manual adjustment may be needed for specific platform requirements"
+    ]
+  };
+  
+  return JSON.stringify(script, null, 2);
+};
+
+/**
+ * SIMPLIFIED: Extract ChatAI wrapped values
  */
 const extractChatAIValue = (data: any): any => {
-  console.log('🔧 CRITICAL FIX: Extracting ChatAI value from:', data);
+  console.log('🔧 SIMPLIFIED: Extracting ChatAI value from:', data);
   
   if (!data) {
-    console.log('🔧 No data provided, returning null');
     return null;
   }
   
-  // Handle ChatAI wrapped structure with _type and value
-  if (typeof data === 'object' && data._type !== undefined && data.value !== undefined) {
-    console.log('🔧 Found ChatAI wrapped structure with _type:', data._type, 'value:', data.value);
-    
-    // If value is "undefined" string, return null
-    if (data.value === "undefined" || data.value === undefined || data.value === null) {
-      console.log('🔧 ChatAI value is undefined/null, returning null');
-      return null;
-    }
-    
-    // Try to parse if it's a JSON string
-    if (typeof data.value === 'string') {
-      // Don't try to parse simple strings that aren't JSON
-      if (data.value.startsWith('{') || data.value.startsWith('[')) {
-        try {
-          const parsed = JSON.parse(data.value);
-          console.log('🔧 Parsed ChatAI JSON value:', parsed);
-          return parsed;
-        } catch {
-          console.log('🔧 Failed to parse as JSON, using ChatAI string value:', data.value);
+  try {
+    // Handle ChatAI wrapped structure
+    if (typeof data === 'object' && data._type !== undefined && data.value !== undefined) {
+      if (data.value === "undefined" || data.value === undefined || data.value === null) {
+        return null;
+      }
+      
+      if (typeof data.value === 'string') {
+        if (data.value.startsWith('{') || data.value.startsWith('[')) {
+          try {
+            return JSON.parse(data.value);
+          } catch {
+            return data.value;
+          }
+        } else {
           return data.value;
         }
-      } else {
-        console.log('🔧 Using ChatAI string value directly:', data.value);
-        return data.value;
       }
+      
+      return data.value;
     }
     
-    console.log('🔧 Using ChatAI direct value:', data.value);
-    return data.value;
+    return data;
+  } catch (error) {
+    console.error('💥 Error in extractChatAIValue:', error);
+    return null;
   }
-  
-  // Handle direct data
-  console.log('🔧 Using direct data:', data);
-  return data;
 };
 
 /**
- * CRITICAL: Generate test script from ChatAI test_payloads
+ * SIMPLIFIED: Generate test script from ChatAI test_payloads
  */
 const generateChatAIPayloadScript = (platform: Platform, credentials: Record<string, string>, extractedPayloads: any[]): string => {
   const chatAIPayload = extractedPayloads[0];
@@ -129,19 +264,14 @@ const generateChatAIPayloadScript = (platform: Platform, credentials: Record<str
       "This test payload was specifically generated by ChatAI for your platform",
       "It contains the exact API calls and parameters needed for testing",
       "Credentials will be automatically injected when testing"
-    ],
-    chatai_metadata: {
-      data_successfully_extracted: true,
-      extraction_source: "ChatAI test_payloads",
-      payload_count: extractedPayloads.length
-    }
+    ]
   };
   
   return JSON.stringify(script, null, 2);
 };
 
 /**
- * CRITICAL: Generate test script from ChatAI testConfig
+ * SIMPLIFIED: Generate test script from ChatAI testConfig
  */
 const generateChatAIConfigScript = (platform: Platform, credentials: Record<string, string>, extractedConfig: any): string => {
   const script = {
@@ -169,12 +299,7 @@ const generateChatAIConfigScript = (platform: Platform, credentials: Record<stri
       "This test configuration was provided by ChatAI specifically for your platform",
       "It includes the correct endpoints, authentication methods, and success indicators",
       "The test will validate your credentials against the actual platform API"
-    ],
-    chatai_metadata: {
-      data_successfully_extracted: true,
-      extraction_source: "ChatAI testConfig",
-      config_validated: true
-    }
+    ]
   };
   
   return JSON.stringify(script, null, 2);
@@ -186,12 +311,10 @@ const generateChatAIConfigScript = (platform: Platform, credentials: Record<stri
 export const injectCredentials = (baseScript: string, credentials: Record<string, string>): string => {
   let updatedScript = baseScript;
   
-  // Replace credential placeholders with actual values (masked for security)
   Object.entries(credentials).forEach(([key, value]) => {
     if (value && value !== '' && value !== '••••••••••••••••') {
       const maskedValue = value.length > 8 ? value.substring(0, 4) + '••••••••' : '••••••••';
       
-      // Replace various placeholder formats
       updatedScript = updatedScript.replace(new RegExp(`\\{${key}\\}`, 'g'), maskedValue);
       updatedScript = updatedScript.replace(new RegExp(`\\$\\{${key}\\}`, 'g'), maskedValue);
       updatedScript = updatedScript.replace(new RegExp(`<${key}>`, 'g'), maskedValue);
@@ -206,7 +329,6 @@ export const injectCredentials = (baseScript: string, credentials: Record<string
  * Format script for clean display in Live Test Payload
  */
 export const formatExecutableScript = (script: string): string => {
-  // Return the script as-is since it's already formatted as JSON
   return script || 'No test script available';
 };
 
@@ -218,29 +340,25 @@ const generateExecutableScript = (config: PlatformTestConfig, platformName: stri
   const url = `${base_url}${test_endpoint.path}`;
   const method = test_endpoint.method || 'GET';
   
-  // Build headers object
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'User-Agent': 'YusrAI-Test/1.0'
   };
   
-  // Add any additional headers from test_endpoint
   if (test_endpoint.headers) {
     Object.assign(headers, test_endpoint.headers);
   }
   
-  // Add authentication header
   if (authentication.location === 'header') {
     const credentialKey = findCredentialKey(credentials, authentication);
     const authValue = authentication.format.replace(/\{[\w_]+\}/g, `{${credentialKey}}`);
     headers[authentication.parameter_name] = authValue;
   }
   
-  // Create structured JSON payload
   const testPayload = {
     platform: platformName,
-    source: "Intelligent Platform Detection",
-    generated_by: "YusrAI Fallback System",
+    source: "Basic Platform Detection",
+    generated_by: "YusrAI Basic System",
     request: {
       method: method,
       url: url,
@@ -255,11 +373,9 @@ const generateExecutableScript = (config: PlatformTestConfig, platformName: stri
       status_codes: config.success_indicators.status_codes,
       response_patterns: config.success_indicators.response_patterns
     },
-    error_handling: config.error_patterns,
-    note: "This is a fallback configuration generated when ChatAI data is not available"
+    error_handling: config.error_patterns
   };
 
-  // Return formatted JSON string
   return JSON.stringify(testPayload, null, 2);
 };
 
@@ -267,7 +383,6 @@ const generateExecutableScript = (config: PlatformTestConfig, platformName: stri
  * Find the appropriate credential key for authentication
  */
 const findCredentialKey = (credentials: Record<string, string>, authentication: any): string => {
-  // Try common patterns first
   const commonKeys = ['api_key', 'access_token', 'token', 'bot_token', 'integration_token'];
   for (const key of commonKeys) {
     if (credentials.hasOwnProperty(key)) {
@@ -275,22 +390,34 @@ const findCredentialKey = (credentials: Record<string, string>, authentication: 
     }
   }
   
-  // Use first available credential key
   const keys = Object.keys(credentials);
   return keys.length > 0 ? keys[0] : 'api_key';
 };
 
 /**
- * Create dynamic fallback configuration with intelligent TLD detection
+ * SIMPLIFIED: Create basic fallback configuration
  */
-const createFallbackConfig = (platformName: string): PlatformTestConfig => {
+const createBasicFallbackConfig = (platformName: string): PlatformTestConfig => {
   const lowerPlatform = platformName.toLowerCase();
   
-  // Intelligent base URL generation with proper TLD detection
-  const baseUrl = generateIntelligentBaseUrl(lowerPlatform);
+  const baseUrl = getBasicBaseUrl(lowerPlatform);
+  const endpointPath = getBasicEndpoint(lowerPlatform);
   
-  // Dynamic endpoint path based on platform patterns
-  const endpointPath = generateIntelligentEndpoint(lowerPlatform);
+  let authConfig = {
+    type: 'bearer',
+    location: 'header',
+    parameter_name: 'Authorization',
+    format: 'Bearer {api_key}'
+  };
+  
+  if (lowerPlatform.includes('elevenlabs') || lowerPlatform.includes('11labs')) {
+    authConfig = {
+      type: 'api_key',
+      location: 'header',
+      parameter_name: 'xi-api-key',
+      format: '{api_key}'
+    };
+  }
   
   return {
     base_url: baseUrl,
@@ -298,15 +425,10 @@ const createFallbackConfig = (platformName: string): PlatformTestConfig => {
       path: endpointPath, 
       method: 'GET' 
     },
-    authentication: {
-      type: 'bearer',
-      location: 'header',
-      parameter_name: 'Authorization',
-      format: 'Bearer {api_key}'
-    },
+    authentication: authConfig,
     success_indicators: { 
       status_codes: [200], 
-      response_patterns: ['id', 'user', 'data', 'ok'] 
+      response_patterns: ['id', 'user', 'data', 'ok', 'voices', 'models'] 
     },
     error_patterns: { 
       '401': 'Unauthorized', 
@@ -317,12 +439,11 @@ const createFallbackConfig = (platformName: string): PlatformTestConfig => {
 };
 
 /**
- * Generate intelligent base URL with proper TLD detection
+ * SIMPLIFIED: Generate basic base URL
  */
-const generateIntelligentBaseUrl = (platformName: string): string => {
+const getBasicBaseUrl = (platformName: string): string => {
   const cleanPlatform = platformName.replace(/\s+/g, '').toLowerCase();
   
-  // Specific platform TLD mappings
   if (cleanPlatform.includes('elevenlabs') || cleanPlatform.includes('11labs')) {
     return 'https://api.elevenlabs.io';
   }
@@ -339,30 +460,17 @@ const generateIntelligentBaseUrl = (platformName: string): string => {
     return 'https://api.notion.com';
   }
   
-  // Smart TLD detection based on common patterns
-  if (cleanPlatform.endsWith('.io') || cleanPlatform.includes('.io')) {
-    const domain = cleanPlatform.replace('.io', '');
-    return `https://api.${domain}.io`;
+  if (cleanPlatform.includes('typeform')) {
+    return 'https://api.typeform.com';
   }
   
-  if (cleanPlatform.endsWith('.ai') || cleanPlatform.includes('.ai')) {
-    const domain = cleanPlatform.replace('.ai', '');
-    return `https://api.${domain}.ai`;
-  }
-  
-  if (cleanPlatform.endsWith('.dev') || cleanPlatform.includes('.dev')) {
-    const domain = cleanPlatform.replace('.dev', '');
-    return `https://api.${domain}.dev`;
-  }
-  
-  // Default to .com for unknown platforms
   return `https://api.${cleanPlatform}.com`;
 };
 
 /**
- * Generate intelligent endpoint path based on platform patterns
+ * SIMPLIFIED: Generate basic endpoint path
  */
-const generateIntelligentEndpoint = (platformName: string): string => {
+const getBasicEndpoint = (platformName: string): string => {
   if (platformName.includes('elevenlabs') || platformName.includes('11labs')) {
     return '/v1/user';
   }
@@ -379,6 +487,9 @@ const generateIntelligentEndpoint = (platformName: string): string => {
     return '/v1/users/me';
   }
   
-  // Common API patterns
+  if (platformName.includes('typeform')) {
+    return '/me';
+  }
+  
   return '/me';
 };

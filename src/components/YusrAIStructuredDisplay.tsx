@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,11 @@ import {
   List, 
   Database, 
   HelpCircle, 
-  Bot
+  Bot,
+  Code,
+  Settings,
+  Play,
+  TestTube
 } from 'lucide-react';
 import { YusrAIStructuredResponse } from '@/utils/jsonParser';
 
@@ -42,6 +47,12 @@ interface FlexibleAgent {
   why_needed?: string;
   purpose?: string;
   description?: string;
+  system_prompt?: string;
+  agent_system_prompt?: string;
+  llm_provider?: string;
+  model?: string;
+  temperature?: number;
+  max_tokens?: number;
 }
 
 interface FlexibleYusrAIData extends Omit<YusrAIStructuredResponse, 'platforms' | 'agents'> {
@@ -60,6 +71,8 @@ interface YusrAIStructuredDisplayProps {
   onTestCredentials?: (platformName: string, testPayload: any) => Promise<boolean>;
   onExecuteAutomation?: () => void;
   isReadyForExecution?: boolean;
+  onUpdateTestCredentials?: () => void;
+  onDatabaseSchemaUpdate?: () => void;
 }
 
 const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({ 
@@ -72,14 +85,17 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
   platformCredentialStatus = {},
   onTestCredentials,
   onExecuteAutomation,
-  isReadyForExecution = false
+  isReadyForExecution = false,
+  onUpdateTestCredentials,
+  onDatabaseSchemaUpdate
 }) => {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     summary: true,
     steps: true,
     platforms: true,
     clarification_questions: false,
-    agents: false
+    agents: false,
+    pending_implementations: false
   });
 
   React.useEffect(() => {
@@ -180,7 +196,7 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
     },
     {
       key: 'platforms',
-      title: 'Platforms',
+      title: 'Platforms & Credentials',
       icon: Database,
       color: 'text-purple-600',
       bgColor: 'bg-purple-50',
@@ -189,16 +205,44 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       component: (
         <div className="space-y-4">
           <div className="text-gray-700 leading-relaxed space-y-2">
-            {(Array.isArray(data.platforms) ? data.platforms : []).map((platform, index) => (
-              <div key={index} className="bg-white p-5 rounded-xl border border-purple-100 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <Database className="w-5 h-5 text-purple-600" />
-                  <div className="font-bold text-purple-800 text-xl">
-                    {platform.name || platform.platform_name || platform.platform || `Platform ${index + 1}`}
+            {(Array.isArray(data.platforms) ? data.platforms : []).map((platform, index) => {
+              const platformName = platform.name || platform.platform_name || platform.platform || `Platform ${index + 1}`;
+              const credentials = platform.credentials || platform.required_credentials || platform.credential_requirements || [];
+              
+              return (
+                <div key={index} className="bg-white p-5 rounded-xl border border-purple-100 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <Database className="w-5 h-5 text-purple-600" />
+                      <div className="font-bold text-purple-800 text-xl">
+                        {platformName}
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => onPlatformCredentialClick?.(platformName)}
+                      size="sm"
+                      className="bg-purple-100 hover:bg-purple-200 text-purple-700 border-purple-300"
+                      variant="outline"
+                    >
+                      Configure Credentials
+                    </Button>
                   </div>
+                  
+                  {Array.isArray(credentials) && credentials.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      <div className="text-sm font-medium text-purple-700">Required Credentials:</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {credentials.map((cred, credIndex) => (
+                          <div key={credIndex} className="text-xs bg-purple-50 px-2 py-1 rounded border">
+                            {typeof cred === 'string' ? cred : (cred.field || cred.name || `Field ${credIndex + 1}`)}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <div className="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
             <p className="text-sm text-purple-700">
@@ -239,71 +283,179 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       show: Array.isArray(data.agents) && data.agents.length > 0,
       component: (
         <div className="space-y-4">
-          {(Array.isArray(data.agents) ? data.agents : []).map((agent, index) => (
-            <Card key={index} className="border border-gray-200 bg-white">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Bot className="w-4 h-4 text-pink-600" />
-                   {agent.name || (agent as any).agent_name || `Agent ${index + 1}`}
-                   <Badge variant="outline" className="text-xs">
-                     {agent.role || (agent as any).agent_role || 'Assistant'}
-                   </Badge>
-                   {onAgentAdd && onAgentDismiss && (
-                     <div className="ml-auto flex gap-2">
-                       {!dismissedAgents.has(agent.name || (agent as any).agent_name || `Agent ${index + 1}`) ? (
-                        <>
-                          <Button
-                            onClick={() => onAgentAdd(agent)}
-                            size="sm"
-                            className="bg-green-100 hover:bg-green-200 text-green-700 border-green-300 text-xs px-3 py-1"
-                            variant="outline"
-                          >
-                            Add
-                          </Button>
+          {(Array.isArray(data.agents) ? data.agents : []).map((agent, index) => {
+            const agentName = agent.name || (agent as any).agent_name || `Agent ${index + 1}`;
+            const agentRole = agent.role || (agent as any).agent_role || 'Assistant';
+            const systemPrompt = agent.system_prompt || (agent as any).agent_system_prompt;
+            
+            return (
+              <Card key={index} className="border border-gray-200 bg-white">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <Bot className="w-4 h-4 text-pink-600" />
+                    {agentName}
+                    <Badge variant="outline" className="text-xs">
+                      {agentRole}
+                    </Badge>
+                    {agent.llm_provider && (
+                      <Badge variant="secondary" className="text-xs">
+                        {agent.llm_provider} - {agent.model || 'default'}
+                      </Badge>
+                    )}
+                    {onAgentAdd && onAgentDismiss && (
+                      <div className="ml-auto flex gap-2">
+                        {!dismissedAgents.has(agentName) ? (
+                         <>
                            <Button
-                             onClick={() => onAgentDismiss(agent.name || (agent as any).agent_name || `Agent ${index + 1}`)}
+                             onClick={() => onAgentAdd(agent)}
                              size="sm"
-                            className="bg-red-100 hover:bg-red-200 text-red-700 border-red-300 text-xs px-3 py-1"
-                            variant="outline"
-                          >
-                            Dismiss
-                          </Button>
-                        </>
-                      ) : (
-                        <Badge variant="secondary" className="text-xs">Dismissed</Badge>
+                             className="bg-green-100 hover:bg-green-200 text-green-700 border-green-300 text-xs px-3 py-1"
+                             variant="outline"
+                           >
+                             Add
+                           </Button>
+                            <Button
+                              onClick={() => onAgentDismiss(agentName)}
+                              size="sm"
+                             className="bg-red-100 hover:bg-red-200 text-red-700 border-red-300 text-xs px-3 py-1"
+                             variant="outline"
+                           >
+                             Dismiss
+                           </Button>
+                         </>
+                       ) : (
+                         <Badge variant="secondary" className="text-xs">Dismissed</Badge>
+                       )}
+                     </div>
+                   )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0 space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="text-xs">
+                      <span className="font-medium text-gray-700">Rule:</span>
+                      <p className="text-gray-600 mt-1">
+                        {agent.rule || (agent as any).agent_rules || (agent as any).instruction || 'Custom agent behavior'}
+                      </p>
+                    </div>
+                    <div className="text-xs">
+                      <span className="font-medium text-gray-700">Goal:</span>
+                      <p className="text-gray-600 mt-1">
+                        {agent.goal || (agent as any).agent_goal || (agent as any).objective || 'Process automation data'}
+                      </p>
+                    </div>
+                    <div className="text-xs">
+                      <span className="font-medium text-gray-700">Memory:</span>
+                      <p className="text-gray-600 mt-1">
+                        {agent.memory || (agent as any).agent_memory || (agent as any).context || 'Stores task context and results'}
+                      </p>
+                    </div>
+                    <div className="text-xs">
+                      <span className="font-medium text-gray-700">Why Needed:</span>
+                      <p className="text-gray-600 mt-1">
+                        {agent.why_needed || (agent as any).purpose || (agent as any).description || 'Enhances automation intelligence'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {systemPrompt && (
+                    <div className="mt-4 p-3 bg-pink-50 rounded-lg border border-pink-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Code className="w-4 h-4 text-pink-600" />
+                        <span className="font-medium text-pink-700 text-sm">Complete System Prompt:</span>
+                      </div>
+                      <ScrollArea className="h-32 w-full">
+                        <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-2 rounded border">
+                          {systemPrompt}
+                        </pre>
+                      </ScrollArea>
+                    </div>
+                  )}
+                  
+                  {(agent.temperature || agent.max_tokens) && (
+                    <div className="mt-3 flex gap-4 text-xs text-gray-600">
+                      {agent.temperature && (
+                        <span>Temperature: <strong>{agent.temperature}</strong></span>
+                      )}
+                      {agent.max_tokens && (
+                        <span>Max Tokens: <strong>{agent.max_tokens}</strong></span>
                       )}
                     </div>
                   )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )
+    },
+    {
+      key: 'pending_implementations',
+      title: 'Pending Implementations',
+      icon: Settings,
+      color: 'text-indigo-600',
+      bgColor: 'bg-indigo-50',
+      borderColor: 'border-indigo-200',
+      show: true, // Always show this section
+      component: (
+        <div className="space-y-4">
+          <div className="text-sm text-indigo-700 mb-4">
+            Complete these remaining implementation steps to enhance your automation system:
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="border border-indigo-200 bg-white">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <TestTube className="w-4 h-4 text-indigo-600" />
+                  Test Credentials Function
                 </CardTitle>
               </CardHeader>
-               <CardContent className="pt-0 space-y-2">
-                 <div className="text-xs">
-                   <span className="font-medium text-gray-700">Rule:</span>
-                   <p className="text-gray-600 mt-1">
-                     {agent.rule || (agent as any).agent_rules || (agent as any).instruction || 'Custom agent behavior'}
-                   </p>
-                 </div>
-                 <div className="text-xs">
-                   <span className="font-medium text-gray-700">Goal:</span>
-                   <p className="text-gray-600 mt-1">
-                     {agent.goal || (agent as any).agent_goal || (agent as any).objective || 'Process automation data'}
-                   </p>
-                 </div>
-                 <div className="text-xs">
-                   <span className="font-medium text-gray-700">Memory:</span>
-                   <p className="text-gray-600 mt-1">
-                     {agent.memory || (agent as any).agent_memory || (agent as any).context || 'Stores task context and results'}
-                   </p>
-                 </div>
-                 <div className="text-xs">
-                   <span className="font-medium text-gray-700">Why Needed:</span>
-                   <p className="text-gray-600 mt-1">
-                     {agent.why_needed || (agent as any).purpose || (agent as any).description || 'Enhances automation intelligence'}
-                   </p>
-                 </div>
-               </CardContent>
+              <CardContent className="pt-0">
+                <p className="text-xs text-gray-600 mb-3">
+                  Update the test-credential function for better ChatAI integration and enhanced platform testing.
+                </p>
+                <Button
+                  onClick={onUpdateTestCredentials}
+                  size="sm"
+                  className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border-indigo-300 w-full"
+                  variant="outline"
+                  disabled={!onUpdateTestCredentials}
+                >
+                  Implement Test Credentials
+                </Button>
+              </CardContent>
             </Card>
-          ))}
+            
+            <Card className="border border-indigo-200 bg-white">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Database className="w-4 h-4 text-indigo-600" />
+                  Database Schema Update
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <p className="text-xs text-gray-600 mb-3">
+                  Add database fields for storing ChatAI system prompts and enhanced agent configurations.
+                </p>
+                <Button
+                  onClick={onDatabaseSchemaUpdate}
+                  size="sm"
+                  className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border-indigo-300 w-full"
+                  variant="outline"
+                  disabled={!onDatabaseSchemaUpdate}
+                >
+                  Update Database Schema
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <div className="mt-4 p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+            <p className="text-sm text-indigo-700">
+              <strong>🚀 Next Steps:</strong> Complete these implementations to unlock full ChatAI integration capabilities.
+            </p>
+          </div>
         </div>
       )
     }
@@ -357,6 +509,7 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
               onClick={onExecuteAutomation}
               className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white px-6 py-3 text-lg"
             >
+              <Play className="w-5 h-5 mr-2" />
               Execute Automation
             </Button>
           </div>

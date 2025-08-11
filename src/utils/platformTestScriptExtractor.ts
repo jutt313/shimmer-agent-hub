@@ -93,6 +93,11 @@ const generateChatAIOriginalPlatformScript = (platform: Platform, credentials: R
       method: "GET",
       base_url: generateIntelligentBaseUrl(platform.name),
       endpoint: generateIntelligentEndpoint(platform.name),
+      authentication: authConfig ? {
+        parameter_name: determineAuthHeader(authConfig.field_name),
+        format: `{${authConfig.field_name}}`,
+        type: "header"
+      } : null,
       headers: authConfig ? {
         [determineAuthHeader(authConfig.field_name)]: `{${authConfig.field_name}}`
       } : {}

@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -7,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// SOLUTION 2: Platform-specific authentication header mapping
+// SOLUTION 2: Platform-specific authentication header mapping - FIXED PRIORITY
 const getAuthHeader = (platformName: string, testConfig: any) => {
   const platformHeaders = {
     'ElevenLabs': 'xi-api-key',
@@ -17,8 +16,9 @@ const getAuthHeader = (platformName: string, testConfig: any) => {
     'Notion': 'Authorization'
   };
   
-  return testConfig.authentication?.parameter_name || 
-         platformHeaders[platformName] || 
+  // CRITICAL FIX: Platform-specific headers take PRIORITY over ChatAI config
+  return platformHeaders[platformName] || 
+         testConfig.authentication?.parameter_name || 
          'Authorization';
 };
 
@@ -62,7 +62,7 @@ serve(async (req) => {
       });
     }
 
-    // SOLUTION 2: Build configuration with platform-specific auth headers
+    // SOLUTION 2: Build configuration with platform-specific auth headers (FIXED PRIORITY)
     const config = {
       base_url: testConfig.base_url,
       test_endpoint: testConfig.test_endpoint.path || testConfig.test_endpoint,

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, RefreshCw, Home, FileText } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface AutomationErrorRecoveryProps {
@@ -19,13 +19,6 @@ const AutomationErrorRecovery: React.FC<AutomationErrorRecoveryProps> = ({
 
   const handleGoHome = () => {
     navigate('/automations');
-  };
-
-  const handleViewDetails = () => {
-    if (automationId) {
-      console.log('Attempting to reload automation:', automationId);
-      onRetry();
-    }
   };
 
   return (
@@ -50,7 +43,7 @@ const AutomationErrorRecovery: React.FC<AutomationErrorRecoveryProps> = ({
 
         <div className="space-y-3">
           <Button 
-            onClick={handleViewDetails} 
+            onClick={onRetry} 
             className="w-full bg-blue-600 hover:bg-blue-700 text-white"
           >
             <RefreshCw className="w-4 h-4 mr-2" />

@@ -32,32 +32,137 @@ interface Platform {
 }
 
 /**
- * CRITICAL FIX: Extract clean, executable test script prioritizing ChatAI data
+ * CRITICAL FIX: Extract clean, executable test script prioritizing ChatAI original_platform data FIRST
  */
 export const extractTestScript = (platform: Platform, credentials: Record<string, string>): string => {
   console.log('🔍 CRITICAL FIX: Extracting test script for platform:', platform.name);
-  console.log('🔍 Platform test_payloads raw:', platform.test_payloads);
-  console.log('🔍 Platform testConfig raw:', platform.testConfig);
+  console.log('🔍 Platform chatai_data:', platform.chatai_data);
   
-  // CRITICAL PRIORITY 1: Use ChatAI test_payloads if available (with proper extraction)
+  // CRITICAL PRIORITY 1: Use ChatAI original_platform.required_credentials if available
+  if (platform.chatai_data?.original_platform?.required_credentials) {
+    console.log('✅ CRITICAL FIX: Using ChatAI original_platform.required_credentials');
+    return generateChatAIOriginalPlatformScript(platform, credentials, platform.chatai_data.original_platform);
+  }
+  
+  // CRITICAL PRIORITY 2: Use ChatAI test_payloads if available (with proper extraction)
   const extractedTestPayloads = extractChatAIValue(platform.test_payloads);
   if (extractedTestPayloads && Array.isArray(extractedTestPayloads) && extractedTestPayloads.length > 0) {
     console.log('✅ CRITICAL FIX: Using extracted ChatAI test_payloads');
     return generateChatAIPayloadScript(platform, credentials, extractedTestPayloads);
   }
   
-  // CRITICAL PRIORITY 2: Use ChatAI testConfig if available (with proper extraction)
+  // CRITICAL PRIORITY 3: Use ChatAI testConfig if available (with proper extraction)
   const extractedTestConfig = extractChatAIValue(platform.testConfig);
   if (extractedTestConfig && typeof extractedTestConfig === 'object') {
     console.log('✅ CRITICAL FIX: Using extracted ChatAI testConfig');
     return generateChatAIConfigScript(platform, credentials, extractedTestConfig);
   }
   
-  // PRIORITY 3: Use existing platform testConfig or create fallback
+  // PRIORITY 4: Use existing platform testConfig or create fallback
   console.log('⚠️ No valid ChatAI data found after extraction, using fallback configuration');
   const config = createFallbackConfig(platform.name);
   const script = generateExecutableScript(config, platform.name, credentials);
   return script;
+};
+
+/**
+ * CRITICAL: Generate test script from ChatAI original_platform data (HIGHEST PRIORITY)
+ */
+const generateChatAIOriginalPlatformScript = (platform: Platform, credentials: Record<string, string>, originalPlatform: any): string => {
+  const requiredCredentials = originalPlatform.required_credentials || [];
+  
+  // Extract authentication configuration from ChatAI required_credentials
+  const authConfig = requiredCredentials.length > 0 ? {
+    field_name: requiredCredentials[0].field_name,
+    obtain_link: requiredCredentials[0].obtain_link,
+    purpose: requiredCredentials[0].purpose
+  } : null;
+  
+  const script = {
+    platform: platform.name,
+    source: "ChatAI Original Platform Configuration",
+    generated_by: "YusrAI ChatAI System",
+    timestamp: new Date().toISOString(),
+    chatai_original_platform: originalPlatform,
+    authentication_config: authConfig ? {
+      field_name: authConfig.field_name,
+      authentication_header: determineAuthHeader(authConfig.field_name),
+      format: determineAuthFormat(authConfig.field_name)
+    } : null,
+    test_configuration: {
+      method: "GET",
+      base_url: generateIntelligentBaseUrl(platform.name),
+      endpoint: generateIntelligentEndpoint(platform.name),
+      headers: authConfig ? {
+        [determineAuthHeader(authConfig.field_name)]: `{${authConfig.field_name}}`
+      } : {}
+    },
+    credentials_required: requiredCredentials.map((cred: any) => ({
+      field_name: cred.field_name,
+      obtain_link: cred.obtain_link,
+      purpose: cred.purpose
+    })),
+    instructions: [
+      "This test configuration was generated from ChatAI original_platform data",
+      "It contains the exact field names and authentication requirements",
+      "Credentials will be automatically injected when testing"
+    ],
+    chatai_metadata: {
+      data_successfully_extracted: true,
+      extraction_source: "ChatAI original_platform.required_credentials",
+      credential_count: requiredCredentials.length
+    }
+  };
+  
+  return JSON.stringify(script, null, 2);
+};
+
+/**
+ * CRITICAL: Determine authentication header based on field name
+ */
+const determineAuthHeader = (fieldName: string): string => {
+  const lowerField = fieldName.toLowerCase();
+  
+  if (lowerField.includes('xi') && lowerField.includes('api')) {
+    return 'xi-api-key';
+  }
+  
+  if (lowerField.includes('authorization') || lowerField.includes('bearer')) {
+    return 'Authorization';
+  }
+  
+  if (lowerField.includes('api_key') || lowerField.includes('apikey')) {
+    return 'Authorization';
+  }
+  
+  if (lowerField.includes('token')) {
+    return 'Authorization';
+  }
+  
+  // Default based on field name
+  return fieldName.replace('_', '-');
+};
+
+/**
+ * CRITICAL: Determine authentication format based on field name
+ */
+const determineAuthFormat = (fieldName: string): string => {
+  const lowerField = fieldName.toLowerCase();
+  
+  if (lowerField.includes('xi') && lowerField.includes('api')) {
+    return `{${fieldName}}`;
+  }
+  
+  if (lowerField.includes('bearer') || lowerField.includes('token')) {
+    return `Bearer {${fieldName}}`;
+  }
+  
+  if (lowerField.includes('api_key') || lowerField.includes('apikey')) {
+    return `Bearer {${fieldName}}`;
+  }
+  
+  // Default format
+  return `{${fieldName}}`;
 };
 
 /**

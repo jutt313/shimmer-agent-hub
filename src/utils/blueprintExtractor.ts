@@ -1,3 +1,4 @@
+
 import { AutomationBlueprint } from "@/types/automation";
 
 /**
@@ -376,7 +377,7 @@ export const ensureBlueprintHasSteps = (blueprint: AutomationBlueprint): Automat
 };
 
 /**
- * PHASE 2: Enhanced blueprint validation for diagram generation
+ * CRITICAL FIX: Enhanced blueprint validation for diagram generation with TYPE SAFETY
  */
 export const validateBlueprintForDiagram = (blueprint: AutomationBlueprint | null): boolean => {
   if (!blueprint) {
@@ -394,8 +395,18 @@ export const validateBlueprintForDiagram = (blueprint: AutomationBlueprint | nul
     blueprint.trigger = { type: 'manual' };
   }
 
-  // Enhanced validation for YusrAI blueprints
-  const validSteps = blueprint.steps.filter(step => step.name && step.name.trim() !== '');
+  // CRITICAL FIX: Convert numeric names to strings and handle type safety
+  blueprint.steps = blueprint.steps.map((step, index) => ({
+    ...step,
+    name: typeof step.name === 'string' ? step.name : String(step.name || `Step ${index + 1}`)
+  }));
+
+  // CRITICAL FIX: Enhanced validation with proper type checking
+  const validSteps = blueprint.steps.filter(step => {
+    const stepName = typeof step.name === 'string' ? step.name : String(step.name || '');
+    return stepName && stepName.trim() !== '';
+  });
+
   if (validSteps.length === 0) {
     console.warn('❌ PHASE 2: Blueprint has no valid steps with names');
     return false;

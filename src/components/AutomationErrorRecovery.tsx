@@ -1,80 +1,91 @@
-
 import React from 'react';
-import { Button } from '@/components/ui/button';
-import { AlertTriangle, RefreshCw, Home, FileText } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertTriangle, RefreshCw, Home } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface AutomationErrorRecoveryProps {
   error: string;
-  onRetry: () => void;
-  automationId?: string;
+  onRetry?: () => void;
+  onReset?: () => void;
 }
 
-const AutomationErrorRecovery: React.FC<AutomationErrorRecoveryProps> = ({ 
-  error, 
-  onRetry, 
-  automationId 
+const AutomationErrorRecovery: React.FC<AutomationErrorRecoveryProps> = ({
+  error,
+  onRetry,
+  onReset
 }) => {
   const navigate = useNavigate();
 
   const handleGoHome = () => {
-    navigate('/automations');
+    navigate('/');
   };
 
-  const handleViewDetails = () => {
-    if (automationId) {
-      console.log('Attempting to reload automation:', automationId);
+  const handleRetry = () => {
+    if (onRetry) {
       onRetry();
+    } else {
+      window.location.reload();
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
-        <div className="mb-6">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <AlertTriangle className="w-8 h-8 text-red-600" />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4">
+      <Card className="max-w-md w-full border-red-200 bg-red-50">
+        <CardHeader className="text-center">
+          <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+            <AlertTriangle className="w-6 h-6 text-red-600" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Automation Load Error
-          </h2>
-          <p className="text-gray-600 mb-4">
-            We encountered an issue loading your automation details.
-          </p>
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-6">
-            <p className="text-sm text-red-700 font-mono">
-              {error}
+          <CardTitle className="text-xl text-red-800">
+            Automation Error
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-center">
+            <p className="text-red-700 mb-4">
+              {error || "Something went wrong with your automation"}
+            </p>
+            <p className="text-sm text-red-600">
+              Don't worry! We can help you recover from this error.
             </p>
           </div>
-        </div>
-
-        <div className="space-y-3">
-          <Button 
-            onClick={handleViewDetails} 
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Retry Loading
-          </Button>
           
-          <Button 
-            onClick={handleGoHome} 
-            variant="outline" 
-            className="w-full"
-          >
-            <Home className="w-4 h-4 mr-2" />
-            Back to Automations
-          </Button>
-        </div>
-
-        {automationId && (
-          <div className="mt-6 pt-4 border-t border-gray-200">
-            <p className="text-xs text-gray-500">
-              Automation ID: {automationId}
+          <div className="space-y-2">
+            <Button
+              onClick={handleRetry}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Try Again
+            </Button>
+            
+            <Button
+              onClick={handleGoHome}
+              variant="outline"
+              className="w-full border-blue-300 text-blue-700 hover:bg-blue-50"
+            >
+              <Home className="w-4 h-4 mr-2" />
+              Start Over
+            </Button>
+            
+            {onReset && (
+              <Button
+                onClick={onReset}
+                variant="ghost"
+                className="w-full text-gray-600 hover:text-gray-800"
+              >
+                Reset Automation
+              </Button>
+            )}
+          </div>
+          
+          <div className="pt-4 border-t border-red-200">
+            <p className="text-xs text-red-600 text-center">
+              If this problem persists, please contact our support team.
             </p>
           </div>
-        )}
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

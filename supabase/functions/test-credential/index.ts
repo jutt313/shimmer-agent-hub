@@ -7,6 +7,34 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// SOLUTION 2: Platform-specific authentication header mapping
+const getAuthHeader = (platformName: string, testConfig: any) => {
+  const platformHeaders = {
+    'ElevenLabs': 'xi-api-key',
+    'OpenAI': 'Authorization',
+    'Typeform': 'Authorization',
+    'Slack': 'Authorization',
+    'Notion': 'Authorization'
+  };
+  
+  return testConfig.authentication?.parameter_name || 
+         platformHeaders[platformName] || 
+         'Authorization';
+};
+
+// SOLUTION 3: Platform-specific credential field mapping
+const getCredentialField = (platformName: string) => {
+  const platformFields = {
+    'ElevenLabs': 'xi_api_key',
+    'OpenAI': 'api_key',
+    'Typeform': 'access_token',
+    'Slack': 'bot_token',
+    'Notion': 'access_token'
+  };
+  
+  return platformFields[platformName] || 'api_key';
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -34,12 +62,12 @@ serve(async (req) => {
       });
     }
 
-    // Build configuration from AI-generated test config ONLY
+    // SOLUTION 2: Build configuration with platform-specific auth headers
     const config = {
       base_url: testConfig.base_url,
       test_endpoint: testConfig.test_endpoint.path || testConfig.test_endpoint,
       method: testConfig.test_endpoint.method || 'GET',
-      auth_header: testConfig.authentication?.parameter_name || 'Authorization',
+      auth_header: getAuthHeader(platformName, testConfig),
       auth_format: testConfig.authentication?.format || 'Bearer {api_key}',
       success_indicators: testConfig.success_indicators?.response_patterns || ['success'],
       error_patterns: testConfig.error_patterns || { 401: 'Unauthorized' }
@@ -55,17 +83,20 @@ serve(async (req) => {
       'User-Agent': 'YusrAI-Test/1.0'
     };
 
-    // Add authentication header
+    // SOLUTION 3: Add authentication header with platform-specific credential field detection
     if (config.auth_header && config.auth_format) {
-      // Find the credential field to use
-      let credentialValue = null;
-      
-      // Try common patterns
-      const commonFields = ['api_key', 'access_token', 'token', 'bot_token', 'integration_token', 'personal_access_token'];
-      for (const field of commonFields) {
-        if (credentials[field]) {
-          credentialValue = credentials[field];
-          break;
+      // Use platform-specific field first
+      const preferredField = getCredentialField(platformName);
+      let credentialValue = credentials[preferredField];
+
+      if (!credentialValue) {
+        // Fall back to common patterns
+        const commonFields = ['api_key', 'access_token', 'token', 'bot_token', 'integration_token', 'personal_access_token'];
+        for (const field of commonFields) {
+          if (credentials[field]) {
+            credentialValue = credentials[field];
+            break;
+          }
         }
       }
 
@@ -81,16 +112,17 @@ serve(async (req) => {
         // Replace placeholder in auth format
         const authValue = config.auth_format.replace(/\{[^}]+\}/g, credentialValue);
         headers[config.auth_header] = authValue;
-        console.log('🔐 AUTH HEADER:', config.auth_header, 'set');
+        console.log('🔐 AUTH HEADER:', config.auth_header, 'set for platform:', platformName);
       } else {
-        console.error('❌ NO CREDENTIAL: No valid credential found');
+        console.error('❌ NO CREDENTIAL: No valid credential found for platform:', platformName);
         return new Response(JSON.stringify({
           success: false,
           message: 'No valid credentials provided',
           details: {
             platform: platformName,
             available_fields: Object.keys(credentials),
-            expected_fields: commonFields
+            expected_field: preferredField,
+            fallback_fields: ['api_key', 'access_token', 'token', 'bot_token']
           }
         }), {
           status: 400,
@@ -100,7 +132,7 @@ serve(async (req) => {
     }
 
     // Make the test request
-    console.log('📡 MAKING REQUEST:', config.method, testUrl);
+    console.log('📡 MAKING REQUEST:', config.method, testUrl, 'with auth header:', config.auth_header);
     const response = await fetch(testUrl, {
       method: config.method,
       headers: headers
@@ -125,7 +157,7 @@ serve(async (req) => {
     );
 
     if (isSuccess) {
-      console.log('✅ TEST SUCCESS:', platformName);
+      console.log('✅ TEST SUCCESS:', platformName, 'with auth header:', config.auth_header);
       return new Response(JSON.stringify({
         success: true,
         message: `${platformName} credentials are valid and working`,
@@ -133,15 +165,17 @@ serve(async (req) => {
           status: response.status,
           platform: platformName,
           endpoint_tested: testUrl,
+          auth_header_used: config.auth_header,
           response_preview: Object.keys(responseData).slice(0, 3),
           config_source: 'ai_generated_only',
-          ai_driven: true
+          ai_driven: true,
+          platform_specific_auth: true
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     } else {
-      console.log('❌ TEST FAILED:', response.status, platformName);
+      console.log('❌ TEST FAILED:', response.status, platformName, 'with auth header:', config.auth_header);
       const errorMessage = config.error_patterns[response.status] || 
                           (responseData?.error || responseData?.message) || 
                           `HTTP ${response.status}`;
@@ -153,10 +187,12 @@ serve(async (req) => {
           status: response.status,
           platform: platformName,
           endpoint_tested: testUrl,
+          auth_header_used: config.auth_header,
           error: errorMessage,
           response: responseData,
           config_source: 'ai_generated_only',
-          ai_driven: true
+          ai_driven: true,
+          platform_specific_auth: true
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -171,7 +207,8 @@ serve(async (req) => {
       details: {
         error: error.message,
         stack: error.stack?.substring(0, 500),
-        ai_driven_only: true
+        ai_driven_only: true,
+        platform_specific_auth: true
       }
     }), {
       status: 500,

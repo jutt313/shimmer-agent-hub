@@ -242,6 +242,58 @@ const extractDomainFromUrl = (url: string): string | null => {
   return null;
 };
 
+// CRITICAL FIX: Handle ChatAI data structure with direct objects AND _type wrapper
+const extractChatAIValue = (data: any) => {
+  console.log('🔧 FIXED EXTRACTION: Input data:', data);
+  
+  if (!data) {
+    console.log('🔧 No data provided, returning null');
+    return null;
+  }
+  
+  // SOLUTION 1: Direct object return (most common case - REAL PLATFORM DATA)
+  if (typeof data === 'object' && !data._type) {
+    console.log('🔧 ✅ FIXED: Found direct object, returning directly:', data);
+    return data;
+  }
+  
+  // Handle ChatAI wrapped structure with _type and value (legacy support)
+  if (typeof data === 'object' && data._type !== undefined && data.value !== undefined) {
+    console.log('🔧 Found ChatAI wrapped structure with _type:', data._type, 'value:', data.value);
+    
+    // If value is "undefined" string, return null
+    if (data.value === "undefined" || data.value === undefined || data.value === null) {
+      console.log('🔧 ChatAI value is undefined/null, returning null');
+      return null;
+    }
+    
+    // Try to parse if it's a JSON string
+    if (typeof data.value === 'string') {
+      // Don't try to parse simple strings that aren't JSON
+      if (data.value.startsWith('{') || data.value.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(data.value);
+          console.log('🔧 Parsed ChatAI JSON value:', parsed);
+          return parsed;
+        } catch {
+          console.log('🔧 Failed to parse as JSON, using ChatAI string value:', data.value);
+          return data.value;
+        }
+      } else {
+        console.log('🔧 Using ChatAI string value directly:', data.value);
+        return data.value;
+      }
+    }
+    
+    console.log('🔧 Using ChatAI direct value:', data.value);
+    return data.value;
+  }
+  
+  // Handle direct data
+  console.log('🔧 ✅ FIXED: Using direct data:', data);
+  return data;
+};
+
 const ChatAICredentialForm = ({ 
   platform, 
   automationId, 
@@ -403,52 +455,6 @@ const ChatAICredentialForm = ({
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // CRITICAL FIX: Handle ChatAI data structure with _type and value properties PROPERLY
-  const extractChatAIValue = (data: any) => {
-    console.log('🔧 Extracting ChatAI value from:', data);
-    
-    if (!data) {
-      console.log('🔧 No data provided, returning null');
-      return null;
-    }
-    
-    // Handle ChatAI wrapped structure with _type and value
-    if (typeof data === 'object' && data._type !== undefined && data.value !== undefined) {
-      console.log('🔧 Found ChatAI wrapped structure with _type:', data._type, 'value:', data.value);
-      
-      // If value is "undefined" string, return null
-      if (data.value === "undefined" || data.value === undefined || data.value === null) {
-        console.log('🔧 ChatAI value is undefined/null, returning null');
-        return null;
-      }
-      
-      // Try to parse if it's a JSON string
-      if (typeof data.value === 'string') {
-        // Don't try to parse simple strings that aren't JSON
-        if (data.value.startsWith('{') || data.value.startsWith('[')) {
-          try {
-            const parsed = JSON.parse(data.value);
-            console.log('🔧 Parsed ChatAI JSON value:', parsed);
-            return parsed;
-          } catch {
-            console.log('🔧 Failed to parse as JSON, using ChatAI string value:', data.value);
-            return data.value;
-          }
-        } else {
-          console.log('🔧 Using ChatAI string value directly:', data.value);
-          return data.value;
-        }
-      }
-      
-      console.log('🔧 Using ChatAI direct value:', data.value);
-      return data.value;
-    }
-    
-    // Handle direct data
-    console.log('🔧 Using direct data:', data);
-    return data;
   };
 
   // CRITICAL FIX: Extract credential fields from ChatAI original_platform data FIRST

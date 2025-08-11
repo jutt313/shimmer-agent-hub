@@ -324,15 +324,6 @@ function validateYusrAIResponse(response: string): { isValid: boolean; data: any
   }
 }
 
-// Heuristic to decide when to delegate to specialist functions
-function requiresDeepAnalysis(primary: any, message?: string): boolean {
-  const text = (message || '').toLowerCase();
-  const keywords = ['automation', 'workflow', 'platform', 'blueprint', 'agent', 'credentials'];
-  const keywordHit = keywords.some(k => text.includes(k));
-  const structured = primary && (primary.step_by_step_explanation || primary.platforms_and_credentials || primary.execution_blueprint);
-  return keywordHit || !!structured;
-}
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -391,7 +382,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-4.1-2025-04-14',
         messages: openAIMessages,
         temperature: 0.3,
         max_tokens: 4000,
@@ -422,48 +413,13 @@ serve(async (req) => {
     const validation = validateYusrAIResponse(aiResponse);
     
     if (validation.isValid) {
-      // Orchestrate specialist functions if needed
-      let mergedData = validation.data;
-      if (requiresDeepAnalysis(validation.data, message)) {
-        try {
-          const payload = { message, context: { primary: validation.data } };
-          const [intentRes, platformRes, workflowRes, agentRes, blueprintRes] = await Promise.all([
-            supabase.functions.invoke('ai-intent-analyzer', { body: payload }),
-            supabase.functions.invoke('ai-platform-detector', { body: payload }),
-            supabase.functions.invoke('ai-workflow-builder', { body: payload }),
-            supabase.functions.invoke('ai-agent-recommender', { body: payload }),
-            supabase.functions.invoke('ai-blueprint-generator', { body: payload })
-          ]);
-
-          const intent = intentRes.data || {};
-          const platforms = platformRes.data || {};
-          const workflow = workflowRes.data || {};
-          const agents = agentRes.data || {};
-          const blueprint = blueprintRes.data || {};
-
-          mergedData = {
-            ...validation.data,
-            intent: intent.intent || validation.data.intent,
-            step_by_step_explanation: workflow.step_by_step_explanation || validation.data.step_by_step_explanation,
-            platforms_and_credentials: platforms.platforms_and_credentials || validation.data.platforms_and_credentials,
-            test_payloads: platforms.test_payloads || validation.data.test_payloads,
-            ai_agents: agents.ai_agents || validation.data.ai_agents,
-            execution_blueprint: blueprint.execution_blueprint || validation.data.execution_blueprint,
-            error_handling: blueprint.error_handling || validation.data.error_handling,
-            performance_config: blueprint.performance_config || validation.data.performance_config,
-          };
-        } catch (e) {
-          console.log('⚠️ Specialist delegation failed, returning primary analysis only', e);
-        }
-      }
-
-      console.log('📊 Returning structured YusrAI response (merged if delegated)');
+      console.log('📊 Returning structured YusrAI response');
       return new Response(JSON.stringify({
-        response: JSON.stringify(mergedData),
-        structuredData: mergedData,
+        response: JSON.stringify(validation.data),
+        structuredData: validation.data,
         yusrai_powered: true,
-        seven_sections_validated: !!(mergedData.summary && mergedData.step_by_step_explanation && mergedData.platforms_and_credentials),
-        error_help_available: !!mergedData.clarification_questions
+        seven_sections_validated: !!(validation.data.summary && validation.data.step_by_step_explanation && validation.data.platforms_and_credentials),
+        error_help_available: !!validation.data.clarification_questions
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });

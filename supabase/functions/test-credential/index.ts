@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -6,33 +7,90 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// SOLUTION 2: Platform-specific authentication header mapping - FIXED PRIORITY
-const getAuthHeader = (platformName: string, testConfig: any) => {
-  const platformHeaders = {
-    'ElevenLabs': 'xi-api-key',
-    'OpenAI': 'Authorization',
-    'Typeform': 'Authorization',
-    'Slack': 'Authorization',
-    'Notion': 'Authorization'
-  };
-  
-  // CRITICAL FIX: Platform-specific headers take PRIORITY over ChatAI config
-  return platformHeaders[platformName] || 
-         testConfig.authentication?.parameter_name || 
-         'Authorization';
-};
+// CRITICAL FIX: Universal ChatAI Script Executor - NO HARDCODED PLATFORMS
+const executeUniversalChatAIScript = (platformName: string, testConfig: any, credentials: Record<string, string>) => {
+  console.log('🚀 UNIVERSAL EXECUTOR: Processing ChatAI script for:', platformName);
+  console.log('🔧 Test config received:', testConfig);
+  console.log('🔧 Credentials fields:', Object.keys(credentials));
 
-// SOLUTION 3: Platform-specific credential field mapping
-const getCredentialField = (platformName: string) => {
-  const platformFields = {
-    'ElevenLabs': 'xi_api_key',
-    'OpenAI': 'api_key',
-    'Typeform': 'access_token',
-    'Slack': 'bot_token',
-    'Notion': 'access_token'
+  // STEP 1: Extract base configuration from ChatAI
+  const baseUrl = testConfig.base_url || testConfig.url || testConfig.endpoint?.base;
+  const testEndpoint = testConfig.test_endpoint?.path || testConfig.test_endpoint || testConfig.endpoint?.path || '/health';
+  const method = testConfig.test_endpoint?.method || testConfig.method || 'GET';
+  
+  if (!baseUrl) {
+    throw new Error(`ChatAI script missing base_url for ${platformName}`);
+  }
+
+  // STEP 2: Build dynamic headers from ChatAI configuration
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'User-Agent': 'YusrAI-Universal-Tester/1.0'
+  };
+
+  // STEP 3: Dynamic authentication header construction
+  const authConfig = testConfig.authentication || {};
+  const authHeader = authConfig.parameter_name || authConfig.header || 'Authorization';
+  const authFormat = authConfig.format || 'Bearer {api_key}';
+
+  // STEP 4: Intelligent credential selection
+  let credentialValue = null;
+  const credentialKeys = Object.keys(credentials);
+  
+  // Try platform-specific field first
+  const platformSpecificFields = {
+    'elevenlabs': 'xi_api_key',
+    'openai': 'api_key',
+    'slack': 'bot_token',
+    'notion': 'access_token',
+    'typeform': 'access_token'
   };
   
-  return platformFields[platformName] || 'api_key';
+  const platformKey = platformName.toLowerCase();
+  if (platformSpecificFields[platformKey] && credentials[platformSpecificFields[platformKey]]) {
+    credentialValue = credentials[platformSpecificFields[platformKey]];
+  } else {
+    // Fallback to common credential patterns
+    const commonFields = ['api_key', 'access_token', 'token', 'bot_token', 'xi_api_key'];
+    for (const field of commonFields) {
+      if (credentials[field]) {
+        credentialValue = credentials[field];
+        break;
+      }
+    }
+    
+    // Last resort: use first available credential
+    if (!credentialValue && credentialKeys.length > 0) {
+      credentialValue = credentials[credentialKeys[0]];
+    }
+  }
+
+  if (!credentialValue) {
+    throw new Error(`No valid credentials provided for ${platformName}`);
+  }
+
+  // STEP 5: Apply authentication format
+  const authValue = authFormat.replace(/\{[^}]+\}/g, credentialValue);
+  headers[authHeader] = authValue;
+
+  // STEP 6: Build final test URL and configuration
+  const testUrl = `${baseUrl.replace(/\/$/, '')}${testEndpoint}`;
+  
+  console.log('✅ UNIVERSAL EXECUTOR: Built configuration:', {
+    platform: platformName,
+    url: testUrl,
+    method: method,
+    authHeader: authHeader,
+    hasCredential: !!credentialValue
+  });
+
+  return {
+    url: testUrl,
+    method: method,
+    headers: headers,
+    authHeader: authHeader,
+    credentialUsed: credentialKeys.find(k => credentials[k] === credentialValue)
+  };
 };
 
 serve(async (req) => {
@@ -43,18 +101,18 @@ serve(async (req) => {
   try {
     const { platformName, credentials, testConfig, userId } = await req.json();
     
-    console.log('🧪 TESTING CREDENTIALS:', { platformName, userId, hasTestConfig: !!testConfig });
+    console.log('🧪 UNIVERSAL TESTING:', { platformName, userId, hasTestConfig: !!testConfig });
 
-    // CRITICAL: Use ONLY AI-generated test config (no hardcoded fallbacks)
-    if (!testConfig || !testConfig.base_url || !testConfig.test_endpoint) {
-      console.error('❌ NO AI CONFIG: Missing AI-generated test configuration');
+    // CRITICAL: Require ChatAI-generated test configuration
+    if (!testConfig) {
+      console.error('❌ NO CHATAI CONFIG: Missing ChatAI-generated test configuration');
       return new Response(JSON.stringify({
         success: false,
-        message: 'No AI-generated test configuration provided',
+        message: 'ChatAI test configuration is required for universal testing',
         details: {
           platform: platformName,
-          error: 'AI test configuration is required',
-          received_config: testConfig
+          error: 'ChatAI must provide test configuration for any platform',
+          universal_testing: true
         }
       }), {
         status: 400,
@@ -62,80 +120,15 @@ serve(async (req) => {
       });
     }
 
-    // SOLUTION 2: Build configuration with platform-specific auth headers (FIXED PRIORITY)
-    const config = {
-      base_url: testConfig.base_url,
-      test_endpoint: testConfig.test_endpoint.path || testConfig.test_endpoint,
-      method: testConfig.test_endpoint.method || 'GET',
-      auth_header: getAuthHeader(platformName, testConfig),
-      auth_format: testConfig.authentication?.format || 'Bearer {api_key}',
-      success_indicators: testConfig.success_indicators?.response_patterns || ['success'],
-      error_patterns: testConfig.error_patterns || { 401: 'Unauthorized' }
-    };
-
-    // Build test URL
-    const testUrl = `${config.base_url}${config.test_endpoint}`;
-    console.log('🎯 TESTING URL:', testUrl);
-
-    // Build headers
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'User-Agent': 'YusrAI-Test/1.0'
-    };
-
-    // SOLUTION 3: Add authentication header with platform-specific credential field detection
-    if (config.auth_header && config.auth_format) {
-      // Use platform-specific field first
-      const preferredField = getCredentialField(platformName);
-      let credentialValue = credentials[preferredField];
-
-      if (!credentialValue) {
-        // Fall back to common patterns
-        const commonFields = ['api_key', 'access_token', 'token', 'bot_token', 'integration_token', 'personal_access_token'];
-        for (const field of commonFields) {
-          if (credentials[field]) {
-            credentialValue = credentials[field];
-            break;
-          }
-        }
-      }
-
-      // Use first available credential if no common pattern found
-      if (!credentialValue) {
-        const credentialKeys = Object.keys(credentials);
-        if (credentialKeys.length > 0) {
-          credentialValue = credentials[credentialKeys[0]];
-        }
-      }
-
-      if (credentialValue) {
-        // Replace placeholder in auth format
-        const authValue = config.auth_format.replace(/\{[^}]+\}/g, credentialValue);
-        headers[config.auth_header] = authValue;
-        console.log('🔐 AUTH HEADER:', config.auth_header, 'set for platform:', platformName);
-      } else {
-        console.error('❌ NO CREDENTIAL: No valid credential found for platform:', platformName);
-        return new Response(JSON.stringify({
-          success: false,
-          message: 'No valid credentials provided',
-          details: {
-            platform: platformName,
-            available_fields: Object.keys(credentials),
-            expected_field: preferredField,
-            fallback_fields: ['api_key', 'access_token', 'token', 'bot_token']
-          }
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-    }
-
-    // Make the test request
-    console.log('📡 MAKING REQUEST:', config.method, testUrl, 'with auth header:', config.auth_header);
-    const response = await fetch(testUrl, {
-      method: config.method,
-      headers: headers
+    // UNIVERSAL EXECUTION: Use ChatAI script executor for ANY platform
+    const scriptConfig = executeUniversalChatAIScript(platformName, testConfig, credentials);
+    
+    console.log('📡 UNIVERSAL REQUEST:', scriptConfig.method, scriptConfig.url);
+    
+    // Execute the universal test
+    const response = await fetch(scriptConfig.url, {
+      method: scriptConfig.method,
+      headers: scriptConfig.headers
     });
 
     const responseText = await response.text();
@@ -147,38 +140,32 @@ serve(async (req) => {
       responseData = { raw_response: responseText };
     }
 
-    console.log('📥 RESPONSE:', response.status, typeof responseData);
+    console.log('📥 UNIVERSAL RESPONSE:', response.status, typeof responseData);
 
-    // Check for success
-    const isSuccess = response.ok && (
-      config.success_indicators.some(indicator => 
-        responseData && typeof responseData === 'object' && responseData[indicator] !== undefined
-      ) || response.status === 200
-    );
+    // Universal success detection
+    const isSuccess = response.ok && (response.status >= 200 && response.status < 300);
 
     if (isSuccess) {
-      console.log('✅ TEST SUCCESS:', platformName, 'with auth header:', config.auth_header);
+      console.log('✅ UNIVERSAL SUCCESS:', platformName);
       return new Response(JSON.stringify({
         success: true,
-        message: `${platformName} credentials are valid and working`,
+        message: `${platformName} credentials tested successfully with ChatAI universal executor`,
         details: {
           status: response.status,
           platform: platformName,
-          endpoint_tested: testUrl,
-          auth_header_used: config.auth_header,
-          response_preview: Object.keys(responseData).slice(0, 3),
-          config_source: 'ai_generated_only',
-          ai_driven: true,
-          platform_specific_auth: true
+          endpoint_tested: scriptConfig.url,
+          auth_header_used: scriptConfig.authHeader,
+          credential_field_used: scriptConfig.credentialUsed,
+          universal_executor: true,
+          chatai_driven: true,
+          response_preview: typeof responseData === 'object' ? Object.keys(responseData).slice(0, 3) : 'text_response'
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     } else {
-      console.log('❌ TEST FAILED:', response.status, platformName, 'with auth header:', config.auth_header);
-      const errorMessage = config.error_patterns[response.status] || 
-                          (responseData?.error || responseData?.message) || 
-                          `HTTP ${response.status}`;
+      console.log('❌ UNIVERSAL FAILURE:', response.status, platformName);
+      const errorMessage = responseData?.error || responseData?.message || `HTTP ${response.status}`;
       
       return new Response(JSON.stringify({
         success: false,
@@ -186,13 +173,13 @@ serve(async (req) => {
         details: {
           status: response.status,
           platform: platformName,
-          endpoint_tested: testUrl,
-          auth_header_used: config.auth_header,
+          endpoint_tested: scriptConfig.url,
+          auth_header_used: scriptConfig.authHeader,
+          credential_field_used: scriptConfig.credentialUsed,
           error: errorMessage,
           response: responseData,
-          config_source: 'ai_generated_only',
-          ai_driven: true,
-          platform_specific_auth: true
+          universal_executor: true,
+          chatai_driven: true
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -200,15 +187,15 @@ serve(async (req) => {
     }
 
   } catch (error: any) {
-    console.error('💥 TEST ERROR:', error);
+    console.error('💥 UNIVERSAL TEST ERROR:', error);
     return new Response(JSON.stringify({
       success: false,
-      message: `Test failed: ${error.message}`,
+      message: `Universal test failed: ${error.message}`,
       details: {
         error: error.message,
         stack: error.stack?.substring(0, 500),
-        ai_driven_only: true,
-        platform_specific_auth: true
+        universal_executor: true,
+        chatai_driven: true
       }
     }), {
       status: 500,

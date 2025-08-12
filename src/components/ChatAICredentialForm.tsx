@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -37,59 +36,7 @@ interface ChatAICredentialFormProps {
   onCredentialTested: (platformName: string) => void;
 }
 
-// CRITICAL FIX: Extract ChatAI data structure with direct objects AND _type wrapper
-const extractChatAIValue = (data: any) => {
-  console.log('🔧 FIXED EXTRACTION: Input data:', data);
-  
-  if (!data) {
-    console.log('🔧 No data provided, returning null');
-    return null;
-  }
-  
-  // SOLUTION 1: Direct object return (most common case - REAL PLATFORM DATA)
-  if (typeof data === 'object' && !data._type) {
-    console.log('🔧 ✅ FIXED: Found direct object, returning directly:', data);
-    return data;
-  }
-  
-  // Handle ChatAI wrapped structure with _type and value (legacy support)
-  if (typeof data === 'object' && data._type !== undefined && data.value !== undefined) {
-    console.log('🔧 Found ChatAI wrapped structure with _type:', data._type, 'value:', data.value);
-    
-    // If value is "undefined" string, return null
-    if (data.value === "undefined" || data.value === undefined || data.value === null) {
-      console.log('🔧 ChatAI value is undefined/null, returning null');
-      return null;
-    }
-    
-    // Try to parse if it's a JSON string
-    if (typeof data.value === 'string') {
-      // Don't try to parse simple strings that aren't JSON
-      if (data.value.startsWith('{') || data.value.startsWith('[')) {
-        try {
-          const parsed = JSON.parse(data.value);
-          console.log('🔧 Parsed ChatAI JSON value:', parsed);
-          return parsed;
-        } catch {
-          console.log('🔧 Failed to parse as JSON, using ChatAI string value:', data.value);
-          return data.value;
-        }
-      } else {
-        console.log('🔧 Using ChatAI string value directly:', data.value);
-        return data.value;
-      }
-    }
-    
-    console.log('🔧 Using ChatAI direct value:', data.value);
-    return data.value;
-  }
-  
-  // Handle direct data
-  console.log('🔧 ✅ FIXED: Using direct data:', data);
-  return data;
-};
-
-// CRITICAL: Extract platform name from ChatAI data ONLY - NO FALLBACKS
+// CRITICAL FIX: Extract platform name from ChatAI data ONLY - NO FALLBACKS
 const extractPlatformName = (platform: Platform): string => {
   console.log('🔍 CHATAI-ONLY EXTRACTION: Full platform structure:', JSON.stringify(platform, null, 2));
   
@@ -139,14 +86,14 @@ const extractPlatformName = (platform: Platform): string => {
   return 'Platform Configuration Required';
 };
 
-// CRITICAL: Extract credential fields from ChatAI data ONLY - NO FALLBACKS
+// CRITICAL FIX: Enhanced credential extraction with multiple fallback paths
 const extractCredentialFieldsFromChatAI = (platform: Platform): Array<{ field: string; placeholder: string; link: string; why_needed: string }> => {
-  console.log('🔧 CHATAI-ONLY: Extracting credential fields from ChatAI data ONLY');
+  console.log('🔧 ENHANCED CHATAI EXTRACTION: Full platform data received:', JSON.stringify(platform, null, 2));
   
-  // HIGHEST PRIORITY: Extract from ChatAI original_platform.required_credentials
+  // PRIORITY 1: Extract from ChatAI original_platform.required_credentials (HIGHEST PRIORITY)
   if (platform.chatai_data?.original_platform?.required_credentials) {
     const requiredCredentials = platform.chatai_data.original_platform.required_credentials;
-    console.log('✅ CHATAI: Found original_platform.required_credentials:', requiredCredentials);
+    console.log('✅ CHATAI PRIORITY 1: Found original_platform.required_credentials:', requiredCredentials);
     
     return requiredCredentials.map((cred: any) => ({
       field: cred.field_name || cred.field || 'credential',
@@ -156,42 +103,126 @@ const extractCredentialFieldsFromChatAI = (platform: Platform): Array<{ field: s
     }));
   }
   
-  // PRIORITY 2: Extract from ChatAI test_payloads headers
+  // PRIORITY 2: Extract from ChatAI nested data structures (ENHANCED FALLBACK)
+  if (platform.chatai_data) {
+    console.log('🔧 CHATAI PRIORITY 2: Scanning chatai_data for credential patterns:', platform.chatai_data);
+    
+    // Check for nested credential arrays in chatai_data
+    const possibleCredentialSources = [
+      platform.chatai_data.credentials,
+      platform.chatai_data.required_credentials,
+      platform.chatai_data.platform_credentials,
+      platform.chatai_data.authentication?.credentials,
+      platform.chatai_data.config?.credentials
+    ];
+    
+    for (const credSource of possibleCredentialSources) {
+      if (credSource && Array.isArray(credSource) && credSource.length > 0) {
+        console.log('✅ CHATAI PRIORITY 2: Found credential source:', credSource);
+        return credSource.map((cred: any) => ({
+          field: cred.field_name || cred.field || cred.name || 'api_key',
+          placeholder: cred.placeholder || `Enter your ${cred.field_name || cred.field || 'credential'}`,
+          link: cred.obtain_link || cred.link || cred.url || '',
+          why_needed: cred.purpose || cred.why_needed || cred.description || 'Required for authentication'
+        }));
+      }
+    }
+  }
+  
+  // PRIORITY 3: Extract from ChatAI test_payloads headers (ENHANCED HEADER DETECTION)
   const extractedTestPayloads = extractChatAIValue(platform.test_payloads);
   if (extractedTestPayloads && Array.isArray(extractedTestPayloads) && extractedTestPayloads.length > 0) {
     const payload = extractedTestPayloads[0];
+    console.log('🔧 CHATAI PRIORITY 3: Scanning test_payloads for headers:', payload);
+    
     if (payload && payload.headers && typeof payload.headers === 'object') {
-      console.log('✅ CHATAI: Found headers in test payload:', payload.headers);
+      console.log('✅ CHATAI PRIORITY 3: Found headers in test payload:', payload.headers);
       const headerKeys = Object.keys(payload.headers);
       const credFields = headerKeys
-        .filter(key => key.toLowerCase().includes('key') || key.toLowerCase().includes('token') || key.toLowerCase().includes('authorization'))
+        .filter(key => {
+          const lowerKey = key.toLowerCase();
+          return lowerKey.includes('key') || 
+                 lowerKey.includes('token') || 
+                 lowerKey.includes('authorization') ||
+                 lowerKey.includes('api') ||
+                 lowerKey.includes('auth');
+        })
         .map(key => ({
-          field: key.toLowerCase().replace('-', '_'),
-          placeholder: `Enter your ${key}`,
-          link: '',
-          why_needed: `Required for authentication`
+          field: key.toLowerCase().replace(/-/g, '_'),
+          placeholder: `Enter your ${key.replace(/-/g, ' ')}`,
+          link: `https://${platformName.toLowerCase()}.com/api-keys`,
+          why_needed: `Required for ${key} authentication`
         }));
       
       if (credFields.length > 0) {
-        console.log('✅ CHATAI: Extracted credential fields from test payload headers:', credFields);
+        console.log('✅ CHATAI PRIORITY 3: Extracted credential fields from headers:', credFields);
         return credFields;
       }
     }
   }
   
-  // PRIORITY 3: Use platform.credentials if provided by ChatAI
+  // PRIORITY 4: Extract from ChatAI testConfig authentication (ENHANCED CONFIG DETECTION)
+  const extractedTestConfig = extractChatAIValue(platform.testConfig);
+  if (extractedTestConfig && extractedTestConfig.authentication) {
+    console.log('🔧 CHATAI PRIORITY 4: Found testConfig authentication:', extractedTestConfig.authentication);
+    
+    const auth = extractedTestConfig.authentication;
+    const fieldName = auth.parameter_name || auth.field || auth.header || 'api_key';
+    
+    return [{
+      field: fieldName.toLowerCase().replace(/-/g, '_'),
+      placeholder: `Enter your ${fieldName.replace(/-/g, ' ')}`,
+      link: `https://${platformName.toLowerCase()}.com/credentials`,
+      why_needed: 'Required for API authentication'
+    }];
+  }
+  
+  // PRIORITY 5: Use platform.credentials if provided by ChatAI (LEGACY SUPPORT)
   if (platform.credentials && Array.isArray(platform.credentials) && platform.credentials.length > 0) {
     const validCredentials = platform.credentials.filter(cred => 
       cred.field && cred.field !== 'undefined'
     );
     if (validCredentials.length > 0) {
-      console.log('✅ CHATAI: Using platform credentials:', validCredentials);
+      console.log('✅ CHATAI PRIORITY 5: Using platform credentials:', validCredentials);
       return validCredentials;
     }
   }
   
-  // CRITICAL: NO FALLBACKS - Return empty if ChatAI didn't provide data
-  console.log('⚠️ CHATAI: No credential fields found in ChatAI data - configuration needed');
+  // PRIORITY 6: Generate intelligent fallback based on platform name
+  const platformName = extractPlatformName(platform);
+  if (platformName && platformName !== 'Platform Configuration Required') {
+    console.log('🔧 CHATAI PRIORITY 6: Generating intelligent fallback for:', platformName);
+    
+    const lowerPlatformName = platformName.toLowerCase();
+    let fallbackField = 'api_key';
+    
+    // Platform-specific intelligent defaults
+    if (lowerPlatformName.includes('slack')) fallbackField = 'bot_token';
+    else if (lowerPlatformName.includes('notion')) fallbackField = 'access_token';
+    else if (lowerPlatformName.includes('typeform')) fallbackField = 'access_token';
+    else if (lowerPlatformName.includes('eleven')) fallbackField = 'xi_api_key';
+    else if (lowerPlatformName.includes('openai')) fallbackField = 'api_key';
+    
+    return [{
+      field: fallbackField,
+      placeholder: `Enter your ${platformName} ${fallbackField.replace('_', ' ')}`,
+      link: `https://${lowerPlatformName.replace(/\s+/g, '')}.com/api-keys`,
+      why_needed: `Required for ${platformName} API authentication`
+    }];
+  }
+  
+  // CRITICAL: Last resort - return empty with detailed debugging
+  console.warn('⚠️ CHATAI EXTRACTION FAILED: No credential fields found in any source');
+  console.warn('🔍 DEBUGGING INFO:', {
+    has_chatai_data: !!platform.chatai_data,
+    has_original_platform: !!platform.chatai_data?.original_platform,
+    has_required_credentials: !!platform.chatai_data?.original_platform?.required_credentials,
+    has_test_payloads: !!(platform.test_payloads?.length),
+    has_testConfig: !!platform.testConfig,
+    has_credentials: !!(platform.credentials?.length),
+    platform_name: platformName
+  });
+  
   return [];
 };
 

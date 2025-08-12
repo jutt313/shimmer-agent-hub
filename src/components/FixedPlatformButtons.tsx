@@ -1,8 +1,8 @@
-
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import SimplePlatformDisplay from './SimplePlatformDisplay';
 
 interface Platform {
   name: string;
@@ -24,6 +24,7 @@ interface FixedPlatformButtonsProps {
 }
 
 const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: FixedPlatformButtonsProps) => {
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
   const { user } = useAuth();
 
   console.log('🚀 FixedPlatformButtons received platforms:', platforms);
@@ -31,7 +32,7 @@ const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: F
 
   const handlePlatformSetup = (platform: Platform) => {
     console.log(`🔧 Platform setup requested for:`, platform);
-    // TODO: Will implement simple credential form here
+    setSelectedPlatform(platform);
   };
 
   if (!platforms || platforms.length === 0) {
@@ -54,8 +55,15 @@ const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: F
         ))}
       </div>
       
+      {selectedPlatform && (
+        <SimplePlatformDisplay
+          platform={selectedPlatform}
+          onClose={() => setSelectedPlatform(null)}
+        />
+      )}
+      
       <div className="text-center text-gray-500 text-sm">
-        Platform credential setup will be implemented with a simple approach
+        Click a platform button to see its ChatAI data
       </div>
     </div>
   );

@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ExternalLink, TestTube, Save, Eye, EyeOff, Code, Activity, Info } from "lucide-react";
+import { ExternalLink, TestTube, Save, Eye, EyeOff, Code, Activity, Info, Loader2, CheckCircle } from "lucide-react";
 import { extractTestScript, injectCredentials } from "@/utils/platformTestScriptExtractor";
 import { AutomationCredentialManager } from "@/utils/automationCredentialManager";
 import { useToast } from "@/hooks/use-toast";
@@ -37,11 +37,43 @@ const SimplePlatformDisplay = ({ platform, automationId, userId, onCredentialCha
   const [testResponse, setTestResponse] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingCredentials, setIsLoadingCredentials] = useState(true);
   const [activeTab, setActiveTab] = useState<'credentials' | 'code' | 'response'>('credentials');
   const [showInfo, setShowInfo] = useState(false);
   const { toast } = useToast();
 
   console.log('🔍 SimplePlatformDisplay received platform data:', platform);
+
+  useEffect(() => {
+    const loadExistingCredentials = async () => {
+      if (!automationId || !userId || !platform.name) {
+        setIsLoadingCredentials(false);
+        return;
+      }
+
+      try {
+        setIsLoadingCredentials(true);
+        const existingCredentials = await AutomationCredentialManager.getCredentials(
+          automationId,
+          platform.name,
+          userId
+        );
+
+        if (existingCredentials) {
+          console.log('✅ LOADED existing credentials for', platform.name, existingCredentials);
+          setCredentialValues(existingCredentials);
+        } else {
+          console.log('ℹ️ No existing credentials found for', platform.name);
+        }
+      } catch (error) {
+        console.error('❌ Failed to load credentials:', error);
+      } finally {
+        setIsLoadingCredentials(false);
+      }
+    };
+
+    loadExistingCredentials();
+  }, [automationId, userId, platform.name]);
 
   const handleInputChange = (field: string, value: string) => {
     setCredentialValues(prev => ({
@@ -118,6 +150,9 @@ const SimplePlatformDisplay = ({ platform, automationId, userId, onCredentialCha
     setIsSaving(true);
     console.log('💾 Saving credentials for:', platform.name, credentialValues);
     
+    const hasExistingCredentials = Object.keys(credentialValues).length > 0 && 
+      Object.values(credentialValues).some(value => value && value.trim() !== '');
+    
     try {
       const result = await AutomationCredentialManager.saveCredentials(
         automationId,
@@ -128,8 +163,8 @@ const SimplePlatformDisplay = ({ platform, automationId, userId, onCredentialCha
 
       if (result.success) {
         toast({
-          title: "Credentials saved successfully",
-          description: `${platform.name} credentials have been securely stored`,
+          title: hasExistingCredentials ? "Credentials updated successfully" : "Credentials saved successfully",
+          description: `${platform.name} credentials have been securely ${hasExistingCredentials ? 'updated' : 'stored'}`,
         });
         
         // Call the callback to notify parent component
@@ -165,6 +200,8 @@ const SimplePlatformDisplay = ({ platform, automationId, userId, onCredentialCha
   };
 
   const isFormValid = platform.credentials?.every(cred => credentialValues[cred.field]) || false;
+  const hasExistingCredentials = Object.keys(credentialValues).length > 0 && 
+    Object.values(credentialValues).some(value => value && value.trim() !== '');
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -247,84 +284,100 @@ const SimplePlatformDisplay = ({ platform, automationId, userId, onCredentialCha
             {/* Tab Content */}
             {activeTab === 'credentials' && (
               <div className="space-y-4">
-                {platform.credentials && platform.credentials.length > 0 && (
-                  <div className="space-y-4">
-                    {platform.credentials.map((cred, index) => {
-                      const isPasswordField = cred.field.toLowerCase().includes('password') || 
-                                            cred.field.toLowerCase().includes('secret') ||
-                                            cred.field.toLowerCase().includes('key');
-                      
-                      return (
-                        <div key={index} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor={cred.field} className="text-sm font-semibold text-gray-700">
-                              {cred.field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                              <span className="text-red-500 ml-1">*</span>
-                            </Label>
-                            {cred.link && (
-                              <a 
-                                href={cred.link} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center text-xs text-purple-600 hover:text-purple-800 font-medium transition-colors duration-200"
-                              >
-                                <ExternalLink className="w-3 h-3 mr-1" />
-                                Get {cred.field}
-                              </a>
-                            )}
-                          </div>
-                          
-                          <div className="relative">
-                            <Input
-                              id={cred.field}
-                              type={isPasswordField && !showPasswords[cred.field] ? 'password' : 'text'}
-                              placeholder={cred.placeholder}
-                              value={credentialValues[cred.field] || ''}
-                              onChange={(e) => handleInputChange(cred.field, e.target.value)}
-                              className="pr-10 border-2 border-transparent bg-white/80 backdrop-blur-sm focus:border-purple-400 focus:bg-white focus:shadow-[0_0_20px_rgba(147,51,234,0.3)] transition-all duration-300 rounded-xl"
-                            />
-                            {isPasswordField && (
-                              <button
-                                type="button"
-                                onClick={() => togglePasswordVisibility(cred.field)}
-                                className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                              >
-                                {showPasswords[cred.field] ? (
-                                  <EyeOff className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-                                ) : (
-                                  <Eye className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-                                )}
-                              </button>
-                            )}
-                          </div>
-                          
-                          <p className="text-xs text-gray-600 bg-white/50 p-2 rounded-lg">{cred.why_needed}</p>
-                        </div>
-                      );
-                    })}
+                {isLoadingCredentials ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-purple-500 mr-3" />
+                    <span className="text-gray-600">Loading saved credentials...</span>
                   </div>
-                )}
+                ) : (
+                  <>
+                    {platform.credentials && platform.credentials.length > 0 && (
+                      <div className="space-y-4">
+                        {platform.credentials.map((cred, index) => {
+                          const isPasswordField = cred.field.toLowerCase().includes('password') || 
+                                                cred.field.toLowerCase().includes('secret') ||
+                                                cred.field.toLowerCase().includes('key');
+                          const hasValue = credentialValues[cred.field] && credentialValues[cred.field].trim() !== '';
+                          
+                          return (
+                            <div key={index} className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <Label htmlFor={cred.field} className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                  {cred.field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                  <span className="text-red-500 ml-1">*</span>
+                                  {hasValue && (
+                                    <div className="flex items-center gap-1 text-green-600">
+                                      <CheckCircle className="w-3 h-3" />
+                                      <span className="text-xs font-medium">Saved</span>
+                                    </div>
+                                  )}
+                                </Label>
+                                {cred.link && (
+                                  <a 
+                                    href={cred.link} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center text-xs text-purple-600 hover:text-purple-800 font-medium transition-colors duration-200"
+                                  >
+                                    <ExternalLink className="w-3 h-3 mr-1" />
+                                    Get {cred.field}
+                                  </a>
+                                )}
+                              </div>
+                              
+                              <div className="relative">
+                                <Input
+                                  id={cred.field}
+                                  type={isPasswordField && !showPasswords[cred.field] ? 'password' : 'text'}
+                                  placeholder={cred.placeholder}
+                                  value={credentialValues[cred.field] || ''}
+                                  onChange={(e) => handleInputChange(cred.field, e.target.value)}
+                                  className={`pr-10 border-2 border-transparent bg-white/80 backdrop-blur-sm focus:border-purple-400 focus:bg-white focus:shadow-[0_0_20px_rgba(147,51,234,0.3)] transition-all duration-300 rounded-xl ${hasValue ? 'border-green-200 bg-green-50/50' : ''}`}
+                                />
+                                {isPasswordField && (
+                                  <button
+                                    type="button"
+                                    onClick={() => togglePasswordVisibility(cred.field)}
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                                  >
+                                    {showPasswords[cred.field] ? (
+                                      <EyeOff className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                                    ) : (
+                                      <Eye className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                              
+                              <p className="text-xs text-gray-600 bg-white/50 p-2 rounded-lg">{cred.why_needed}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
 
-                {/* Test & Save Buttons */}
-                <div className="flex gap-3 pt-4 border-t border-white/30">
-                  <Button
-                    onClick={handleTest}
-                    disabled={!isFormValid || isLoading}
-                    className="flex-1 bg-gradient-to-r from-purple-500 via-blue-500 to-green-500 hover:from-purple-600 hover:via-blue-600 hover:to-green-600 text-white py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
-                  >
-                    <TestTube className="w-4 h-4 mr-2" />
-                    {isLoading ? 'Testing...' : 'Test Connection'}
-                  </Button>
-                  
-                  <Button
-                    onClick={handleSave}
-                    disabled={!isFormValid || isSaving}
-                    className="flex-1 bg-gradient-to-r from-green-500 via-blue-500 to-purple-500 hover:from-green-600 hover:via-blue-600 hover:to-purple-600 text-white py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
-                  >
-                    <Save className="w-4 h-4 mr-2" />
-                    {isSaving ? 'Saving...' : 'Save Credentials'}
-                  </Button>
-                </div>
+                    {/* Test & Save Buttons */}
+                    <div className="flex gap-3 pt-4 border-t border-white/30">
+                      <Button
+                        onClick={handleTest}
+                        disabled={!isFormValid || isLoading}
+                        className="flex-1 bg-gradient-to-r from-purple-500 via-blue-500 to-green-500 hover:from-purple-600 hover:via-blue-600 hover:to-green-600 text-white py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
+                      >
+                        <TestTube className="w-4 h-4 mr-2" />
+                        {isLoading ? 'Testing...' : 'Test Connection'}
+                      </Button>
+                      
+                      <Button
+                        onClick={handleSave}
+                        disabled={!isFormValid || isSaving}
+                        className="flex-1 bg-gradient-to-r from-green-500 via-blue-500 to-purple-500 hover:from-green-600 hover:via-blue-600 hover:to-purple-600 text-white py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
+                      >
+                        <Save className="w-4 h-4 mr-2" />
+                        {isSaving ? 'Saving...' : hasExistingCredentials ? 'Update Credentials' : 'Save Credentials'}
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 

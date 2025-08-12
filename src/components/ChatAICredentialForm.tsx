@@ -36,6 +36,36 @@ interface ChatAICredentialFormProps {
   onCredentialTested: (platformName: string) => void;
 }
 
+// Utility function to extract ChatAI values from wrapped objects
+const extractChatAIValue = (value: any): any => {
+  // Handle null/undefined
+  if (!value) return value;
+  
+  // If it's already a plain value, return as-is
+  if (typeof value !== 'object') return value;
+  
+  // Handle ChatAI wrapped objects with _type and value properties
+  if (value._type === 'object' && value.value !== undefined) {
+    return value.value;
+  }
+  
+  // Handle arrays
+  if (Array.isArray(value)) {
+    return value.map(item => extractChatAIValue(item));
+  }
+  
+  // For regular objects, recursively extract values
+  if (typeof value === 'object' && value !== null) {
+    const extracted: any = {};
+    for (const [key, val] of Object.entries(value)) {
+      extracted[key] = extractChatAIValue(val);
+    }
+    return extracted;
+  }
+  
+  return value;
+};
+
 // CRITICAL FIX: Extract platform name from ChatAI data ONLY - NO FALLBACKS
 const extractPlatformName = (platform: Platform): string => {
   console.log('🔍 CHATAI-ONLY EXTRACTION: Full platform structure:', JSON.stringify(platform, null, 2));
@@ -89,6 +119,9 @@ const extractPlatformName = (platform: Platform): string => {
 // CRITICAL FIX: Enhanced credential extraction with multiple fallback paths
 const extractCredentialFieldsFromChatAI = (platform: Platform): Array<{ field: string; placeholder: string; link: string; why_needed: string }> => {
   console.log('🔧 ENHANCED CHATAI EXTRACTION: Full platform data received:', JSON.stringify(platform, null, 2));
+  
+  // Get platform name first for use in fallbacks
+  const platformName = extractPlatformName(platform);
   
   // PRIORITY 1: Extract from ChatAI original_platform.required_credentials (HIGHEST PRIORITY)
   if (platform.chatai_data?.original_platform?.required_credentials) {
@@ -189,7 +222,6 @@ const extractCredentialFieldsFromChatAI = (platform: Platform): Array<{ field: s
   }
   
   // PRIORITY 6: Generate intelligent fallback based on platform name
-  const platformName = extractPlatformName(platform);
   if (platformName && platformName !== 'Platform Configuration Required') {
     console.log('🔧 CHATAI PRIORITY 6: Generating intelligent fallback for:', platformName);
     

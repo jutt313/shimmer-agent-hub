@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -5,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Edit, Trash2, Play, LayoutDashboard, Code2, KanbanSquare, MessageSquare, Network, Bot, ListChecks } from "lucide-react";
 import { toast } from "@/components/ui/use-toast"
-import { useCompletion } from 'ai/react';
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -22,13 +22,9 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { useAutomation } from '@/providers/AutomationProvider';
-import { SimplePlatformDisplay } from '@/components/SimplePlatformDisplay';
-import { cleanPlatformName } from '@/utils/stringHelper';
+import SimplePlatformDisplay from '@/components/SimplePlatformDisplay';
 import { extractPlatformCredentials } from '@/utils/platformDataExtractor';
-import { WorkflowDiagram } from '@/components/WorkflowDiagram';
 import { useToast } from "@/components/ui/use-toast"
-import { AutomationCredentialManager } from '@/utils/automationCredentialManager';
 
 interface ChatCardProps {
   chat: any;
@@ -39,13 +35,18 @@ interface ChatCardProps {
   showDiagram: boolean;
 }
 
+// Helper function to clean platform names
+const cleanPlatformName = (name: string) => {
+  if (!name) return 'Unknown Platform';
+  return name.replace(/[^a-zA-Z0-9\s]/g, '').trim();
+};
+
 const ChatCard = ({ chat, onEdit, onDelete, onExecute, isExecuting, showDiagram }: ChatCardProps) => {
   const [showPlatformModal, setShowPlatformModal] = useState(false);
   const [platforms, setPlatforms] = useState<any[]>([]);
   const [selectedPlatform, setSelectedPlatform] = useState<any | null>(null);
   const [isExecutingSingle, setIsExecutingSingle] = useState(false);
   const { toast } = useToast();
-  const { setAutomationContext } = useAutomation();
 
   const handleShowPlatforms = () => {
     console.log('🔍 ChatCard: Extracting platforms from chat message');
@@ -83,35 +84,33 @@ const ChatCard = ({ chat, onEdit, onDelete, onExecute, isExecuting, showDiagram 
       }
     }
 
-    // CRITICAL FIX: Preserve exact ChatAI credential structure - NO FALLBACKS
+    // ✅ CRITICAL FIX: Preserve exact ChatAI credential structure - NO FALLBACKS
     const finalPlatforms = platformsSource.map((platform: any, index: number) => {
       console.log(`🔧 Processing platform ${index}:`, platform);
       
       const rawPlatformName = platform.platform_name || platform.name || platform.platform || `Platform_${index}`;
       const cleanedPlatformName = cleanPlatformName(rawPlatformName);
       
-      // CRITICAL: Use ChatAI's original_platform.required_credentials directly
+      // ✅ CRITICAL: Use ChatAI's original_platform.required_credentials directly WITHOUT FALLBACKS
       let credentials = [];
       
       if (platform.chatai_data?.original_platform?.required_credentials) {
-        // ✅ PRESERVE ChatAI credentials exactly as generated
-        credentials = platform.chatai_data.original_platform.required_credentials.map((cred: any) => ({
-          field: cred.field_name,  // Use exact ChatAI field name
-          placeholder: cred.example || `Enter ${cred.field_name}`,
-          link: cred.obtain_link || '',
-          why_needed: cred.purpose || `Required for ${cleanedPlatformName} authentication`
-        }));
+        // ✅ PRESERVE ChatAI credentials exactly as generated - NO MAPPING OR FALLBACKS
+        credentials = platform.chatai_data.original_platform.required_credentials;
+        console.log('✅ PRESERVED: Using exact ChatAI required_credentials structure');
       } else if (platform.credentials && Array.isArray(platform.credentials)) {
-        // ✅ PRESERVE existing credentials exactly
+        // ✅ PRESERVE existing credentials exactly - NO MAPPING OR FALLBACKS
         credentials = platform.credentials;
+        console.log('✅ PRESERVED: Using existing credentials structure');
       } else {
         // Only use fallback if absolutely no credential data exists
         credentials = [{
-          field: "api_key",
-          placeholder: `Enter ${cleanedPlatformName} API key`,
-          link: "",
-          why_needed: `Required for ${cleanedPlatformName} API authentication`
+          field_name: "api_key",
+          example: `Enter ${cleanedPlatformName} API key`,
+          obtain_link: "",
+          purpose: `Required for ${cleanedPlatformName} API authentication`
         }];
+        console.log('⚠️ FALLBACK: Using minimal credential structure');
       }
 
       return {
@@ -124,6 +123,7 @@ const ChatCard = ({ chat, onEdit, onDelete, onExecute, isExecuting, showDiagram 
       };
     });
 
+    console.log('🎯 FINAL PLATFORMS WITH PRESERVED CHATAI DATA:', finalPlatforms);
     setPlatforms(finalPlatforms);
     setShowPlatformModal(true);
   };
@@ -141,17 +141,6 @@ const ChatCard = ({ chat, onEdit, onDelete, onExecute, isExecuting, showDiagram 
   const handleExecuteSingle = async () => {
     setIsExecutingSingle(true);
     try {
-      // Set the automation context
-      setAutomationContext({
-        automationId: chat.id,
-        automationName: chat.title,
-        automationDescription: chat.description,
-        automationMessage: chat.message,
-        automationType: chat.type,
-        automationCreatedAt: chat.createdAt,
-        automationUpdatedAt: chat.updatedAt,
-      });
-
       // Execute the automation
       onExecute(chat.id);
     } catch (error: any) {
@@ -232,7 +221,7 @@ const ChatCard = ({ chat, onEdit, onDelete, onExecute, isExecuting, showDiagram 
             Platforms
           </Button>
           <Button
-            variant="primary"
+            variant="default"
             size="sm"
             onClick={handleExecuteSingle}
             disabled={isExecutingSingle}

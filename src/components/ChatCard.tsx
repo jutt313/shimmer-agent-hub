@@ -1,390 +1,892 @@
-
-import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash2, Play, LayoutDashboard, Code2, KanbanSquare, MessageSquare, Network, Bot, ListChecks } from "lucide-react";
-import { toast } from "@/components/ui/use-toast"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import SimplePlatformDisplay from '@/components/SimplePlatformDisplay';
-import { extractPlatformCredentials } from '@/utils/platformDataExtractor';
-import { useToast } from "@/components/ui/use-toast"
+import { User, Code, CheckCircle2, AlertCircle } from 'lucide-react';
+import { parseYusrAIStructuredResponse, cleanDisplayText, YusrAIStructuredResponse } from "@/utils/jsonParser";
+import { useEffect, useRef, useState } from "react";
+import { useErrorRecovery } from "@/hooks/useErrorRecovery";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { agentStateManager } from '@/utils/agentStateManager';
+import ErrorHelpButton from './ErrorHelpButton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import YusrAIStructuredDisplay from './YusrAIStructuredDisplay';
+import ExecutionBlueprintVisualizer from './ExecutionBlueprintVisualizer';
+import { FlagPropagationLogger } from '@/utils/flagPropagationLogger';
+import FixedPlatformButtons from './FixedPlatformButtons';
+import { GHQ } from '@/utils/GHQ';
+import DebugCodeModal from './DebugCodeModal';
 
-// Updated interface to support multiple usage patterns
-interface ChatCardProps {
-  // For automation-specific usage (when chat object is provided)
-  chat?: any;
-  onEdit?: (id: string) => void;
-  onDelete?: (id: string) => void;
-  onExecute?: (id: string) => void;
-  isExecuting?: boolean;
-  showDiagram?: boolean;
-  
-  // For chat interface usage (when messages array is provided)
-  messages?: Array<{
-    id: number;
-    text: string;
-    isBot: boolean;
-    timestamp: Date;
-    structuredData?: any;
+interface Message {
+  id: number;
+  text: string;
+  isBot: boolean;
+  timestamp: Date;
+  structuredData?: YusrAIStructuredResponse;
+  error_help_available?: boolean;
+  yusraiPowered?: boolean;
+  sevenSectionsValidated?: boolean;
+  platformData?: Array<{
+    name: string;
+    credentials: Array<{
+      field: string;
+      placeholder: string;
+      link: string;
+      why_needed: string;
+    }>;
+    // FIXED: Add ChatAI test configuration properties to prevent TypeScript errors
+    testConfig?: any;
+    test_payloads?: any[];
+    chatai_data?: any;
   }>;
-  onSendMessage?: (message: string) => void;
-  
-  // Additional props for other usage patterns
+  automationDiagramData?: any;
+  executionBlueprint?: any;
+}
+
+interface ChatCardProps {
+  messages: Message[];
   onAgentAdd?: (agent: any) => void;
   dismissedAgents?: Set<string>;
   onAgentDismiss?: (agentName: string) => void;
   automationId?: string;
   isLoading?: boolean;
-  platformCredentialStatus?: any;
+  onSendMessage?: (message: string) => void;
+  onExecuteAutomation?: () => void;
+  platformCredentialStatus?: { [key: string]: 'saved' | 'tested' | 'missing' };
   onPlatformCredentialChange?: () => void;
+  automationDiagramData?: any;
 }
 
-// Helper function to clean platform names
-const cleanPlatformName = (name: string) => {
-  if (!name) return 'Unknown Platform';
-  return name.replace(/[^a-zA-Z0-9\s]/g, '').trim();
-};
-
-const ChatCard = ({ 
-  chat, 
-  onEdit, 
-  onDelete, 
-  onExecute, 
-  isExecuting, 
-  showDiagram,
+const ChatCard = ({
   messages,
-  onSendMessage,
   onAgentAdd,
-  dismissedAgents,
+  dismissedAgents = new Set(),
   onAgentDismiss,
-  automationId,
-  isLoading,
-  platformCredentialStatus,
-  onPlatformCredentialChange
+  automationId = "temp-automation-id",
+  isLoading = false,
+  onSendMessage,
+  onExecuteAutomation,
+  platformCredentialStatus = {},
+  onPlatformCredentialChange,
+  automationDiagramData
 }: ChatCardProps) => {
-  const [showPlatformModal, setShowPlatformModal] = useState(false);
-  const [platforms, setPlatforms] = useState<any[]>([]);
-  const [selectedPlatform, setSelectedPlatform] = useState<any | null>(null);
-  const [isExecutingSingle, setIsExecutingSingle] = useState(false);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { handleError } = useErrorRecovery();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const [showCodeModal, setShowCodeModal] = useState(false);
+  const [showBlueprintModal, setShowBlueprintModal] = useState(false);
+  const [enhancedMessages, setEnhancedMessages] = useState<Message[]>([]);
+  const [debugModalData, setDebugModalData] = useState<any>(null);
+  const [showDebugModal, setShowDebugModal] = useState(false);
 
-  // If this is a chat interface usage (messages provided), render differently
-  if (messages) {
-    return (
-      <div className="w-full max-w-4xl mx-auto">
-        <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-2xl rounded-3xl overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6">
-            <CardTitle className="text-2xl font-bold">YusrAI Assistant</CardTitle>
-            <CardDescription className="text-blue-100">
-              Your AI-powered automation companion
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <ScrollArea className="h-96 p-6">
-              {messages.map((message) => (
-                <div key={message.id} className={`mb-4 ${message.isBot ? 'flex justify-start' : 'flex justify-end'}`}>
-                  <div className={`max-w-[80%] p-4 rounded-2xl ${
-                    message.isBot 
-                      ? 'bg-gray-100 text-gray-800' 
-                      : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
-                  }`}>
-                    <div className="flex items-start gap-3">
-                      {message.isBot && (
-                        <Avatar className="w-8 h-8">
-                          <AvatarFallback className="bg-blue-500 text-white">
-                            <Bot className="w-4 h-4" />
-                          </AvatarFallback>
-                        </Avatar>
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading]);
+
+  // CRITICAL FIX: Enhanced platform name cleaning function - NO hardcoded fallbacks
+  const cleanPlatformName = (rawName: string | undefined | null): string => {
+    if (!rawName || typeof rawName !== 'string') return 'API Platform';
+    
+    const cleaned = rawName
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/\*(.*?)\*/g, '$1')
+      .replace(/`(.*?)`/g, '$1')
+      .replace(/__(.*?)__/g, '$1')
+      .replace(/_(.*?)_/g, '$1')
+      .replace(/[*_`#]/g, '')
+      .replace(/^\d+\.\s*/, '')
+      .replace(/^[-•]\s*/, '')
+      .trim();
+      
+    return cleaned || 'API Platform';
+  };
+
+  // CRITICAL FIX: Enhanced step text extraction with better markdown cleaning
+  const extractStepText = (step: any): string => {
+    if (typeof step === 'string') {
+      return cleanPlatformName(step.replace(/^\d+\.\s*/, ''));
+    }
+    
+    if (typeof step === 'object' && step !== null) {
+      const stepText = step.description || 
+                     step.action || 
+                     step.step || 
+                     step.instruction || 
+                     step.text ||
+                     step.summary ||
+                     step.task ||
+                     step.name;
+      
+      if (stepText && typeof stepText === 'string') {
+        return cleanPlatformName(stepText.replace(/^\d+\.\s*/, ''));
+      }
+      
+      if (step.platform && step.method) {
+        return `${step.method} request to ${cleanPlatformName(step.platform)}`;
+      }
+      
+      return 'Processing automation step...';
+    }
+    
+    return 'Step information unavailable';
+  };
+
+  useEffect(() => {
+    const processMessages = () => {
+      try {
+        const processed = messages.map((message) => {
+          if (message.isBot && !message.structuredData) {
+            try {
+              console.log('🔍 Processing bot message for structured data:', message.text.substring(0, 150));
+              
+              const parseResult = parseYusrAIStructuredResponse(message.text);
+              if (parseResult.structuredData && !parseResult.isPlainText) {
+                console.log('✅ Structured data found from YusrAI:', parseResult.structuredData);
+                
+                // CRITICAL FIX: Enhanced platform data extraction with complete ChatAI data preservation
+                const platformsSource = parseResult.structuredData.platforms || 
+                                       parseResult.structuredData.platforms_and_credentials || 
+                                       parseResult.structuredData.required_platforms ||
+                                       [];
+                
+                const platformData = platformsSource.map((platform: any, index: number) => {
+                  console.log(`🔍 Processing platform ${index + 1}:`, platform);
+                  
+                  // CRITICAL FIX: Better platform name extraction and cleaning
+                  const rawPlatformName = platform.name || 
+                                         platform.platform || 
+                                         platform.platform_name ||
+                                         platform.service ||
+                                         `Platform ${index + 1}`;
+                  
+                  const cleanedPlatformName = cleanPlatformName(rawPlatformName);
+                  console.log(`🔧 Platform name cleaned: "${rawPlatformName}" → "${cleanedPlatformName}"`);
+                  
+                  // CRITICAL FIX: Extract credentials with multiple format support - REMOVE HARDCODED FALLBACKS
+                  let credentials = [];
+                  if (platform.credentials) {
+                    if (Array.isArray(platform.credentials)) {
+                      credentials = platform.credentials;
+                    } else if (typeof platform.credentials === 'object') {
+                      credentials = Object.entries(platform.credentials).map(([key, value]: [string, any]) => ({
+                        field: key,
+                        placeholder: value.example || value.placeholder || `Enter ${key}`,
+                        link: value.link || value.url || value.where_to_get,
+                        why_needed: value.description || value.why_needed
+                      }));
+                    }
+                  } else if (platform.required_credentials) {
+                    credentials = Array.isArray(platform.required_credentials) ? platform.required_credentials : [];
+                  } else if (platform.authentication) {
+                    // Handle authentication object format
+                    credentials = [{
+                      field: platform.authentication.field || 'api_key',
+                      placeholder: platform.authentication.placeholder || 'Enter API key',
+                      link: platform.authentication.link,
+                      why_needed: platform.authentication.description
+                    }];
+                  }
+                  
+                  // CRITICAL FIX: Preserve complete ChatAI test configuration
+                  const testConfig = platform.testConfig || 
+                                   platform.test_config || 
+                                   platform.testing || 
+                                   platform.test_setup ||
+                                   null;
+                  
+                  const testPayloads = platform.test_payloads || 
+                                     platform.test_payload || 
+                                     platform.test_data ||
+                                     platform.testing_payload ||
+                                     [];
+                  
+                  const finalPlatform = {
+                    name: cleanedPlatformName,
+                    credentials: credentials.map((cred: any) => ({
+                      field: cred.field || cred.name || 'api_key',
+                      placeholder: cred.example || cred.placeholder || `Enter ${cred.field}`,
+                      link: cred.link || cred.where_to_get || cred.url,
+                      why_needed: cred.why_needed || cred.description
+                    })),
+                    // CRITICAL: Preserve ChatAI test configuration with proper types
+                    testConfig: testConfig,
+                    test_payloads: Array.isArray(testPayloads) ? testPayloads : (testPayloads ? [testPayloads] : []),
+                    // Preserve additional ChatAI metadata
+                    chatai_data: {
+                      original_platform: platform,
+                      base_url: platform.base_url || platform.api_base || platform.endpoint,
+                      api_version: platform.api_version || platform.version,
+                      authentication_type: platform.authentication_type || platform.auth_type
+                    }
+                  };
+                  
+                  console.log('🔗 Final processed platform with ChatAI data:', finalPlatform);
+                  return finalPlatform;
+                });
+                
+                console.log('🔗 Extracted platform data with ChatAI preservation:', platformData);
+                
+                const diagramData = automationDiagramData ||
+                                  parseResult.structuredData.execution_blueprint || 
+                                  parseResult.structuredData.blueprint ||
+                                  parseResult.structuredData.automation_diagram;
+                
+                console.log('📊 Extracted diagram data:', diagramData);
+                
+                return {
+                  ...message,
+                  structuredData: parseResult.structuredData,
+                  platformData: platformData,
+                  yusraiPowered: parseResult.metadata.yusraiPowered,
+                  sevenSectionsValidated: parseResult.metadata.sevenSectionsValidated,
+                  automationDiagramData: diagramData,
+                  executionBlueprint: parseResult.structuredData.execution_blueprint
+                };
+              } else {
+                console.log('📄 No structured data found, keeping as plain text');
+              }
+            } catch (error) {
+              console.log('❌ Error processing message:', error);
+            }
+          }
+          return message;
+        });
+        
+        setEnhancedMessages(processed);
+        console.log('✅ Enhanced messages processed with ChatAI data preservation:', processed.length);
+      } catch (error) {
+        console.log('❌ Message processing error:', error);
+        setEnhancedMessages(messages);
+      }
+    };
+
+    processMessages();
+  }, [messages, automationDiagramData]);
+
+  const optimizedMessages = enhancedMessages.slice(-50);
+
+  const safeFormatMessageText = (inputText: string | undefined | null, structuredData?: YusrAIStructuredResponse): React.ReactNode[] => {
+    try {
+      if (!inputText || typeof inputText !== 'string') {
+        return [<span key="fallback-input-error">Message content unavailable.</span>];
+      }
+
+      if (structuredData) {
+        const sections = [];
+        
+        if (structuredData.summary && typeof structuredData.summary === 'string') {
+          sections.push(
+            <div key="summary" className="mb-4">
+              <div className="font-semibold text-gray-800 mb-2">Summary:</div>
+              <div className="text-gray-700 leading-relaxed">{cleanPlatformName(structuredData.summary)}</div>
+            </div>
+          );
+        }
+        
+        // Handle both step_by_step_explanation and steps with FIXED markdown cleaning
+        const stepsData = structuredData.step_by_step_explanation || structuredData.steps;
+        if (stepsData && Array.isArray(stepsData) && stepsData.length > 0) {
+          sections.push(
+            <div key="steps" className="mb-4">
+              <div className="font-semibold text-gray-800 mb-2">Steps:</div>
+              <div className="text-gray-700 leading-relaxed">
+                {stepsData.map((step, index) => (
+                  <div key={index} className="mb-1">
+                    Step {index + 1}: {extractStepText(step)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        }
+        
+        // CRITICAL FIX: Enhanced platforms display with proper credential information and cleaned names
+        const platformsData = structuredData.platforms_and_credentials || 
+                             structuredData.platforms ||
+                             structuredData.required_platforms;
+        if (platformsData && Array.isArray(platformsData) && platformsData.length > 0) {
+          sections.push(
+            <div key="platforms" className="mb-4">
+              <div className="font-semibold text-gray-800 mb-2">Platforms:</div>
+              <div className="text-gray-700 leading-relaxed">
+                {platformsData.map((platform, index) => {
+                  // CRITICAL FIX: Use the same cleaning function for consistency
+                  const platformName = cleanPlatformName(
+                    platform?.name || platform?.platform || platform?.platform_name || `Platform ${index + 1}`
+                  );
+                  
+                  return (
+                    <div key={index} className="mb-3 p-3 bg-gray-50 rounded-lg">
+                      <div className="font-medium text-gray-800 mb-2">{platformName}</div>
+                      {platform?.credentials && (
+                        <div className="space-y-2">
+                          <div className="text-sm font-medium text-gray-600">Required credentials:</div>
+                          {/* Handle both array and object credential formats */}
+                          {Array.isArray(platform.credentials) ? (
+                            platform.credentials.map((cred, credIndex) => (
+                              <div key={credIndex} className="text-sm bg-white p-2 rounded border-l-4 border-blue-200">
+                                <div className="font-medium text-gray-800">{cred.field || cred.name || 'API Key'}</div>
+                                <div className="text-gray-600 text-xs mt-1">{cred.why_needed || cred.description || 'Required for authentication'}</div>
+                                {(cred.link || cred.where_to_get || cred.url) && cred.link !== '#' && (
+                                  <div className="text-blue-600 text-xs mt-1">
+                                    <a href={cred.link || cred.where_to_get || cred.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                      Get it from: {cred.where_to_get || 'Documentation'}
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            ))
+                          ) : typeof platform.credentials === 'object' ? (
+                            Object.entries(platform.credentials).map(([key, value]: [string, any], credIndex) => (
+                              <div key={credIndex} className="text-sm bg-white p-2 rounded border-l-4 border-blue-200">
+                                <div className="font-medium text-gray-800">{key}</div>
+                                <div className="text-gray-600 text-xs mt-1">{value?.description || value?.why_needed || `Required for ${key}`}</div>
+                                {(value?.link || value?.where_to_get || value?.url) && value.link !== '#' && (
+                                  <div className="text-blue-600 text-xs mt-1">
+                                    <a href={value.link || value.where_to_get || value.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                      Get it from: {value.where_to_get || 'Documentation'}
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-sm text-gray-500">Credential information not available</div>
+                          )}
+                        </div>
                       )}
-                      <div className="flex-1">
-                        <p className="text-sm leading-relaxed">{message.text}</p>
-                        <p className="text-xs opacity-70 mt-2">
-                          {message.timestamp.toLocaleTimeString()}
-                        </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        }
+        
+        if (structuredData.clarification_questions && Array.isArray(structuredData.clarification_questions) && structuredData.clarification_questions.length > 0) {
+          sections.push(
+            <div key="questions" className="mb-4">
+              <div className="font-semibold text-gray-800 mb-2">Clarification Questions:</div>
+              <div className="text-gray-700 leading-relaxed">
+                {structuredData.clarification_questions.map((question, index) => (
+                  <div key={index} className="mb-1">{index + 1}. {String(question || '')}</div>
+                ))}
+              </div>
+            </div>
+          );
+        }
+        
+        // FIXED: Handle all agent field variants including automation_agents with DEBUG LOGGING
+        const agentsData = structuredData.ai_agents || structuredData.agents || structuredData.automation_agents;
+        console.log('🤖 AGENT DEBUG - Checking agent data:', {
+          ai_agents: structuredData.ai_agents,
+          agents: structuredData.agents,
+          automation_agents: structuredData.automation_agents,
+          agentsData: agentsData,
+          isArray: Array.isArray(agentsData),
+          length: agentsData?.length
+        });
+        
+        if (agentsData && Array.isArray(agentsData) && agentsData.length > 0) {
+          console.log('✅ AGENT DEBUG - Displaying agents section with data:', agentsData);
+          sections.push(
+            <div key="agents" className="mb-4">
+              <div className="font-semibold text-gray-800 mb-2">AI Agents:</div>
+              <div className="text-gray-700 leading-relaxed">
+                {agentsData.map((agent, index) => (
+                  <div key={index} className="mb-3 p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="font-medium text-gray-800">{cleanPlatformName(String(agent?.name || agent?.agent_name || `Agent ${index + 1}`))}</div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleAgentAdd(agent)}
+                          className="bg-green-100 hover:bg-green-200 text-green-700 border-green-300 text-xs px-3 py-1"
+                          variant="outline"
+                        >
+                          Add
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleAgentDismiss(agent?.name || agent?.agent_name || `Agent ${index + 1}`)}
+                          className="bg-red-100 hover:bg-red-200 text-red-700 border-red-300 text-xs px-3 py-1"
+                          variant="outline"
+                        >
+                          Dismiss
+                        </Button>
                       </div>
                     </div>
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <div><strong>Role:</strong> {cleanPlatformName(agent?.role || 'Assistant')}</div>
+                      <div><strong>Goal:</strong> {cleanPlatformName(agent?.goal || 'General assistance')}</div>
+                      {agent?.rule && <div><strong>Rule:</strong> {cleanPlatformName(agent.rule)}</div>}
+                      {agent?.why_needed && <div><strong>Why needed:</strong> {cleanPlatformName(agent.why_needed)}</div>}
+                      {agent?.memory && <div><strong>Memory:</strong> {cleanPlatformName(agent.memory)}</div>}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </ScrollArea>
-          </CardContent>
-          {onSendMessage && (
-            <CardFooter className="p-6 border-t">
-              <Button 
-                onClick={() => onSendMessage("Help me get started with creating an automation")}
-                className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-2xl py-3"
-              >
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Get Help Creating Automation
-              </Button>
-            </CardFooter>
-          )}
-        </Card>
-      </div>
-    );
-  }
-
-  // If no chat object is provided, show a placeholder
-  if (!chat) {
-    return (
-      <Card className="w-full shadow-md hover:shadow-lg transition-shadow duration-300 border-0 bg-gradient-to-br from-gray-50 to-white">
-        <CardContent className="p-6 text-center">
-          <Bot className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-500">No automation data available</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const handleShowPlatforms = () => {
-    console.log('🔍 ChatCard: Extracting platforms from chat message');
-    
-    let platformsSource = [];
-    try {
-      const parsedMessage = JSON.parse(chat.message);
-      
-      if (parsedMessage && parsedMessage.steps) {
-        console.log('✅ ChatCard: Found steps in parsed message');
-        platformsSource = extractPlatformCredentials(parsedMessage);
-      } else if (parsedMessage && parsedMessage.automations) {
-        console.log('✅ ChatCard: Found automations in parsed message');
-        platformsSource = extractPlatformCredentials(parsedMessage.automations);
-      } else if (parsedMessage && Array.isArray(parsedMessage)) {
-        console.log('✅ ChatCard: Found array in parsed message');
-        platformsSource = extractPlatformCredentials(parsedMessage);
-      } else {
-        console.warn('⚠️ ChatCard: No steps or automations found in parsed message');
-        platformsSource = extractPlatformCredentials(parsedMessage);
-      }
-    } catch (error) {
-      console.error('❌ ChatCard: Error parsing chat message:', error);
-      
-      try {
-        platformsSource = extractPlatformCredentials(chat.message);
-      } catch (secondaryError) {
-        console.error('❌ ChatCard: Secondary error extracting platforms:', secondaryError);
-        toast({
-          title: "Error Extracting Platforms",
-          description: "There was an error extracting platforms from the chat message.",
-          variant: "destructive",
-        })
-        return;
-      }
-    }
-
-    // ✅ CRITICAL FIX: Preserve exact ChatAI credential structure - NO FALLBACKS
-    const finalPlatforms = platformsSource.map((platform: any, index: number) => {
-      console.log(`🔧 Processing platform ${index}:`, platform);
-      
-      const rawPlatformName = platform.platform_name || platform.name || platform.platform || `Platform_${index}`;
-      const cleanedPlatformName = cleanPlatformName(rawPlatformName);
-      
-      // ✅ CRITICAL: Use ChatAI's original_platform.required_credentials directly WITHOUT FALLBACKS
-      let credentials = [];
-      
-      if (platform.chatai_data?.original_platform?.required_credentials) {
-        // ✅ PRESERVE ChatAI credentials exactly as generated - NO MAPPING OR FALLBACKS
-        credentials = platform.chatai_data.original_platform.required_credentials;
-        console.log('✅ PRESERVED: Using exact ChatAI required_credentials structure');
-      } else if (platform.credentials && Array.isArray(platform.credentials)) {
-        // ✅ PRESERVE existing credentials exactly - NO MAPPING OR FALLBACKS
-        credentials = platform.credentials;
-        console.log('✅ PRESERVED: Using existing credentials structure');
-      } else {
-        // Only use fallback if absolutely no credential data exists
-        credentials = [{
-          field_name: "api_key",
-          example: `Enter ${cleanedPlatformName} API key`,
-          obtain_link: "",
-          purpose: `Required for ${cleanedPlatformName} API authentication`
-        }];
-        console.log('⚠️ FALLBACK: Using minimal credential structure');
+                ))}
+              </div>
+            </div>
+          );
+        } else {
+          console.log('❌ AGENT DEBUG - No agents to display. Data:', {
+            structuredData: !!structuredData,
+            agentsData: agentsData,
+            isArray: Array.isArray(agentsData),
+            hasLength: agentsData?.length > 0
+          });
+        }
+        
+        return sections.length > 0 ? sections : [<span key="no-sections">AI response processed successfully.</span>];
       }
 
-      return {
-        name: cleanedPlatformName,
-        credentials: credentials,
-        // ✅ CRITICAL: Preserve ALL ChatAI data for test script generation
-        testConfig: platform.testConfig,
-        test_payloads: platform.test_payloads,
-        chatai_data: platform.chatai_data || platform  // Preserve complete ChatAI structure
-      };
-    });
+      const lines = inputText.split('\n');
+      return lines.map((line, index) => (
+        <span key={`line-${index}`}>
+          {cleanPlatformName(line)}
+          {index < lines.length - 1 && <br />}
+        </span>
+      ));
 
-    console.log('🎯 FINAL PLATFORMS WITH PRESERVED CHATAI DATA:', finalPlatforms);
-    setPlatforms(finalPlatforms);
-    setShowPlatformModal(true);
-  };
-
-  const handleClosePlatformModal = () => {
-    setShowPlatformModal(false);
-    setSelectedPlatform(null);
-  };
-
-  const handlePlatformClick = (platform: any) => {
-    console.log('✅ ChatCard: Platform clicked:', platform);
-    setSelectedPlatform(platform);
-  };
-
-  const handleExecuteSingle = async () => {
-    setIsExecutingSingle(true);
-    try {
-      if (onExecute) {
-        onExecute(chat.id);
-      }
     } catch (error: any) {
+      handleError(error, 'Text formatting in ChatCard');
+      return [<span key="processing-error">Processing your YusrAI automation request...</span>];
+    }
+  };
+
+  const handleAgentAdd = (agent: any) => {
+    console.log(`🤖 User adding YusrAI agent with complete data:`, agent);
+    
+    const completeAgentData = {
+      name: agent.name || 'Unnamed Agent',
+      role: agent.role || 'Assistant',
+      rule: agent.rule || agent.rules || '',
+      goal: agent.goal || 'General assistance',
+      memory: agent.memory || '',
+      why_needed: agent.why_needed || ''
+    };
+    
+    agentStateManager.addAgent(agent.name, completeAgentData);
+    
+    if (onAgentAdd) {
+      onAgentAdd(completeAgentData);
+    }
+  };
+
+  const handleAgentDismiss = (agentName: string) => {
+    console.log(`❌ User dismissing YusrAI agent: ${agentName}`);
+    agentStateManager.dismissAgent(agentName);
+    if (onAgentDismiss) {
+      onAgentDismiss(agentName);
+    }
+  };
+
+  const handleErrorHelp = (errorMessage?: string) => {
+    const helpMessage = errorMessage ? 
+      `I encountered this error: "${errorMessage}". Can you help me resolve it and continue with my YusrAI automation?` :
+      "I need help with an error I encountered. Can you assist me?";
+    
+    if (onSendMessage) {
+      onSendMessage(helpMessage);
+    }
+  };
+
+  const handlePlatformCredentialClick = (platformName: string) => {
+    if (onPlatformCredentialChange) {
+      console.log(`🔧 Opening YusrAI credential form for ${platformName}`);
+      onPlatformCredentialChange();
+    }
+  };
+
+  const testPlatformCredentials = async (platformName: string, testPayload: any) => {
+    try {
+      console.log(`🧪 Testing YusrAI credentials for ${platformName}`);
+      const { data, error } = await supabase.functions.invoke('test-credential', {
+        body: {
+          platform: platformName,
+          testConfig: testPayload
+        }
+      });
+
+      if (error) throw error;
+
       toast({
-        title: "Error Executing Automation",
-        description: error.message,
+        title: data.success ? "✅ YusrAI Test Successful" : "❌ YusrAI Test Failed",
+        description: data.message || `YusrAI credential test for ${platformName} completed`,
+        variant: data.success ? "default" : "destructive",
+      });
+
+      return data.success;
+    } catch (error: any) {
+      console.error('YusrAI test error:', error);
+      toast({
+        title: "YusrAI Test Error",
+        description: `Failed to test ${platformName} credentials`,
         variant: "destructive",
       });
-    } finally {
-      setIsExecutingSingle(false);
+      return false;
     }
+  };
+
+  const checkReadyForExecution = () => {
+    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
+    if (!latestBotMessage?.structuredData) return false;
+
+    const structuredData = latestBotMessage.structuredData;
+    
+    const platforms = Array.isArray(structuredData.platforms) ? structuredData.platforms : 
+                     Array.isArray(structuredData.platforms_and_credentials) ? structuredData.platforms_and_credentials : [];
+    const agents = Array.isArray(structuredData.agents) ? structuredData.agents : 
+                  Array.isArray(structuredData.ai_agents) ? structuredData.ai_agents : [];
+    
+    const allPlatformsConfigured = platforms.length === 0 || platforms.every(platform => 
+      platformCredentialStatus[platform.name || platform.platform] === 'saved' || 
+      platformCredentialStatus[platform.name || platform.platform] === 'tested'
+    );
+
+    const allAgentsHandled = agents.length === 0 || agents.every(agent => 
+      dismissedAgents.has(agent.name || agent.agent_name)
+    );
+
+    console.log('🔍 Execution readiness check:', {
+      hasStructuredData: !!structuredData,
+      platformsCount: platforms.length,
+      agentsCount: agents.length,
+      allPlatformsConfigured,
+      allAgentsHandled,
+      isReady: allPlatformsConfigured && allAgentsHandled
+    });
+
+    return allPlatformsConfigured && allAgentsHandled;
+  };
+
+  const handleExecuteAutomation = async () => {
+    console.log('🚀 GHQ execution will be handled by GHQAutomationExecuteButton');
+  };
+
+  const getCompleteAutomationJSON = () => {
+    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
+    if (!latestBotMessage?.structuredData) return null;
+
+    return {
+      automation_id: automationId,
+      created_at: new Date().toISOString(),
+      yusrai_response: latestBotMessage.structuredData,
+      yusraiPowered: latestBotMessage.yusraiPowered || true,
+      sevenSectionsValidated: latestBotMessage.sevenSectionsValidated || true,
+      ready_for_execution: checkReadyForExecution(),
+      credential_status: platformCredentialStatus
+    };
+  };
+
+  const saveAutomationResponse = async (messageData: Message) => {
+    if (!user?.id || !messageData.isBot || !messageData.structuredData) return;
+    
+    try {
+        const { error } = await supabase.from('automation_responses').insert({
+          user_id: user.id,
+          automation_id: automationId,
+          chat_message_id: messageData.id,
+          response_text: messageData.text,
+          structured_data: messageData.structuredData as any,
+          yusraiPowered: messageData.yusraiPowered || false,
+          sevenSectionsValidated: messageData.sevenSectionsValidated || false,
+          error_help_available: messageData.error_help_available || false,
+          is_ready_for_execution: checkReadyForExecution()
+        });
+      
+      if (error) {
+        console.error('❌ Failed to save automation response:', error);
+      } else {
+        console.log('✅ Automation response saved successfully');
+      }
+    } catch (error) {
+      console.error('❌ Error saving automation response:', error);
+    }
+  };
+
+  // PHASE 2: FIXED - Priority 1: structuredData FIRST, fallback to platformData
+  const getLatestPlatforms = () => {
+    console.log('🔍 FIXED: Getting platforms with structuredData FIRST priority');
+    
+    // Priority 1: Rich structuredData extraction (preserves ChatAI data)
+    const latestStructuredMessage = optimizedMessages.filter(msg => msg.isBot && msg.structuredData).pop();
+    if (latestStructuredMessage?.structuredData) {
+      const platformsSource = latestStructuredMessage.structuredData.platforms || 
+                             latestStructuredMessage.structuredData.platforms_and_credentials ||
+                             latestStructuredMessage.structuredData.required_platforms || [];
+      
+      if (platformsSource.length > 0) {
+        const transformedPlatforms = platformsSource.map((platform: any, index: number) => {
+          const platformName = cleanPlatformName(
+            platform.name || platform.platform || platform.platform_name
+          );
+          
+          // CRITICAL: Skip if name becomes generic fallback AND no useful data
+          if (platformName === 'API Platform' && (!platform.credentials || platform.credentials.length === 0) && !platform.testConfig && !platform.test_payloads) {
+            console.log('⚠️ FILTERED: Skipping platform with no useful data');
+            return null;
+          }
+          
+          let credentials = [];
+          if (platform.credentials) {
+            if (Array.isArray(platform.credentials)) {
+              credentials = platform.credentials;
+            } else if (typeof platform.credentials === 'object') {
+              credentials = Object.entries(platform.credentials).map(([key, value]: [string, any]) => ({
+                field: key,
+                placeholder: value.example || value.placeholder || `Enter ${key}`,
+                link: value.link || value.url || value.where_to_get,
+                why_needed: value.description || value.why_needed
+              }));
+            }
+          }
+          
+          const finalPlatform = {
+            name: platformName,
+            credentials: credentials.map((cred: any) => ({
+              field: cred.field || cred.name || 'api_key',
+              placeholder: cred.example || cred.placeholder || `Enter ${cred.field}`,
+              link: cred.link || cred.where_to_get || cred.url,
+              why_needed: cred.why_needed || cred.description
+            })),
+            // CRITICAL: Preserve ALL ChatAI test configuration
+            testConfig: platform.testConfig || platform.test_config,
+            test_payloads: platform.test_payloads || platform.test_payload || [],
+            chatai_data: {
+              original_platform: platform,
+              base_url: platform.base_url || platform.api_base,
+              api_version: platform.api_version
+            }
+          };
+          
+          console.log('✅ FIXED: Rich platform extraction with ChatAI data:', finalPlatform.name);
+          return finalPlatform;
+        }).filter(Boolean); // Remove null entries
+        
+        if (transformedPlatforms.length > 0) {
+          console.log('🎯 FIXED: Using rich structuredData extraction with ChatAI data:', transformedPlatforms.map(p => p.name));
+          return transformedPlatforms;
+        }
+      }
+    }
+    
+    // Priority 2: Fallback to platformData (but filter out rejected platforms)
+    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.platformData).pop();
+    if (latestBotMessage?.platformData) {
+      const filteredPlatforms = latestBotMessage.platformData.filter(platform => {
+        // FIXED: Reject API Platform with no useful data
+        const isGenericPlatform = platform.name === 'API Platform';
+        const hasUsefulData = (platform.credentials && platform.credentials.length > 0) || 
+                             platform.testConfig || 
+                             (platform.test_payloads && platform.test_payloads.length > 0);
+        
+        if (isGenericPlatform && !hasUsefulData) {
+          console.log('⚠️ FILTERED: Rejecting platform with generic name and no data:', platform.name);
+          return false;
+        }
+        return true;
+      });
+      
+      if (filteredPlatforms.length > 0) {
+        console.log('🔄 FIXED: Using filtered platformData as fallback:', filteredPlatforms.map(p => p.name));
+        return filteredPlatforms;
+      }
+    }
+    
+    console.log('⚠️ FIXED: No valid platforms found');
+    return [];
+  };
+
+  const getLatestDiagramData = () => {
+    const latestBotMessage = optimizedMessages.filter(msg => msg.isBot && msg.automationDiagramData).pop();
+    return latestBotMessage?.automationDiagramData || automationDiagramData || null;
+  };
+
+  const transformPlatformsForButtons = (yusraiPlatforms: any[]) => {
+    console.log('🔄 Transforming platforms for buttons with ChatAI data preservation:', yusraiPlatforms);
+    
+    if (!Array.isArray(yusraiPlatforms)) {
+      console.log('⚠️ No platforms array found, returning empty array');
+      return [];
+    }
+    
+    const transformedPlatforms = yusraiPlatforms.map((platform, index) => {
+      console.log(`🔄 Processing platform ${index + 1} for buttons:`, platform);
+      
+      const credentials = platform.credentials || 
+                         platform.required_credentials || 
+                         platform.credential_requirements ||
+                         platform.fields ||
+                         [];
+      
+      const transformedPlatform = {
+        name: platform.name || platform.platform_name || platform.platform || `Platform ${index + 1}`,
+        credentials: Array.isArray(credentials) ? credentials.map((cred: any) => ({
+          field: cred.field || cred.name || cred.key || 'api_key',
+          placeholder: cred.example || cred.placeholder || cred.description || `Enter ${cred.field || 'credential'}`,
+          link: cred.link || cred.where_to_get || cred.documentation_url || cred.url,
+          why_needed: cred.why_needed || cred.description || cred.purpose
+        })) : [],
+        // CRITICAL: Preserve all ChatAI test data
+        testConfig: platform.testConfig || platform.test_config,
+        test_payloads: platform.test_payloads || platform.test_payload || platform.test_data || [],
+        chatai_data: platform.chatai_data || {}
+      };
+      
+      console.log(`✅ Transformed platform with ChatAI data:`, transformedPlatform);
+      return transformedPlatform;
+    });
+    
+    console.log('🎯 Final transformed platforms with ChatAI data:', transformedPlatforms);
+    return transformedPlatforms;
   };
 
   return (
-    <>
-      <Card className="w-full shadow-md hover:shadow-lg transition-shadow duration-300 border-0 bg-gradient-to-br from-gray-50 to-white">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-semibold">{chat.title}</CardTitle>
-          <div className="flex items-center space-x-2">
-            {onEdit && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onEdit(chat.id)}
-                className="h-7 w-7 p-0 rounded-full border-gray-200 hover:bg-gray-100 transition-all duration-300"
-              >
-                <Edit className="w-4 h-4 text-gray-500" />
-              </Button>
-            )}
-            {onDelete && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 rounded-full border-red-200 hover:bg-red-100 transition-all duration-300"
+    <div className="space-y-6">
+      <div 
+        className="w-full bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-0 relative mx-auto flex flex-col"
+        style={{
+          boxShadow: '0 0 60px rgba(92, 142, 246, 0.15), 0 0 120px rgba(154, 94, 255, 0.08)',
+          height: '600px'
+        }}
+      >
+        <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-100/20 to-purple-100/20 pointer-events-none"></div>
+        
+        <ScrollArea className="flex-1 relative z-10 p-6 overflow-y-auto" ref={scrollAreaRef}>
+          <div className="space-y-6 pb-4 min-h-full">
+            {optimizedMessages.map(message => {
+              return (
+                <div key={message.id} className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}>
+                  <div className={`max-w-4xl px-6 py-4 rounded-2xl ${
+                    message.isBot 
+                      ? 'bg-white border border-blue-100/50 text-gray-800 shadow-lg backdrop-blur-sm' 
+                      : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
+                    } transition-all duration-300 overflow-hidden`}
                   >
-                    <Trash2 className="w-4 h-4 text-red-500" />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete this automation and all of its data.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => onDelete(chat.id)}>Delete</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <CardDescription className="text-xs text-gray-500">
-            {chat.description}
-          </CardDescription>
-          <div className="mt-4 flex items-center space-x-2">
-            <Badge variant="secondary">
-              <LayoutDashboard className="mr-1.5 h-3 w-3" />
-              {chat.type}
-            </Badge>
-            {chat.tags && chat.tags.length > 0 && (
-              <Badge variant="outline">
-                <Code2 className="mr-1.5 h-3 w-3" />
-                {chat.tags.join(', ')}
-              </Badge>
-            )}
-          </div>
-        </CardContent>
-        <CardFooter className="flex justify-between items-center">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleShowPlatforms}
-            className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white shadow-md hover:shadow-lg transition-shadow duration-300 font-semibold"
-          >
-            <Network className="mr-2 h-4 w-4" />
-            Platforms
-          </Button>
-          {onExecute && (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleExecuteSingle}
-              disabled={isExecutingSingle}
-              className="bg-gradient-to-r from-green-500 to-purple-500 hover:from-green-600 hover:to-purple-600 text-white shadow-md hover:shadow-lg transition-shadow duration-300 font-semibold"
-            >
-              <Play className="mr-2 h-4 w-4" />
-              {isExecutingSingle ? 'Executing...' : 'Execute'}
-            </Button>
-          )}
-        </CardFooter>
-      </Card>
+                    {message.isBot && (
+                      <div className="flex items-center gap-2 mb-3">
+                        <img 
+                          src="/lovable-uploads/cf9c8f76-d8e9-4790-b043-40ba7239140d.png" 
+                          alt="YusrAI" 
+                          className="w-5 h-5 object-contain"
+                        />
+                        <span className="text-sm font-medium text-blue-600">
+                          YusrAI {message.yusraiPowered ? (message.sevenSectionsValidated ? '(Complete)' : '(Processing)') : '(Basic)'}
+                        </span>
+                        {message.sevenSectionsValidated && (
+                          <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        )}
+                        {message.structuredData && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="ml-2 text-xs h-6 px-2"
+                            onClick={() => {
+                              setDebugModalData(message.structuredData);
+                              setShowDebugModal(true);
+                            }}
+                          >
+                            <Code className="w-3 h-3 mr-1" />
+                            Code
+                          </Button>
+                        )}
+                        {message.automationDiagramData && (
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="ml-2 text-xs h-6 px-2"
+                              >
+                                <Code className="w-3 h-3 mr-1" />
+                                Diagram
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-6xl max-h-[90vh] overflow-auto">
+                              <DialogHeader>
+                                <DialogTitle>Automation Diagram</DialogTitle>
+                              </DialogHeader>
+                              <ExecutionBlueprintVisualizer
+                                blueprint={message.automationDiagramData}
+                              />
+                            </DialogContent>
+                          </Dialog>
+                        )}
+                      </div>
+                    )}
+                    
+                    {!message.isBot && (
+                      <div className="flex items-start gap-2 mb-2">
+                        <User className="w-4 h-4 mt-1 flex-shrink-0" />
+                        <span className="text-sm">You</span>
+                      </div>
+                    )}
 
-      {showPlatformModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-xl shadow-2xl bg-white">
-            <div className="flex justify-between items-center p-4 border-b">
-              <h2 className="text-lg font-semibold">Select a Platform</h2>
-              <Button variant="ghost" size="sm" onClick={handleClosePlatformModal}>
-                Close
-              </Button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 overflow-y-auto max-h-[calc(90vh - 80px)]">
-              {platforms && platforms.length > 0 ? (
-                platforms.map((platform, index) => (
-                  <Card
-                    key={index}
-                    className={`shadow-sm hover:shadow-md transition-shadow duration-300 cursor-pointer border-0 ${selectedPlatform?.name === platform.name ? 'bg-blue-50 border-blue-300' : 'bg-gray-50'
-                      }`}
-                    onClick={() => handlePlatformClick(platform)}
-                  >
-                    <CardHeader className="space-y-0 pb-2">
-                      <CardTitle className="text-sm font-semibold">{platform.name}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <CardDescription className="text-xs text-gray-500">
-                        {platform.credentials?.length} Credentials Required
-                      </CardDescription>
-                    </CardContent>
-                  </Card>
-                ))
-              ) : (
-                <div className="col-span-3 text-center text-gray-500">No platforms found in this automation.</div>
-              )}
-            </div>
+                    <div className="leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
+                      {safeFormatMessageText(message.text, message.structuredData)}
+                      
+                      {message.isBot && message.error_help_available && (
+                        <ErrorHelpButton 
+                          errorMessage={message.text}
+                          onHelpRequest={() => handleErrorHelp(message.text)}
+                        />
+                      )}
+                    </div>
+                    
+                    <p className={`text-xs mt-3 ${message.isBot ? 'text-gray-500' : 'text-blue-100'}`}>
+                      {message.timestamp.toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+            
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="max-w-4xl px-6 py-4 rounded-2xl bg-white border border-blue-100/50 text-gray-800 shadow-lg backdrop-blur-sm">
+                  <div className="flex items-center space-x-3">
+                    <img 
+                      src="/lovable-uploads/cf9c8f76-d8e9-4790-b043-40ba7239140d.png" 
+                      alt="YusrAI" 
+                      className="w-5 h-5 object-contain animate-pulse"
+                    />
+                    <span className="text-sm font-medium text-blue-600">YusrAI is creating your automation...</span>
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
+        </ScrollArea>
+      </div>
+
+      {getLatestPlatforms().length > 0 && (
+        <div className="mt-4">
+          <FixedPlatformButtons
+            platforms={transformPlatformsForButtons(getLatestPlatforms())}
+            automationId={automationId}
+            onCredentialChange={onPlatformCredentialChange}
+          />
         </div>
       )}
 
-      {selectedPlatform && (
-        <SimplePlatformDisplay platform={selectedPlatform} onClose={() => setSelectedPlatform(null)} />
-      )}
-    </>
+      <DebugCodeModal
+        structuredData={debugModalData}
+        isOpen={showDebugModal}
+        onOpenChange={setShowDebugModal}
+      />
+    </div>
   );
 };
 

@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ExternalLink, TestTube, Save, Eye, EyeOff, Code, Activity, Info } from "lucide-react";
 import { extractTestScript, injectCredentials } from "@/utils/platformTestScriptExtractor";
+import { AutomationCredentialManager } from "@/utils/automationCredentialManager";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Platform {
@@ -23,16 +25,21 @@ interface Platform {
 
 interface SimplePlatformDisplayProps {
   platform: Platform;
+  automationId: string;
+  userId: string;
+  onCredentialChange?: () => void;
   onClose: () => void;
 }
 
-const SimplePlatformDisplay = ({ platform, onClose }: SimplePlatformDisplayProps) => {
+const SimplePlatformDisplay = ({ platform, automationId, userId, onCredentialChange, onClose }: SimplePlatformDisplayProps) => {
   const [credentialValues, setCredentialValues] = useState<Record<string, string>>({});
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [testResponse, setTestResponse] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'credentials' | 'code' | 'response'>('credentials');
   const [showInfo, setShowInfo] = useState(false);
+  const { toast } = useToast();
 
   console.log('🔍 SimplePlatformDisplay received platform data:', platform);
 
@@ -63,7 +70,7 @@ const SimplePlatformDisplay = ({ platform, onClose }: SimplePlatformDisplayProps
           credentials: credentialValues,
           testConfig: platform.testConfig,
           chataiData: platform.chatai_data,
-          userId: 'current-user'
+          userId: userId
         }
       });
 
@@ -72,6 +79,10 @@ const SimplePlatformDisplay = ({ platform, onClose }: SimplePlatformDisplayProps
       }
 
       setTestResponse(result);
+      toast({
+        title: "Credentials tested successfully",
+        description: `${platform.name} connection test completed`,
+      });
       setIsLoading(false);
     } catch (error: any) {
       console.error('❌ Real ChatAI testing failed:', error);
@@ -85,13 +96,59 @@ const SimplePlatformDisplay = ({ platform, onClose }: SimplePlatformDisplayProps
           platform: platform.name
         }
       });
+      toast({
+        title: "Test failed",
+        description: `Failed to test ${platform.name} credentials: ${error.message}`,
+        variant: "destructive"
+      });
       setIsLoading(false);
     }
   };
 
-  const handleSave = () => {
-    console.log('💾 Saving credentials:', credentialValues);
-    // TODO: Implement save functionality
+  const handleSave = async () => {
+    if (!automationId || !userId) {
+      toast({
+        title: "Save failed",
+        description: "Missing automation ID or user ID",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    console.log('💾 Saving credentials for:', platform.name, credentialValues);
+    
+    try {
+      const result = await AutomationCredentialManager.saveCredentials(
+        automationId,
+        platform.name,
+        credentialValues,
+        userId
+      );
+
+      if (result.success) {
+        toast({
+          title: "Credentials saved successfully",
+          description: `${platform.name} credentials have been securely stored`,
+        });
+        
+        // Call the callback to notify parent component
+        if (onCredentialChange) {
+          onCredentialChange();
+        }
+      } else {
+        throw new Error(result.error || 'Failed to save credentials');
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to save credentials:', error);
+      toast({
+        title: "Save failed",
+        description: `Failed to save ${platform.name} credentials: ${error.message}`,
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const generateTestScript = () => {
@@ -261,11 +318,11 @@ const SimplePlatformDisplay = ({ platform, onClose }: SimplePlatformDisplayProps
                   
                   <Button
                     onClick={handleSave}
-                    disabled={!isFormValid}
+                    disabled={!isFormValid || isSaving}
                     className="flex-1 bg-gradient-to-r from-green-500 via-blue-500 to-purple-500 hover:from-green-600 hover:via-blue-600 hover:to-purple-600 text-white py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
                   >
                     <Save className="w-4 h-4 mr-2" />
-                    Save Credentials
+                    {isSaving ? 'Saving...' : 'Save Credentials'}
                   </Button>
                 </div>
               </div>

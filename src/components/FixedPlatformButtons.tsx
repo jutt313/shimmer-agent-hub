@@ -58,6 +58,9 @@ const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: F
       {selectedPlatform && (
         <SimplePlatformDisplay
           platform={selectedPlatform}
+          automationId={automationId}
+          userId={user?.id || ''}
+          onCredentialChange={onCredentialChange}
           onClose={() => setSelectedPlatform(null)}
         />
       )}

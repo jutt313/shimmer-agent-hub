@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import ChatAICredentialForm from './ChatAICredentialForm';
 
 interface Platform {
   name: string;
@@ -25,17 +24,14 @@ interface FixedPlatformButtonsProps {
 }
 
 const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: FixedPlatformButtonsProps) => {
-  const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
   const { user } = useAuth();
 
-  console.log('🚀 FixedPlatformButtons using COMPLETE platform objects with ChatAI data:', platforms);
+  console.log('🚀 FixedPlatformButtons received platforms:', platforms);
   console.log('🧪 Automation ID:', automationId);
 
   const handlePlatformSetup = (platform: Platform) => {
-    console.log(`🔧 Opening ChatAI credential setup for platform:`, platform);
-    console.log(`🔧 Platform includes ChatAI testConfig:`, !!platform.testConfig);
-    console.log(`🔧 Platform includes test_payloads:`, platform.test_payloads?.length || 0);
-    setSelectedPlatform(platform);
+    console.log(`🔧 Platform setup requested for:`, platform);
+    // TODO: Will implement simple credential form here
   };
 
   if (!platforms || platforms.length === 0) {
@@ -57,22 +53,10 @@ const FixedPlatformButtons = ({ platforms, automationId, onCredentialChange }: F
           </Button>
         ))}
       </div>
-
-      {selectedPlatform && (
-        <ChatAICredentialForm
-          platform={selectedPlatform}
-          automationId={automationId}
-          onCredentialSaved={(platformName: string) => {
-            console.log(`✅ ChatAI credentials saved for ${platformName}`);
-            onCredentialChange?.();
-            setSelectedPlatform(null);
-          }}
-          onCredentialTested={(platformName: string) => {
-            console.log(`🧪 ChatAI credential tested successfully for ${platformName}`);
-          }}
-          onClose={() => setSelectedPlatform(null)}
-        />
-      )}
+      
+      <div className="text-center text-gray-500 text-sm">
+        Platform credential setup will be implemented with a simple approach
+      </div>
     </div>
   );
 };

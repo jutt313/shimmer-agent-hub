@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,6 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ExternalLink, TestTube, Save, Eye, EyeOff, Code, Activity, Info } from "lucide-react";
+import { extractTestScript, injectCredentials } from "@/utils/platformTestScriptExtractor";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Platform {
   name: string;
@@ -52,25 +53,40 @@ const SimplePlatformDisplay = ({ platform, onClose }: SimplePlatformDisplayProps
   const handleTest = async () => {
     setIsLoading(true);
     setActiveTab('response');
-    console.log('🧪 Testing credentials with values:', credentialValues);
+    console.log('🧪 Testing credentials with real ChatAI-powered API calls:', credentialValues);
     
-    // Simulate test response
-    setTimeout(() => {
+    try {
+      // Use the new real credential testing edge function
+      const { data: result, error } = await supabase.functions.invoke('test-platform-credentials', {
+        body: {
+          platformName: platform.name,
+          credentials: credentialValues,
+          testConfig: platform.testConfig,
+          chataiData: platform.chatai_data,
+          userId: 'current-user'
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setTestResponse(result);
+      setIsLoading(false);
+    } catch (error: any) {
+      console.error('❌ Real ChatAI testing failed:', error);
       setTestResponse({
-        success: true,
-        message: `${platform.name} credentials tested successfully!`,
-        timestamp: new Date().toISOString(),
-        credentials_tested: Object.keys(credentialValues).length,
-        platform: platform.name,
-        status_code: 200,
-        response_data: {
-          user_id: "12345",
-          api_quota: "unlimited",
-          account_type: "premium"
+        success: false,
+        message: `Real API test failed: ${error.message}`,
+        details: { 
+          error: error.message, 
+          chatai_driven: true,
+          real_api_testing: true,
+          platform: platform.name
         }
       });
       setIsLoading(false);
-    }, 2000);
+    }
   };
 
   const handleSave = () => {
@@ -79,37 +95,16 @@ const SimplePlatformDisplay = ({ platform, onClose }: SimplePlatformDisplayProps
   };
 
   const generateTestScript = () => {
-    const baseScript = `// ${platform.name} API Test Script
-const testConnection = async () => {
-  const config = {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-${platform.credentials?.map(cred => {
-  const value = credentialValues[cred.field] || `your_${cred.field}`;
-  if (cred.field.toLowerCase().includes('key') || cred.field.toLowerCase().includes('token')) {
-    return `      'Authorization': 'Bearer ${value}',`;
-  }
-  return `      '${cred.field}': '${value}',`;
-}).join('\n') || '      // Add your credentials here'}
-    }
-  };
-  
-  try {
-    const response = await fetch('${platform.chatai_data?.original_platform?.credential_link || 'https://api.' + platform.name.toLowerCase() + '.com/test'}', config);
-    const data = await response.json();
-    return { success: true, data };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-};
-
-// Execute test
-testConnection().then(result => {
-  console.log('Test Result:', result);
-});`;
-
-    return baseScript;
+    console.log('🤖 CRITICAL FIX: Using ChatAI-aware script extractor instead of hardcoded generation');
+    
+    // CRITICAL FIX: Use the existing platformTestScriptExtractor utility
+    // This properly handles ChatAI's original_platform data, test_payloads, and testConfig
+    const baseScript = extractTestScript(platform, credentialValues);
+    
+    // Inject actual credentials for display (masked)
+    const scriptWithCredentials = injectCredentials(baseScript, credentialValues);
+    
+    return scriptWithCredentials;
   };
 
   const isFormValid = platform.credentials?.every(cred => credentialValues[cred.field]) || false;

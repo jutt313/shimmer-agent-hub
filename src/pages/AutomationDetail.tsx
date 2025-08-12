@@ -538,29 +538,25 @@ const AutomationDetail = () => {
     }
   };
 
-  const handleAgentSaved = (agentName: string, agentId: string) => {
-    setShowAIAgentForm(false);
-    setSelectedAgent(null);
+  const handleAgentSaved = (agentName: string, agentId?: string, llmProvider?: string, model?: string, config?: any, apiKey?: string) => {
+    console.log(`✅ AI Agent "${agentName}" saved successfully`, { agentId, llmProvider, model });
     
-    agentStateManager.addAgent(agentName, { name: agentName, id: agentId });
-    
-    if (automation) {
-      const confirmationMessage = `I've successfully configured your new AI Agent: "${agentName}"!`;
-      
-      setMessages(prev => [...prev, {
-        id: Date.now(),
-        text: confirmationMessage,
-        isBot: false,
-        timestamp: new Date()
-      }]);
-
-      const agentStatusSummary = agentStateManager.getStatusSummary();
-      const enhancedMessage = `Please incorporate the newly configured AI Agent "${agentName}" (ID: ${agentId}) into this automation's blueprint. ${agentStatusSummary} Please update the blueprint and explain its role and impact on the workflow.`;
-
-      handleSendMessage(enhancedMessage).then(() => {
-        setNewMessage("");
-      });
+    // Update agent state management
+    if (agentName && config) {
+      agentStateManager.addAgent(agentName, config);
     }
+    
+    // Direct success feedback only - NO chat message generation
+    toast({
+      title: "Agent Saved",
+      description: `AI Agent "${agentName}" has been successfully configured and saved.`,
+    });
+    
+    // Close the agent form
+    setShowAIAgentForm(false);
+    
+    // Refresh the page to show updated agent status if needed
+    window.location.reload();
   };
 
   const handleAgentAdd = (agent: any) => {

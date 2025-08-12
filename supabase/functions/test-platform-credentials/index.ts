@@ -25,9 +25,9 @@ serve(async (req) => {
     // Extract ChatAI configuration for real testing
     let baseUrl, testEndpoint, authConfig;
     
-    if (chataiData?.original_platform) {
+    if (chataiData?.chatai_data?.original_platform) {
       // Use ChatAI original_platform data (highest priority)
-      const originalPlatform = chataiData.original_platform;
+      const originalPlatform = chataiData.chatai_data.original_platform;
       baseUrl = originalPlatform.base_url || originalPlatform.api_base_url;
       testEndpoint = originalPlatform.test_endpoint || '/health';
       

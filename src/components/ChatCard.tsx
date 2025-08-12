@@ -26,13 +26,34 @@ import SimplePlatformDisplay from '@/components/SimplePlatformDisplay';
 import { extractPlatformCredentials } from '@/utils/platformDataExtractor';
 import { useToast } from "@/components/ui/use-toast"
 
+// Updated interface to support multiple usage patterns
 interface ChatCardProps {
-  chat: any;
-  onEdit: (id: string) => void;
-  onDelete: (id: string) => void;
-  onExecute: (id: string) => void;
-  isExecuting: boolean;
-  showDiagram: boolean;
+  // For automation-specific usage (when chat object is provided)
+  chat?: any;
+  onEdit?: (id: string) => void;
+  onDelete?: (id: string) => void;
+  onExecute?: (id: string) => void;
+  isExecuting?: boolean;
+  showDiagram?: boolean;
+  
+  // For chat interface usage (when messages array is provided)
+  messages?: Array<{
+    id: number;
+    text: string;
+    isBot: boolean;
+    timestamp: Date;
+    structuredData?: any;
+  }>;
+  onSendMessage?: (message: string) => void;
+  
+  // Additional props for other usage patterns
+  onAgentAdd?: (agent: any) => void;
+  dismissedAgents?: Set<string>;
+  onAgentDismiss?: (agentName: string) => void;
+  automationId?: string;
+  isLoading?: boolean;
+  platformCredentialStatus?: any;
+  onPlatformCredentialChange?: () => void;
 }
 
 // Helper function to clean platform names
@@ -41,12 +62,96 @@ const cleanPlatformName = (name: string) => {
   return name.replace(/[^a-zA-Z0-9\s]/g, '').trim();
 };
 
-const ChatCard = ({ chat, onEdit, onDelete, onExecute, isExecuting, showDiagram }: ChatCardProps) => {
+const ChatCard = ({ 
+  chat, 
+  onEdit, 
+  onDelete, 
+  onExecute, 
+  isExecuting, 
+  showDiagram,
+  messages,
+  onSendMessage,
+  onAgentAdd,
+  dismissedAgents,
+  onAgentDismiss,
+  automationId,
+  isLoading,
+  platformCredentialStatus,
+  onPlatformCredentialChange
+}: ChatCardProps) => {
   const [showPlatformModal, setShowPlatformModal] = useState(false);
   const [platforms, setPlatforms] = useState<any[]>([]);
   const [selectedPlatform, setSelectedPlatform] = useState<any | null>(null);
   const [isExecutingSingle, setIsExecutingSingle] = useState(false);
   const { toast } = useToast();
+
+  // If this is a chat interface usage (messages provided), render differently
+  if (messages) {
+    return (
+      <div className="w-full max-w-4xl mx-auto">
+        <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-2xl rounded-3xl overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6">
+            <CardTitle className="text-2xl font-bold">YusrAI Assistant</CardTitle>
+            <CardDescription className="text-blue-100">
+              Your AI-powered automation companion
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ScrollArea className="h-96 p-6">
+              {messages.map((message) => (
+                <div key={message.id} className={`mb-4 ${message.isBot ? 'flex justify-start' : 'flex justify-end'}`}>
+                  <div className={`max-w-[80%] p-4 rounded-2xl ${
+                    message.isBot 
+                      ? 'bg-gray-100 text-gray-800' 
+                      : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
+                  }`}>
+                    <div className="flex items-start gap-3">
+                      {message.isBot && (
+                        <Avatar className="w-8 h-8">
+                          <AvatarFallback className="bg-blue-500 text-white">
+                            <Bot className="w-4 h-4" />
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
+                      <div className="flex-1">
+                        <p className="text-sm leading-relaxed">{message.text}</p>
+                        <p className="text-xs opacity-70 mt-2">
+                          {message.timestamp.toLocaleTimeString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </ScrollArea>
+          </CardContent>
+          {onSendMessage && (
+            <CardFooter className="p-6 border-t">
+              <Button 
+                onClick={() => onSendMessage("Help me get started with creating an automation")}
+                className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-2xl py-3"
+              >
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Get Help Creating Automation
+              </Button>
+            </CardFooter>
+          )}
+        </Card>
+      </div>
+    );
+  }
+
+  // If no chat object is provided, show a placeholder
+  if (!chat) {
+    return (
+      <Card className="w-full shadow-md hover:shadow-lg transition-shadow duration-300 border-0 bg-gradient-to-br from-gray-50 to-white">
+        <CardContent className="p-6 text-center">
+          <Bot className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+          <p className="text-gray-500">No automation data available</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const handleShowPlatforms = () => {
     console.log('🔍 ChatCard: Extracting platforms from chat message');
@@ -141,8 +246,9 @@ const ChatCard = ({ chat, onEdit, onDelete, onExecute, isExecuting, showDiagram 
   const handleExecuteSingle = async () => {
     setIsExecutingSingle(true);
     try {
-      // Execute the automation
-      onExecute(chat.id);
+      if (onExecute) {
+        onExecute(chat.id);
+      }
     } catch (error: any) {
       toast({
         title: "Error Executing Automation",
@@ -160,37 +266,41 @@ const ChatCard = ({ chat, onEdit, onDelete, onExecute, isExecuting, showDiagram 
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-semibold">{chat.title}</CardTitle>
           <div className="flex items-center space-x-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onEdit(chat.id)}
-              className="h-7 w-7 p-0 rounded-full border-gray-200 hover:bg-gray-100 transition-all duration-300"
-            >
-              <Edit className="w-4 h-4 text-gray-500" />
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0 rounded-full border-red-200 hover:bg-red-100 transition-all duration-300"
-                >
-                  <Trash2 className="w-4 h-4 text-red-500" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete this automation and all of its data.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => onDelete(chat.id)}>Delete</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            {onEdit && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onEdit(chat.id)}
+                className="h-7 w-7 p-0 rounded-full border-gray-200 hover:bg-gray-100 transition-all duration-300"
+              >
+                <Edit className="w-4 h-4 text-gray-500" />
+              </Button>
+            )}
+            {onDelete && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 rounded-full border-red-200 hover:bg-red-100 transition-all duration-300"
+                  >
+                    <Trash2 className="w-4 h-4 text-red-500" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete this automation and all of its data.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => onDelete(chat.id)}>Delete</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -220,16 +330,18 @@ const ChatCard = ({ chat, onEdit, onDelete, onExecute, isExecuting, showDiagram 
             <Network className="mr-2 h-4 w-4" />
             Platforms
           </Button>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={handleExecuteSingle}
-            disabled={isExecutingSingle}
-            className="bg-gradient-to-r from-green-500 to-purple-500 hover:from-green-600 hover:to-purple-600 text-white shadow-md hover:shadow-lg transition-shadow duration-300 font-semibold"
-          >
-            <Play className="mr-2 h-4 w-4" />
-            {isExecutingSingle ? 'Executing...' : 'Execute'}
-          </Button>
+          {onExecute && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleExecuteSingle}
+              disabled={isExecutingSingle}
+              className="bg-gradient-to-r from-green-500 to-purple-500 hover:from-green-600 hover:to-purple-600 text-white shadow-md hover:shadow-lg transition-shadow duration-300 font-semibold"
+            >
+              <Play className="mr-2 h-4 w-4" />
+              {isExecutingSingle ? 'Executing...' : 'Execute'}
+            </Button>
+          )}
         </CardFooter>
       </Card>
 

@@ -30,7 +30,7 @@ const SimplePlatformDisplay = ({ platform, onClose }: SimplePlatformDisplayProps
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [testResponse, setTestResponse] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'code' | 'response'>('code');
+  const [activeTab, setActiveTab] = useState<'credentials' | 'code' | 'response'>('credentials');
   const [showInfo, setShowInfo] = useState(false);
 
   console.log('🔍 SimplePlatformDisplay received platform data:', platform);
@@ -115,135 +115,65 @@ testConnection().then(result => {
   const isFormValid = platform.credentials?.every(cred => credentialValues[cred.field]) || false;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl">
-        <CardHeader className="pb-4">
-          <CardTitle className="flex justify-between items-center">
-            <span className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-green-600 bg-clip-text text-transparent">
-              {platform.name}
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowInfo(!showInfo)}
-                className="text-blue-600 hover:text-blue-800"
-              >
-                <Info className="w-4 h-4" />
-              </Button>
-              <button 
-                onClick={onClose}
-                className="text-gray-500 hover:text-gray-700 text-xl font-bold"
-              >
-                ×
-              </button>
-            </div>
-          </CardTitle>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="w-full max-w-3xl max-h-[85vh] overflow-hidden">
+        <Card className="bg-gradient-to-br from-purple-50 via-blue-50 to-green-50 border-0 shadow-2xl rounded-2xl overflow-hidden backdrop-blur-lg">
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-blue-500/10 to-green-500/10 pointer-events-none"></div>
+          <div className="absolute inset-0 shadow-[inset_0_0_50px_rgba(147,51,234,0.15)] pointer-events-none rounded-2xl"></div>
           
-          {showInfo && (
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h4 className="font-semibold text-blue-800 mb-2">Why do we need these credentials?</h4>
-              <p className="text-sm text-blue-700">
-                These credentials are required to authenticate with {platform.name}'s API and test the connection. 
-                Your credentials are securely stored and only used for API authentication.
-              </p>
-            </div>
-          )}
-        </CardHeader>
-        
-        <CardContent className="space-y-6">
-          {/* Credential Input Fields */}
-          {platform.credentials && platform.credentials.length > 0 && (
-            <div>
-              <h3 className="font-semibold text-lg mb-4 text-gray-800">Credentials</h3>
-              <div className="space-y-4">
-                {platform.credentials.map((cred, index) => {
-                  const isPasswordField = cred.field.toLowerCase().includes('password') || 
-                                        cred.field.toLowerCase().includes('secret') ||
-                                        cred.field.toLowerCase().includes('key');
-                  
-                  return (
-                    <div key={index} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor={cred.field} className="text-sm font-medium text-gray-700">
-                          {cred.field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                          <span className="text-red-500 ml-1">*</span>
-                        </Label>
-                        {cred.link && (
-                          <a 
-                            href={cred.link} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center text-xs text-blue-600 hover:text-blue-800"
-                          >
-                            <ExternalLink className="w-3 h-3 mr-1" />
-                            Get {cred.field}
-                          </a>
-                        )}
-                      </div>
-                      
-                      <div className="relative">
-                        <Input
-                          id={cred.field}
-                          type={isPasswordField && !showPasswords[cred.field] ? 'password' : 'text'}
-                          placeholder={cred.placeholder}
-                          value={credentialValues[cred.field] || ''}
-                          onChange={(e) => handleInputChange(cred.field, e.target.value)}
-                          className="pr-10"
-                        />
-                        {isPasswordField && (
-                          <button
-                            type="button"
-                            onClick={() => togglePasswordVisibility(cred.field)}
-                            className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                          >
-                            {showPasswords[cred.field] ? (
-                              <EyeOff className="h-4 w-4 text-gray-400" />
-                            ) : (
-                              <Eye className="h-4 w-4 text-gray-400" />
-                            )}
-                          </button>
-                        )}
-                      </div>
-                      
-                      <p className="text-xs text-gray-600">{cred.why_needed}</p>
-                    </div>
-                  );
-                })}
+          {/* Compact Header */}
+          <CardHeader className="pb-3 relative z-10">
+            <CardTitle className="flex justify-between items-center">
+              <span className="text-xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-green-600 bg-clip-text text-transparent">
+                {platform.name}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowInfo(!showInfo)}
+                  className="h-8 w-8 p-0 rounded-full border-purple-200 hover:bg-purple-100/50 transition-all duration-300"
+                >
+                  <Info className="w-4 h-4 text-purple-600" />
+                </Button>
+                <button 
+                  onClick={onClose}
+                  className="text-gray-400 hover:text-gray-600 text-xl font-bold transition-colors duration-200"
+                >
+                  ×
+                </button>
               </div>
-            </div>
-          )}
-
-          {/* Test & Save Buttons */}
-          <div className="flex gap-3 justify-center py-4">
-            <Button
-              onClick={handleTest}
-              disabled={!isFormValid || isLoading}
-              className="bg-gradient-to-r from-purple-500 via-blue-500 to-green-500 hover:from-purple-600 hover:via-blue-600 hover:to-green-600 text-white px-6 py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300"
-            >
-              <TestTube className="w-4 h-4 mr-2" />
-              {isLoading ? 'Testing...' : 'Test Connection'}
-            </Button>
+            </CardTitle>
             
-            <Button
-              onClick={handleSave}
-              disabled={!isFormValid}
-              className="bg-gradient-to-r from-green-500 via-blue-500 to-purple-500 hover:from-green-600 hover:via-blue-600 hover:to-purple-600 text-white px-6 py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Save Credentials
-            </Button>
-          </div>
-
-          {/* Navigation Tabs */}
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
+            {showInfo && (
+              <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200/50 backdrop-blur-sm">
+                <p className="text-sm text-blue-700 font-medium">
+                  These credentials authenticate with {platform.name}'s API. Your data is securely encrypted and only used for API connections.
+                </p>
+              </div>
+            )}
+          </CardHeader>
+          
+          <CardContent className="space-y-4 relative z-10 max-h-[calc(85vh-120px)] overflow-y-auto custom-scrollbar">
+            {/* Navigation Tabs */}
+            <div className="flex gap-1 p-1 bg-white/40 rounded-xl backdrop-blur-sm border border-white/30">
+              <button
+                onClick={() => setActiveTab('credentials')}
+                className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-all duration-300 flex items-center justify-center gap-2 ${
+                  activeTab === 'credentials'
+                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg'
+                    : 'text-gray-600 hover:text-gray-800 hover:bg-white/50'
+                }`}
+              >
+                <TestTube className="w-4 h-4" />
+                Credentials
+              </button>
               <button
                 onClick={() => setActiveTab('code')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-all duration-300 flex items-center justify-center gap-2 ${
                   activeTab === 'code'
-                    ? 'border-purple-500 text-purple-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'bg-gradient-to-r from-blue-500 to-green-500 text-white shadow-lg'
+                    : 'text-gray-600 hover:text-gray-800 hover:bg-white/50'
                 }`}
               >
                 <Code className="w-4 h-4" />
@@ -251,28 +181,108 @@ testConnection().then(result => {
               </button>
               <button
                 onClick={() => setActiveTab('response')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-all duration-300 flex items-center justify-center gap-2 ${
                   activeTab === 'response'
-                    ? 'border-green-500 text-green-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'bg-gradient-to-r from-green-500 to-purple-500 text-white shadow-lg'
+                    : 'text-gray-600 hover:text-gray-800 hover:bg-white/50'
                 }`}
               >
                 <Activity className="w-4 h-4" />
                 Response
               </button>
-            </nav>
-          </div>
+            </div>
 
-          {/* Tab Content */}
-          <div className="mt-6">
+            {/* Tab Content */}
+            {activeTab === 'credentials' && (
+              <div className="space-y-4">
+                {platform.credentials && platform.credentials.length > 0 && (
+                  <div className="space-y-4">
+                    {platform.credentials.map((cred, index) => {
+                      const isPasswordField = cred.field.toLowerCase().includes('password') || 
+                                            cred.field.toLowerCase().includes('secret') ||
+                                            cred.field.toLowerCase().includes('key');
+                      
+                      return (
+                        <div key={index} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor={cred.field} className="text-sm font-semibold text-gray-700">
+                              {cred.field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                              <span className="text-red-500 ml-1">*</span>
+                            </Label>
+                            {cred.link && (
+                              <a 
+                                href={cred.link} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center text-xs text-purple-600 hover:text-purple-800 font-medium transition-colors duration-200"
+                              >
+                                <ExternalLink className="w-3 h-3 mr-1" />
+                                Get {cred.field}
+                              </a>
+                            )}
+                          </div>
+                          
+                          <div className="relative">
+                            <Input
+                              id={cred.field}
+                              type={isPasswordField && !showPasswords[cred.field] ? 'password' : 'text'}
+                              placeholder={cred.placeholder}
+                              value={credentialValues[cred.field] || ''}
+                              onChange={(e) => handleInputChange(cred.field, e.target.value)}
+                              className="pr-10 border-2 border-transparent bg-white/80 backdrop-blur-sm focus:border-purple-400 focus:bg-white focus:shadow-[0_0_20px_rgba(147,51,234,0.3)] transition-all duration-300 rounded-xl"
+                            />
+                            {isPasswordField && (
+                              <button
+                                type="button"
+                                onClick={() => togglePasswordVisibility(cred.field)}
+                                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                              >
+                                {showPasswords[cred.field] ? (
+                                  <EyeOff className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                                ) : (
+                                  <Eye className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                          
+                          <p className="text-xs text-gray-600 bg-white/50 p-2 rounded-lg">{cred.why_needed}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Test & Save Buttons */}
+                <div className="flex gap-3 pt-4 border-t border-white/30">
+                  <Button
+                    onClick={handleTest}
+                    disabled={!isFormValid || isLoading}
+                    className="flex-1 bg-gradient-to-r from-purple-500 via-blue-500 to-green-500 hover:from-purple-600 hover:via-blue-600 hover:to-green-600 text-white py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
+                  >
+                    <TestTube className="w-4 h-4 mr-2" />
+                    {isLoading ? 'Testing...' : 'Test Connection'}
+                  </Button>
+                  
+                  <Button
+                    onClick={handleSave}
+                    disabled={!isFormValid}
+                    className="flex-1 bg-gradient-to-r from-green-500 via-blue-500 to-purple-500 hover:from-green-600 hover:via-blue-600 hover:to-purple-600 text-white py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Credentials
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {activeTab === 'code' && (
               <div>
-                <h3 className="font-semibold text-lg mb-3 text-purple-700">Generated Test Script</h3>
-                <div className="bg-gray-900 rounded-lg p-4">
+                <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl p-4 border border-purple-200/30 shadow-lg">
                   <Textarea
                     value={generateTestScript()}
                     readOnly
-                    className="font-mono text-sm min-h-[300px] bg-transparent text-green-400 border-0 resize-none"
+                    className="font-mono text-sm min-h-[400px] bg-transparent text-green-400 border-0 resize-none focus:ring-0"
                   />
                 </div>
               </div>
@@ -280,24 +290,23 @@ testConnection().then(result => {
 
             {activeTab === 'response' && (
               <div>
-                <h3 className="font-semibold text-lg mb-3 text-green-700">Test Response</h3>
                 {testResponse ? (
-                  <div className="bg-gray-900 rounded-lg p-4">
-                    <pre className="text-sm text-green-400 whitespace-pre-wrap">
+                  <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl p-4 border border-green-200/30 shadow-lg">
+                    <pre className="text-sm text-green-400 whitespace-pre-wrap font-mono">
                       {JSON.stringify(testResponse, null, 2)}
                     </pre>
                   </div>
                 ) : (
-                  <div className="bg-gray-50 rounded-lg p-8 text-center">
+                  <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-8 text-center border border-gray-200/50">
                     <Activity className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-500">No test response yet. Run a test to see results here.</p>
+                    <p className="text-gray-500 font-medium">No test response yet. Run a test to see results here.</p>
                   </div>
                 )}
               </div>
             )}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

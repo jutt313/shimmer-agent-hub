@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { X, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,8 +34,8 @@ const llmOptions = {
   "OpenAI": ["gpt-4", "gpt-3.5-turbo", "gpt-4-turbo", "gpt-4o", "gpt-4o-mini"],
   "Claude": ["claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
   "Gemini": ["gemini-pro", "gemini-1.5-pro-latest", "gemini-1.0-pro"],
-  "Grok": ["grok-1", "grok-1.5"],
-  "DeepSeek": ["deepseek-chat", "deepseek-coder"]
+  "Grok": ["grok-beta", "grok-2-vision-beta", "grok-2-1212"],
+  "DeepSeek": ["deepseek-chat", "deepseek-coder", "deepseek-reasoner"]
 };
 
 const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: AIAgentFormProps) => {
@@ -390,7 +391,7 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
               </div>
             </div>
 
-            {/* ENHANCED: Test Script Button */}
+            {/* Test Script Button */}
             {initialAgentData && formData.name && selectedLLM && selectedModel && formData.apiKey && (
               <div className="pt-4 border-t border-gray-200">
                 <Button
@@ -398,8 +399,8 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
                   variant="outline"
                   className="w-full rounded-xl border-purple-300 text-purple-700 hover:bg-purple-100 transition-all duration-200"
                 >
-                  <Code className="w-4 h-4 mr-2" />
-                  View & Test ChatAI System Prompt
+                  <Code className="w-5 h-5 mr-2" />
+                  View & Test Agent Script
                 </Button>
               </div>
             )}
@@ -419,7 +420,7 @@ const AIAgentForm = ({ automationId, onClose, onAgentSaved, initialAgentData }: 
         </div>
       </div>
 
-      {/* ENHANCED: Test Script Modal */}
+      {/* Test Script Modal */}
       {showTestScriptModal && initialAgentData && (
         <AIAgentTestScriptModal
           isOpen={showTestScriptModal}

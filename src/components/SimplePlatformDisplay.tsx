@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ExternalLink, TestTube, Save, Eye, EyeOff, Code, Activity, Info } from "lucide-react";
+import { extractTestScript, injectCredentials } from "@/utils/platformTestScriptExtractor";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Platform {
   name: string;
@@ -52,25 +54,36 @@ const SimplePlatformDisplay = ({ platform, onClose }: SimplePlatformDisplayProps
   const handleTest = async () => {
     setIsLoading(true);
     setActiveTab('response');
-    console.log('🧪 Testing credentials with values:', credentialValues);
+    console.log('🧪 REAL TESTING: Using ChatAI configuration for', platform.name);
     
-    // Simulate test response
-    setTimeout(() => {
-      setTestResponse({
-        success: true,
-        message: `${platform.name} credentials tested successfully!`,
-        timestamp: new Date().toISOString(),
-        credentials_tested: Object.keys(credentialValues).length,
-        platform: platform.name,
-        status_code: 200,
-        response_data: {
-          user_id: "12345",
-          api_quota: "unlimited",
-          account_type: "premium"
+    try {
+      // CRITICAL FIX: Use real credential testing with ChatAI data
+      const { data: result, error } = await supabase.functions.invoke('test-platform-credentials', {
+        body: {
+          platformName: platform.name,
+          credentials: credentialValues,
+          testConfig: platform.testConfig,
+          test_payloads: platform.test_payloads,
+          chatai_data: platform.chatai_data
         }
       });
-      setIsLoading(false);
-    }, 2000);
+
+      if (error) {
+        throw error;
+      }
+
+      setTestResponse(result);
+    } catch (error: any) {
+      console.error('❌ Real testing failed:', error);
+      setTestResponse({
+        success: false,
+        message: `Testing failed: ${error.message}`,
+        error: error.message,
+        platform: platform.name
+      });
+    }
+    
+    setIsLoading(false);
   };
 
   const handleSave = () => {
@@ -78,38 +91,33 @@ const SimplePlatformDisplay = ({ platform, onClose }: SimplePlatformDisplayProps
     // TODO: Implement save functionality
   };
 
+  // ✅ CRITICAL FIX: Use ChatAI-generated test script instead of hardcoded
   const generateTestScript = () => {
-    const baseScript = `// ${platform.name} API Test Script
-const testConnection = async () => {
-  const config = {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-${platform.credentials?.map(cred => {
-  const value = credentialValues[cred.field] || `your_${cred.field}`;
-  if (cred.field.toLowerCase().includes('key') || cred.field.toLowerCase().includes('token')) {
-    return `      'Authorization': 'Bearer ${value}',`;
-  }
-  return `      '${cred.field}': '${value}',`;
-}).join('\n') || '      // Add your credentials here'}
+    console.log('🔧 GENERATING CHATAI SCRIPT for:', platform.name);
+    console.log('🔧 Using ChatAI data:', platform.chatai_data);
+    
+    try {
+      // Use the actual ChatAI test script extractor
+      const chatAIScript = extractTestScript(platform, credentialValues);
+      
+      // Inject credentials safely with masking
+      const finalScript = injectCredentials(chatAIScript, credentialValues);
+      
+      return finalScript;
+    } catch (error) {
+      console.error('❌ Failed to generate ChatAI script:', error);
+      
+      // Minimal fallback that still shows it's using ChatAI
+      return JSON.stringify({
+        platform: platform.name,
+        source: "ChatAI Generated Configuration",
+        error: "Failed to parse ChatAI data",
+        chatai_data_available: !!platform.chatai_data,
+        test_config_available: !!platform.testConfig,
+        credentials_required: platform.credentials.map(c => c.field),
+        note: "This should show rich ChatAI test configuration"
+      }, null, 2);
     }
-  };
-  
-  try {
-    const response = await fetch('${platform.chatai_data?.original_platform?.credential_link || 'https://api.' + platform.name.toLowerCase() + '.com/test'}', config);
-    const data = await response.json();
-    return { success: true, data };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-};
-
-// Execute test
-testConnection().then(result => {
-  console.log('Test Result:', result);
-});`;
-
-    return baseScript;
   };
 
   const isFormValid = platform.credentials?.every(cred => credentialValues[cred.field]) || false;
@@ -148,7 +156,7 @@ testConnection().then(result => {
             {showInfo && (
               <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200/50 backdrop-blur-sm">
                 <p className="text-sm text-blue-700 font-medium">
-                  These credentials authenticate with {platform.name}'s API. Your data is securely encrypted and only used for API connections.
+                  ✅ Using ChatAI-generated configuration for {platform.name}. Your data is securely encrypted and tested against real API endpoints.
                 </p>
               </div>
             )}
@@ -177,7 +185,7 @@ testConnection().then(result => {
                 }`}
               >
                 <Code className="w-4 h-4" />
-                Test Script
+                ChatAI Script
               </button>
               <button
                 onClick={() => setActiveTab('response')}
@@ -188,7 +196,7 @@ testConnection().then(result => {
                 }`}
               >
                 <Activity className="w-4 h-4" />
-                Response
+                Live Test
               </button>
             </div>
 
@@ -261,7 +269,7 @@ testConnection().then(result => {
                     className="flex-1 bg-gradient-to-r from-purple-500 via-blue-500 to-green-500 hover:from-purple-600 hover:via-blue-600 hover:to-green-600 text-white py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
                   >
                     <TestTube className="w-4 h-4 mr-2" />
-                    {isLoading ? 'Testing...' : 'Test Connection'}
+                    {isLoading ? 'Testing with ChatAI...' : 'Test with ChatAI Config'}
                   </Button>
                   
                   <Button
@@ -299,7 +307,7 @@ testConnection().then(result => {
                 ) : (
                   <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-8 text-center border border-gray-200/50">
                     <Activity className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-500 font-medium">No test response yet. Run a test to see results here.</p>
+                    <p className="text-gray-500 font-medium">No test response yet. Click "Test with ChatAI Config" to see live results here.</p>
                   </div>
                 )}
               </div>

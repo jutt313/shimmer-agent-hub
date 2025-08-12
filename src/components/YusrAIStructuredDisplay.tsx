@@ -1,10 +1,10 @@
-
 import React, { useState } from 'react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -19,6 +19,7 @@ import {
   TestTube
 } from 'lucide-react';
 import { YusrAIStructuredResponse } from '@/utils/jsonParser';
+import AIAgentTestScriptModal from './AIAgentTestScriptModal';
 
 // Extended interfaces to handle all field variations from different AI responses
 interface FlexiblePlatform {
@@ -98,6 +99,20 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
     pending_implementations: false
   });
 
+  const [testModalOpen, setTestModalOpen] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState<any>(null);
+  const [selectedLLMProvider, setSelectedLLMProvider] = useState('openai');
+  const [selectedModel, setSelectedModel] = useState('gpt-4o-mini');
+  const [apiKey, setApiKey] = useState('');
+
+  const llmProviders = [
+    { value: 'openai', label: 'OpenAI', models: ['gpt-4o', 'gpt-4o-mini'] },
+    { value: 'claude', label: 'Claude', models: ['claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307'] },
+    { value: 'gemini', label: 'Gemini', models: ['gemini-1.5-pro', 'gemini-1.5-flash'] },
+    { value: 'grok', label: 'Grok', models: ['grok-beta', 'grok-vision-beta'] },
+    { value: 'deepseek', label: 'DeepSeek', models: ['deepseek-chat', 'deepseek-coder'] }
+  ];
+
   React.useEffect(() => {
     console.log('🎯 YusrAI sections rendering with your consistent JSON data:', {
       hasSummary: !!data?.summary,
@@ -116,6 +131,11 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
       ...prev,
       [section]: !prev[section]
     }));
+  };
+
+  const handleTestAgent = (agent: any) => {
+    setSelectedAgent(agent);
+    setTestModalOpen(true);
   };
 
   const getStepDisplayText = (step: unknown, index: number): string => {
@@ -294,6 +314,15 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
                     <Bot className="w-4 h-4 text-pink-600" />
                     {agentName}
+                    <Button
+                      onClick={() => handleTestAgent(agent)}
+                      size="sm"
+                      variant="ghost"
+                      className="ml-auto p-1 h-8 w-8 hover:bg-pink-100"
+                      title="Test Agent Script"
+                    >
+                      <TestTube className="w-4 h-4 text-pink-600" />
+                    </Button>
                     <Badge variant="outline" className="text-xs">
                       {agentRole}
                     </Badge>
@@ -355,6 +384,39 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
                       <p className="text-gray-600 mt-1">
                         {agent.why_needed || (agent as any).purpose || (agent as any).description || 'Enhances automation intelligence'}
                       </p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                    <div className="text-xs">
+                      <span className="font-medium text-gray-700">LLM Provider:</span>
+                      <Select value={selectedLLMProvider} onValueChange={setSelectedLLMProvider}>
+                        <SelectTrigger className="w-full mt-1 h-8">
+                          <SelectValue placeholder="Select LLM Provider" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {llmProviders.map((provider) => (
+                            <SelectItem key={provider.value} value={provider.value}>
+                              {provider.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="text-xs">
+                      <span className="font-medium text-gray-700">Model:</span>
+                      <Select value={selectedModel} onValueChange={setSelectedModel}>
+                        <SelectTrigger className="w-full mt-1 h-8">
+                          <SelectValue placeholder="Select Model" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {llmProviders.find(p => p.value === selectedLLMProvider)?.models.map((model) => (
+                            <SelectItem key={model} value={model}>
+                              {model}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                   
@@ -514,6 +576,17 @@ const YusrAIStructuredDisplay: React.FC<YusrAIStructuredDisplayProps> = ({
             </Button>
           </div>
         </div>
+      )}
+
+      {selectedAgent && (
+        <AIAgentTestScriptModal
+          isOpen={testModalOpen}
+          onClose={() => setTestModalOpen(false)}
+          agentData={selectedAgent}
+          llmProvider={selectedLLMProvider}
+          model={selectedModel}
+          apiKey={apiKey}
+        />
       )}
     </div>
   );

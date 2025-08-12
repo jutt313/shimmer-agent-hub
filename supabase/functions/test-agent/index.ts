@@ -99,11 +99,46 @@ serve(async (req) => {
         };
         break;
 
+      case 'grok':
+      case 'xai':
+        apiUrl = 'https://api.x.ai/v1/chat/completions';
+        headers = {
+          'Authorization': `Bearer ${api_key}`,
+          'Content-Type': 'application/json',
+        };
+        requestBody = {
+          model: model,
+          messages: [
+            { role: 'system', content: system_prompt },
+            { role: 'user', content: test_prompt }
+          ],
+          max_tokens: 500,
+          temperature: 0.7
+        };
+        break;
+
+      case 'deepseek':
+        apiUrl = 'https://api.deepseek.com/v1/chat/completions';
+        headers = {
+          'Authorization': `Bearer ${api_key}`,
+          'Content-Type': 'application/json',
+        };
+        requestBody = {
+          model: model,
+          messages: [
+            { role: 'system', content: system_prompt },
+            { role: 'user', content: test_prompt }
+          ],
+          max_tokens: 500,
+          temperature: 0.7
+        };
+        break;
+
       default:
         return new Response(JSON.stringify({
           success: false,
           message: `Unsupported LLM provider: ${llm_provider}`,
-          details: { supported_providers: ['OpenAI', 'Claude', 'Gemini'] }
+          details: { supported_providers: ['OpenAI', 'Claude', 'Gemini', 'Grok', 'DeepSeek'] }
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400
@@ -141,6 +176,9 @@ serve(async (req) => {
     try {
       switch (llm_provider.toLowerCase()) {
         case 'openai':
+        case 'grok':
+        case 'xai':
+        case 'deepseek':
           agentResponse = responseData.choices[0]?.message?.content || 'No response generated';
           break;
 

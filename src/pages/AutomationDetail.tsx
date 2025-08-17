@@ -12,7 +12,7 @@ import AIAgentForm from "@/components/AIAgentForm";
 import FixedPlatformButtons from "@/components/FixedPlatformButtons";
 import BlueprintCard from "@/components/BlueprintCard";
 import AutomationDiagramDisplay from "@/components/AutomationDiagramDisplay";
-import AutomationExecutionPanel from "@/components/AutomationExecutionPanel";
+import ReadyForExecutionButton from "@/components/ReadyForExecutionButton";
 import { AutomationBlueprint } from "@/types/automation";
 import { parseStructuredResponse, parseYusrAIStructuredResponse, cleanDisplayText } from "@/utils/jsonParser";
 import { agentStateManager } from '@/utils/agentStateManager';
@@ -843,6 +843,14 @@ I want to understand the full impact of dismissing this agent and what my automa
           }}
           onAgentSaved={handleAgentSaved}
           initialAgentData={selectedAgent}
+        />
+      )}
+
+      {automation.automation_blueprint && (
+        <ReadyForExecutionButton
+          automationId={id!}
+          blueprint={automation.automation_blueprint}
+          title={automation.title}
         />
       )}
     </div>

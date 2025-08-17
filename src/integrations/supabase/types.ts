@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -403,6 +403,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "automation_diagrams_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_executions: {
+        Row: {
+          automation_id: string
+          created_at: string
+          execution_result: Json | null
+          generated_code: string | null
+          generation_timestamp: string | null
+          id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          automation_id: string
+          created_at?: string
+          execution_result?: Json | null
+          generated_code?: string | null
+          generation_timestamp?: string | null
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          automation_id?: string
+          created_at?: string
+          execution_result?: Json | null
+          generated_code?: string | null
+          generation_timestamp?: string | null
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_executions_automation_id_fkey"
             columns: ["automation_id"]
             isOneToOne: false
             referencedRelation: "automations"
@@ -1879,45 +1923,45 @@ export type Database = {
       }
       track_api_usage: {
         Args: {
-          p_user_id: string
           p_api_credential_id: string
-          p_project_id: string
+          p_cost_amount?: number
           p_endpoint: string
           p_method: string
-          p_tokens_used?: number
-          p_cost_amount?: number
+          p_project_id: string
           p_response_time_ms?: number
           p_status_code?: number
+          p_tokens_used?: number
+          p_user_id: string
         }
         Returns: undefined
       }
       validate_api_token: {
         Args: { token_hash: string }
         Returns: {
-          user_id: string
-          token_type: Database["public"]["Enums"]["api_token_type"]
-          permissions: Json
           is_valid: boolean
+          permissions: Json
+          token_type: Database["public"]["Enums"]["api_token_type"]
+          user_id: string
         }[]
       }
       validate_unified_api_key: {
         Args: { api_key: string }
         Returns: {
-          user_id: string
           credential_type: string
-          permissions: Json
           is_valid: boolean
+          permissions: Json
           rate_limit_per_hour: number
+          user_id: string
         }[]
       }
       validate_yusrai_api_key: {
         Args: { api_key: string }
         Returns: {
-          user_id: string
-          project_id: string
-          permissions: Json
           is_valid: boolean
+          permissions: Json
+          project_id: string
           rate_limit_per_hour: number
+          user_id: string
         }[]
       }
     }

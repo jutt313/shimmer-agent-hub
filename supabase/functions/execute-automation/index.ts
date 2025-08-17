@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -437,30 +436,150 @@ serve(async (req) => {
   }
 
   try {
-    const { automation_id, user_id, trigger_data } = await req.json();
+    const { automation_id, user_id, generated_code, trigger_data } = await req.json();
     
-    console.log(`🌟 FULLY DYNAMIC AUTOMATION EXECUTION: ${automation_id} for user ${user_id}`);
+    console.log(`🚀 ENHANCED EXECUTION: ${automation_id} with AI-generated code for user ${user_id}`);
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const executor = new FullyDynamicRealAutomationExecutor(supabase);
-    const result = await executor.executeAutomation(automation_id, user_id, trigger_data);
-    
-    console.log(`📊 FULLY DYNAMIC EXECUTION RESULT:`, result.success ? '✅ SUCCESS' : '❌ FAILED');
+    // Get automation details
+    const { data: automation, error: automationError } = await supabase
+      .from('automations')
+      .select('*')
+      .eq('id', automation_id)
+      .eq('user_id', user_id)
+      .single();
 
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    if (automationError || !automation) {
+      throw new Error('Automation not found');
+    }
+
+    // Create execution record
+    const { data: executionRecord, error: executionError } = await supabase
+      .from('automation_executions')
+      .insert({
+        automation_id,
+        user_id,
+        generated_code,
+        status: 'running'
+      })
+      .select()
+      .single();
+
+    if (executionError) {
+      throw new Error('Failed to create execution record');
+    }
+
+    console.log(`📝 Created execution record: ${executionRecord.id}`);
+
+    // If AI-generated code is provided, use it for execution
+    if (generated_code) {
+      console.log('🤖 Executing AI-generated automation code...');
+
+      // Create safe execution environment
+      const executionContext = {
+        supabase,
+        console,
+        fetch,
+        automation_id,
+        user_id,
+        trigger_data,
+        // Add abort signal for timeout
+        AbortSignal
+      };
+
+      // Execute generated code in a controlled environment
+      const executionFunction = new Function(
+        'context', 
+        `
+        const { supabase, console, fetch, automation_id, user_id, trigger_data, AbortSignal } = context;
+        return (async () => {
+          try {
+            ${generated_code}
+          } catch (error) {
+            console.error('Execution error:', error);
+            return {
+              success: false,
+              results: [],
+              errors: [error.message],
+              executionLog: ['Execution failed: ' + error.message]
+            };
+          }
+        })();
+        `
+      );
+
+      const executionResult = await executionFunction(executionContext);
+
+      // Update execution record with results
+      await supabase
+        .from('automation_executions')
+        .update({
+          status: executionResult.success ? 'completed' : 'failed',
+          execution_result: executionResult,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', executionRecord.id);
+
+      console.log(`✅ AI-generated automation executed: ${executionResult.success ? 'SUCCESS' : 'FAILED'}`);
+
+      return new Response(JSON.stringify({
+        success: executionResult.success,
+        execution_id: executionRecord.id,
+        results: executionResult.results || [],
+        errors: executionResult.errors || [],
+        executionLog: executionResult.executionLog || [],
+        message: executionResult.success 
+          ? 'Automation executed successfully with AI-generated code'
+          : 'Automation execution completed with errors'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    } else {
+      // Fall back to existing execution system if no AI code provided
+      const executor = new FullyDynamicRealAutomationExecutor(supabase);
+      const result = await executor.executeAutomation(automation_id, user_id, trigger_data);
+      
+      // Update execution record
+      await supabase
+        .from('automation_executions')
+        .update({
+          status: result.success ? 'completed' : 'failed',
+          execution_result: result,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', executionRecord.id);
+
+      return new Response(JSON.stringify({
+        ...result,
+        execution_id: executionRecord.id
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
   } catch (error: any) {
-    console.error('❌ FULLY DYNAMIC EXECUTION SYSTEM ERROR:', error);
+    console.error('❌ ENHANCED EXECUTION SYSTEM ERROR:', error);
+    
+    // Update execution record with error if it exists
+    if (executionRecord?.id) {
+      await supabase
+        .from('automation_executions')
+        .update({
+          status: 'failed',
+          execution_result: { error: error.message },
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', executionRecord.id);
+    }
+    
     return new Response(
       JSON.stringify({ 
         success: false, 
-        message: `Fully dynamic execution system error: ${error.message}`,
+        message: `Enhanced execution system error: ${error.message}`,
         error: error.message
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

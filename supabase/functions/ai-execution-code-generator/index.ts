@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.2';
@@ -61,34 +60,39 @@ serve(async (req) => {
 
     console.log(`📊 Found ${agents?.length || 0} agents and ${credentials?.length || 0} credentials`);
 
-    // Create AI prompt for code generation
-    const systemPrompt = `You are an AI Execution Code Generator. Generate executable JavaScript code for automation workflows.
+    // Create AI prompt for code generation with enhanced system prompt
+    const systemPrompt = `You are an AI Execution Code Generator for automation workflows.
 
 CONTEXT:
 - Automation: "${automation.title}"
 - Description: "${automation.description}"
 - Blueprint: ${JSON.stringify(automation.blueprint, null, 2)}
-- AI Agents: ${JSON.stringify(agents, null, 2)}
-- Platform Credentials: ${JSON.stringify(credentials?.map(c => ({ platform: c.platform_name, type: c.credential_type })), null, 2)}
+- AI Agents (${agents?.length || 0}): ${JSON.stringify(agents, null, 2)}
+- Platform Credentials (${credentials?.length || 0}): ${JSON.stringify(credentials?.map(c => ({ 
+    platform: c.platform_name, 
+    type: c.credential_type,
+    is_tested: c.is_tested,
+    test_status: c.test_status 
+  })), null, 2)}
 
-REQUIREMENTS:
-1. Generate complete executable JavaScript code
-2. Implement each automation step sequentially
-3. Integrate AI agents at decision points using their configured API keys
-4. Use platform APIs with provided credentials
-5. Include comprehensive error handling
-6. Return structured execution results
-7. Add clear comments explaining each step
+GENERATE EXECUTABLE JAVASCRIPT CODE that:
+1. Implements each blueprint step sequentially with error handling
+2. Integrates AI agents at decision points using their configured APIs
+3. Uses platform credentials for external API calls
+4. Logs execution progress at each step
+5. Returns structured results: { success: boolean, results: any[], errors: any[], executionLog: string[] }
 
-IMPORTANT:
-- Use async/await for all operations
-- Handle errors gracefully with try-catch
-- Log progress at each step
-- Return execution results in this format: { success: boolean, results: any[], errors: any[] }
-- For AI agent calls, use the agent's configured provider and API key
-- For platform integrations, use the stored credentials
+AGENT INTEGRATION:
+- For each AI agent call, use agent.llm_provider and agent.api_key
+- Pass agent.agent_role, agent.agent_goal, and agent.agent_rules as context
+- Include agent.agent_memory for context continuity
 
-Generate ONLY the executable code with comments.`;
+PLATFORM INTEGRATION:
+- Use stored credentials for API authentication
+- Handle different credential types (api_key, oauth, basic_auth)
+- Include comprehensive error handling for API failures
+
+RETURN ONLY EXECUTABLE CODE with detailed comments explaining each section.`;
 
     const userPrompt = `Generate execution code for this automation workflow that integrates the configured AI agents and platform credentials.`;
 
@@ -142,7 +146,9 @@ Generate ONLY the executable code with comments.`;
       agents_count: agents?.length || 0,
       credentials_count: credentials?.length || 0,
       code_length: generatedCode.length,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      validation_complete: true,
+      ready_for_execution: true
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

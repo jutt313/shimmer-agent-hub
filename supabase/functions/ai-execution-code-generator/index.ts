@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.2';
@@ -27,7 +28,7 @@ serve(async (req) => {
     // Get automation blueprint
     const { data: automation, error: automationError } = await supabase
       .from('automations')
-      .select('title, description, blueprint')
+      .select('title, description, automation_blueprint')
       .eq('id', automation_id)
       .eq('user_id', user_id)
       .single();
@@ -66,7 +67,7 @@ serve(async (req) => {
 CONTEXT:
 - Automation: "${automation.title}"
 - Description: "${automation.description}"
-- Blueprint: ${JSON.stringify(automation.blueprint, null, 2)}
+- Blueprint: ${JSON.stringify(automation.automation_blueprint, null, 2)}
 - AI Agents (${agents?.length || 0}): ${JSON.stringify(agents, null, 2)}
 - Platform Credentials (${credentials?.length || 0}): ${JSON.stringify(credentials?.map(c => ({ 
     platform: c.platform_name, 
@@ -91,6 +92,13 @@ PLATFORM INTEGRATION:
 - Use stored credentials for API authentication
 - Handle different credential types (api_key, oauth, basic_auth)
 - Include comprehensive error handling for API failures
+
+CRITICAL REQUIREMENTS:
+- ALWAYS return exactly this structure: { success: boolean, results: any[], errors: any[], executionLog: string[] }
+- Include detailed logging for each step
+- Handle all potential errors gracefully
+- Use real API endpoints based on the platform credentials provided
+- Make actual API calls using the fetch() function available in the context
 
 RETURN ONLY EXECUTABLE CODE with detailed comments explaining each section.`;
 

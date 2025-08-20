@@ -15,7 +15,7 @@ interface Automation {
   id: string;
   title: string;
   description: string;
-  automation_blueprint: AutomationBlueprint;
+  automation_blueprint: any; // Changed from AutomationBlueprint to any to handle Json type
   created_at: string;
   updated_at: string;
   user_id: string;
@@ -62,6 +62,9 @@ const AutomationDetail: React.FC = () => {
   if (!automation) {
     return <div>Automation not found.</div>;
   }
+
+  // Type cast the automation_blueprint when we need to use it as AutomationBlueprint
+  const blueprint = automation.automation_blueprint as AutomationBlueprint;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-6">
@@ -131,7 +134,7 @@ const AutomationDetail: React.FC = () => {
       {automation.automation_blueprint && (
         <ReadyForExecutionButton
           automationId={id!}
-          blueprint={automation.automation_blueprint}
+          blueprint={blueprint}
           title={automation.title}
         />
       )}

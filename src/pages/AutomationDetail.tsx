@@ -1,14 +1,25 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Automation } from '@/types/automation';
+import { AutomationBlueprint } from '@/types/automation';
 import { ArrowLeft, Bot, Settings, Network, MessageCircle, Activity } from 'lucide-react';
-import AIAgentSectionController from '@/components/AIAgentSectionController';
+import { Button } from '@/components/ui/button';
 import PlatformCredentialManager from '@/components/PlatformCredentialManager';
 import AutomationDiagramDisplay from '@/components/AutomationDiagramDisplay';
 import ChatCard from '@/components/ChatCard';
 import AutomationRunsMonitor from '@/components/AutomationRunsMonitor';
 import ReadyForExecutionButton from '@/components/ReadyForExecutionButton';
+
+interface Automation {
+  id: string;
+  title: string;
+  description: string;
+  automation_blueprint: AutomationBlueprint;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+}
 
 const AutomationDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -78,25 +89,11 @@ const AutomationDetail: React.FC = () => {
         {automation.automation_blueprint && (
           <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-white/50 p-6">
             <div className="flex items-center gap-2 mb-4">
-              <Bot className="h-5 w-5 text-purple-600" />
-              <h2 className="text-xl font-bold text-gray-900">AI Agent Configuration</h2>
-            </div>
-            <AIAgentSectionController 
-              automationId={id} 
-              blueprint={automation.automation_blueprint}
-            />
-          </div>
-        )}
-
-        {automation.automation_blueprint && (
-          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-white/50 p-6">
-            <div className="flex items-center gap-2 mb-4">
               <Settings className="h-5 w-5 text-blue-600" />
               <h2 className="text-xl font-bold text-gray-900">Platform Credentials</h2>
             </div>
             <PlatformCredentialManager 
-              automationId={id} 
-              blueprint={automation.automation_blueprint} 
+              onSave={(data) => console.log('Platform data saved:', data)}
             />
           </div>
         )}
@@ -107,10 +104,7 @@ const AutomationDetail: React.FC = () => {
               <Network className="h-5 w-5 text-green-600" />
               <h2 className="text-xl font-bold text-gray-900">Automation Flow</h2>
             </div>
-            <AutomationDiagramDisplay 
-              automationId={id} 
-              blueprint={automation.automation_blueprint} 
-            />
+            <AutomationDiagramDisplay />
           </div>
         )}
 
@@ -119,7 +113,10 @@ const AutomationDetail: React.FC = () => {
             <MessageCircle className="h-5 w-5 text-indigo-600" />
             <h2 className="text-xl font-bold text-gray-900">Chat with AI</h2>
           </div>
-          <ChatCard automationId={id} />
+          <ChatCard 
+            automationId={id!} 
+            messages={[]}
+          />
         </div>
 
         <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-white/50 p-6">
@@ -127,13 +124,13 @@ const AutomationDetail: React.FC = () => {
             <Activity className="h-5 w-5 text-orange-600" />
             <h2 className="text-xl font-bold text-gray-900">Execution History</h2>
           </div>
-          <AutomationRunsMonitor automationId={id} />
+          <AutomationRunsMonitor automationId={id!} />
         </div>
       </div>
 
       {automation.automation_blueprint && (
         <ReadyForExecutionButton
-          automationId={id}
+          automationId={id!}
           blueprint={automation.automation_blueprint}
           title={automation.title}
         />

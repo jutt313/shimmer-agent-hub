@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -408,7 +407,7 @@ Return ONLY the complete JSON configuration with NO text before or after.`,
     // Apply step parameters dynamically
     if (step.parameters) {
       Object.entries(step.parameters).forEach(([key, value]) => {
-        if (typeof value === 'string' && value.includes('{{')) {
+        if (typeof value === string && value.includes('{{')) {
           const placeholder = value.match(/\{\{(\w+)\}\}/);
           if (placeholder && data[placeholder[1]]) {
             body[key] = data[placeholder[1]];
@@ -436,8 +435,6 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  let executionRecord: any = null;
-
   try {
     const { automation_id, user_id, generated_code, trigger_data } = await req.json();
     
@@ -461,7 +458,7 @@ serve(async (req) => {
     }
 
     // Create execution record
-    const { data: newExecutionRecord, error: executionError } = await supabase
+    const { data: executionRecord, error: executionError } = await supabase
       .from('automation_executions')
       .insert({
         automation_id,
@@ -476,7 +473,6 @@ serve(async (req) => {
       throw new Error('Failed to create execution record');
     }
 
-    executionRecord = newExecutionRecord;
     console.log(`📝 Created execution record: ${executionRecord.id}`);
 
     // If AI-generated code is provided, use it for execution
@@ -570,23 +566,14 @@ serve(async (req) => {
     
     // Update execution record with error if it exists
     if (executionRecord?.id) {
-      try {
-        const supabase = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        );
-        
-        await supabase
-          .from('automation_executions')
-          .update({
-            status: 'failed',
-            execution_result: { error: error.message },
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', executionRecord.id);
-      } catch (updateError) {
-        console.error('Failed to update execution record with error:', updateError);
-      }
+      await supabase
+        .from('automation_executions')
+        .update({
+          status: 'failed',
+          execution_result: { error: error.message },
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', executionRecord.id);
     }
     
     return new Response(
